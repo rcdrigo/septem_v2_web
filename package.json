@@ -1,0 +1,33 @@
+{
+  "name": "septem-v2-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Frontend headless do Septem V2 — SGI multi-tenant para setor público",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "@bpmn-io/form-js": "^1.21.3",
+    "@bpmn-io/properties-panel": "^3.41.3",
+    "bpmn-js": "^18.16.1",
+    "bpmn-js-properties-panel": "^5.54.0",
+    "lucide-react": "^1.14.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-router-dom": "^7.15.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.4",
+    "@types/node": "^25.6.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.2.4",
+    "typescript": "~5.6.3",
+    "vite": "^6.0.0"
+  }
+}

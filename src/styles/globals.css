@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+/* bpmn-js core */
+@import "bpmn-js/dist/assets/diagram-js.css";
+@import "bpmn-js/dist/assets/bpmn-js.css";
+@import "bpmn-js/dist/assets/bpmn-font/css/bpmn.css";
+
+/* properties panel (compartilhado com bpmn-js-properties-panel) */
+@import "@bpmn-io/properties-panel/assets/properties-panel.css";
+
+/* form-js (editor) */
+@import "@bpmn-io/form-js/dist/assets/form-js.css";
+@import "@bpmn-io/form-js/dist/assets/form-js-base.css";
+@import "@bpmn-io/form-js/dist/assets/form-js-editor.css";
+@import "@bpmn-io/form-js/dist/assets/form-js-editor-base.css";
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Garante que canvases dos editores ocupem o container pai */
+.bjs-container,
+.djs-container,
+.fjs-container {
+  height: 100%;
+}
