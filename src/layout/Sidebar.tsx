@@ -1,12 +1,11 @@
 import { NavLink } from 'react-router-dom';
-import { Workflow, FormInput } from 'lucide-react';
+import { Workflow } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 type Item = { to: string; label: string; icon: LucideIcon };
 
 const items: Item[] = [
   { to: '/modelador', label: 'Modelador', icon: Workflow },
-  { to: '/formulario', label: 'Formulário', icon: FormInput },
 ];
 
 export function Sidebar() {
@@ -39,7 +38,7 @@ export function Sidebar() {
         </ul>
       </nav>
       <div className="border-t border-slate-200 px-4 py-3 text-xs text-slate-400">
-        Fase 1 — editores standalone
+        v0.1 — em desenvolvimento
       </div>
     </aside>
   );

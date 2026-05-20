@@ -1,10 +1,9 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import Modeler from 'bpmn-js/lib/Modeler';
-import {
-  BpmnPropertiesPanelModule,
-  BpmnPropertiesProviderModule,
-} from 'bpmn-js-properties-panel';
 import emptyDiagram from '@/assets/empty-diagram.bpmn?raw';
+import { SeptemPaletteModule } from './SeptemPaletteProvider';
+import septemModdle from './septem-moddle.json';
+import { useModeladorStore } from '@/stores/modelador';
 
 export type BpmnModelerHandle = {
   importXML: (xml: string) => Promise<void>;
@@ -12,16 +11,23 @@ export type BpmnModelerHandle = {
   reset: () => Promise<void>;
 };
 
-export const BpmnModeler = forwardRef<BpmnModelerHandle>((_, ref) => {
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const propertiesRef = useRef<HTMLDivElement>(null);
-  const modelerRef = useRef<any>(null);
+type Props = {
+  onReady?: (modeler: any) => void;
+};
 
-  /** Importa e enquadra o diagrama; ignora resultado se o modeler já foi destruído. */
+const STORAGE_KEY = 'septem.modelador.xml';
+const AUTOSAVE_DEBOUNCE_MS = 500;
+
+export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, ref) => {
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const modelerRef = useRef<any>(null);
+  const setXml = useModeladorStore((s) => s.setXml);
+  const setSelectedElementId = useModeladorStore((s) => s.setSelectedElementId);
+
   async function loadDiagram(modeler: any, xml: string) {
     try {
       await modeler.importXML(xml);
-      if (modelerRef.current !== modeler) return; // desmontado durante o await (StrictMode)
+      if (modelerRef.current !== modeler) return;
       modeler.get('canvas').zoom('fit-viewport', 'auto');
     } catch (err) {
       if (modelerRef.current === modeler) {
@@ -31,23 +37,55 @@ export const BpmnModeler = forwardRef<BpmnModelerHandle>((_, ref) => {
   }
 
   useEffect(() => {
-    if (!canvasRef.current || !propertiesRef.current) return;
+    if (!canvasRef.current) return;
 
     const modeler = new Modeler({
       container: canvasRef.current,
-      propertiesPanel: { parent: propertiesRef.current },
-      additionalModules: [BpmnPropertiesPanelModule, BpmnPropertiesProviderModule],
+      additionalModules: [SeptemPaletteModule],
+      moddleExtensions: { septem: septemModdle as any },
       keyboard: { bindTo: document },
     });
     modelerRef.current = modeler;
+    onReady?.(modeler);
 
-    void loadDiagram(modeler, emptyDiagram);
+    const stored = readStoredXml();
+    void loadDiagram(modeler, stored ?? emptyDiagram);
+
+    // Auto-save em localStorage + store, com debounce
+    let saveTimer: number | undefined;
+    const scheduleSave = () => {
+      window.clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(async () => {
+        try {
+          const { xml } = await modeler.saveXML({ format: true });
+          if (modelerRef.current !== modeler) return;
+          window.localStorage.setItem(STORAGE_KEY, xml as string);
+          setXml(xml as string);
+        } catch (err) {
+          console.warn('Auto-save falhou:', err);
+        }
+      }, AUTOSAVE_DEBOUNCE_MS);
+    };
+
+    const eventBus: any = modeler.get('eventBus');
+    const watchedEvents = ['commandStack.changed', 'elements.changed', 'shape.added', 'connection.added'];
+    watchedEvents.forEach((ev) => eventBus.on(ev, scheduleSave));
+
+    const onSelectionChanged = (e: any) => {
+      const sel = e.newSelection?.[0];
+      setSelectedElementId(sel ? sel.id : null);
+    };
+    eventBus.on('selection.changed', onSelectionChanged);
 
     return () => {
+      window.clearTimeout(saveTimer);
+      watchedEvents.forEach((ev) => eventBus.off(ev, scheduleSave));
+      eventBus.off('selection.changed', onSelectionChanged);
       modelerRef.current = null;
+      setSelectedElementId(null);
       modeler.destroy();
     };
-  }, []);
+  }, [onReady, setXml, setSelectedElementId]);
 
   useImperativeHandle(
     ref,
@@ -63,21 +101,22 @@ export const BpmnModeler = forwardRef<BpmnModelerHandle>((_, ref) => {
       },
       async reset() {
         if (!modelerRef.current) return;
+        window.localStorage.removeItem(STORAGE_KEY);
         await loadDiagram(modelerRef.current, emptyDiagram);
       },
     }),
     [],
   );
 
-  return (
-    <div className="flex flex-1 overflow-hidden">
-      <div ref={canvasRef} className="flex-1 bg-white" />
-      <div
-        ref={propertiesRef}
-        className="w-[360px] shrink-0 overflow-y-auto border-l border-slate-200 bg-slate-50"
-      />
-    </div>
-  );
+  return <div ref={canvasRef} className="flex-1 bg-white" />;
 });
 
 BpmnModeler.displayName = 'BpmnModeler';
+
+function readStoredXml(): string | null {
+  try {
+    return window.localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}

@@ -1,5 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { Toaster } from '@/components/ui/Toaster';
+import { ConfirmDialogHost } from '@/components/ui/ConfirmDialog';
 
 export function AppShell() {
   return (
@@ -8,6 +10,8 @@ export function AppShell() {
       <main className="flex flex-1 flex-col overflow-hidden">
         <Outlet />
       </main>
+      <Toaster />
+      <ConfirmDialogHost />
     </div>
   );
 }

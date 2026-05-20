@@ -1,0 +1,61 @@
+import { getExtensionConfig, setExtensionConfig } from './bpmn-helpers';
+import { getExtensionCollection, setExtensionCollection, type CollectionSchema } from './bpmn-arrays';
+
+export type GatewayConditionMode = 'button' | 'formValues' | 'else';
+
+export type ComparisonOperator = 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte' | 'contains' | 'startsWith';
+
+export const OPERATOR_OPTIONS: ReadonlyArray<{ value: ComparisonOperator; label: string }> = [
+  { value: 'eq', label: 'igual a' },
+  { value: 'neq', label: 'diferente de' },
+  { value: 'gt', label: 'maior que' },
+  { value: 'lt', label: 'menor que' },
+  { value: 'gte', label: 'maior ou igual a' },
+  { value: 'lte', label: 'menor ou igual a' },
+  { value: 'contains', label: 'contém' },
+  { value: 'startsWith', label: 'começa com' },
+];
+
+export type FormRule = {
+  fieldRef: string;
+  operator: ComparisonOperator;
+  value: string;
+};
+
+const RULES_SCHEMA: CollectionSchema = {
+  containerType: 'septem:GatewayCondition',
+  itemsProp: 'rules',
+  itemType: 'septem:FormRule',
+};
+
+const MODE_DEFAULTS = { mode: 'formValues' as GatewayConditionMode, buttonId: '' };
+
+export function getGatewayCondition(connection: any): {
+  mode: GatewayConditionMode;
+  buttonId: string;
+  rules: FormRule[];
+} {
+  const meta = getExtensionConfig(connection, 'septem:GatewayCondition', MODE_DEFAULTS);
+  const rules = getExtensionCollection(connection, RULES_SCHEMA, (raw) => ({
+    fieldRef: raw.fieldRef ?? '',
+    operator: (raw.operator as ComparisonOperator) ?? 'eq',
+    value: raw.value ?? '',
+  }));
+  return { mode: meta.mode, buttonId: meta.buttonId, rules };
+}
+
+export function setGatewayConditionMode(modeler: any, connection: any, mode: GatewayConditionMode) {
+  setExtensionConfig(modeler, connection, 'septem:GatewayCondition', { mode });
+  if (mode !== 'button') setExtensionConfig(modeler, connection, 'septem:GatewayCondition', { buttonId: '' });
+  if (mode !== 'formValues') setExtensionCollection(modeler, connection, RULES_SCHEMA, []);
+}
+
+export function setGatewayButton(modeler: any, connection: any, buttonId: string) {
+  setExtensionConfig(modeler, connection, 'septem:GatewayCondition', { buttonId, mode: 'button' });
+}
+
+export function setGatewayRules(modeler: any, connection: any, rules: FormRule[]) {
+  // garante o container e o atributo mode
+  setExtensionConfig(modeler, connection, 'septem:GatewayCondition', { mode: 'formValues' });
+  setExtensionCollection(modeler, connection, RULES_SCHEMA, rules);
+}

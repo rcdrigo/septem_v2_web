@@ -1,0 +1,61 @@
+import { getExtensionCollection, setExtensionCollection, type CollectionSchema } from './bpmn-arrays';
+
+export type ActionButton = {
+  id: string;
+  label: string;
+  primaryColor: string;
+  textColor: string;
+  validateForm: boolean;
+};
+
+const SCHEMA: CollectionSchema = {
+  containerType: 'septem:ActionButtons',
+  itemsProp: 'buttons',
+  itemType: 'septem:ActionButton',
+};
+
+const DEFAULTS: ActionButton = {
+  id: '',
+  label: '',
+  primaryColor: '#1e293b',
+  textColor: '#ffffff',
+  validateForm: true,
+};
+
+export function getActionButtons(element: any): ActionButton[] {
+  return getExtensionCollection(element, SCHEMA, (raw) => ({
+    id: raw.id ?? '',
+    label: raw.label ?? '',
+    primaryColor: raw.primaryColor ?? DEFAULTS.primaryColor,
+    textColor: raw.textColor ?? DEFAULTS.textColor,
+    validateForm: raw.validateForm ?? true,
+  }));
+}
+
+export function setActionButtons(modeler: any, element: any, buttons: ActionButton[]) {
+  setExtensionCollection(modeler, element, SCHEMA, buttons);
+}
+
+/**
+ * Varre o processo inteiro e retorna todos os botões de ação cadastrados,
+ * agrupados pela tarefa de origem. Usado pelo editor de condições do gateway
+ * para a opção "Botão de conclusão clicado".
+ */
+export function getAllProcessButtons(
+  modeler: any,
+): { ownerId: string; ownerLabel: string; buttons: ActionButton[] }[] {
+  if (!modeler) return [];
+  const registry: any = modeler.get('elementRegistry');
+  const out: { ownerId: string; ownerLabel: string; buttons: ActionButton[] }[] = [];
+  registry.forEach((el: any) => {
+    const buttons = getActionButtons(el);
+    if (buttons.length === 0) return;
+    const bo = el.businessObject;
+    out.push({
+      ownerId: bo.id,
+      ownerLabel: bo.name || bo.id,
+      buttons,
+    });
+  });
+  return out;
+}

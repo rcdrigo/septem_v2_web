@@ -1,7 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppShell } from './layout/AppShell';
-import { ModeladorPage } from './pages/ModeladorPage';
-import { FormularioPage } from './pages/FormularioPage';
+import { ModeladorPage } from './pages/modelador/ModeladorPage';
 
 export const router = createBrowserRouter(
   [
@@ -11,7 +10,6 @@ export const router = createBrowserRouter(
       children: [
         { index: true, element: <Navigate to="/modelador" replace /> },
         { path: 'modelador', element: <ModeladorPage /> },
-        { path: 'formulario', element: <FormularioPage /> },
       ],
     },
   ],
