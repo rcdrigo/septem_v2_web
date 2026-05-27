@@ -9,9 +9,17 @@ roteamento que sustentam todas as telas. Companion de:
 > menu existe; quase todas as telas por trás são *stubs* (`StubPage`). Preenchemos item a item.
 >
 > **Backend (2026-05-26):** B0–B1 inteiros concluídos em `septem_v2` (multi-tenant, auth,
-> RBAC, CRUDs de Configurações). **IF1.a entregue em 2026-05-26**: TanStack Query +
-> bootstrap real (`/api/tenant/config` + `/api/v1/me`), página `/login`, route guards,
-> logout real, branding do tenant. Mock removido. Falta IF1.b–e (telas reais dos CRUDs).
+> RBAC, CRUDs de Configurações). 28/28 testes.
+>
+> **IF1.a (2026-05-26)** — mock removido; bootstrap real (`/api/tenant/config` + `/api/v1/me`),
+> `lib/api.ts` (Bearer + refresh em 401 + `problem+json`), `/login`, route guards, logout
+> real, branding do tenant, TanStack Query.
+>
+> **IF1.b (2026-05-26)** — `/admin/usuarios` real (lista paginada + busca/status; criar com
+> senha inicial mostrada 1x; editar nome+status+perfis; soft-delete). Hooks em
+> `lib/api/users.ts` e `lib/api/access-profiles.ts`; componente `Dialog` reutilizável.
+>
+> **Falta IF1.c–e:** Unidades+Posições, Perfis (matriz de permissions), Logs, /me, /me/senha, Organograma, Personificar.
 
 ---
 
@@ -133,7 +141,7 @@ Fase = quando o item ganha backend real (ver `septem_v2/ROADMAP.md`).
 | Admin › Relatórios › Categorias | `/admin/relatorios/categorias` | stub | report-categories | 7 |
 | Admin › Relatórios › Dashboards | `/admin/dashboards` | stub | dashboards | 7 |
 | Admin › Config › Manuais | `/admin/manuais` | stub | manuals | 7 |
-| Admin › Config › Usuários | `/admin/usuarios` | stub | users | 2 |
+| Admin › Config › Usuários | `/admin/usuarios` | **✅ real (IF1.b)** | users | 2 |
 | Admin › Config › Unidades | `/admin/unidades` | stub | org-units | 2 |
 | Admin › Config › Posições | `/admin/posicoes` | stub | positions | 2 |
 | Admin › Config › Perfis de acesso | `/admin/perfis` | stub | access-profiles | 2 |
