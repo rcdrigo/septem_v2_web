@@ -3,6 +3,7 @@ import { AppShell } from './layout/AppShell';
 import { LoginPage } from './pages/LoginPage';
 import { ModeladorPage } from './pages/modelador/ModeladorPage';
 import { ProcessosPage } from './pages/processos/ProcessosPage';
+import { UsuariosPage } from './pages/admin/UsuariosPage';
 import { StubPage } from './pages/StubPage';
 
 /** Açúcar para registrar uma rota que ainda só tem placeholder. */
@@ -42,7 +43,7 @@ export const router = createBrowserRouter(
 
         // --- Admin › Configurações ----------------------------------------
         stub('admin/manuais', 'Manuais', { phase: 'Fase 7' }),
-        stub('admin/usuarios', 'Usuários', { phase: 'Fase 2' }),
+        { path: 'admin/usuarios', element: <UsuariosPage /> },
         stub('admin/unidades', 'Unidades organizacionais', { phase: 'Fase 2' }),
         stub('admin/posicoes', 'Posições', { phase: 'Fase 2' }),
         stub('admin/perfis', 'Perfis de acesso', { phase: 'Fase 2' }),
