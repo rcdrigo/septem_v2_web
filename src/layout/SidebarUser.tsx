@@ -2,12 +2,14 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronDown, KeyRound, LogOut, User } from 'lucide-react';
 import { Popover, MenuItem, MenuDivider } from '@/components/ui/Popover';
 import { useSessionStore } from '@/stores/session';
-import { toast } from '@/stores/toast';
 
 /** Bloco de identidade do usuário no topo da sidebar, com dropdown de conta. */
 export function SidebarUser() {
   const user = useSessionStore((s) => s.user);
+  const logout = useSessionStore((s) => s.logout);
   const navigate = useNavigate();
+
+  if (!user) return null;
 
   const initials = user.name
     .split(/\s+/)
@@ -46,7 +48,11 @@ export function SidebarUser() {
               <KeyRound size={15} /> Mudar senha
             </MenuItem>
             <MenuDivider />
-            <MenuItem destructive onClick={() => { close(); toast.info('Sessão encerrada (mock).'); }}>
+            <MenuItem destructive onClick={async () => {
+              close();
+              await logout();
+              navigate('/login', { replace: true });
+            }}>
               <LogOut size={15} /> Sair
             </MenuItem>
           </>

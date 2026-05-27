@@ -37,6 +37,15 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    // Em dev, `/api` aponta para o backend local (Septem.Api em :5000). O header
+    // `X-Tenant` injetado no cliente HTTP escolhe o tenant — não precisa mexer em
+    // /etc/hosts pra simular subdomínios.
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+    },
   },
   assetsInclude: ['**/*.bpmn'],
 });

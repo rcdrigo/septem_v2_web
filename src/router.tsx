@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom';
 import { AppShell } from './layout/AppShell';
+import { LoginPage } from './pages/LoginPage';
 import { ModeladorPage } from './pages/modelador/ModeladorPage';
 import { ProcessosPage } from './pages/processos/ProcessosPage';
 import { StubPage } from './pages/StubPage';
@@ -11,6 +12,7 @@ function stub(path: string, title: string, opts?: { phase?: string; hint?: strin
 
 export const router = createBrowserRouter(
   [
+    { path: '/login', element: <LoginPage /> },
     {
       path: '/',
       element: <AppShell />,

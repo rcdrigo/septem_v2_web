@@ -11,20 +11,21 @@ import { toast } from '@/stores/toast';
 export function Sidebar() {
   const session = useSessionStore();
   const tenant = session.tenant;
+  const tenantName = tenant?.clienteNome ?? 'Septem V2';
   const layout = MENU[session.effectiveMode()];
 
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
       {/* Logo do cliente */}
       <div className="flex items-center gap-2.5 border-b border-slate-200 px-4 py-3.5">
-        {tenant.logoUrl ? (
-          <img src={tenant.logoUrl} alt={tenant.name} className="h-8 w-auto" />
+        {tenant?.logoUrl ? (
+          <img src={tenant.logoUrl} alt={tenantName} className="h-8 w-auto" />
         ) : (
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-900 text-sm font-bold text-white">
-            {tenant.name[0]}
+            {tenantName[0]}
           </div>
         )}
-        <span className="truncate text-sm font-semibold tracking-tight text-slate-900">{tenant.name}</span>
+        <span className="truncate text-sm font-semibold tracking-tight text-slate-900">{tenantName}</span>
       </div>
 
       {/* Usuário + tipo de acesso */}

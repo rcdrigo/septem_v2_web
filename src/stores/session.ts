@@ -1,68 +1,150 @@
 import { create } from 'zustand';
+import { api, configureApi } from '@/lib/api';
 
 /**
- * Sessão do usuário logado + contexto de navegação.
- *
- * Hoje é MOCK — substituir por dados de `GET /api/v1/me` + `/api/tenant/config`
- * quando a Fase 2 (auth/tenant) existir. A forma do `SessionUser` já antecipa o
- * que o backend vai devolver (nome, perms[], flags), então o restante do app pode
- * consumir `useSessionStore` sem saber que ainda é mock.
+ * Sessão real do app — substitui o mock anterior do B0/B1 do frontend.
+ * Tokens persistidos em <c>localStorage</c> sobrevivem a F5; `bootstrap()`
+ * é chamado no AppShell e popula tenant + user a partir do backend.
  */
 
 export type AccessMode = 'interno' | 'externo';
 
 export type SessionUser = {
+  id: string;
   name: string;
   email: string;
-  /** Funcionário interno pode alternar entre layout interno e externo.
-   *  Usuário externo (auto-cadastro) fica travado no layout externo. */
   isInternal: boolean;
-  /** Permissões efetivas. `*` = tudo (admin). Dirige a visibilidade do menu. */
   perms: string[];
-  /** Dashboard só aparece no menu se o usuário tiver um configurado. */
   hasDashboard: boolean;
+  accessProfiles: { id: string; name: string }[];
 };
 
 export type Tenant = {
-  name: string;
-  /** URL do logo do cliente (branding). Quando ausente, usa-se o nome. */
+  tenantId: string;
+  clienteNome: string;
+  ambienteNome: string;
   logoUrl?: string;
+  primaryColor: string;
+  modulos: string[];
 };
 
-export type SessionState = {
-  user: SessionUser;
-  tenant: Tenant;
+export type SessionStatus = 'idle' | 'booting' | 'unauthenticated' | 'authenticated' | 'error';
+
+type SessionState = {
+  status: SessionStatus;
+  error?: string;
+  user: SessionUser | null;
+  tenant: Tenant | null;
+  accessToken: string | null;
+  refreshToken: string | null;
   accessMode: AccessMode;
+  bootstrap: () => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  refresh: () => Promise<string | null>;
+  logout: () => Promise<void>;
   setAccessMode: (mode: AccessMode) => void;
-  /** Modo efetivo: externo é forçado para quem não é interno. */
   effectiveMode: () => AccessMode;
-  /** Checa permissão; sem `perm` informado, sempre libera. */
   can: (perm?: string) => boolean;
 };
 
-// --- MOCK (remover na Fase 2) -------------------------------------------------
-const MOCK_USER: SessionUser = {
-  name: 'Rodrigo Araújo',
-  email: 'rodrigo@prefeitura.gov.br',
-  isInternal: true,
-  hasDashboard: true,
-  perms: ['*'],
+const ACCESS_KEY = 'septem.accessToken';
+const REFRESH_KEY = 'septem.refreshToken';
+
+type TokenResponse = {
+  accessToken: string;
+  refreshToken: string;
+  accessExpiresAt: string;
+  refreshExpiresAt: string;
 };
 
-const MOCK_TENANT: Tenant = {
-  name: 'Prefeitura de Exemplo',
+type MeResponse = {
+  id: string;
+  name: string;
+  email: string;
+  isInternal: boolean;
+  hasDashboard: boolean;
+  perms: string[];
+  accessProfiles: { id: string; name: string }[];
 };
-// -----------------------------------------------------------------------------
 
 export const useSessionStore = create<SessionState>((set, get) => ({
-  user: MOCK_USER,
-  tenant: MOCK_TENANT,
+  status: 'idle',
+  user: null,
+  tenant: null,
+  accessToken: localStorage.getItem(ACCESS_KEY),
+  refreshToken: localStorage.getItem(REFRESH_KEY),
   accessMode: 'interno',
+
+  bootstrap: async () => {
+    set({ status: 'booting', error: undefined });
+    try {
+      // /tenant/config é não-autenticado — sempre tenta.
+      const tenant = await api.get<Tenant>('/api/tenant/config', { anonymous: true });
+      if (!get().accessToken) {
+        set({ status: 'unauthenticated', tenant });
+        return;
+      }
+      const user = await api.get<MeResponse>('/api/v1/me');
+      set({ status: 'authenticated', tenant, user });
+    } catch (err) {
+      // Token expirado / inválido sem refresh válido → cai pra unauthenticated.
+      const tenant = get().tenant;
+      set({ status: tenant ? 'unauthenticated' : 'error', error: (err as Error).message });
+    }
+  },
+
+  login: async (email, password) => {
+    const tokens = await api.post<TokenResponse>('/api/v1/auth/login', { email, password }, { anonymous: true });
+    localStorage.setItem(ACCESS_KEY, tokens.accessToken);
+    localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
+    set({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
+
+    const user = await api.get<MeResponse>('/api/v1/me');
+    set({ status: 'authenticated', user });
+  },
+
+  refresh: async () => {
+    const refreshToken = get().refreshToken;
+    if (!refreshToken) return null;
+    try {
+      const tokens = await api.post<TokenResponse>('/api/v1/auth/refresh', { refreshToken }, { anonymous: true, skipRefresh: true });
+      localStorage.setItem(ACCESS_KEY, tokens.accessToken);
+      localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
+      set({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
+      return tokens.accessToken;
+    } catch {
+      return null;
+    }
+  },
+
+  logout: async () => {
+    const refreshToken = get().refreshToken;
+    try {
+      if (refreshToken)
+        await api.post('/api/v1/auth/logout', { refreshToken }, { anonymous: true, skipRefresh: true });
+    } catch {
+      // best-effort
+    }
+    localStorage.removeItem(ACCESS_KEY);
+    localStorage.removeItem(REFRESH_KEY);
+    set({ accessToken: null, refreshToken: null, user: null, status: 'unauthenticated' });
+  },
+
   setAccessMode: (mode) => set({ accessMode: mode }),
-  effectiveMode: () => (get().user.isInternal ? get().accessMode : 'externo'),
+  effectiveMode: () => (get().user?.isInternal ? get().accessMode : 'externo'),
   can: (perm) => {
     if (!perm) return true;
-    const { perms } = get().user;
+    const perms = get().user?.perms ?? [];
     return perms.includes('*') || perms.includes(perm);
   },
 }));
+
+// Liga o api.ts à store para token + refresh + logout (quebra ciclo de import).
+configureApi({
+  getAccessToken: () => useSessionStore.getState().accessToken,
+  refresh: () => useSessionStore.getState().refresh(),
+  logout: () => useSessionStore.getState().logout(),
+});
+
+/** Para componentes que ainda precisam do tipo legado (compatibilidade). */
+export type { SessionState };

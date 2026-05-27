@@ -8,9 +8,10 @@ roteamento que sustentam todas as telas. Companion de:
 > **Estado em 2026-05-20:** shell completo e navegável (build verde). Toda a árvore do
 > menu existe; quase todas as telas por trás são *stubs* (`StubPage`). Preenchemos item a item.
 >
-> **Backend (2026-05-21):** B0 (scaffold .NET 10) concluído em `septem_v2`. O próximo passo
-> que destrava a sessão real e o gating por permissão é o **B1** (multi-tenant + auth + RBAC).
-> A integração frontend correspondente está em `septem_v2/BACKEND_PLAN.md` (seções IF0–IF5).
+> **Backend (2026-05-26):** B0–B1 inteiros concluídos em `septem_v2` (multi-tenant, auth,
+> RBAC, CRUDs de Configurações). **IF1.a entregue em 2026-05-26**: TanStack Query +
+> bootstrap real (`/api/tenant/config` + `/api/v1/me`), página `/login`, route guards,
+> logout real, branding do tenant. Mock removido. Falta IF1.b–e (telas reais dos CRUDs).
 
 ---
 

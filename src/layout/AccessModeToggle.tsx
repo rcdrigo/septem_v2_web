@@ -7,7 +7,7 @@ import { useSessionStore, type AccessMode } from '@/stores/session';
  * (funcionários) — externos (auto-cadastro) ficam travados no modo externo.
  */
 export function AccessModeToggle() {
-  const isInternal = useSessionStore((s) => s.user.isInternal);
+  const isInternal = useSessionStore((s) => s.user?.isInternal ?? false);
   const accessMode = useSessionStore((s) => s.accessMode);
   const setAccessMode = useSessionStore((s) => s.setAccessMode);
   const navigate = useNavigate();

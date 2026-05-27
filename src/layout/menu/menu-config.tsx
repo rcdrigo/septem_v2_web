@@ -43,7 +43,7 @@ export const MENU: MenuByMode = {
             label: 'Dashboard',
             to: '/dashboard',
             icon: LayoutDashboard,
-            visible: (s) => s.user.hasDashboard,
+            visible: (s) => s.user?.hasDashboard ?? false,
           },
           { kind: 'link', label: 'Serviços', to: '/servicos', icon: LayoutGrid },
           { kind: 'link', label: 'Tarefas executadas', to: '/tarefas', icon: ClipboardCheck },
