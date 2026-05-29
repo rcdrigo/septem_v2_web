@@ -1,0 +1,37 @@
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+
+/**
+ * Catálogos que populam os combos do modelador (B2 §4.7). Fontes de dados e
+ * templates de e-mail ainda são stubs vazios no backend até seus módulos existirem.
+ */
+
+export type Category = { id: number; name: string; description: string | null; color: string | null; icon: string | null };
+export type Area = { id: string; key: string; name: string; active: boolean };
+export type AreaPosition = { id: string; key: string; name: string };
+export type DataSource = { id: string; name: string };
+export type EmailTemplate = { id: string; name: string };
+
+export function useCategories() {
+  return useQuery({ queryKey: ['catalog', 'categories'], queryFn: () => api.get<Category[]>('/api/v1/categories') });
+}
+
+export function useAreas() {
+  return useQuery({ queryKey: ['catalog', 'areas'], queryFn: () => api.get<Area[]>('/api/v1/areas') });
+}
+
+export function useAreaPositions(areaKey: string | null) {
+  return useQuery({
+    queryKey: ['catalog', 'areas', areaKey, 'positions'],
+    queryFn: () => api.get<AreaPosition[]>(`/api/v1/areas/${areaKey}/positions`),
+    enabled: !!areaKey,
+  });
+}
+
+export function useDataSources() {
+  return useQuery({ queryKey: ['catalog', 'data-sources'], queryFn: () => api.get<DataSource[]>('/api/v1/data-sources') });
+}
+
+export function useEmailTemplates() {
+  return useQuery({ queryKey: ['catalog', 'email-templates'], queryFn: () => api.get<EmailTemplate[]>('/api/v1/email-templates') });
+}

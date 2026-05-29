@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ModeladorNavbar, type RecursosHandlers } from '@/components/modelador/ModeladorNavbar';
 import { FluxoView } from '@/components/modelador/views/FluxoView';
 import { FormularioView } from '@/components/modelador/views/FormularioView';
@@ -10,6 +11,8 @@ import { useProcessNameSync } from '@/lib/useProcessNameSync';
 import { useKeyboardShortcuts } from '@/lib/useKeyboardShortcuts';
 import { exportBpmn, exportPng, importBpmn } from '@/lib/recursos';
 import { toast } from '@/stores/toast';
+import { ApiError } from '@/lib/api';
+import { useProcessDefinition, useSaveProcess, usePatchProcessStatus } from '@/lib/api/process-definitions';
 import type { BpmnModelerHandle } from '@/components/bpmn/BpmnModeler';
 
 /**
@@ -28,6 +31,57 @@ export function ModeladorPage() {
 
   const onReady = useCallback((m: any) => setModeler(m), []);
   useProcessNameSync(modeler);
+
+  // ── Persistência no backend (IF2) ──────────────────────────────────
+  const [searchParams, setSearchParams] = useSearchParams();
+  const key = searchParams.get('key');
+  const detail = useProcessDefinition(key);
+  const saveMut = useSaveProcess();
+  const patchMut = usePatchProcessStatus();
+  const loadedKeyRef = useRef<string | null>(null);
+
+  // Carrega o XML do processo existente no modeler quando ele e o fetch estão prontos.
+  useEffect(() => {
+    if (!modeler || !key || !detail.data) return;
+    if (loadedKeyRef.current === key) return;
+    loadedKeyRef.current = key;
+    void modelerHandleRef.current?.importXML(detail.data.bpmnXml);
+  }, [modeler, key, detail.data]);
+
+  async function persist(publish: boolean) {
+    if (!modeler) return;
+    try {
+      const { xml } = await modeler.saveXML({ format: true });
+      const saved = await saveMut.mutateAsync({ bpmnXml: xml as string, key: key ?? undefined });
+      if (publish) await patchMut.mutateAsync({ key: saved.key, status: 'published' });
+
+      const warns = saved.warnings?.length ?? 0;
+      const suffix = warns ? ` (${warns} aviso${warns === 1 ? '' : 's'})` : '';
+      toast.success((publish ? `Publicado v${saved.version}` : `Rascunho salvo v${saved.version}`) + suffix);
+
+      if (key !== saved.key) {
+        loadedKeyRef.current = saved.key; // não re-importar o que acabamos de salvar
+        setSearchParams({ key: saved.key }, { replace: true });
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 422) {
+        const issues = Array.isArray(err.issues) ? (err.issues as { message: string }[]) : [];
+        toast.error(issues[0]?.message ?? 'Diagrama inválido. Corrija os apontamentos do lint.');
+      } else if (err instanceof ApiError && err.status === 403) {
+        toast.error('Você não tem permissão para publicar processos.');
+      } else if (err instanceof ApiError && err.status === 409) {
+        toast.error(err.message);
+      } else {
+        toast.error('Não foi possível salvar o processo.');
+      }
+    }
+  }
+
+  const persistence = {
+    onSave: () => void persist(false),
+    onPublish: () => void persist(true),
+    saving: saveMut.isPending || patchMut.isPending,
+  };
 
   const recursos: RecursosHandlers = {
     onImport: () => {
@@ -69,7 +123,7 @@ export function ModeladorPage() {
 
   return (
     <div className="flex h-full flex-1 flex-col overflow-hidden">
-      <ModeladorNavbar recursos={recursos} modeler={modeler} />
+      <ModeladorNavbar recursos={recursos} modeler={modeler} persistence={persistence} />
       <div className="relative flex flex-1 overflow-hidden">
         {/*
           O FluxoView fica SEMPRE montado (oculto via `hidden`) — desmontar/remontar

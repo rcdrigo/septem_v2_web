@@ -114,5 +114,7 @@ export const api = {
     apiFetch<T>(path, { method: 'POST', body: body !== undefined ? JSON.stringify(body) : undefined, ...opts }),
   put: <T = unknown>(path: string, body?: unknown, opts?: ApiOptions) =>
     apiFetch<T>(path, { method: 'PUT', body: body !== undefined ? JSON.stringify(body) : undefined, ...opts }),
+  patch: <T = unknown>(path: string, body?: unknown, opts?: ApiOptions) =>
+    apiFetch<T>(path, { method: 'PATCH', body: body !== undefined ? JSON.stringify(body) : undefined, ...opts }),
   del: <T = unknown>(path: string, opts?: ApiOptions) => apiFetch<T>(path, { method: 'DELETE', ...opts }),
 };

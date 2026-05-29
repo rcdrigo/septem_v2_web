@@ -10,6 +10,8 @@ import {
   Download,
   Image as ImageIcon,
   ChevronDown,
+  Save,
+  Send,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useModeladorStore, type ModeladorView } from '@/stores/modelador';
@@ -31,9 +33,17 @@ export type RecursosHandlers = {
   onExportPng: () => void;
 };
 
+/** Persistência no backend (IF2): salvar rascunho e publicar. */
+export type PersistenceHandlers = {
+  onSave: () => void;
+  onPublish: () => void;
+  saving: boolean;
+};
+
 type Props = {
   recursos: RecursosHandlers;
   modeler: any | null;
+  persistence?: PersistenceHandlers;
 };
 
 /**
@@ -44,7 +54,7 @@ type Props = {
  * Espelha a toolbar do `Designer.ascx/Designer2.ascx` do ZEEV, mas com paleta
  * reduzida e menus enxutos.
  */
-export function ModeladorNavbar({ recursos, modeler }: Props) {
+export function ModeladorNavbar({ recursos, modeler, persistence }: Props) {
   const processName = useModeladorStore((s) => s.processName);
   const setProcessName = useModeladorStore((s) => s.setProcessName);
   const currentView = useModeladorStore((s) => s.currentView);
@@ -166,6 +176,30 @@ export function ModeladorNavbar({ recursos, modeler }: Props) {
             </>
           )}
         </Popover>
+
+        {persistence && (
+          <>
+            <span className="mx-1 h-5 w-px bg-slate-200" />
+            <button
+              type="button"
+              onClick={persistence.onSave}
+              disabled={persistence.saving}
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-50"
+            >
+              <Save size={16} />
+              Salvar
+            </button>
+            <button
+              type="button"
+              onClick={persistence.onPublish}
+              disabled={persistence.saving}
+              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+            >
+              <Send size={16} />
+              Publicar
+            </button>
+          </>
+        )}
       </nav>
     </header>
   );
