@@ -100,11 +100,22 @@ export function useProcessDiagnostics(key: string | null) {
   });
 }
 
+/** POST = cria uma NOVA versão (ação "Versionar" / primeiro save). */
 export function useSaveProcess() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: { bpmnXml: string; key?: string; commitMessage?: string }) =>
       api.post<SavedProcess>(`${BASE}/`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: processKeys.all }),
+  });
+}
+
+/** PUT = atualiza a versão corrente NO LUGAR (ação "Salvar"). 409 se publicada. */
+export function useUpdateProcess() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, bpmnXml }: { key: string; bpmnXml: string }) =>
+      api.put<SavedProcess>(`${BASE}/${key}`, { bpmnXml }),
     onSuccess: () => qc.invalidateQueries({ queryKey: processKeys.all }),
   });
 }

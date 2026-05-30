@@ -2,10 +2,8 @@ import { downloadText, readTextFile } from './download';
 
 /**
  * Ações da navbar "Recursos". Cada função opera sobre o modeler do bpmn-js
- * e devolve uma Promise resolvida quando a ação terminou.
- *
- * Espelha os itens do dropdown "Exportar" do `Designer2.ascx` do ZEEV
- * (BPMN/PNG/SVG) — aqui mantemos BPMN+PNG conforme spec.
+ * e devolve uma Promise resolvida quando a ação terminou. Exporta o fluxo em
+ * BPMN e como imagem PNG.
  */
 
 export async function exportBpmn(modeler: any, filename: string) {

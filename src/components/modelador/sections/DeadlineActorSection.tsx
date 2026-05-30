@@ -1,5 +1,6 @@
-import { Checkbox, Field, RadioGroup, Section, TextInput } from '@/components/ui/Field';
+import { Checkbox, Field, RadioGroup, Section, Select, TextInput, type SelectOption } from '@/components/ui/Field';
 import { useExtensionState } from '@/lib/useExtensionState';
+import { useAreas, useAreaPositions } from '@/lib/api/catalog';
 import { DeadlineAlertsEditor } from '../editors/DeadlineAlertsEditor';
 
 type Props = {
@@ -48,7 +49,7 @@ const ACTOR_OPTIONS = [
 
 /**
  * Seção "Responsáveis e prazos" — exclusiva de tarefa humana.
- * Espelha o bloco `ConfigTaskGeneral` (`inpStBusinessHour`, mails, `inpStRequester` etc.).
+ * Define horário de expediente, e-mails de notificação, requisitante e demais responsáveis.
  *
  * O cronograma detalhado de alertas (único / repetido / após X dias / faltando X horas)
  * fica como placeholder até a Fase 4.2.
@@ -56,6 +57,22 @@ const ACTOR_OPTIONS = [
 export function DeadlineActorSection({ modeler, element }: Props) {
   const actor = useExtensionState(modeler, element, 'septem:ActorConfig', ACTOR_DEFAULTS);
   const deadline = useExtensionState(modeler, element, 'septem:DeadlineConfig', DEADLINE_DEFAULTS);
+
+  // Catálogos remotos (B1.5): área = org_unit.key, posição = position.key — é o que
+  // o backend resolve para FK no save. Posições dependem da área selecionada.
+  const isAreaPosition = actor.state.actorType === 'areaPosition';
+  const areas = useAreas();
+  const positions = useAreaPositions(isAreaPosition && actor.state.areaId ? actor.state.areaId : null);
+
+  // Mantém valores legados (refs digitados antes do catálogo) visíveis no select.
+  const areaOptions = withFallback(
+    (areas.data ?? []).map((a) => ({ value: a.key, label: a.name })),
+    actor.state.areaId,
+  );
+  const positionOptions = withFallback(
+    (positions.data ?? []).map((p) => ({ value: p.key, label: p.name })),
+    actor.state.positionId,
+  );
 
   return (
     <Section title="Responsáveis e prazos">
@@ -93,22 +110,28 @@ export function DeadlineActorSection({ modeler, element }: Props) {
         />
       </Field>
 
-      {actor.state.actorType === 'areaPosition' && (
+      {isAreaPosition && (
         <div className="grid grid-cols-2 gap-2">
           <Field label="Área">
-            <TextInput
+            <Select
               value={actor.state.areaId}
-              onChange={(e) => actor.update({ areaId: e.target.value })}
-              onBlur={() => actor.commit('areaId')}
-              placeholder="ID da área"
+              options={areaOptions}
+              placeholder={areas.isLoading ? 'Carregando…' : 'Selecione a área'}
+              disabled={areas.isLoading}
+              onChange={(e) => actor.flush({ areaId: e.target.value, positionId: '' })}
             />
           </Field>
           <Field label="Posição">
-            <TextInput
+            <Select
               value={actor.state.positionId}
-              onChange={(e) => actor.update({ positionId: e.target.value })}
-              onBlur={() => actor.commit('positionId')}
-              placeholder="ID da posição"
+              options={positionOptions}
+              placeholder={
+                !actor.state.areaId ? 'Escolha a área primeiro'
+                : positions.isLoading ? 'Carregando…'
+                : 'Selecione a posição'
+              }
+              disabled={!actor.state.areaId || positions.isLoading}
+              onChange={(e) => actor.flush({ positionId: e.target.value })}
             />
           </Field>
         </div>
@@ -159,4 +182,11 @@ export function DeadlineActorSection({ modeler, element }: Props) {
       </div>
     </Section>
   );
+}
+
+/** Garante que um valor já gravado (ref legado/fora do catálogo) continue selecionável. */
+function withFallback(options: SelectOption[], value: string): SelectOption[] {
+  if (value && !options.some((o) => o.value === value))
+    return [{ value, label: value }, ...options];
+  return options;
 }

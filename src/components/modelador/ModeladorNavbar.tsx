@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Save,
   Send,
+  GitBranch,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useModeladorStore, type ModeladorView } from '@/stores/modelador';
@@ -33,11 +34,14 @@ export type RecursosHandlers = {
   onExportPng: () => void;
 };
 
-/** Persistência no backend (IF2): salvar rascunho e publicar. */
+/** Persistência no backend (IF2): salvar no lugar, versionar e publicar. */
 export type PersistenceHandlers = {
   onSave: () => void;
+  onVersion: () => void;
   onPublish: () => void;
   saving: boolean;
+  /** Há alterações no fluxo ainda não salvas no servidor. */
+  dirty: boolean;
 };
 
 type Props = {
@@ -49,10 +53,7 @@ type Props = {
 /**
  * Barra superior do modelador. Tem 3 zonas:
  *  - Esquerda: nome do processo (clique para renomear; sincronizado com `bpmn:Process.name`)
- *  - Centro/Direita: 4 botões de view + dropdown "Recursos"
- *
- * Espelha a toolbar do `Designer.ascx/Designer2.ascx` do ZEEV, mas com paleta
- * reduzida e menus enxutos.
+ *  - Centro/Direita: 4 botões de view + dropdown "Recursos" + Salvar/Publicar
  */
 export function ModeladorNavbar({ recursos, modeler, persistence }: Props) {
   const processName = useModeladorStore((s) => s.processName);
@@ -173,6 +174,20 @@ export function ModeladorNavbar({ recursos, modeler, persistence }: Props) {
                 <ImageIcon size={14} />
                 Salvar como imagem (PNG)
               </MenuItem>
+              {persistence && (
+                <>
+                  <div className="my-1 h-px bg-slate-200" />
+                  <MenuItem
+                    onClick={() => {
+                      close();
+                      persistence.onVersion();
+                    }}
+                  >
+                    <GitBranch size={14} />
+                    Versionar processo
+                  </MenuItem>
+                </>
+              )}
             </>
           )}
         </Popover>
@@ -180,11 +195,20 @@ export function ModeladorNavbar({ recursos, modeler, persistence }: Props) {
         {persistence && (
           <>
             <span className="mx-1 h-5 w-px bg-slate-200" />
+            {persistence.dirty && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600" title="Há alterações no fluxo ainda não salvas">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                Alterações pendentes
+              </span>
+            )}
             <button
               type="button"
               onClick={persistence.onSave}
               disabled={persistence.saving}
-              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-50"
+              className={[
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50',
+                persistence.dirty ? 'bg-amber-100 text-amber-800 hover:bg-amber-200' : 'text-slate-700 hover:bg-slate-100',
+              ].join(' ')}
             >
               <Save size={16} />
               Salvar
