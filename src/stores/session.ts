@@ -38,8 +38,11 @@ type SessionState = {
   accessToken: string | null;
   refreshToken: string | null;
   accessMode: AccessMode;
+  /** Sessão atual é uma personificação (admin agindo como outro usuário). */
+  isImpersonating: boolean;
   bootstrap: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
+  impersonate: (userId: string) => Promise<void>;
   refresh: () => Promise<string | null>;
   logout: () => Promise<void>;
   setAccessMode: (mode: AccessMode) => void;
@@ -74,6 +77,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   accessToken: localStorage.getItem(ACCESS_KEY),
   refreshToken: localStorage.getItem(REFRESH_KEY),
   accessMode: 'interno',
+  isImpersonating: false,
 
   bootstrap: async () => {
     set({ status: 'booting', error: undefined });
@@ -103,6 +107,16 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ status: 'authenticated', user });
   },
 
+  impersonate: async (userId) => {
+    const tokens = await api.post<TokenResponse>(`/api/v1/impersonate/${userId}`);
+    localStorage.setItem(ACCESS_KEY, tokens.accessToken);
+    localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
+    set({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
+
+    const user = await api.get<MeResponse>('/api/v1/me');
+    set({ status: 'authenticated', user, isImpersonating: true });
+  },
+
   refresh: async () => {
     const refreshToken = get().refreshToken;
     if (!refreshToken) return null;
@@ -127,7 +141,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
     localStorage.removeItem(ACCESS_KEY);
     localStorage.removeItem(REFRESH_KEY);
-    set({ accessToken: null, refreshToken: null, user: null, status: 'unauthenticated' });
+    set({ accessToken: null, refreshToken: null, user: null, status: 'unauthenticated', isImpersonating: false });
   },
 
   setAccessMode: (mode) => set({ accessMode: mode }),

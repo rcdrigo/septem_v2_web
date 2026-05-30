@@ -4,6 +4,13 @@ import { LoginPage } from './pages/LoginPage';
 import { ModeladorPage } from './pages/modelador/ModeladorPage';
 import { ProcessosPage } from './pages/processos/ProcessosPage';
 import { UsuariosPage } from './pages/admin/UsuariosPage';
+import { UnidadesPage } from './pages/admin/UnidadesPage';
+import { PosicoesPage } from './pages/admin/PosicoesPage';
+import { PerfisPage } from './pages/admin/PerfisPage';
+import { LogsPage } from './pages/admin/LogsPage';
+import { MeuDadosPage } from './pages/admin/MeuDadosPage';
+import { MudarSenhaPage } from './pages/admin/MudarSenhaPage';
+import { OrganogramaPage } from './pages/OrganogramaPage';
 import { StubPage } from './pages/StubPage';
 
 /** Açúcar para registrar uma rota que ainda só tem placeholder. */
@@ -25,7 +32,7 @@ export const router = createBrowserRouter(
         stub('servicos', 'Serviços', { phase: 'Fase 3/4', hint: 'Catálogo de processos publicados que você pode iniciar.' }),
         stub('tarefas', 'Tarefas executadas', { phase: 'Fase 4', hint: 'Processos que você iniciou ou dos quais participou.' }),
         stub('consultas', 'Consultas', { phase: 'Fase 7' }),
-        stub('organograma', 'Organograma', { phase: 'Fase 2/5' }),
+        { path: 'organograma', element: <OrganogramaPage /> },
 
         // --- Admin › Processos --------------------------------------------
         { path: 'admin/processos', element: <ProcessosPage /> },
@@ -44,14 +51,14 @@ export const router = createBrowserRouter(
         // --- Admin › Configurações ----------------------------------------
         stub('admin/manuais', 'Manuais', { phase: 'Fase 7' }),
         { path: 'admin/usuarios', element: <UsuariosPage /> },
-        stub('admin/unidades', 'Unidades organizacionais', { phase: 'Fase 2' }),
-        stub('admin/posicoes', 'Posições', { phase: 'Fase 2' }),
-        stub('admin/perfis', 'Perfis de acesso', { phase: 'Fase 2' }),
-        stub('admin/logs', 'Logs', { phase: 'Fase 2/9' }),
+        { path: 'admin/unidades', element: <UnidadesPage /> },
+        { path: 'admin/posicoes', element: <PosicoesPage /> },
+        { path: 'admin/perfis', element: <PerfisPage /> },
+        { path: 'admin/logs', element: <LogsPage /> },
 
         // --- Conta / rodapé ------------------------------------------------
-        stub('me', 'Meus dados', { phase: 'Fase 2' }),
-        stub('me/senha', 'Mudar senha', { phase: 'Fase 2' }),
+        { path: 'me', element: <MeuDadosPage /> },
+        { path: 'me/senha', element: <MudarSenhaPage /> },
         stub('suporte', 'Suporte', { phase: 'Fase 7' }),
 
         // Back-compat: a rota antiga /modelador agora vive em /admin/processos/editar.

@@ -1,13 +1,20 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, KeyRound, LogOut, User } from 'lucide-react';
+import { ChevronDown, KeyRound, LogOut, User, UserCog, Search } from 'lucide-react';
 import { Popover, MenuItem, MenuDivider } from '@/components/ui/Popover';
+import { Dialog } from '@/components/ui/Dialog';
 import { useSessionStore } from '@/stores/session';
+import { useUsersList } from '@/lib/api/users';
+import { toast } from '@/stores/toast';
 
 /** Bloco de identidade do usuário no topo da sidebar, com dropdown de conta. */
 export function SidebarUser() {
   const user = useSessionStore((s) => s.user);
   const logout = useSessionStore((s) => s.logout);
+  const can = useSessionStore((s) => s.can);
+  const isImpersonating = useSessionStore((s) => s.isImpersonating);
   const navigate = useNavigate();
+  const [impersonateOpen, setImpersonateOpen] = useState(false);
 
   if (!user) return null;
 
@@ -17,8 +24,24 @@ export function SidebarUser() {
     .map((p) => p[0]?.toUpperCase() ?? '')
     .join('');
 
+  async function endSession() {
+    await logout();
+    navigate('/login', { replace: true });
+  }
+
   return (
     <div className="px-3 py-2">
+      {isImpersonating && (
+        <div className="mb-2 flex items-center justify-between gap-2 rounded-md bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">
+          <span className="min-w-0 truncate">
+            Personificando <strong className="font-semibold">{user.name}</strong>
+          </span>
+          <button type="button" onClick={endSession} className="shrink-0 font-medium underline hover:text-amber-900">
+            Encerrar
+          </button>
+        </div>
+      )}
+
       <Popover
         align="left"
         trigger={(open) => (
@@ -47,17 +70,83 @@ export function SidebarUser() {
             <MenuItem onClick={() => { close(); navigate('/me/senha'); }}>
               <KeyRound size={15} /> Mudar senha
             </MenuItem>
+            {can('users:impersonate') && !isImpersonating && (
+              <MenuItem onClick={() => { close(); setImpersonateOpen(true); }}>
+                <UserCog size={15} /> Personificar usuário
+              </MenuItem>
+            )}
             <MenuDivider />
-            <MenuItem destructive onClick={async () => {
-              close();
-              await logout();
-              navigate('/login', { replace: true });
-            }}>
+            <MenuItem destructive onClick={async () => { close(); await endSession(); }}>
               <LogOut size={15} /> Sair
             </MenuItem>
           </>
         )}
       </Popover>
+
+      {impersonateOpen && <ImpersonateDialog selfId={user.id} onClose={() => setImpersonateOpen(false)} />}
     </div>
+  );
+}
+
+function ImpersonateDialog({ selfId, onClose }: { selfId: string; onClose: () => void }) {
+  const impersonate = useSessionStore((s) => s.impersonate);
+  const navigate = useNavigate();
+  const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
+  const list = useUsersList({ q: q || undefined, status: 'active', pageSize: 20 });
+
+  async function pick(id: string, name: string) {
+    setBusy(true);
+    try {
+      await impersonate(id);
+      toast.success(`Personificando ${name}.`);
+      onClose();
+      navigate('/', { replace: true });
+    } catch {
+      toast.error('Não foi possível personificar este usuário.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open onClose={onClose} title="Personificar usuário" footer={
+      <button onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Fechar</button>
+    }>
+      <p className="mb-3 text-sm text-slate-600">
+        Você assumirá a sessão do usuário selecionado. Para voltar, encerre a personificação e entre novamente.
+      </p>
+      <div className="relative mb-3">
+        <Search size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input
+          type="search"
+          autoFocus
+          placeholder="Buscar por nome ou e-mail..."
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-3 text-sm focus:border-slate-500 focus:outline-none"
+        />
+      </div>
+      <div className="max-h-72 overflow-auto rounded-md border border-slate-200">
+        {list.isLoading && <p className="px-3 py-4 text-center text-sm text-slate-400">Carregando...</p>}
+        {list.data?.items.filter((u) => u.id !== selfId).map((u) => (
+          <button
+            key={u.id}
+            type="button"
+            disabled={busy}
+            onClick={() => pick(u.id, u.name)}
+            className="flex w-full items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <span className="min-w-0">
+              <span className="block truncate font-medium text-slate-800">{u.name}</span>
+              <span className="block truncate text-xs text-slate-500">{u.email}</span>
+            </span>
+            <UserCog size={15} className="shrink-0 text-slate-400" />
+          </button>
+        ))}
+        {!list.isLoading && (list.data?.items.filter((u) => u.id !== selfId).length ?? 0) === 0 && (
+          <p className="px-3 py-4 text-center text-sm text-slate-400">Nenhum usuário encontrado.</p>
+        )}
+      </div>
+    </Dialog>
   );
 }
