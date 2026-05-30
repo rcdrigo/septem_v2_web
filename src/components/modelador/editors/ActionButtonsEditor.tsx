@@ -19,9 +19,9 @@ type Props = {
 };
 
 /**
- * Editor de botões de ação por tarefa. Espelha o bloco do `ConfigTaskGeneral.aspx`
- * que define `inpStShowPositiveButton`, `inpStShowNegativeButton` etc. — mas
- * aqui é uma lista arbitrária, com cor primária, cor do texto e checkbox de validação.
+ * Editor de botões de ação por tarefa. Em vez de um par fixo de botões
+ * positivo/negativo, permite uma lista arbitrária, cada um com cor primária,
+ * cor do texto e checkbox de validação.
  *
  * Persistência: `septem:ActionButtons > septem:ActionButton[]` na própria tarefa.
  */

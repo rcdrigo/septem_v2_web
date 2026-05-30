@@ -22,10 +22,8 @@ const STATES: ReadonlyArray<{ value: FieldVisibility; icon: typeof Eye; label: s
 ];
 
 /**
- * Matriz de visibilidade dos campos do formulário, por tarefa. Espelha o
- * comportamento de `ConfigTaskGeneral.aspx` ao listar `inpChkStEnabled`,
- * `inpChkStVisible`, `inpChkStManipulable` e fonte de dados por campo
- * (`inpMulDsSource`).
+ * Matriz de visibilidade dos campos do formulário, por tarefa. Lista cada
+ * campo com seu estado (habilitado, visível, editável) e a fonte de dados.
  *
  * Lê o schema do formulário do `formStore` (Zustand). Enquanto o form não foi
  * configurado, mostra empty-state. Quando configurado, exibe os campos

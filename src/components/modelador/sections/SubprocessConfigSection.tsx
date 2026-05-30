@@ -28,9 +28,9 @@ const SYNC_OPTIONS = [
 ] as const;
 
 /**
- * Configuração de subprocesso. Espelha `ConfigTaskSubprocess.aspx`
- * (radio síncrono/assíncrono, checkboxes inpStSyncronize / inpStViewMessage, select de fluxo,
- * agrupamento para multi-instance).
+ * Configuração de subprocesso: modo síncrono/assíncrono, opções de
+ * sincronização e exibição de mensagem, seleção do fluxo chamado e
+ * agrupamento para multi-instance.
  */
 export function SubprocessConfigSection({ modeler, element }: Props) {
   const { state, update, flush, commit } = useExtensionState(

@@ -28,7 +28,7 @@ const HUMAN_TASK_TYPES = new Set(['bpmn:UserTask', 'bpmn:StartEvent']);
  * Cada célula expõe o toggle 3-estados (oculto/visível/editável) e persiste
  * em `septem:FormFields > septem:FormFieldEntry[]` na tarefa correspondente.
  *
- * Equivale à matriz que o ZEEV expõe no `wfForm_TaskFormField.aspx`.
+ * Visão consolidada da visibilidade de cada campo em cada tarefa humana.
  */
 export function TarefasCamposView({ modeler }: Props) {
   const formFields = useFormStore((s) => s.fields);

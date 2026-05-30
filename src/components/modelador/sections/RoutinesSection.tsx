@@ -18,9 +18,8 @@ const FIELDS: ReadonlyArray<{ key: keyof Routines; label: string }> = [
 
 /**
  * Seção "Rotinas" — 4 ganchos de fonte de dados que rodam em momentos diferentes
- * do ciclo da tarefa. Equivale aos pontos pre/post create/finish do ZEEV
- * (presentes em ConfigTaskGeneral, ConfigTaskService, ConfigTaskSubprocess,
- * ConfigEventEmail, ConfigEventTimer, ConfigEventMilestone).
+ * do ciclo da tarefa (antes/depois de criar e antes/depois de finalizar),
+ * disponíveis para tarefas, serviços, subprocessos e eventos.
  *
  * O campo aceita texto livre por enquanto (identificador da fonte de dados).
  * Na Fase 4 vira combobox lendo a lista de fontes do tenant.

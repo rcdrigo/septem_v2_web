@@ -31,8 +31,7 @@ const MODE_OPTIONS = [
 ] as const;
 
 /**
- * Configuração de timer. Espelha `ConfigEventTimer.aspx` com os 4 tipos
- * (`inpStType1..inpStType4`) e o modo fixo/dinâmico (`inpStDynamic`).
+ * Configuração de timer, com os 4 tipos de temporização e o modo fixo/dinâmico.
  *
  * O campo `value` muda de máscara conforme o tipo (data DD/MM/AAAA, número de horas etc.).
  * Por ora aceitamos texto livre; máscaras entram no polimento (Fase 7).

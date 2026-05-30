@@ -8,8 +8,8 @@ import type { PanelProps } from './types';
 /**
  * Painel da Atividade de Início.
  *
- * Equivale ao mesmo `ConfigTaskGeneral.aspx` que o ZEEV usa para tarefas humanas,
- * mas sem "Responsáveis e prazos" — quem inicia o processo é sempre o requisitante.
+ * Reúne a mesma configuração das tarefas humanas, mas sem "Responsáveis e
+ * prazos" — quem inicia o processo é sempre o requisitante.
  */
 export function StartEventPanel({ modeler, element }: PanelProps) {
   return (

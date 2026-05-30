@@ -19,7 +19,7 @@ const MODE_OPTIONS = [
 ] as const;
 
 /**
- * Seção "Assinaturas" — espelha o bloco `ConfigTaskGeneral` (`inpStSignatureType`)
+ * Seção "Assinaturas" — define o tipo de assinatura da tarefa
  * com modos: nenhum / assinatura eletrônica. Quando "eletrônica" é selecionada,
  * mostra a lista de campos a assinar (texto livre por linha — vai virar
  * multi-select de campos do formulário na Fase 4.3).

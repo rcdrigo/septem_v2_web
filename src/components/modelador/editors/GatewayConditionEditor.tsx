@@ -40,9 +40,8 @@ const MODE_OPTIONS: ReadonlyArray<{ value: GatewayConditionMode; label: string; 
 ];
 
 /**
- * Editor de condições por conexão de saída de gateway condicional. Espelha
- * `ConfigGatewayForkConditions.aspx` (com operadores `=, <>, >, <, >=, <=`
- * mais `contains`/`startsWith` que o ZEEV não tem nativos).
+ * Editor de condições por conexão de saída de gateway condicional, com
+ * operadores `=, <>, >, <, >=, <=`, além de `contains`/`startsWith`.
  *
  * Renderizado inline em `GatewayLinksSection` ao expandir uma linha.
  */

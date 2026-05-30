@@ -9,7 +9,7 @@ import type { PanelProps } from './types';
 /**
  * Painel da Tarefa humana.
  *
- * Espelha `ConfigTaskGeneral.aspx` do ZEEV — o painel mais completo do modelador.
+ * Reúne toda a configuração de uma tarefa humana — o painel mais completo do modelador.
  */
 export function UserTaskPanel({ modeler, element }: PanelProps) {
   return (

@@ -12,7 +12,7 @@ const DEFAULTS: ServiceSource = { dataSourceRef: '' };
 
 /**
  * Seção "Fonte de dados" para Atividades de serviço.
- * Espelha `ConfigTaskService.aspx` (referência a uma fonte de dados a executar).
+ * Referencia a fonte de dados a ser executada pela atividade.
  *
  * O input é texto livre por enquanto; vira combobox lendo fontes cadastradas
  * no tenant assim que houver backend (Fase 6).

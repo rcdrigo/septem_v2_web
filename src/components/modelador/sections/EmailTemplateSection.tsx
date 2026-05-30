@@ -12,9 +12,8 @@ const DEFAULTS: EmailTemplate = { templateRef: '' };
 
 /**
  * Seção "Template" — referência a um template de e-mail a ser disparado.
- * Espelha o bloco de configuração de mensagem em `ConfigEventEmail.aspx`
- * (assunto/corpo na ZEEV; no septem o template é gerenciado em outro lugar,
- * aqui referenciamos pela chave).
+ * No septem o template (assunto/corpo) é gerenciado em outro lugar; aqui
+ * referenciamos apenas pela chave.
  */
 export function EmailTemplateSection({ modeler, element }: Props) {
   const { state, update, commit } = useExtensionState(modeler, element, 'septem:EmailTemplate', DEFAULTS);

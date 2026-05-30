@@ -3,7 +3,6 @@
  *
  * Limita o conjunto de elementos ao que a spec define
  * (12 itens: 3 eventos finais/início/fim, 4 atividades, 3 gateways em 4 papéis, 3 eventos intermediários).
- * Equivale ao "menu de eventos" que o ZEEV expõe no `Designer.ascx` legado.
  *
  * Plugada no bpmn-js como módulo via `additionalModules` em `BpmnModeler.tsx`.
  */

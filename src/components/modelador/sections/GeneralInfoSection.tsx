@@ -18,8 +18,6 @@ type Props = {
  * Seção "Informações gerais" — reutilizada por praticamente todos os tipos
  * de elemento (Início, Tarefa humana, Serviço, Subprocesso, Eventos, Marco, Gateways).
  *
- * Equivale ao bloco `LblGeneralConfiguration` visto em `Designer/ConfigTaskGeneral.aspx`.
- *
  * Estratégia de save: aplica no blur do input (ou no Enter) — o auto-save
  * global do BpmnModeler propaga para localStorage + Zustand.
  */

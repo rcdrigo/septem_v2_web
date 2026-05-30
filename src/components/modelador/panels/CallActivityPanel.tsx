@@ -4,7 +4,8 @@ import { RoutinesSection } from '../sections/RoutinesSection';
 import type { PanelProps } from './types';
 
 /**
- * Painel do Subprocesso (BPMN CallActivity). Espelha `ConfigTaskSubprocess.aspx`.
+ * Painel do Subprocesso (BPMN CallActivity): informações gerais, configuração
+ * do subprocesso chamado e rotinas de ciclo de vida.
  */
 export function CallActivityPanel({ modeler, element }: PanelProps) {
   return (
