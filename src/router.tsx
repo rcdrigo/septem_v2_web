@@ -13,6 +13,7 @@ import { MudarSenhaPage } from './pages/admin/MudarSenhaPage';
 import { OrganogramaPage } from './pages/OrganogramaPage';
 import { FontesDadosPage } from './pages/admin/FontesDadosPage';
 import { ModelosEmailPage } from './pages/admin/ModelosEmailPage';
+import { FormulariosPage } from './pages/admin/FormulariosPage';
 import { StubPage } from './pages/StubPage';
 
 /** Açúcar para registrar uma rota que ainda só tem placeholder. */
@@ -40,6 +41,7 @@ export const router = createBrowserRouter(
         { path: 'admin/processos', element: <ProcessosPage /> },
         // Modelador (BPMN + form) — vive dentro de Processos, aberto via "Novo/Editar".
         { path: 'admin/processos/editar', element: <ModeladorPage /> },
+        { path: 'admin/formularios', element: <FormulariosPage /> },
         stub('admin/processos/categorias', 'Categorias de processos', { phase: 'Fase 3' }),
         { path: 'admin/modelos-email', element: <ModelosEmailPage /> },
         stub('admin/modelos-doc', 'Modelos de documentos', { phase: 'Fase 7' }),

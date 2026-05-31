@@ -7,6 +7,7 @@ import {
   Database,
   FileSearch,
   FileStack,
+  FileText,
   FolderTree,
   LayoutDashboard,
   LayoutGrid,
@@ -61,6 +62,7 @@ export const MENU: MenuByMode = {
             perm: 'workflow:read',
             children: [
               { kind: 'link', label: 'Processos', to: '/admin/processos', icon: Workflow },
+              { kind: 'link', label: 'Formulários', to: '/admin/formularios', icon: FileText },
               { kind: 'link', label: 'Categorias', to: '/admin/processos/categorias', icon: Tags },
               { kind: 'link', label: 'Modelos de e-mails', to: '/admin/modelos-email', icon: Mail },
               { kind: 'link', label: 'Modelos de documentos', to: '/admin/modelos-doc', icon: FileStack },
