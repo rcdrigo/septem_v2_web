@@ -1,5 +1,7 @@
-import { useState } from 'react';
-import { ArrowLeft, ChevronDown, ChevronRight, FileText, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ArrowLeft, ChevronDown, ChevronRight, Eye, FileText, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { FormPreview } from '@/components/form/FormPreview';
+import { buildFormJsSchema } from '@/lib/form-js-schema';
 import {
   useFormsList, useForm, useCreateForm, useUpdateForm, useDeleteForm, useFormMasks,
   type FormListItem, type FormGroup, type FormField,
@@ -78,6 +80,8 @@ function FormBuilder({ id, onClose }: { id: string | null; onClose: () => void }
   const [groups, setGroups] = useState<FormGroup[]>([]);
   const [fields, setFields] = useState<FormField[]>([]);
   const [hydrated, setHydrated] = useState(!id);
+  const [showPreview, setShowPreview] = useState(false);
+  const previewSchema = useMemo(() => buildFormJsSchema(groups, fields), [groups, fields]);
 
   if (id && detail.data && !hydrated) {
     setName(detail.data.name); setGroups(detail.data.groups); setFields(detail.data.fields); setHydrated(true);
@@ -117,11 +121,15 @@ function FormBuilder({ id, onClose }: { id: string | null; onClose: () => void }
           <button type="button" onClick={onClose} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"><ArrowLeft size={18} /></button>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome do formulário" className="rounded-md border border-slate-300 px-2 py-1 text-base font-semibold text-slate-900 focus:border-slate-500 focus:outline-none" />
         </div>
-        <button type="button" onClick={save} disabled={!name || create.isPending || update.isPending} className="rounded-md bg-slate-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">Salvar</button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => setShowPreview((p) => !p)} className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium ${showPreview ? 'bg-slate-200 text-slate-800' : 'text-slate-700 hover:bg-slate-100'}`}><Eye size={16} /> Pré-visualizar</button>
+          <button type="button" onClick={save} disabled={!name || create.isPending || update.isPending} className="rounded-md bg-slate-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">Salvar</button>
+        </div>
       </header>
 
+      <div className="flex flex-1 overflow-hidden">
       <div className="flex-1 overflow-auto p-6">
-        <div className="mx-auto max-w-3xl space-y-6">
+        <div className={showPreview ? 'space-y-6' : 'mx-auto max-w-3xl space-y-6'}>
           <section>
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Agrupamentos</h2>
@@ -155,6 +163,13 @@ function FormBuilder({ id, onClose }: { id: string | null; onClose: () => void }
             </div>
           </section>
         </div>
+      </div>
+      {showPreview && (
+        <div className="w-[440px] shrink-0 overflow-auto border-l border-slate-200 bg-white p-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Pré-visualização</p>
+          <FormPreview schema={previewSchema} />
+        </div>
+      )}
       </div>
     </div>
   );
