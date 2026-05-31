@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowLeft, ChevronDown, ChevronRight, Eye, FileText, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { FormPreview } from '@/components/form/FormPreview';
+import { MasksDialog } from '@/components/form/MasksDialog';
 import { buildFormJsSchema } from '@/lib/form-js-schema';
 import {
   useFormsList, useForm, useCreateForm, useUpdateForm, useDeleteForm, useFormMasks,
@@ -23,6 +24,7 @@ const FIELD_TYPES = ['textfield', 'textarea', 'number', 'select', 'checkbox', 'd
 export function FormulariosPage() {
   const list = useFormsList();
   const [editing, setEditing] = useState<string | 'new' | null>(null);
+  const [masksOpen, setMasksOpen] = useState(false);
   const del = useDeleteForm();
 
   async function askDelete(f: FormListItem) {
@@ -37,7 +39,10 @@ export function FormulariosPage() {
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
         <h1 className="text-lg font-semibold text-slate-900">Formulários</h1>
-        <button type="button" onClick={() => setEditing('new')} className="flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-700"><Plus size={16} /> Novo formulário</button>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setMasksOpen(true)} className="rounded-md border border-slate-300 px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Máscaras</button>
+          <button type="button" onClick={() => setEditing('new')} className="flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-700"><Plus size={16} /> Novo formulário</button>
+        </div>
       </header>
       <div className="flex-1 overflow-auto p-6">
         {!list.isLoading && (list.data?.length ?? 0) === 0 ? (
@@ -65,6 +70,7 @@ export function FormulariosPage() {
           </table>
         )}
       </div>
+      {masksOpen && <MasksDialog onClose={() => setMasksOpen(false)} />}
     </div>
   );
 }

@@ -49,6 +49,10 @@ export function useCreateFormMask() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: (body: { key: string; name: string; regex: string; shouldValidate: boolean }) => api.post<{ id: string }>('/api/v1/form-masks/', body), onSuccess: () => qc.invalidateQueries({ queryKey: maskKeys.all }) });
 }
+export function useUpdateFormMask() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: ({ id, body }: { id: string; body: { name: string; regex: string; shouldValidate: boolean } }) => api.put<void>(`/api/v1/form-masks/${id}`, body), onSuccess: () => qc.invalidateQueries({ queryKey: maskKeys.all }) });
+}
 export function useDeleteFormMask() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: (id: string) => api.del<void>(`/api/v1/form-masks/${id}`), onSuccess: () => qc.invalidateQueries({ queryKey: maskKeys.all }) });
