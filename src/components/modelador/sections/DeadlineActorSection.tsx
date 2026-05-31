@@ -1,6 +1,7 @@
 import { Checkbox, Field, RadioGroup, Section, Select, TextInput, type SelectOption } from '@/components/ui/Field';
 import { useExtensionState } from '@/lib/useExtensionState';
 import { useAreas, useAreaPositions } from '@/lib/api/catalog';
+import { DataSourceSelect } from '../fields/DataSourceSelect';
 import { DeadlineAlertsEditor } from '../editors/DeadlineAlertsEditor';
 
 type Props = {
@@ -150,12 +151,7 @@ export function DeadlineActorSection({ modeler, element }: Props) {
 
       {actor.state.actorType === 'dataSource' && (
         <Field label="Fonte de dados">
-          <TextInput
-            value={actor.state.dataSourceRef}
-            onChange={(e) => actor.update({ dataSourceRef: e.target.value })}
-            onBlur={() => actor.commit('dataSourceRef')}
-            placeholder="Identificador da fonte de dados"
-          />
+          <DataSourceSelect value={actor.state.dataSourceRef} onChange={(v) => actor.flush({ dataSourceRef: v })} />
         </Field>
       )}
 

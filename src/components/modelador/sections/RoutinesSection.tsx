@@ -1,5 +1,6 @@
-import { Field, Section, TextInput } from '@/components/ui/Field';
+import { Field, Section } from '@/components/ui/Field';
 import { useExtensionState } from '@/lib/useExtensionState';
+import { DataSourceSelect } from '../fields/DataSourceSelect';
 import type { Routines } from '@/lib/bpmn-helpers';
 
 type Props = {
@@ -25,7 +26,7 @@ const FIELDS: ReadonlyArray<{ key: keyof Routines; label: string }> = [
  * Na Fase 4 vira combobox lendo a lista de fontes do tenant.
  */
 export function RoutinesSection({ modeler, element }: Props) {
-  const { state, update, commit } = useExtensionState(modeler, element, 'septem:Routines', DEFAULTS);
+  const { state, flush } = useExtensionState(modeler, element, 'septem:Routines', DEFAULTS);
 
   return (
     <Section
@@ -34,11 +35,10 @@ export function RoutinesSection({ modeler, element }: Props) {
     >
       {FIELDS.map(({ key, label }) => (
         <Field key={key} label={label}>
-          <TextInput
+          <DataSourceSelect
             value={state[key]}
-            onChange={(e) => update({ [key]: e.target.value } as Partial<Routines>)}
-            onBlur={() => commit(key)}
-            placeholder="Identificador da fonte de dados"
+            onChange={(v) => flush({ [key]: v } as Partial<Routines>)}
+            placeholder="Nenhuma"
           />
         </Field>
       ))}
