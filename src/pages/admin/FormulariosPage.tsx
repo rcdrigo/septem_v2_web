@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, ChevronDown, ChevronRight, Eye, FileText, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, Code2, Eye, FileText, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { FormPreview } from '@/components/form/FormPreview';
 import { MasksDialog } from '@/components/form/MasksDialog';
+import { ScriptsDialog } from '@/components/form/ScriptsDialog';
 import { buildFormJsSchema } from '@/lib/form-js-schema';
 import {
   useFormsList, useForm, useCreateForm, useUpdateForm, useDeleteForm, useFormMasks,
@@ -9,6 +10,8 @@ import {
 } from '@/lib/api/forms';
 import { useDataSources } from '@/lib/api/catalog';
 import { Field, TextInput, TextArea, Select, Checkbox } from '@/components/ui/Field';
+import { Dialog } from '@/components/ui/Dialog';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
@@ -87,6 +90,7 @@ function FormBuilder({ id, onClose }: { id: string | null; onClose: () => void }
   const [fields, setFields] = useState<FormField[]>([]);
   const [hydrated, setHydrated] = useState(!id);
   const [showPreview, setShowPreview] = useState(false);
+  const [scriptsOpen, setScriptsOpen] = useState(false);
   const previewSchema = useMemo(() => buildFormJsSchema(groups, fields), [groups, fields]);
 
   if (id && detail.data && !hydrated) {
@@ -128,6 +132,7 @@ function FormBuilder({ id, onClose }: { id: string | null; onClose: () => void }
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome do formulário" className="rounded-md border border-slate-300 px-2 py-1 text-base font-semibold text-slate-900 focus:border-slate-500 focus:outline-none" />
         </div>
         <div className="flex items-center gap-2">
+          {id && <button type="button" onClick={() => setScriptsOpen(true)} className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"><Code2 size={16} /> Scripts</button>}
           <button type="button" onClick={() => setShowPreview((p) => !p)} className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium ${showPreview ? 'bg-slate-200 text-slate-800' : 'text-slate-700 hover:bg-slate-100'}`}><Eye size={16} /> Pré-visualizar</button>
           <button type="button" onClick={save} disabled={!name || create.isPending || update.isPending} className="rounded-md bg-slate-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">Salvar</button>
         </div>
@@ -177,6 +182,7 @@ function FormBuilder({ id, onClose }: { id: string | null; onClose: () => void }
         </div>
       )}
       </div>
+      {scriptsOpen && id && <ScriptsDialog formId={id} onClose={() => setScriptsOpen(false)} />}
     </div>
   );
 }
@@ -190,7 +196,9 @@ function FieldCard({ field, groupOptions, maskOptions, dsOptions, onChange, onRe
   onRemove: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const set = (patch: Partial<FormField>) => onChange({ ...field, ...patch });
+  const helpType = field.helpTextType ?? 'inline';
 
   return (
     <div className="rounded-md border border-slate-200 bg-white">
@@ -205,7 +213,18 @@ function FieldCard({ field, groupOptions, maskOptions, dsOptions, onChange, onRe
 
       {open && (
         <div className="grid grid-cols-2 gap-3 border-t border-slate-100 bg-slate-50 p-3">
-          <Field label="Texto de ajuda"><TextArea rows={2} value={field.helpText ?? ''} onChange={(e) => set({ helpText: e.target.value })} /></Field>
+          <Field label="Texto de ajuda">
+            <div className="space-y-1.5">
+              <Select value={helpType} options={[{ value: 'inline', label: 'Inline (abaixo do campo)' }, { value: 'popover', label: 'Popover (ícone com rich-text)' }]} onChange={(e) => set({ helpTextType: e.target.value })} />
+              {helpType === 'popover' ? (
+                <button type="button" onClick={() => setHelpOpen(true)} className="w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-left text-sm text-slate-600 hover:bg-slate-50">
+                  {field.helpText ? 'Editar texto de ajuda…' : 'Definir texto de ajuda…'}
+                </button>
+              ) : (
+                <TextArea rows={2} value={field.helpText ?? ''} onChange={(e) => set({ helpText: e.target.value })} />
+              )}
+            </div>
+          </Field>
           <div className="grid grid-cols-2 gap-2">
             <Field label="Prefixo"><TextInput value={field.prefix ?? ''} onChange={(e) => set({ prefix: e.target.value })} /></Field>
             <Field label="Sufixo"><TextInput value={field.suffix ?? ''} onChange={(e) => set({ suffix: e.target.value })} /></Field>
@@ -221,6 +240,13 @@ function FieldCard({ field, groupOptions, maskOptions, dsOptions, onChange, onRe
             <Checkbox checked={field.isVisibleRequester} onChange={(v) => set({ isVisibleRequester: v })} label="Visível ao requisitante" />
           </div>
         </div>
+      )}
+
+      {helpOpen && (
+        <Dialog open onClose={() => setHelpOpen(false)} width="lg" title="Texto de ajuda (popover)"
+          footer={<button onClick={() => setHelpOpen(false)} className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700">Concluir</button>}>
+          <RichTextEditor value={field.helpText ?? ''} onChange={(html) => set({ helpText: html })} />
+        </Dialog>
       )}
     </div>
   );
