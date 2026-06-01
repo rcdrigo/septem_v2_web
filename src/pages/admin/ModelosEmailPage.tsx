@@ -8,6 +8,7 @@ import { useAreas, useAreaPositions } from '@/lib/api/catalog';
 import { useUsersList } from '@/lib/api/users';
 import { Dialog } from '@/components/ui/Dialog';
 import { Field, TextInput, TextArea, Select } from '@/components/ui/Field';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 
@@ -121,7 +122,7 @@ function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
         <Field label="Nome"><TextInput required autoFocus value={name} onChange={(e) => setName(e.target.value)} /></Field>
         <Field label="Descrição"><TextArea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
         <Field label="Assunto" hint="Aceita placeholders, ex: {{requisitante.nome}}."><TextInput value={subject} onChange={(e) => setSubject(e.target.value)} /></Field>
-        <Field label="Mensagem" hint="HTML + placeholders {{ }}. Editor rich-text entra depois."><TextArea rows={5} value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)} className="font-mono text-xs" /></Field>
+        <Field label="Mensagem" hint="Use placeholders, ex: {{requisitante.nome}}."><RichTextEditor value={bodyHtml} onChange={setBodyHtml} /></Field>
 
         <Field label="Anexos (campos do formulário)">
           <div className="flex flex-col gap-1.5">
