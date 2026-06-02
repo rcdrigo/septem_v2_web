@@ -11,6 +11,9 @@ import { LogsPage } from './pages/admin/LogsPage';
 import { MeuDadosPage } from './pages/admin/MeuDadosPage';
 import { MudarSenhaPage } from './pages/admin/MudarSenhaPage';
 import { OrganogramaPage } from './pages/OrganogramaPage';
+import { ServicosPage } from './pages/ServicosPage';
+import { TarefasPage } from './pages/TarefasPage';
+import { InstanciasPage } from './pages/InstanciasPage';
 import { FontesDadosPage } from './pages/admin/FontesDadosPage';
 import { ModelosEmailPage } from './pages/admin/ModelosEmailPage';
 import { FormulariosPage } from './pages/admin/FormulariosPage';
@@ -32,9 +35,9 @@ export const router = createBrowserRouter(
 
         // --- Geral ---------------------------------------------------------
         stub('dashboard', 'Dashboard', { phase: 'Fase 7' }),
-        stub('servicos', 'Serviços', { phase: 'Fase 3/4', hint: 'Catálogo de processos publicados que você pode iniciar.' }),
-        stub('tarefas', 'Tarefas executadas', { phase: 'Fase 4', hint: 'Processos que você iniciou ou dos quais participou.' }),
-        stub('consultas', 'Consultas', { phase: 'Fase 7' }),
+        { path: 'servicos', element: <ServicosPage /> },
+        { path: 'tarefas', element: <TarefasPage /> },
+        { path: 'consultas', element: <InstanciasPage /> },
         { path: 'organograma', element: <OrganogramaPage /> },
 
         // --- Admin › Processos --------------------------------------------

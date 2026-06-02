@@ -1,0 +1,64 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+
+export type StartedInstance = { executionId: string; status: string; tasks: { id: string; name: string | null }[] };
+export type MyTask = { id: string; name: string | null; executionId: string; createdAt: string };
+export type TaskButton = { id: string; label: string; validateForm: boolean; primaryColor?: string | null; textColor?: string | null };
+export type TaskDetail = {
+  id: string; name: string | null; status: string; executionId: string;
+  formSchema: unknown; data: unknown; buttons: TaskButton[];
+};
+export type CompleteResult = { taskStatus: string; executionStatus: string; pendingTasks: number };
+
+const execKeys = { tasks: ['workflow', 'tasks'] as const, task: (id: string) => ['workflow', 'task', id] as const };
+
+/** Schema form-js do processo (formulário inicial de "Iniciar"). */
+export function useProcessForm(key: string | null) {
+  return useQuery({ queryKey: ['workflow', 'process-form', key], queryFn: () => api.get<unknown>(`/api/v1/workflow/process-definitions/${key}/form`), enabled: !!key });
+}
+
+export function useStartInstance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { key: string; data?: unknown }) => api.post<StartedInstance>('/api/v1/workflow/instances', body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: execKeys.tasks }),
+  });
+}
+
+export function useMyTasks() {
+  return useQuery({ queryKey: execKeys.tasks, queryFn: () => api.get<MyTask[]>('/api/v1/workflow/tasks?assignee=me') });
+}
+
+export function useTask(id: string | null) {
+  return useQuery({ queryKey: execKeys.task(id ?? ''), queryFn: () => api.get<TaskDetail>(`/api/v1/workflow/tasks/${id}`), enabled: !!id });
+}
+
+export function useCompleteTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data, action }: { id: string; data?: unknown; action?: string }) =>
+      api.post<CompleteResult>(`/api/v1/workflow/tasks/${id}/complete`, { data, action }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: execKeys.tasks }),
+  });
+}
+
+// ── instâncias (acompanhamento) ───────────────────────────────────────
+export type InstanceListItem = { id: string; process: string | null; status: string; startedAt: string; endedAt: string | null; pendingTasks: number };
+export type InstancesPage = { items: InstanceListItem[]; total: number; page: number; pageSize: number };
+export type InstanceTask = { id: string; name: string | null; status: string; assigneeId: number | null; createdAt: string; completedAt: string | null; action: string | null };
+export type InstanceDetail = { id: string; process: string | null; status: string; startedAt: string; endedAt: string | null; data: unknown; tasks: InstanceTask[] };
+export type InstancesParams = { q?: string; status?: string; mine?: boolean; page?: number; pageSize?: number };
+
+export function useInstances(params: InstancesParams) {
+  const qs = new URLSearchParams();
+  if (params.q) qs.set('q', params.q);
+  if (params.status) qs.set('status', params.status);
+  if (params.mine) qs.set('mine', 'me');
+  qs.set('page', String(params.page ?? 1));
+  qs.set('pageSize', String(params.pageSize ?? 20));
+  return useQuery({ queryKey: ['workflow', 'instances', params], queryFn: () => api.get<InstancesPage>(`/api/v1/workflow/instances?${qs.toString()}`), placeholderData: (p) => p });
+}
+
+export function useInstance(id: string | null) {
+  return useQuery({ queryKey: ['workflow', 'instance', id], queryFn: () => api.get<InstanceDetail>(`/api/v1/workflow/instances/${id}`), enabled: !!id });
+}
