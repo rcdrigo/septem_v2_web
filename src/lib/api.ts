@@ -10,12 +10,30 @@ import { toast } from '@/stores/toast';
  * Importações tardias para quebrar o ciclo `session ↔ api`.
  */
 
-const BASE_URL = '';   // Vite proxy /api → backend em dev; em prod o mesmo path bate no host.
+/**
+ * Base das chamadas. Em dev fica vazia (Vite faz proxy de `/api` → backend).
+ * Em prod com o backend publicado numa origem separada, defina `VITE_API_URL`
+ * (ex.: `https://septem-api.onrender.com`); se vazio, assume mesma origem.
+ */
+const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? '';
 
-/** Em dev, sem subdomínios reais, identificamos o tenant via header. */
-const DEV_TENANT_HEADER: string | undefined = import.meta.env.DEV
-  ? (import.meta.env.VITE_TENANT as string | undefined) ?? 'prefeitura-x'
-  : undefined;
+/**
+ * Tenant enviado no header `X-Tenant`. Em dev é fixo (VITE_TENANT ou prefeitura-x).
+ * Em prod, com o front publicado em `{tenant}.dominio.com`, derivamos do primeiro
+ * rótulo do hostname (VITE_TENANT força um valor fixo, útil para preview). Hosts
+ * sem subdomínio de tenant (`www`, apex) → sem header (resolução por host no back).
+ */
+const TENANT_HEADER: string | undefined = resolveTenantHeader();
+
+function resolveTenantHeader(): string | undefined {
+  const forced = import.meta.env.VITE_TENANT as string | undefined;
+  if (import.meta.env.DEV) return forced ?? 'prefeitura-x';
+  if (forced) return forced;
+  if (typeof window === 'undefined') return undefined;
+  const label = window.location.hostname.split('.')[0];
+  if (!label || label === 'www' || label === 'localhost') return undefined;
+  return label;
+}
 
 export class ApiError extends Error {
   status: number;
@@ -80,8 +98,8 @@ export async function apiFetch<T = unknown>(path: string, options: ApiOptions = 
     const token = tokenProvider();
     if (token) finalHeaders.set('Authorization', `Bearer ${token}`);
   }
-  if (DEV_TENANT_HEADER && !finalHeaders.has('X-Tenant'))
-    finalHeaders.set('X-Tenant', DEV_TENANT_HEADER);
+  if (TENANT_HEADER && !finalHeaders.has('X-Tenant'))
+    finalHeaders.set('X-Tenant', TENANT_HEADER);
 
   const resp = await fetch(`${BASE_URL}${path}`, { ...rest, headers: finalHeaders });
 

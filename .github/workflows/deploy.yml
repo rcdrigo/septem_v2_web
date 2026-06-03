@@ -25,6 +25,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          # GitHub Pages serve sob /septem_v2_web/ (subpath).
+          VITE_BASE: /septem_v2_web/
+          # URL pública do backend (Render). Defina em Settings → Secrets and
+          # variables → Actions → Variables: VITE_API_URL.
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          # Pages é host único (sem subdomínio por tenant) → tenant fixo no build.
+          VITE_TENANT: ${{ vars.VITE_TENANT || 'prefeitura-x' }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

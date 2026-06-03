@@ -27,7 +27,9 @@ function spaFallback(): Plugin {
 }
 
 export default defineConfig({
-  base: '/septem_v2_web/',
+  // Raiz por padrão (Cloudflare Pages/Netlify em domínio próprio). O deploy do
+  // GitHub Pages passa VITE_BASE=/septem_v2_web/ por servir sob subpath.
+  base: process.env.VITE_BASE || '/',
   plugins: [react(), tailwindcss(), spaFallback()],
   resolve: {
     alias: {
