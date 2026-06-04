@@ -28,9 +28,9 @@ jobs:
         env:
           # GitHub Pages serve sob /septem_v2_web/ (subpath).
           VITE_BASE: /septem_v2_web/
-          # URL pública do backend (Render). Defina em Settings → Secrets and
-          # variables → Actions → Variables: VITE_API_URL.
-          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          # URL pública do backend (Render). Default aponta pro ambiente provisório;
+          # pode sobrescrever em Settings → Secrets and variables → Actions → Variables.
+          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://septem-api.onrender.com' }}
           # Pages é host único (sem subdomínio por tenant) → tenant fixo no build.
           VITE_TENANT: ${{ vars.VITE_TENANT || 'prefeitura-x' }}
       - uses: actions/upload-pages-artifact@v3
