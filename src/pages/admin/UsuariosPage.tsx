@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import {
   useUsersList,
   useUser,
@@ -14,6 +14,7 @@ import {
 import { useAccessProfiles } from '@/lib/api/access-profiles';
 import { useOrgUnitsFlat } from '@/lib/api/org-units';
 import { usePositions } from '@/lib/api/positions';
+import { maskCpf, maskPhone, isValidCpf } from '@/lib/masks';
 import { Dialog } from '@/components/ui/Dialog';
 import { Field, TextInput } from '@/components/ui/Field';
 import { confirm } from '@/components/ui/ConfirmDialog';
@@ -198,6 +199,7 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (cadastral.cpf && !isValidCpf(cadastral.cpf)) { toast.error('CPF inválido.'); return; }
     try {
       const created = await create.mutateAsync({ name, email, isInternal, ...cadastral });
       setResult(created);
@@ -216,7 +218,16 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
           <strong>{result.name}</strong> foi criado.
         </p>
         <p className="mt-3 text-sm text-slate-600">Senha inicial (anote agora — não será mostrada de novo):</p>
-        <code className="mt-1 block break-all rounded bg-slate-100 px-3 py-2 font-mono text-sm">{result.initialPassword}</code>
+        <div className="mt-1 flex items-center gap-2">
+          <code className="flex-1 break-all rounded bg-slate-100 px-3 py-2 font-mono text-sm">{result.initialPassword}</code>
+          <button
+            type="button"
+            onClick={() => { void navigator.clipboard?.writeText(result.initialPassword).then(() => toast.success('Senha copiada.')); }}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <Copy size={14} /> Copiar
+          </button>
+        </div>
       </Dialog>
     );
   }
@@ -282,6 +293,7 @@ function EditUserDialog({ id, onClose }: { id: string; onClose: () => void }) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (cadastral.cpf && !isValidCpf(cadastral.cpf)) { toast.error('CPF inválido.'); return; }
     try {
       await update.mutateAsync({ id, body: {
         name, status, accessProfileIds: Array.from(profileIds),
@@ -353,12 +365,30 @@ function EditUserDialog({ id, onClose }: { id: string; onClose: () => void }) {
 /** Campos cadastrais opcionais (RG, CPF, matrícula, telefone, cargo). */
 function CadastralGrid({ value, onChange }: { value: UserCadastral; onChange: (v: UserCadastral) => void }) {
   const set = (k: keyof UserCadastral) => (e: React.ChangeEvent<HTMLInputElement>) => onChange({ ...value, [k]: e.target.value });
+  const cpfInvalid = !!value.cpf && !isValidCpf(value.cpf);
   return (
     <div className="grid grid-cols-2 gap-2">
-      <Field label="CPF"><TextInput value={value.cpf ?? ''} onChange={set('cpf')} /></Field>
+      <Field label="CPF">
+        <TextInput
+          value={value.cpf ?? ''}
+          inputMode="numeric"
+          placeholder="000.000.000-00"
+          aria-invalid={cpfInvalid}
+          className={cpfInvalid ? 'border-rose-400' : undefined}
+          onChange={(e) => onChange({ ...value, cpf: maskCpf(e.target.value) })}
+        />
+        {cpfInvalid && <span className="mt-0.5 block text-xs text-rose-600">CPF inválido.</span>}
+      </Field>
       <Field label="RG"><TextInput value={value.rg ?? ''} onChange={set('rg')} /></Field>
       <Field label="Matrícula"><TextInput value={value.matricula ?? ''} onChange={set('matricula')} /></Field>
-      <Field label="Telefone"><TextInput value={value.telefone ?? ''} onChange={set('telefone')} /></Field>
+      <Field label="Telefone">
+        <TextInput
+          value={value.telefone ?? ''}
+          inputMode="numeric"
+          placeholder="(00) 00000-0000"
+          onChange={(e) => onChange({ ...value, telefone: maskPhone(e.target.value) })}
+        />
+      </Field>
       <div className="col-span-2"><Field label="Cargo"><TextInput value={value.cargo ?? ''} onChange={set('cargo')} /></Field></div>
     </div>
   );

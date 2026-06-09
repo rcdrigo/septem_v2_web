@@ -26,12 +26,13 @@ Telas integradas ponta a ponta. **Ambiente:** `https://rcdrigo.github.io/septem_
 - [ ] Selecionar a unidade → criar **posição** (ex.: "Fiscal").
 - [ ] Editar e excluir uma posição sem vínculo.
 
-## 4. Usuários (`/admin/usuarios`) 🆕
-- [ ] **Criar usuário** com nome, e-mail **+ CPF, RG, matrícula, telefone, cargo** → mostra a senha inicial.
-- [ ] **Editar** o usuário: confirmar que os campos cadastrais (CPF etc.) **persistiram**.
-- [ ] 🆕 Na edição, seção **"Unidades e posições"**: escolher uma **unidade** → uma **posição** → **Adicionar**; ela aparece na lista. Salvar.
-- [ ] Reabrir o usuário → a posição atribuída continua lá.
+## 4. Usuários (`/admin/usuarios`) 🆕 ✅ TESTADO
+- [x] **Criar usuário** com nome, e-mail **+ CPF, RG, matrícula, telefone, cargo** → mostra a senha inicial.
+- [x] **Editar** o usuário: confirmar que os campos cadastrais (CPF etc.) **persistiram**.
+- [x] 🆕 Na edição, seção **"Unidades e posições"**: escolher uma **unidade** → uma **posição** → **Adicionar**; ela aparece na lista. Salvar.
+- [x] Reabrir o usuário → a posição atribuída continua lá.
 - [ ] Buscar por nome/e-mail; **desativar** (some dos ativos).
+- _Correções aplicadas:_ CPF com máscara+validação, telefone com máscara, botão "Copiar" senha (ver `CORRECOES.md`).
 
 ## 5. Perfis (`/admin/perfis`)
 - [ ] Criar perfil marcando permissões na matriz; editar.
