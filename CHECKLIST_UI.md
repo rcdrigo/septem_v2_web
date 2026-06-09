@@ -1,115 +1,96 @@
 # Checklist de testes da UI (integrada com o backend)
 
-Só telas **integradas ponta a ponta** (UI ↔ API). Telas ainda *stub* (Dashboard,
-Relatórios, Categorias, Modelos de documento, Manuais, Suporte) ficam de fora.
+Telas integradas ponta a ponta. **Ambiente:** `https://rcdrigo.github.io/septem_v2_web/`
+· tenant `prefeitura-x` · login `admin@prefeitura-x.local` / *(senha do `Seed__AdminPassword`)*.
 
-**Ambiente:** `https://rcdrigo.github.io/septem_v2_web/` · tenant `prefeitura-x`
-**Login:** `admin@prefeitura-x.local` / *(senha do `Seed__AdminPassword`)*
+> **Antes de começar:** abra com **Ctrl+Shift+R** (hard reload) pra pegar o bundle novo.
+> A 1ª ação pode levar ~50s (cold start do Render). Faça na ordem — um passo alimenta o próximo.
 
-> Dica: a 1ª chamada após ~15 min pode demorar ~50s (cold start do Render). Depois fica rápido.
-> Faça na ordem — um passo alimenta o próximo (ex.: criar unidade → posição → usuário → form → processo → executar).
+> 🆕 **Novidades desta rodada** estão marcadas com 🆕.
 
 ---
 
 ## 1. Sessão & conta
-- [ ] **Branding** carrega (nome do ambiente + cor primária) já na tela de login.
 - [ ] **Login** com as credenciais acima → entra no back-office.
-- [ ] **Login inválido** (senha errada) → mensagem de erro, não entra.
-- [ ] **Meus dados** (`/me`): mostra nome, e-mail, tipo (interno), perfis e nº de permissões.
-- [ ] **Trocar senha** (`/me/senha`): troca com a senha atual correta → relogar com a nova funciona.
-- [ ] **Logout** → volta ao login; rota protegida não abre mais.
+- [ ] **Login inválido** (senha errada) → erro, não entra.
+- [ ] **Meus dados** (`/me`): nome, e-mail, tipo, perfis, nº de permissões.
+- [ ] **Trocar senha** (`/me/senha`) → relogar com a nova funciona.
+- [ ] **Logout** → volta ao login.
 
-## 2. Configurações › Unidades (`/admin/unidades`)
-- [ ] Listar a árvore de unidades.
-- [ ] Criar **unidade raiz** (ex.: nome "Secretaria de Obras").
+## 2. Unidades (`/admin/unidades`)
+- [ ] Criar **unidade raiz** (ex.: "Secretaria de Obras").
 - [ ] Criar **subunidade** dentro dela.
-- [ ] Editar o nome de uma unidade.
-- [ ] Tentar **excluir** unidade com subunidade/posição → bloqueado.
+- [ ] Editar nome; tentar **excluir** unidade com filho/posição → bloqueado.
 
-## 3. Configurações › Posições (`/admin/posicoes`)
+## 3. Posições (`/admin/posicoes`)
 - [ ] Selecionar a unidade → criar **posição** (ex.: "Fiscal").
-- [ ] Editar o nome da posição.
-- [ ] Excluir uma posição sem vínculo.
+- [ ] Editar e excluir uma posição sem vínculo.
 
-## 4. Configurações › Usuários (`/admin/usuarios`)
-- [ ] Criar **usuário** (ex.: "Fulano") → sistema mostra a **senha inicial gerada**.
-- [ ] Editar: atribuir **perfil de acesso** e **posição** (vincular à posição criada acima).
-- [ ] Buscar por nome/e-mail e filtrar por status.
-- [ ] **Desativar** o usuário (some dos ativos).
-- [ ] (Opcional) Logar com o Fulano numa aba anônima → confirma que a conta funciona.
+## 4. Usuários (`/admin/usuarios`) 🆕
+- [ ] **Criar usuário** com nome, e-mail **+ CPF, RG, matrícula, telefone, cargo** → mostra a senha inicial.
+- [ ] **Editar** o usuário: confirmar que os campos cadastrais (CPF etc.) **persistiram**.
+- [ ] 🆕 Na edição, seção **"Unidades e posições"**: escolher uma **unidade** → uma **posição** → **Adicionar**; ela aparece na lista. Salvar.
+- [ ] Reabrir o usuário → a posição atribuída continua lá.
+- [ ] Buscar por nome/e-mail; **desativar** (some dos ativos).
 
-## 5. Configurações › Perfis (`/admin/perfis`)
-- [ ] Listar perfis (com contagem de usuários).
-- [ ] Criar **perfil** novo marcando permissões na matriz (ex.: só `workflow:read`).
-- [ ] Editar a matriz de um perfil.
+## 5. Perfis (`/admin/perfis`)
+- [ ] Criar perfil marcando permissões na matriz; editar.
 - [ ] Tentar **excluir** o perfil **Administrador** (sistema) → bloqueado.
 
-## 6. Configurações › Logs (`/admin/logs`)
-- [ ] Abrir os logs e ver os registros das ações acima (create/update/delete).
-- [ ] Filtrar por **ação**, **tipo de entidade** e **período**.
+## 6. Logs (`/admin/logs`)
+- [ ] Ver registros das ações acima; filtrar por ação/entidade/período.
 
 ## 7. Organograma (`/organograma`)
-- [ ] Abrir e ver a árvore organizacional (as unidades/posições criadas aparecem).
+- [ ] Ver a árvore com as unidades/posições criadas.
 
-## 8. Fontes de dados (`/admin/fontes-dados`)
-- [ ] Criar fonte **Fixa** (array JSON) → **Testar** mostra a tabela de resultado.
-- [ ] Criar fonte **SQL** (um `SELECT` simples) → **Testar** retorna linhas.
-- [ ] Confirmar **sandbox**: comando de escrita (INSERT/UPDATE) é **barrado**.
+## 8. Fontes de dados — Processos (`/admin/fontes-dados`) 🆕
+- [ ] 🆕 O cabeçalho mostra **"Fontes de dados · Processos"** (sem botão "Conexões").
+- [ ] Criar fonte **Fixa** com alguns itens (valor/texto).
+- [ ] 🆕 **Ordenar** os itens: botões **↑/↓** por linha, **"por valor"** e **"por texto"** → a ordem muda. Salvar e reabrir → ordem mantida.
+- [ ] Criar fonte **SQL** (`SELECT 1 AS value, 'um' AS label`) → **Testar** retorna a linha (roda no banco do tenant).
+- [ ] Fonte SQL de escrita (`DELETE ...`) → **Testar** é **barrado**.
 - [ ] Editar e excluir uma fonte.
-- [ ] (Opcional) Criar uma **conexão externa** e usá-la numa fonte SQL.
 
-## 9. Modelos de e-mail (`/admin/modelos-email`)
-- [ ] Criar template com **assunto e corpo** usando placeholders (ex.: `Olá {{requisitante.nome}}`, `{{formulario.assunto}}`).
-- [ ] Adicionar **destinatário** (ex.: tipo `requester` em "Para").
-- [ ] Usar o **Preview** com valores fictícios → placeholders resolvidos.
-- [ ] Editar e excluir um template.
+## 9. Fontes de dados — Relatórios (`/admin/relatorios` → Fontes de dados) 🆕
+- [ ] 🆕 Abrir por **Relatórios e Dashboards → Fontes de dados** → cabeçalho mostra **"· Relatórios"**.
+- [ ] Criar uma fonte aqui → ela **NÃO** aparece na lista de Processos (e vice-versa). ✅ escopos separados.
 
-## 10. Formulários (`/admin/formularios`)
-- [ ] Criar **formulário** com um grupo e campos (ex.: `assunto` texto, `valor` número, `decisao` select). Anote as **keys**.
-- [ ] Ver o **preview ao vivo** refletindo os campos.
-- [ ] Configurar opções avançadas de um campo (obrigatório, help-text, máscara).
-- [ ] **Máscaras**: criar uma máscara (regex) e testá-la ao vivo.
-- [ ] **Scripts**: criar um script, ver o **lint ao vivo**, salvar revisão e fazer **rollback**.
-- [ ] **Testes de script**: criar teste (input/expected), rodar; confirmar que **publicar** bloqueia se algum teste falha.
+## 10. Modelos de e-mail (`/admin/modelos-email`)
+- [ ] Criar template com assunto/corpo usando placeholders (`{{requisitante.nome}}`).
+- [ ] Adicionar destinatário (tipo `requester`); usar **Preview**.
 
-## 11. Processos › Modelador (`/admin/processos`)
-- [ ] Listar processos (`/admin/processos`).
-- [ ] Criar **processo** no modelador: início → tarefa → fim.
-- [ ] Vincular o **formulário** do passo 10.
-- [ ] Configurar **botões de ação** na tarefa (ex.: "Aprovar"/"Reprovar").
-- [ ] Configurar o **ator** da tarefa (área + posição).
-- [ ] **Salvar rascunho** → aviso de "alterações pendentes" some após salvar.
-- [ ] **Versionar processo** → a versão sobe.
-- [ ] **Validação/lint**: um diagrama quebrado retorna issues e não publica.
-- [ ] **Publicar** (status → published) → aparece na lista com status correto.
+## 11. Modelador / Formulário do processo (`/admin/processos`) 🆕
+- [ ] 🆕 Confirmar que **não existe mais** o item "Formulários" no menu (forms vivem no processo).
+- [ ] Criar **processo**: início → tarefa → fim.
+- [ ] Aba **Formulário**: adicionar grupo + campos (ex.: `assunto` texto, `valor` número, `decisao` select com opções).
+- [ ] 🆕 Aba Formulário → botão **"Máscaras"** abre o gestor de máscaras (criar uma regex + testar).
+- [ ] Na tarefa: configurar **botões** ("Aprovar"/"Reprovar") e **ator** (área + posição).
+- [ ] **Salvar** rascunho (aviso "alterações pendentes" some) → **Publicar**.
+- [ ] 🆕 **Editar o processo já publicado** e **Salvar** → toast diz **"Rascunho salvo v2"** (cria rascunho à parte, **sem erro/sem 409**). A versão publicada continua valendo.
+- [ ] 🆕 **Publicar** de novo → o rascunho v2 vira a versão publicada.
+- [ ] Para a execução, publique 3 variações: **simples**, **gateway por valor**, **paralelo (join)**.
 
-> Para a execução, crie e **publique** 3 variações: **simples** (início→tarefa→fim),
-> **gateway** (rota por valor do form), **paralelo** (2 ramos → join → tarefa final).
-
-## 12. Execução › Serviços (`/servicos`)
+## 12. Serviços → iniciar em nova aba (`/servicos`) 🆕
 - [ ] O processo publicado aparece no catálogo.
-- [ ] **Iniciar**: preencher o formulário inicial → inicia a instância.
+- [ ] 🆕 **Iniciar** → abre uma **NOVA ABA** só com o formulário (sem menus laterais).
+- [ ] 🆕 O formulário é renderizado com **campos nativos** (não o form-js); validação de obrigatório funciona.
+- [ ] Preencher → **Iniciar** → tela **"Solicitação iniciada!"**; fechar a aba.
 
-## 13. Execução › Tarefas (`/tarefas`)
-- [ ] A tarefa pendente aparece (para o ator correto).
-- [ ] **Abrir** a tarefa: form carrega com os dados + botões.
-- [ ] **Concluir** por um botão → a instância avança/encerra.
-- [ ] **Gateway por valor**: iniciar com `valor>=100` cria a tarefa; com valor baixo, encerra direto.
-- [ ] **Join paralelo**: concluir só 1 ramo não libera; concluir o 2º libera a tarefa final (uma vez).
+## 13. Tarefas (`/tarefas`)
+- [ ] A tarefa pendente aparece para o ator correto.
+- [ ] Abrir → preencher → **Concluir** por um botão → instância avança/encerra.
+- [ ] **Gateway por valor**: iniciar com `valor>=100` cria a tarefa; valor baixo encerra direto.
+- [ ] **Join paralelo**: concluir 1 ramo não libera; concluir o 2º libera a tarefa final (uma vez).
 
-## 14. Execução › Consultas (`/consultas`)
-- [ ] Lista as instâncias com status e nº de tarefas pendentes.
-- [ ] Filtrar por **processo (busca)**, **status** e **"apenas as que iniciei"**.
-- [ ] Abrir o **detalhe** (Ver): dados do formulário + **histórico de tarefas**.
-
-## 15. Permissões (amostragem)
-- [ ] Com um usuário **sem** `workflow:read`, Serviços/Tarefas/Consultas ficam indisponíveis.
-- [ ] Toda ação relevante (create/update/delete/publish) **aparece nos Logs**.
+## 14. Consultas (`/consultas`)
+- [ ] Lista as instâncias com status e nº de pendentes.
+- [ ] Filtrar por processo/status/"apenas as que iniciei".
+- [ ] Abrir o **detalhe** (Ver): dados do formulário + histórico de tarefas.
 
 ---
 
-### Observações do ambiente publicado
-- **Tenant fixo** `prefeitura-x` (GitHub Pages é host único).
-- **Evento de e-mail**: o disparo funciona, mas **não envia** de verdade — o `LoggingEmailSender`
-  registra destinatário/assunto/corpo no **log do Render** (não há SMTP neste ambiente provisório).
-- **Scripts de formulário** rodam no **navegador** (Web Worker), isolados.
+### Observações
+- **Tenant fixo** `prefeitura-x` (Pages é host único).
+- **Evento de e-mail**: dispara mas **não envia** — registra no **log do Render** (sem SMTP).
+- **Scripts de formulário**: a entrada saiu junto com a página de Formulários (o form do
+  processo é embutido e não tem id próprio para scripts) — fora de escopo nesta rodada.
