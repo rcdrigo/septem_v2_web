@@ -6,7 +6,11 @@ Telas integradas ponta a ponta. **Ambiente:** `https://rcdrigo.github.io/septem_
 > **Antes de começar:** abra com **Ctrl+Shift+R** (hard reload) pra pegar o bundle novo.
 > A 1ª ação pode levar ~50s (cold start do Render). Faça na ordem — um passo alimenta o próximo.
 
-> 🆕 **Novidades desta rodada** estão marcadas com 🆕.
+> 🆕 **Novidades desta rodada** estão marcadas com 🆕. Itens já validados aparecem **✅ TESTADO**.
+
+> **Dados de exemplo já cadastrados** (não precisa criar do zero): unidades _Prefeitura ›
+> Secretaria de ADM / Secretaria de Obras › Fiscalização / Protocolo Geral_ e posições
+> (Engenheiro, Fiscal de Obras, Fiscal, Atendente, Analista/Assistente/Diretor Administrativo…).
 
 ---
 
