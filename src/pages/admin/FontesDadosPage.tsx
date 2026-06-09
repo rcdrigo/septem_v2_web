@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Database, Pencil, Plus, Plug, Play, Trash2, X } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Database, Pencil, Plus, Play, Trash2, X } from 'lucide-react';
 import {
   useDataSourcesList,
   useDataSource,
@@ -7,10 +8,8 @@ import {
   useUpdateDataSource,
   useDeleteDataSource,
   useTestDataSource,
-  useExternalConnections,
-  useCreateExternalConnection,
-  useDeleteExternalConnection,
   type DataSourceListItem,
+  type DataSourceScope,
   type DataSourceType,
   type TestResult,
 } from '@/lib/api/data-sources';
@@ -23,15 +22,16 @@ import { ApiError } from '@/lib/api';
 const TYPE_LABEL: Record<DataSourceType, string> = { fixed: 'Fixa', sql: 'SQL', api: 'API (JSON)' };
 
 /**
- * Admin › Configurações › Fontes de dados (T1). Lista + editor por tipo
- * (Fixa / SQL / API) com "Testar" (executa sob o sandbox e mostra a tabela de
- * resultado) e gestão das conexões externas usadas pelas fontes SQL.
+ * Fontes de dados (T1). Lista + editor por tipo (Fixa / SQL / API) com "Testar".
+ * O escopo (process/report) vem da query `?scope=report` — fontes de processo e
+ * de relatório são listadas e criadas separadamente.
  */
 export function FontesDadosPage() {
-  const list = useDataSourcesList();
+  const [params] = useSearchParams();
+  const scope: DataSourceScope = params.get('scope') === 'report' ? 'report' : 'process';
+  const list = useDataSourcesList(scope);
   const [editId, setEditId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [connsOpen, setConnsOpen] = useState(false);
   const del = useDeleteDataSource();
 
   async function askDelete(d: DataSourceListItem) {
@@ -44,11 +44,10 @@ export function FontesDadosPage() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="text-lg font-semibold text-slate-900">Fontes de dados</h1>
+        <h1 className="text-lg font-semibold text-slate-900">
+          Fontes de dados <span className="text-sm font-normal text-slate-400">· {scope === 'report' ? 'Relatórios' : 'Processos'}</span>
+        </h1>
         <div className="flex gap-2">
-          <button type="button" onClick={() => setConnsOpen(true)} className="flex items-center gap-2 rounded-md border border-slate-300 px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-            <Plug size={16} /> Conexões
-          </button>
           <button type="button" onClick={() => setCreating(true)} className="flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-700">
             <Plus size={16} /> Nova fonte
           </button>
@@ -87,9 +86,8 @@ export function FontesDadosPage() {
         )}
       </div>
 
-      {creating && <DataSourceDialog onClose={() => setCreating(false)} />}
-      {editId && <DataSourceDialog id={editId} onClose={() => setEditId(null)} />}
-      {connsOpen && <ConnectionsDialog onClose={() => setConnsOpen(false)} />}
+      {creating && <DataSourceDialog scope={scope} onClose={() => setCreating(false)} />}
+      {editId && <DataSourceDialog id={editId} scope={scope} onClose={() => setEditId(null)} />}
     </div>
   );
 }
@@ -98,9 +96,8 @@ export function FontesDadosPage() {
 type FixedItem = { value: string; label: string };
 type ApiHeader = { k: string; v: string };
 
-function DataSourceDialog({ id, onClose }: { id?: string; onClose: () => void }) {
+function DataSourceDialog({ id, scope, onClose }: { id?: string; scope: DataSourceScope; onClose: () => void }) {
   const detail = useDataSource(id ?? null);
-  const conns = useExternalConnections();
   const create = useCreateDataSource();
   const update = useUpdateDataSource();
   const test = useTestDataSource();
@@ -109,7 +106,6 @@ function DataSourceDialog({ id, onClose }: { id?: string; onClose: () => void })
   const [description, setDescription] = useState('');
   const [type, setType] = useState<DataSourceType>('fixed');
   const [items, setItems] = useState<FixedItem[]>([{ value: '', label: '' }]);
-  const [connectionId, setConnectionId] = useState('');
   const [query, setQuery] = useState('');
   const [url, setUrl] = useState('');
   const [method, setMethod] = useState('GET');
@@ -123,14 +119,14 @@ function DataSourceDialog({ id, onClose }: { id?: string; onClose: () => void })
     const d = detail.data; const cfg = (d.config ?? {}) as any;
     setName(d.name); setDescription(d.description ?? ''); setType(d.type);
     if (d.type === 'fixed') setItems(cfg.items?.length ? cfg.items : [{ value: '', label: '' }]);
-    if (d.type === 'sql') { setConnectionId(cfg.connectionId ?? ''); setQuery(cfg.query ?? ''); }
+    if (d.type === 'sql') setQuery(cfg.query ?? '');
     if (d.type === 'api') { setUrl(cfg.url ?? ''); setMethod(cfg.method ?? 'GET'); setHeaders(cfg.headers ?? []); setBody(cfg.body ?? ''); setMapping(cfg.mapping ?? { repeat: '', value: '', text: '' }); }
     setHydrated(true);
   }
 
   function buildConfig(): unknown {
     if (type === 'fixed') return { items: items.filter((i) => i.value || i.label) };
-    if (type === 'sql') return { connectionId, query };
+    if (type === 'sql') return { query };
     return { url, method, headers: headers.filter((h) => h.k), body, mapping };
   }
 
@@ -142,7 +138,7 @@ function DataSourceDialog({ id, onClose }: { id?: string; onClose: () => void })
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    const body = { name, description: description || undefined, type, config: buildConfig() };
+    const body = { name, description: description || undefined, scope, type, config: buildConfig() };
     try {
       if (id) await update.mutateAsync({ id, body }); else await create.mutateAsync(body);
       toast.success(id ? 'Fonte atualizada.' : `Fonte "${name}" criada.`);
@@ -169,14 +165,9 @@ function DataSourceDialog({ id, onClose }: { id?: string; onClose: () => void })
 
         {type === 'fixed' && <FixedEditor items={items} setItems={setItems} />}
         {type === 'sql' && (
-          <>
-            <Field label="Conexão" hint="Vazio = banco do tenant (read-only). Ou escolha um Postgres externo cadastrado.">
-              <Select value={connectionId} options={(conns.data ?? []).map((c) => ({ value: c.id, label: c.name }))} placeholder="Banco do tenant (padrão)" onChange={(e) => setConnectionId(e.target.value)} />
-            </Field>
-            <Field label="Consulta (SELECT ou procedure — somente leitura)" hint="1 coluna → valor=texto; 2 → valor,texto; 3+ → viram atributos data-*. Use @parametros.">
-              <TextArea rows={5} value={query} onChange={(e) => setQuery(e.target.value)} className="font-mono text-xs" placeholder="SELECT id, nome FROM setores ORDER BY nome" />
-            </Field>
-          </>
+          <Field label="Consulta (SELECT ou procedure — somente leitura)" hint="Roda no banco do tenant. 1 coluna → valor=texto; 2 → valor,texto. Use @parametros.">
+            <TextArea rows={5} value={query} onChange={(e) => setQuery(e.target.value)} className="font-mono text-xs" placeholder="SELECT id, nome FROM setores ORDER BY nome" />
+          </Field>
         )}
         {type === 'api' && (
           <ApiEditor url={url} setUrl={setUrl} method={method} setMethod={setMethod} headers={headers} setHeaders={setHeaders} body={body} setBody={setBody} mapping={mapping} setMapping={setMapping} />
@@ -189,11 +180,31 @@ function DataSourceDialog({ id, onClose }: { id?: string; onClose: () => void })
 }
 
 function FixedEditor({ items, setItems }: { items: FixedItem[]; setItems: (v: FixedItem[]) => void }) {
+  function move(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= items.length) return;
+    const next = items.slice();
+    [next[i], next[j]] = [next[j], next[i]];
+    setItems(next);
+  }
+  function sortBy(field: 'value' | 'label') {
+    setItems([...items].sort((a, b) => (a[field] ?? '').localeCompare(b[field] ?? '', 'pt-BR', { numeric: true })));
+  }
   return (
     <Field label="Itens">
+      <div className="mb-1.5 flex items-center gap-2 text-xs">
+        <span className="text-slate-400">Ordenar:</span>
+        <button type="button" onClick={() => sortBy('value')} className="rounded border border-slate-300 px-2 py-0.5 font-medium text-slate-600 hover:bg-slate-50">por valor</button>
+        <button type="button" onClick={() => sortBy('label')} className="rounded border border-slate-300 px-2 py-0.5 font-medium text-slate-600 hover:bg-slate-50">por texto</button>
+        <span className="text-slate-400">· use ↑/↓ para ordenar manualmente</span>
+      </div>
       <div className="flex flex-col gap-1.5">
         {items.map((it, i) => (
-          <div key={i} className="flex gap-2">
+          <div key={i} className="flex items-center gap-2">
+            <div className="flex flex-col">
+              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="leading-none text-slate-400 hover:text-slate-800 disabled:opacity-30" title="Subir">▲</button>
+              <button type="button" onClick={() => move(i, 1)} disabled={i === items.length - 1} className="leading-none text-slate-400 hover:text-slate-800 disabled:opacity-30" title="Descer">▼</button>
+            </div>
             <TextInput value={it.value} placeholder="valor" onChange={(e) => setItems(items.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} />
             <TextInput value={it.label} placeholder="texto" onChange={(e) => setItems(items.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
             <button type="button" onClick={() => setItems(items.filter((_, j) => j !== i))} className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-700"><X size={15} /></button>
@@ -258,38 +269,3 @@ function ResultTable({ result }: { result: TestResult }) {
   );
 }
 
-// ── conexões externas ──────────────────────────────────────────────────
-function ConnectionsDialog({ onClose }: { onClose: () => void }) {
-  const conns = useExternalConnections();
-  const create = useCreateExternalConnection();
-  const del = useDeleteExternalConnection();
-  const [name, setName] = useState('');
-  const [connStr, setConnStr] = useState('');
-
-  async function add(e: React.FormEvent) {
-    e.preventDefault();
-    try { await create.mutateAsync({ name, provider: 'postgres', connectionString: connStr }); toast.success('Conexão adicionada.'); setName(''); setConnStr(''); }
-    catch { toast.error('Falha ao adicionar a conexão.'); }
-  }
-
-  return (
-    <Dialog open onClose={onClose} width="lg" title="Conexões externas" footer={<button onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Fechar</button>}>
-      <p className="mb-3 text-sm text-slate-600">Bancos externos (somente leitura) usados pelas fontes SQL. A string de conexão é guardada cifrada.</p>
-      <div className="mb-4 overflow-hidden rounded-md border border-slate-200">
-        {conns.data?.length === 0 && <p className="px-3 py-3 text-sm text-slate-400">Nenhuma conexão cadastrada.</p>}
-        {conns.data?.map((c) => (
-          <div key={c.id} className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-sm last:border-b-0">
-            <span><span className="font-medium text-slate-800">{c.name}</span> <span className="text-xs text-slate-500">({c.provider})</span></span>
-            <button type="button" onClick={() => del.mutate(c.id)} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-700"><Trash2 size={14} /></button>
-          </div>
-        ))}
-      </div>
-      <form onSubmit={add} className="flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nova conexão</p>
-        <TextInput required value={name} placeholder="Nome (ex: Postgres de referência)" onChange={(e) => setName(e.target.value)} />
-        <TextInput required value={connStr} placeholder="Connection string Postgres (login read-only)" onChange={(e) => setConnStr(e.target.value)} className="font-mono text-xs" />
-        <button type="submit" disabled={!name || !connStr || create.isPending} className="self-start rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">Adicionar</button>
-      </form>
-    </Dialog>
-  );
-}

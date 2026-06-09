@@ -7,9 +7,13 @@ import {
   useUpdateUser,
   useDeleteUser,
   type UserListItem,
+  type UserCadastral,
+  type UserPositionRef,
   type CreatedUser,
 } from '@/lib/api/users';
 import { useAccessProfiles } from '@/lib/api/access-profiles';
+import { useOrgUnitsFlat } from '@/lib/api/org-units';
+import { usePositions } from '@/lib/api/positions';
 import { Dialog } from '@/components/ui/Dialog';
 import { Field, TextInput } from '@/components/ui/Field';
 import { confirm } from '@/components/ui/ConfirmDialog';
@@ -183,18 +187,19 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [isInternal, setIsInternal] = useState(true);
+  const [cadastral, setCadastral] = useState<UserCadastral>({});
   const [result, setResult] = useState<CreatedUser | null>(null);
   const create = useCreateUser();
 
   function handleClose() {
-    setName(''); setEmail(''); setIsInternal(true); setResult(null);
+    setName(''); setEmail(''); setIsInternal(true); setCadastral({}); setResult(null);
     onClose();
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const created = await create.mutateAsync({ name, email, isInternal });
+      const created = await create.mutateAsync({ name, email, isInternal, ...cadastral });
       setResult(created);
     } catch (err) {
       const msg = err instanceof ApiError && err.status === 409 ? 'E-mail já em uso.' : 'Não foi possível criar.';
@@ -235,6 +240,7 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
         <Field label="E-mail">
           <TextInput required type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
+        <CadastralGrid value={cadastral} onChange={setCadastral} />
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={isInternal} onChange={(e) => setIsInternal(e.target.checked)} />
           Usuário interno (funcionário)
@@ -253,12 +259,16 @@ function EditUserDialog({ id, onClose }: { id: string; onClose: () => void }) {
   const [name, setName] = useState('');
   const [status, setStatus] = useState<'active' | 'disabled' | 'invited'>('active');
   const [profileIds, setProfileIds] = useState<Set<string>>(new Set());
+  const [cadastral, setCadastral] = useState<UserCadastral>({});
+  const [positions, setPositions] = useState<UserPositionRef[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
   if (user.data && !hydrated) {
     setName(user.data.name);
     setStatus(user.data.status);
     setProfileIds(new Set(user.data.accessProfiles.map((p) => p.id)));
+    setCadastral({ rg: user.data.rg, cpf: user.data.cpf, matricula: user.data.matricula, telefone: user.data.telefone, cargo: user.data.cargo });
+    setPositions(user.data.positions);
     setHydrated(true);
   }
 
@@ -273,7 +283,10 @@ function EditUserDialog({ id, onClose }: { id: string; onClose: () => void }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await update.mutateAsync({ id, body: { name, status, accessProfileIds: Array.from(profileIds) } });
+      await update.mutateAsync({ id, body: {
+        name, status, accessProfileIds: Array.from(profileIds),
+        positionIds: positions.map((p) => p.id), ...cadastral,
+      } });
       toast.success('Alterações salvas.');
       onClose();
     } catch {
@@ -302,6 +315,7 @@ function EditUserDialog({ id, onClose }: { id: string; onClose: () => void }) {
           <Field label="E-mail">
             <TextInput value={user.data.email} readOnly className="bg-slate-50 text-slate-500" />
           </Field>
+          <CadastralGrid value={cadastral} onChange={setCadastral} />
           <Field label="Status">
             <select
               value={status}
@@ -326,8 +340,74 @@ function EditUserDialog({ id, onClose }: { id: string; onClose: () => void }) {
               {profiles.data && profiles.data.length === 0 && <span className="text-xs text-slate-400">Nenhum perfil cadastrado.</span>}
             </div>
           </Field>
+          <Field label="Unidades e posições">
+            <PositionsEditor positions={positions} onChange={setPositions} />
+          </Field>
         </form>
       )}
     </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+/** Campos cadastrais opcionais (RG, CPF, matrícula, telefone, cargo). */
+function CadastralGrid({ value, onChange }: { value: UserCadastral; onChange: (v: UserCadastral) => void }) {
+  const set = (k: keyof UserCadastral) => (e: React.ChangeEvent<HTMLInputElement>) => onChange({ ...value, [k]: e.target.value });
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <Field label="CPF"><TextInput value={value.cpf ?? ''} onChange={set('cpf')} /></Field>
+      <Field label="RG"><TextInput value={value.rg ?? ''} onChange={set('rg')} /></Field>
+      <Field label="Matrícula"><TextInput value={value.matricula ?? ''} onChange={set('matricula')} /></Field>
+      <Field label="Telefone"><TextInput value={value.telefone ?? ''} onChange={set('telefone')} /></Field>
+      <div className="col-span-2"><Field label="Cargo"><TextInput value={value.cargo ?? ''} onChange={set('cargo')} /></Field></div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+/** Atribui unidades organizacionais + posições ao usuário (mapeia para positionIds). */
+function PositionsEditor({ positions, onChange }: { positions: UserPositionRef[]; onChange: (v: UserPositionRef[]) => void }) {
+  const [orgId, setOrgId] = useState('');
+  const [posId, setPosId] = useState('');
+  const orgs = useOrgUnitsFlat();
+  const orgPositions = usePositions(orgId || null);
+
+  function add() {
+    if (!posId) return;
+    if (positions.some((p) => p.id === posId)) return;
+    const org = orgs.data?.find((o) => o.id === orgId);
+    const pos = orgPositions.data?.find((p) => p.id === posId);
+    if (!org || !pos) return;
+    onChange([...positions, { id: pos.id, key: pos.key, name: pos.name, orgUnitId: org.id, orgUnitName: org.name }]);
+    setPosId('');
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 p-2">
+      {positions.length === 0 && <span className="text-xs text-slate-400">Nenhuma posição atribuída.</span>}
+      {positions.map((p) => (
+        <div key={p.id} className="flex items-center justify-between rounded border border-slate-200 bg-white px-2 py-1 text-sm">
+          <span className="text-slate-700"><span className="text-slate-400">{p.orgUnitName} ·</span> {p.name}</span>
+          <button type="button" onClick={() => onChange(positions.filter((x) => x.id !== p.id))} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-700"><Trash2 size={14} /></button>
+        </div>
+      ))}
+      <div className="flex items-end gap-2">
+        <label className="flex-1 text-xs text-slate-500">
+          Unidade
+          <select value={orgId} onChange={(e) => { setOrgId(e.target.value); setPosId(''); }} className="mt-0.5 w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm">
+            <option value="">Selecione…</option>
+            {orgs.data?.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>
+        </label>
+        <label className="flex-1 text-xs text-slate-500">
+          Posição
+          <select value={posId} onChange={(e) => setPosId(e.target.value)} disabled={!orgId} className="mt-0.5 w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm disabled:bg-slate-100">
+            <option value="">Selecione…</option>
+            {orgPositions.data?.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </label>
+        <button type="button" onClick={add} disabled={!posId} className="rounded-md bg-slate-700 px-2.5 py-1.5 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-40">Adicionar</button>
+      </div>
+    </div>
   );
 }

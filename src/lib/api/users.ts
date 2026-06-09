@@ -9,9 +9,19 @@ export type UserListItem = {
   isInternal: boolean;
 };
 
-export type UserDetail = UserListItem & {
+export type UserCadastral = {
+  rg?: string | null;
+  cpf?: string | null;
+  matricula?: string | null;
+  telefone?: string | null;
+  cargo?: string | null;
+};
+
+export type UserPositionRef = { id: string; key: string; name: string; orgUnitId: string; orgUnitName: string };
+
+export type UserDetail = UserListItem & UserCadastral & {
   accessProfiles: { id: string; name: string }[];
-  positions: { id: string; key: string; orgUnitId: string }[];
+  positions: UserPositionRef[];
 };
 
 export type CreatedUser = {
@@ -57,11 +67,12 @@ export function useUser(id: string | null) {
   });
 }
 
+export type CreateUserBody = { name: string; email: string; isInternal: boolean } & UserCadastral;
+
 export function useCreateUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name: string; email: string; isInternal: boolean }) =>
-      api.post<CreatedUser>('/api/v1/users/', body),
+    mutationFn: (body: CreateUserBody) => api.post<CreatedUser>('/api/v1/users/', body),
     onSuccess: () => qc.invalidateQueries({ queryKey: userKeys.all }),
   });
 }
@@ -71,7 +82,7 @@ export type UpdateUserBody = {
   status?: 'active' | 'disabled' | 'invited';
   accessProfileIds?: string[];
   positionIds?: string[];
-};
+} & UserCadastral;
 
 export function useUpdateUser() {
   const qc = useQueryClient();

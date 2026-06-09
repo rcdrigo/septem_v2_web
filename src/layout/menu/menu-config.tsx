@@ -7,7 +7,6 @@ import {
   Database,
   FileSearch,
   FileStack,
-  FileText,
   FolderTree,
   LayoutDashboard,
   LayoutGrid,
@@ -62,7 +61,6 @@ export const MENU: MenuByMode = {
             perm: 'workflow:read',
             children: [
               { kind: 'link', label: 'Processos', to: '/admin/processos', icon: Workflow },
-              { kind: 'link', label: 'Formulários', to: '/admin/formularios', icon: FileText },
               { kind: 'link', label: 'Categorias', to: '/admin/processos/categorias', icon: Tags },
               { kind: 'link', label: 'Modelos de e-mails', to: '/admin/modelos-email', icon: Mail },
               { kind: 'link', label: 'Modelos de documentos', to: '/admin/modelos-doc', icon: FileStack },
@@ -78,7 +76,7 @@ export const MENU: MenuByMode = {
               { kind: 'link', label: 'Relatórios', to: '/admin/relatorios', icon: FileSearch },
               { kind: 'link', label: 'Categorias', to: '/admin/relatorios/categorias', icon: Tags },
               { kind: 'link', label: 'Dashboards', to: '/admin/dashboards', icon: BarChart3 },
-              { kind: 'link', label: 'Fontes de dados', to: '/admin/fontes-dados', icon: Database },
+              { kind: 'link', label: 'Fontes de dados', to: '/admin/fontes-dados?scope=report', icon: Database },
             ],
           },
           {

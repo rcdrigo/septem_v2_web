@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { LayoutTemplate, RefreshCcw } from 'lucide-react';
+import { LayoutTemplate, RefreshCcw, Regex } from 'lucide-react';
 import { IconButton } from '@/components/ui/IconButton';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { FormBuilder, type FormBuilderHandle } from '@/components/form/FormBuilder';
+import { MasksDialog } from '@/components/form/MasksDialog';
 import { extractFields } from '@/lib/form-schema';
 import { useFormStore } from '@/stores/form';
 import { getEmbeddedFormSchema, setEmbeddedFormSchema } from '@/lib/bpmn-process';
@@ -31,6 +32,7 @@ export function FormularioView({ modeler }: Props) {
   const builderRef = useRef<FormBuilderHandle>(null);
   const setFields = useFormStore((s) => s.setFields);
   const [ready, setReady] = useState(false);
+  const [masksOpen, setMasksOpen] = useState(false);
   const lastSerialized = useRef<string>('');
 
   // 1) Carrega o schema persistido (preferindo o XML; cai pra localStorage)
@@ -104,6 +106,10 @@ export function FormularioView({ modeler }: Props) {
           </p>
         </div>
         <div className="flex gap-2">
+          <IconButton onClick={() => setMasksOpen(true)}>
+            <Regex size={14} />
+            Máscaras
+          </IconButton>
           <IconButton onClick={handleReset}>
             <RefreshCcw size={14} />
             Limpar formulário
@@ -115,6 +121,7 @@ export function FormularioView({ modeler }: Props) {
         </div>
       </header>
       <FormBuilder ref={builderRef} />
+      {masksOpen && <MasksDialog onClose={() => setMasksOpen(false)} />}
     </div>
   );
 }

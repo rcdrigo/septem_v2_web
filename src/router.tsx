@@ -16,7 +16,7 @@ import { TarefasPage } from './pages/TarefasPage';
 import { InstanciasPage } from './pages/InstanciasPage';
 import { FontesDadosPage } from './pages/admin/FontesDadosPage';
 import { ModelosEmailPage } from './pages/admin/ModelosEmailPage';
-import { FormulariosPage } from './pages/admin/FormulariosPage';
+import { ServicoFormPage } from './pages/ServicoFormPage';
 import { StubPage } from './pages/StubPage';
 
 /** Açúcar para registrar uma rota que ainda só tem placeholder. */
@@ -27,6 +27,8 @@ function stub(path: string, title: string, opts?: { phase?: string; hint?: strin
 export const router = createBrowserRouter(
   [
     { path: '/login', element: <LoginPage /> },
+    // Aba limpa (sem menus) para preencher e iniciar um serviço.
+    { path: '/servico/:processKey', element: <ServicoFormPage /> },
     {
       path: '/',
       element: <AppShell />,
@@ -44,7 +46,6 @@ export const router = createBrowserRouter(
         { path: 'admin/processos', element: <ProcessosPage /> },
         // Modelador (BPMN + form) — vive dentro de Processos, aberto via "Novo/Editar".
         { path: 'admin/processos/editar', element: <ModeladorPage /> },
-        { path: 'admin/formularios', element: <FormulariosPage /> },
         stub('admin/processos/categorias', 'Categorias de processos', { phase: 'Fase 3' }),
         { path: 'admin/modelos-email', element: <ModelosEmailPage /> },
         stub('admin/modelos-doc', 'Modelos de documentos', { phase: 'Fase 7' }),
