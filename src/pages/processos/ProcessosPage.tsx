@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Send, Workflow, Archive } from 'lucide-react';
 import {
   useProcessList,
@@ -17,8 +16,13 @@ import { ApiError } from '@/lib/api';
  * (última versão por key), com busca/status/paginação e ações publicar/inativar.
  * "Novo" e "Editar" abrem o modelador (este último com `?key=`).
  */
+/** Abre o modelador em aba própria (sem menu lateral). `key` omitido = novo processo. */
+function openModeler(key?: string) {
+  const qs = key ? `?key=${encodeURIComponent(key)}` : '';
+  window.open(`${import.meta.env.BASE_URL}processos/editar${qs}`, '_blank', 'noopener');
+}
+
 export function ProcessosPage() {
-  const navigate = useNavigate();
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
@@ -32,7 +36,7 @@ export function ProcessosPage() {
   const del = useDeleteProcess();
 
   function edit(key: string) {
-    navigate(`/admin/processos/editar?key=${encodeURIComponent(key)}`);
+    openModeler(key);
   }
 
   async function publish(p: ProcessListItem) {
@@ -67,7 +71,7 @@ export function ProcessosPage() {
         <h1 className="text-lg font-semibold text-slate-900">Processos</h1>
         <button
           type="button"
-          onClick={() => navigate('/admin/processos/editar')}
+          onClick={() => openModeler()}
           className="flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700"
         >
           <Plus size={16} /> Novo processo
@@ -99,7 +103,7 @@ export function ProcessosPage() {
 
       <div className="flex-1 overflow-auto p-6">
         {!list.isLoading && total === 0 ? (
-          <EmptyState onNew={() => navigate('/admin/processos/editar')} hasFilters={!!q || !!status} />
+          <EmptyState onNew={() => openModeler()} hasFilters={!!q || !!status} />
         ) : (
           <>
             <table className="w-full overflow-hidden rounded-md border border-slate-200 bg-white text-sm">

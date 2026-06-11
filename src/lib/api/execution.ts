@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 export type StartedInstance = { executionId: string; status: string; tasks: { id: string; name: string | null }[] };
-export type MyTask = { id: string; name: string | null; executionId: string; createdAt: string };
+export type MyTask = { id: string; name: string | null; executionId: string; createdAt: string; dueAt: string | null };
 export type TaskButton = { id: string; label: string; validateForm: boolean; primaryColor?: string | null; textColor?: string | null };
 export type TaskDetail = {
   id: string; name: string | null; status: string; executionId: string;
@@ -45,7 +45,7 @@ export function useCompleteTask() {
 // ── instâncias (acompanhamento) ───────────────────────────────────────
 export type InstanceListItem = { id: string; process: string | null; status: string; startedAt: string; endedAt: string | null; pendingTasks: number };
 export type InstancesPage = { items: InstanceListItem[]; total: number; page: number; pageSize: number };
-export type InstanceTask = { id: string; name: string | null; status: string; assigneeId: number | null; createdAt: string; completedAt: string | null; action: string | null };
+export type InstanceTask = { id: string; name: string | null; status: string; assignee: string | null; completedBy: string | null; createdAt: string; completedAt: string | null; dueAt: string | null; action: string | null };
 export type InstanceDetail = { id: string; process: string | null; status: string; startedAt: string; endedAt: string | null; data: unknown; tasks: InstanceTask[] };
 export type InstancesParams = { q?: string; status?: string; mine?: boolean; page?: number; pageSize?: number };
 

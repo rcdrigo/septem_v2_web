@@ -1,22 +1,26 @@
 import { useRef, useState } from 'react';
-import { CheckCircle2, Inbox } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Inbox } from 'lucide-react';
 import { useMyTasks, useTask, useCompleteTask, type MyTask, type TaskButton } from '@/lib/api/execution';
-import { FormFill, type FormFillHandle } from '@/components/form/FormFill';
-import { Dialog } from '@/components/ui/Dialog';
+import { ReactForm, type ReactFormHandle } from '@/components/form/ReactForm';
 import { toast } from '@/stores/toast';
 
 /**
- * Geral › Tarefas (B3): tarefas pendentes do usuário. Abrir renderiza o form-js
- * com os dados atuais; concluir (por botão) avança o fluxo.
+ * Geral › Tarefas pendentes (B3): inbox do executor — tarefas atribuídas a ele
+ * para concluir (concluir avança o fluxo). Abrir renderiza o form-js em página
+ * inteira (req. 3 — full-width) com os botões de conclusão sempre visíveis no
+ * rodapé (req. 4).
  */
 export function TarefasPage() {
   const tasks = useMyTasks();
   const [openId, setOpenId] = useState<string | null>(null);
 
+  // Tarefa aberta ocupa toda a área de conteúdo (sem modal centralizado).
+  if (openId) return <TaskView taskId={openId} onClose={() => setOpenId(null)} />;
+
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="text-lg font-semibold text-slate-900">Tarefas</h1>
+        <h1 className="text-lg font-semibold text-slate-900">Tarefas pendentes</h1>
       </header>
       <div className="flex-1 overflow-auto p-6">
         {!tasks.isLoading && (tasks.data?.length ?? 0) === 0 ? (
@@ -27,13 +31,14 @@ export function TarefasPage() {
           </div>
         ) : (
           <table className="w-full overflow-hidden rounded-md border border-slate-200 bg-white text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-2 text-left">Tarefa</th><th className="px-4 py-2 text-left">Recebida</th><th className="px-4 py-2 w-24" /></tr></thead>
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-2 text-left">Tarefa</th><th className="px-4 py-2 text-left">Recebida</th><th className="px-4 py-2 text-left">Prazo</th><th className="px-4 py-2 w-24" /></tr></thead>
             <tbody>
-              {tasks.isLoading && <tr><td colSpan={3} className="px-4 py-8 text-center text-slate-400">Carregando...</td></tr>}
+              {tasks.isLoading && <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">Carregando...</td></tr>}
               {tasks.data?.map((t: MyTask) => (
                 <tr key={t.id} className="border-t border-slate-100 hover:bg-slate-50">
                   <td className="px-4 py-2 font-medium text-slate-800">{t.name ?? 'Tarefa'}</td>
                   <td className="px-4 py-2 text-slate-500">{new Date(t.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</td>
+                  <td className="px-4 py-2"><Prazo dueAt={t.dueAt} /></td>
                   <td className="px-4 py-2 text-right">
                     <button type="button" onClick={() => setOpenId(t.id)} className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700">Abrir</button>
                   </td>
@@ -43,15 +48,26 @@ export function TarefasPage() {
           </table>
         )}
       </div>
-      {openId && <TaskDialog taskId={openId} onClose={() => setOpenId(null)} />}
     </div>
   );
 }
 
-function TaskDialog({ taskId, onClose }: { taskId: string; onClose: () => void }) {
+/** Prazo da tarefa com destaque de atrasado. */
+function Prazo({ dueAt }: { dueAt: string | null }) {
+  if (!dueAt) return <span className="text-xs text-slate-400">—</span>;
+  const due = new Date(dueAt);
+  const overdue = due.getTime() < Date.now();
+  return (
+    <span className={`text-xs font-medium ${overdue ? 'text-rose-600' : 'text-slate-500'}`}>
+      {overdue && '⚠ '}{due.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+    </span>
+  );
+}
+
+function TaskView({ taskId, onClose }: { taskId: string; onClose: () => void }) {
   const task = useTask(taskId);
   const complete = useCompleteTask();
-  const fillRef = useRef<FormFillHandle>(null);
+  const fillRef = useRef<ReactFormHandle>(null);
 
   async function finish(button?: TaskButton) {
     const { data, errors } = fillRef.current?.submit() ?? { data: {}, errors: {} };
@@ -69,23 +85,36 @@ function TaskDialog({ taskId, onClose }: { taskId: string; onClose: () => void }
   const buttons = task.data?.buttons ?? [];
 
   return (
-    <Dialog open onClose={onClose} width="lg" title={task.data?.name ?? 'Tarefa'} footer={
-      <>
-        <button onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Fechar</button>
+    <div className="flex h-full flex-col">
+      <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-6 py-4">
+        <button type="button" onClick={onClose} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="Voltar para a lista">
+          <ArrowLeft size={18} />
+        </button>
+        <h1 className="text-lg font-semibold text-slate-900">{task.data?.name ?? 'Tarefa'}</h1>
+      </header>
+
+      {/* Container ocupa toda a largura (req. 3) */}
+      <main className="flex-1 overflow-auto p-6">
+        <div className="rounded-md border border-slate-200 bg-white p-6">
+          {task.isLoading ? <p className="text-sm text-slate-400">Carregando...</p> : <ReactForm ref={fillRef} schema={task.data?.formSchema} data={task.data?.data as Record<string, unknown> | undefined} />}
+        </div>
+      </main>
+
+      {/* Botões de conclusão sempre visíveis no rodapé (req. 4) */}
+      <footer className="flex justify-end gap-2 border-t border-slate-200 bg-white px-6 py-3">
+        <button type="button" onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Fechar</button>
         {buttons.length === 0 ? (
-          <button onClick={() => finish()} disabled={complete.isPending} className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">
+          <button type="button" onClick={() => finish()} disabled={complete.isPending || task.isLoading} className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">
             <CheckCircle2 size={15} /> Concluir
           </button>
         ) : buttons.map((b) => (
-          <button key={b.id} onClick={() => finish(b)} disabled={complete.isPending}
+          <button key={b.id} type="button" onClick={() => finish(b)} disabled={complete.isPending || task.isLoading}
             style={b.primaryColor ? { backgroundColor: b.primaryColor, color: b.textColor ?? '#fff' } : undefined}
             className={`rounded-md px-3.5 py-1.5 text-sm font-medium disabled:opacity-60 ${b.primaryColor ? '' : 'bg-slate-900 text-white hover:bg-slate-700'}`}>
             {b.label}
           </button>
         ))}
-      </>
-    }>
-      {task.isLoading ? <p className="text-sm text-slate-400">Carregando...</p> : <FormFill ref={fillRef} schema={task.data?.formSchema} data={task.data?.data} />}
-    </Dialog>
+      </footer>
+    </div>
   );
 }

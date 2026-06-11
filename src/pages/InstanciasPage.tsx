@@ -6,11 +6,24 @@ import { Dialog } from '@/components/ui/Dialog';
 const STATUS = { em_andamento: { label: 'Em andamento', cls: 'bg-sky-100 text-sky-700' }, concluido: { label: 'Concluído', cls: 'bg-emerald-100 text-emerald-700' }, cancelado: { label: 'Cancelado', cls: 'bg-rose-100 text-rose-700' } } as Record<string, { label: string; cls: string }>;
 const TASK_STATUS = { pendente: 'bg-amber-100 text-amber-700', concluida: 'bg-emerald-100 text-emerald-700' } as Record<string, string>;
 
-/** Geral › Consultas (B3): acompanhamento das instâncias de processo. */
-export function InstanciasPage() {
+type InstanciasPageProps = {
+  /** Título do cabeçalho. */
+  title?: string;
+  /** Trava em "apenas as que iniciei" (esconde o checkbox) — usado em "Minhas tarefas". */
+  lockMine?: boolean;
+  /** Status pré-selecionado (ex.: "em_andamento"). */
+  initialStatus?: string;
+};
+
+/**
+ * Acompanhamento de instâncias (B3). Reusada em duas telas:
+ *  - "Tarefas executadas": todas as instâncias, com filtros livres.
+ *  - "Minhas tarefas": travada nas instâncias que EU iniciei e em andamento.
+ */
+export function InstanciasPage({ title = 'Tarefas executadas', lockMine = false, initialStatus = '' }: InstanciasPageProps = {}) {
   const [q, setQ] = useState('');
-  const [status, setStatus] = useState('');
-  const [mine, setMine] = useState(false);
+  const [status, setStatus] = useState(initialStatus);
+  const [mine, setMine] = useState(lockMine);
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
   const pageSize = 20;
@@ -21,7 +34,7 @@ export function InstanciasPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="border-b border-slate-200 bg-white px-6 py-4"><h1 className="text-lg font-semibold text-slate-900">Consultas</h1></header>
+      <header className="border-b border-slate-200 bg-white px-6 py-4"><h1 className="text-lg font-semibold text-slate-900">{title}</h1></header>
       <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-white px-6 py-3">
         <div className="relative flex-1 min-w-48">
           <Search size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -33,7 +46,7 @@ export function InstanciasPage() {
           <option value="concluido">Concluídos</option>
           <option value="cancelado">Cancelados</option>
         </select>
-        <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" checked={mine} onChange={(e) => { setMine(e.target.checked); setPage(1); }} /> Apenas as que iniciei</label>
+        {!lockMine && <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" checked={mine} onChange={(e) => { setMine(e.target.checked); setPage(1); }} /> Apenas as que iniciei</label>}
       </div>
 
       <div className="flex-1 overflow-auto p-6">
@@ -109,7 +122,11 @@ function InstanceDialog({ id, onClose }: { id: string; onClose: () => void }) {
                     <span className="text-slate-800">{t.name ?? 'Tarefa'}</span>
                     {t.action && <span className="text-xs text-slate-400">· {t.action}</span>}
                   </span>
-                  <span className="text-xs text-slate-400">{t.completedAt ? fmt(t.completedAt) : `criada ${fmt(t.createdAt)}`}</span>
+                  <span className="text-right text-xs text-slate-400">
+                    {t.completedAt
+                      ? <>concluída {fmt(t.completedAt)}{t.completedBy && <> · por {t.completedBy}</>}</>
+                      : <>criada {fmt(t.createdAt)}{t.assignee && <> · com {t.assignee}</>}</>}
+                  </span>
                 </div>
               ))}
             </div>

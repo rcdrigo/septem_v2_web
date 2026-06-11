@@ -189,11 +189,23 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
   const [email, setEmail] = useState('');
   const [isInternal, setIsInternal] = useState(true);
   const [cadastral, setCadastral] = useState<UserCadastral>({});
+  const [profileIds, setProfileIds] = useState<Set<string>>(new Set());
+  const [positions, setPositions] = useState<UserPositionRef[]>([]);
   const [result, setResult] = useState<CreatedUser | null>(null);
+  const profiles = useAccessProfiles();
   const create = useCreateUser();
 
+  function toggleProfile(pid: string) {
+    setProfileIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(pid)) next.delete(pid); else next.add(pid);
+      return next;
+    });
+  }
+
   function handleClose() {
-    setName(''); setEmail(''); setIsInternal(true); setCadastral({}); setResult(null);
+    setName(''); setEmail(''); setIsInternal(true); setCadastral({});
+    setProfileIds(new Set()); setPositions([]); setResult(null);
     onClose();
   }
 
@@ -201,7 +213,12 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
     e.preventDefault();
     if (cadastral.cpf && !isValidCpf(cadastral.cpf)) { toast.error('CPF inválido.'); return; }
     try {
-      const created = await create.mutateAsync({ name, email, isInternal, ...cadastral });
+      const created = await create.mutateAsync({
+        name, email, isInternal,
+        accessProfileIds: Array.from(profileIds),
+        positionIds: positions.map((p) => p.id),
+        ...cadastral,
+      });
       setResult(created);
     } catch (err) {
       const msg = err instanceof ApiError && err.status === 409 ? 'E-mail já em uso.' : 'Não foi possível criar.';
@@ -233,7 +250,7 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
   }
 
   return (
-    <Dialog open={open} onClose={handleClose} title="Novo usuário" footer={
+    <Dialog open={open} onClose={handleClose} title="Novo usuário" width="lg" footer={
       <>
         <button onClick={handleClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Cancelar</button>
         <button
@@ -256,6 +273,22 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
           <input type="checkbox" checked={isInternal} onChange={(e) => setIsInternal(e.target.checked)} />
           Usuário interno (funcionário)
         </label>
+        <Field label="Perfis de acesso">
+          <div className="flex flex-col gap-1.5 rounded-md border border-slate-200 bg-slate-50 p-2">
+            {profiles.isLoading && <span className="text-xs text-slate-400">Carregando perfis...</span>}
+            {profiles.data?.map((p) => (
+              <label key={p.id} className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={profileIds.has(p.id)} onChange={() => toggleProfile(p.id)} />
+                <span className="text-slate-700">{p.name}</span>
+                {p.isSystem && <span className="rounded-full bg-slate-200 px-1.5 text-[10px] text-slate-600">sistema</span>}
+              </label>
+            ))}
+            {profiles.data && profiles.data.length === 0 && <span className="text-xs text-slate-400">Nenhum perfil cadastrado.</span>}
+          </div>
+        </Field>
+        <Field label="Unidades e posições">
+          <PositionsEditor positions={positions} onChange={setPositions} />
+        </Field>
       </form>
     </Dialog>
   );

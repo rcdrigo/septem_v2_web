@@ -67,7 +67,13 @@ export function useUser(id: string | null) {
   });
 }
 
-export type CreateUserBody = { name: string; email: string; isInternal: boolean } & UserCadastral;
+export type CreateUserBody = {
+  name: string;
+  email: string;
+  isInternal: boolean;
+  accessProfileIds?: string[];
+  positionIds?: string[];
+} & UserCadastral;
 
 export function useCreateUser() {
   const qc = useQueryClient();

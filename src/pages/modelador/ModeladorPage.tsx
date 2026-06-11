@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
+import { useSessionStore } from '@/stores/session';
 import { ModeladorNavbar, type RecursosHandlers } from '@/components/modelador/ModeladorNavbar';
 import { FluxoView } from '@/components/modelador/views/FluxoView';
 import { FormularioView } from '@/components/modelador/views/FormularioView';
@@ -30,6 +31,10 @@ import type { BpmnModelerHandle } from '@/components/bpmn/BpmnModeler';
  *  - injeta os handlers do dropdown "Recursos"
  */
 export function ModeladorPage() {
+  // Roda em aba própria (sem AppShell). Compartilha o token via localStorage com
+  // a aba principal; sem sessão → volta para o login.
+  const token = useSessionStore((s) => s.accessToken);
+
   const currentView = useModeladorStore((s) => s.currentView);
   const processName = useModeladorStore((s) => s.processName);
   const modelerHandleRef = useRef<BpmnModelerHandle>(null);
@@ -110,7 +115,9 @@ export function ModeladorPage() {
       const r = key
         ? await updateMut.mutateAsync({ key, bpmnXml: xml })
         : await saveMut.mutateAsync({ bpmnXml: xml });
-      toast.success(`Rascunho salvo v${r.version}` + warnSuffix(r));
+      // Editar publicado salva no lugar (sem versionar); rascunho idem.
+      const label = r.status === 'published' ? `Salvo (publicado) v${r.version}` : `Rascunho salvo v${r.version}`;
+      toast.success(label + warnSuffix(r));
       afterPersist(r);
     } catch (err) { handleError(err); }
   }
@@ -186,8 +193,11 @@ export function ModeladorPage() {
     },
   };
 
+  // Guard de sessão depois de todos os hooks (regras de hooks).
+  if (!token) return <Navigate to="/login" replace />;
+
   return (
-    <div className="flex h-full flex-1 flex-col overflow-hidden">
+    <div className="flex h-screen flex-1 flex-col overflow-hidden">
       <ModeladorNavbar recursos={recursos} modeler={modeler} persistence={persistence} />
       <div className="relative flex flex-1 overflow-hidden">
         {/*

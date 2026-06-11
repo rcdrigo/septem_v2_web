@@ -14,6 +14,8 @@ import { OrganogramaPage } from './pages/OrganogramaPage';
 import { ServicosPage } from './pages/ServicosPage';
 import { TarefasPage } from './pages/TarefasPage';
 import { InstanciasPage } from './pages/InstanciasPage';
+import { ConsultasPage } from './pages/ConsultasPage';
+import { RelatoriosPage } from './pages/admin/RelatoriosPage';
 import { FontesDadosPage } from './pages/admin/FontesDadosPage';
 import { ModelosEmailPage } from './pages/admin/ModelosEmailPage';
 import { ServicoFormPage } from './pages/ServicoFormPage';
@@ -29,6 +31,8 @@ export const router = createBrowserRouter(
     { path: '/login', element: <LoginPage /> },
     // Aba limpa (sem menus) para preencher e iniciar um serviço.
     { path: '/servico/:processKey', element: <ServicoFormPage /> },
+    // Modelador em aba própria (sem menu lateral) — aberto via "Novo/Editar".
+    { path: '/processos/editar', element: <ModeladorPage /> },
     {
       path: '/',
       element: <AppShell />,
@@ -38,21 +42,27 @@ export const router = createBrowserRouter(
         // --- Geral ---------------------------------------------------------
         stub('dashboard', 'Dashboard', { phase: 'Fase 7' }),
         { path: 'servicos', element: <ServicosPage /> },
-        { path: 'tarefas', element: <TarefasPage /> },
-        { path: 'consultas', element: <InstanciasPage /> },
+        // Minhas tarefas = instâncias que o usuário iniciou e estão em andamento (req. 2).
+        { path: 'tarefas', element: <InstanciasPage title="Minhas tarefas" lockMine initialStatus="em_andamento" /> },
+        // Tarefas pendentes = inbox do executor (concluir uma tarefa avança o fluxo).
+        { path: 'tarefas/pendentes', element: <TarefasPage /> },
+        // Tarefas executadas = acompanhamento de todas as instâncias (movido de Consultas, req. 7).
+        { path: 'tarefas-executadas', element: <InstanciasPage /> },
+        // Consultas = catálogo de relatórios publicados (req. 8).
+        { path: 'consultas', element: <ConsultasPage /> },
         { path: 'organograma', element: <OrganogramaPage /> },
 
         // --- Admin › Processos --------------------------------------------
         { path: 'admin/processos', element: <ProcessosPage /> },
-        // Modelador (BPMN + form) — vive dentro de Processos, aberto via "Novo/Editar".
-        { path: 'admin/processos/editar', element: <ModeladorPage /> },
+        // O modelador agora abre em aba própria (rota /processos/editar, fora do shell).
+        { path: 'admin/processos/editar', element: <Navigate to="/processos/editar" replace /> },
         stub('admin/processos/categorias', 'Categorias de processos', { phase: 'Fase 3' }),
         { path: 'admin/modelos-email', element: <ModelosEmailPage /> },
         stub('admin/modelos-doc', 'Modelos de documentos', { phase: 'Fase 7' }),
         { path: 'admin/fontes-dados', element: <FontesDadosPage /> },
 
         // --- Admin › Relatórios e Dashboards ------------------------------
-        stub('admin/relatorios', 'Relatórios', { phase: 'Fase 7' }),
+        { path: 'admin/relatorios', element: <RelatoriosPage /> },
         stub('admin/relatorios/categorias', 'Categorias de relatórios', { phase: 'Fase 7' }),
         stub('admin/dashboards', 'Dashboards', { phase: 'Fase 7' }),
 
@@ -69,8 +79,8 @@ export const router = createBrowserRouter(
         { path: 'me/senha', element: <MudarSenhaPage /> },
         stub('suporte', 'Suporte', { phase: 'Fase 7' }),
 
-        // Back-compat: a rota antiga /modelador agora vive em /admin/processos/editar.
-        { path: 'modelador', element: <Navigate to="/admin/processos/editar" replace /> },
+        // Back-compat: a rota antiga /modelador agora abre o modelador standalone.
+        { path: 'modelador', element: <Navigate to="/processos/editar" replace /> },
 
         { path: '*', element: <StubPage title="Página não encontrada" hint="O endereço acessado não existe." /> },
       ],
