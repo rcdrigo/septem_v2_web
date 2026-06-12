@@ -15,6 +15,7 @@ import { ServicosPage } from './pages/ServicosPage';
 import { TarefasPage } from './pages/TarefasPage';
 import { InstanciasPage } from './pages/InstanciasPage';
 import { ConsultasPage } from './pages/ConsultasPage';
+import { TarefasExecutadasPage } from './pages/TarefasExecutadasPage';
 import { RelatoriosPage } from './pages/admin/RelatoriosPage';
 import { FontesDadosPage } from './pages/admin/FontesDadosPage';
 import { ModelosEmailPage } from './pages/admin/ModelosEmailPage';
@@ -42,12 +43,12 @@ export const router = createBrowserRouter(
         // --- Geral ---------------------------------------------------------
         stub('dashboard', 'Dashboard', { phase: 'Fase 7' }),
         { path: 'servicos', element: <ServicosPage /> },
-        // Minhas tarefas = instâncias que o usuário iniciou e estão em andamento (req. 2).
-        { path: 'tarefas', element: <InstanciasPage title="Minhas tarefas" lockMine initialStatus="em_andamento" /> },
-        // Tarefas pendentes = inbox do executor (concluir uma tarefa avança o fluxo).
-        { path: 'tarefas/pendentes', element: <TarefasPage /> },
-        // Tarefas executadas = acompanhamento de todas as instâncias (movido de Consultas, req. 7).
-        { path: 'tarefas-executadas', element: <InstanciasPage /> },
+        // Tarefas pendentes = tarefas pendentes COM o usuário (inbox do executor).
+        { path: 'tarefas', element: <TarefasPage /> },
+        // Tarefas executadas = tarefas que o usuário concluiu (não estão mais com ele).
+        { path: 'tarefas-executadas', element: <TarefasExecutadasPage /> },
+        // Minhas solicitações (cidadão) = instâncias que o usuário iniciou, em andamento.
+        { path: 'minhas-solicitacoes', element: <InstanciasPage title="Minhas solicitações" lockMine initialStatus="em_andamento" /> },
         // Consultas = catálogo de relatórios publicados (req. 8).
         { path: 'consultas', element: <ConsultasPage /> },
         { path: 'organograma', element: <OrganogramaPage /> },

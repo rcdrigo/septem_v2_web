@@ -8,14 +8,22 @@ import type { MenuAction, MenuGroup, MenuLink, MenuNode } from './menu/types';
 import { useSessionStore } from '@/stores/session';
 import { toast } from '@/stores/toast';
 
-export function Sidebar() {
+export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
   const session = useSessionStore();
   const tenant = session.tenant;
   const tenantName = tenant?.clienteNome ?? 'Septem V2';
   const layout = MENU[session.effectiveMode()];
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
+    <aside
+      className={[
+        'flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white',
+        // Desktop: fixa na grade. Mobile: drawer off-canvas que desliza.
+        'fixed inset-y-0 left-0 z-40 shadow-lg transition-transform duration-200',
+        'lg:static lg:z-auto lg:shadow-none lg:translate-x-0',
+        mobileOpen ? 'translate-x-0' : '-translate-x-full',
+      ].join(' ')}
+    >
       {/* Logo do cliente */}
       <div className="flex items-center gap-2.5 border-b border-slate-200 px-4 py-3.5">
         {tenant?.logoUrl ? (

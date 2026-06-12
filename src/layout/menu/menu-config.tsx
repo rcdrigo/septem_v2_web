@@ -47,8 +47,7 @@ export const MENU: MenuByMode = {
             visible: (s) => s.user?.hasDashboard ?? false,
           },
           { kind: 'link', label: 'Serviços', to: '/servicos', icon: LayoutGrid },
-          { kind: 'link', label: 'Minhas tarefas', to: '/tarefas', icon: ListChecks },
-          { kind: 'link', label: 'Tarefas pendentes', to: '/tarefas/pendentes', icon: Inbox },
+          { kind: 'link', label: 'Tarefas pendentes', to: '/tarefas', icon: Inbox },
           { kind: 'link', label: 'Tarefas executadas', to: '/tarefas-executadas', icon: ClipboardCheck },
           { kind: 'link', label: 'Consultas', to: '/consultas', icon: FileSearch },
           { kind: 'link', label: 'Organograma', to: '/organograma', icon: Network },
@@ -112,7 +111,7 @@ export const MENU: MenuByMode = {
       {
         items: [
           { kind: 'link', label: 'Serviços', to: '/servicos', icon: LayoutGrid },
-          { kind: 'link', label: 'Minhas solicitações', to: '/tarefas', icon: ListChecks },
+          { kind: 'link', label: 'Minhas solicitações', to: '/minhas-solicitacoes', icon: ListChecks },
           { kind: 'link', label: 'Organograma', to: '/organograma', icon: FolderTree },
         ],
       },

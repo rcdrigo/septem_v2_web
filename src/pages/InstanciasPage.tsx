@@ -89,7 +89,7 @@ export function InstanciasPage({ title = 'Tarefas executadas', lockMine = false,
   );
 }
 
-function InstanceDialog({ id, onClose }: { id: string; onClose: () => void }) {
+export function InstanceDialog({ id, onClose }: { id: string; onClose: () => void }) {
   const inst = useInstance(id);
   const data = (inst.data?.data ?? {}) as Record<string, unknown>;
 

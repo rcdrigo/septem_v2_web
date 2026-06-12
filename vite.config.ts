@@ -35,6 +35,13 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
+    // O form-js e o @bpmn-io/properties-panel usam preact internamente. Sem isto,
+    // o Vite pode pré-empacotar mais de uma cópia de preact → os hooks das entries
+    // do painel quebram ("can't access property context"). Deduplicar resolve.
+    dedupe: ['preact', 'preact/hooks', 'preact/jsx-runtime'],
+  },
+  optimizeDeps: {
+    include: ['preact', 'preact/hooks', 'preact/jsx-runtime'],
   },
   server: {
     port: 5173,

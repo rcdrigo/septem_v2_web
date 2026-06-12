@@ -4,6 +4,7 @@ import { CheckCircle2, Play } from 'lucide-react';
 import { useProcessDefinition } from '@/lib/api/process-definitions';
 import { useProcessForm, useStartInstance } from '@/lib/api/execution';
 import { ReactForm, type ReactFormHandle } from '@/components/form/ReactForm';
+import { Toaster } from '@/components/ui/Toaster';
 import { useSessionStore } from '@/stores/session';
 import { toast } from '@/stores/toast';
 
@@ -73,6 +74,7 @@ export function ServicoFormPage() {
           </footer>
         </>
       )}
+      <Toaster />
     </div>
   );
 }

@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 export type StartedInstance = { executionId: string; status: string; tasks: { id: string; name: string | null }[] };
-export type MyTask = { id: string; name: string | null; executionId: string; createdAt: string; dueAt: string | null };
+export type MyTask = { id: string; name: string | null; executionId: string; createdAt: string; dueAt: string | null; process?: string | null };
+export type ExecutedTask = { id: string; name: string | null; executionId: string; process: string | null; completedAt: string | null; action: string | null };
 export type TaskButton = { id: string; label: string; validateForm: boolean; primaryColor?: string | null; textColor?: string | null };
 export type TaskDetail = {
   id: string; name: string | null; status: string; executionId: string;
@@ -27,6 +28,11 @@ export function useStartInstance() {
 
 export function useMyTasks() {
   return useQuery({ queryKey: execKeys.tasks, queryFn: () => api.get<MyTask[]>('/api/v1/workflow/tasks?assignee=me') });
+}
+
+/** Tarefas que o usuário concluiu (não estão mais com ele). */
+export function useExecutedTasks() {
+  return useQuery({ queryKey: ['workflow', 'tasks', 'executed'], queryFn: () => api.get<ExecutedTask[]>('/api/v1/workflow/tasks?status=concluida') });
 }
 
 export function useTask(id: string | null) {

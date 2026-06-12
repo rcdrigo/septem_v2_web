@@ -43,7 +43,7 @@ export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, re
       container: canvasRef.current,
       additionalModules: [SeptemPaletteModule],
       moddleExtensions: { septem: septemModdle as any },
-      keyboard: { bindTo: document },
+      // keyboard.bindTo foi removido no diagram-js atual (bind agora é implícito).
     });
     modelerRef.current = modeler;
     onReady?.(modeler);

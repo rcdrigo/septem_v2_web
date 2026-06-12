@@ -20,6 +20,21 @@ html, body, #root {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
+/* Tailwind 4 removeu o cursor:pointer padrão de botões/links — restauramos. */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+label:has(> input[type="checkbox"]),
+summary {
+  cursor: pointer;
+}
+
+/* Cockpit do formulário: usamos nossa paleta de cards + nosso painel de campo no
+   lugar da paleta e do painel de propriedades padrão do form-js. Escondemos os
+   CONTAINERS externos (a paleta reserva largura própria e o painel de propriedades
+   tem 300px fixos — esconder só o filho deixava o vão). */
+.septem-cockpit .fjs-palette-container,
+.septem-cockpit .fjs-properties-container { display: none !important; }
+
 /* Garante que canvases dos editores ocupem o container pai */
 .bjs-container,
 .djs-container,

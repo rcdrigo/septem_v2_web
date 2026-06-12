@@ -1,60 +1,99 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Eye, RefreshCcw, Regex } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { LayoutTemplate, Rows3, Columns3, RefreshCcw, Regex } from 'lucide-react';
 import { IconButton } from '@/components/ui/IconButton';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
-import { FormFieldsBuilder } from '@/components/form/FormFieldsBuilder';
-import { ReactForm } from '@/components/form/ReactForm';
+import { FormBuilder, type FormBuilderHandle } from '@/components/form/FormBuilder';
+import { FormFieldsPalette } from '@/components/form/FormFieldsPalette';
+import { FieldConfigPanel } from '@/components/form/FieldConfigPanel';
 import { MasksDialog } from '@/components/form/MasksDialog';
-import { buildFormJsSchema, schemaToModel } from '@/lib/form-js-schema';
 import { extractFields } from '@/lib/form-schema';
 import { useFormStore } from '@/stores/form';
 import { useFormMasks } from '@/lib/api/forms';
 import { useDataSources } from '@/lib/api/catalog';
 import { getEmbeddedFormSchema, setEmbeddedFormSchema } from '@/lib/bpmn-process';
-import type { FormGroup, FormField } from '@/lib/api/forms';
 
 type Props = { modeler: any | null };
+type GroupLayout = 'stacked' | 'tabs';
+
+const POLL_MS = 600;
 
 /**
- * View "Formulário" — builder React próprio (req. 7.1). Opera sobre o modelo
- * {grupos, campos}; cada mudança deriva o schema form-js e o persiste em:
- *  - `septem:FormSchema` no `bpmn:Process` (round-trip ao exportar/importar);
- *  - `localStorage` (sobrevive a F5 antes do save);
- *  - `formStore` (alimenta FieldVisibilityEditor / TarefasCamposView / gateways).
- * O ReactForm renderiza o preview e a execução com os MESMOS componentes.
+ * View "Formulário" — editor do @bpmn-io/form-js (FormBuilder) com o painel direito
+ * estendido (grupo "Configurações Septem"). Além disso, um seletor define como os
+ * grupos PRINCIPAIS são exibidos na execução: empilhados ou em abas. A flag viaja
+ * no schema (`septemGroupLayout`), injetada na persistência e removida antes de
+ * importar no editor (o form-js não precisa conhecê-la).
  */
 export function FormularioView({ modeler }: Props) {
-  const setStoreFields = useFormStore((s) => s.setFields);
+  const builderRef = useRef<FormBuilderHandle>(null);
+  const setFields = useFormStore((s) => s.setFields);
   const masks = useFormMasks();
   const dataSources = useDataSources();
-
-  const [groups, setGroupsState] = useState<FormGroup[]>([]);
-  const [fields, setFieldsState] = useState<FormField[]>([]);
   const [ready, setReady] = useState(false);
   const [masksOpen, setMasksOpen] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [selectedField, setSelectedField] = useState<any | null>(null);
+  const [groupLayout, setGroupLayout] = useState<GroupLayout>('stacked');
+  const layoutRef = useRef<GroupLayout>('stacked');
+  layoutRef.current = groupLayout;
+  const lastSerialized = useRef<string>('');
 
-  // Carrega o schema persistido (prefere o XML; cai pro localStorage) → modelo.
+  const maskOptions = useMemo(
+    () => (masks.data ?? []).map((m) => ({ value: m.id, label: m.name, regex: m.regex, shouldValidate: m.shouldValidate })),
+    [masks.data],
+  );
+  const dsOptions = useMemo(
+    () => (dataSources.data ?? []).map((d) => ({ value: d.id, label: d.name })),
+    [dataSources.data],
+  );
+
+  // 1) Carrega o schema persistido (prefere o XML; cai pra localStorage); extrai a flag.
   useEffect(() => {
-    const initial = (modeler ? getEmbeddedFormSchema(modeler) : null) ?? readFormFromLocalStorage();
-    const model = schemaToModel(initial);
-    setGroupsState(model.groups);
-    setFieldsState(model.fields);
-    setStoreFields(extractFields(initial as any));
-    setReady(true);
-  }, [modeler, setStoreFields]);
+    if (!builderRef.current) return;
+    let cancelled = false;
+    (async () => {
+      const fromXml = modeler ? getEmbeddedFormSchema(modeler) : null;
+      const fromLs = readFormFromLocalStorage();
+      const initial = (fromXml ?? fromLs) as any;
+      const clean = stripLayout(initial);
+      const layout = initial?.septemGroupLayout;
+      if (layout === 'tabs' || layout === 'stacked') setGroupLayout(layout);
+      if (clean && !cancelled) {
+        try { await builderRef.current!.importSchema(clean); }
+        catch (err) { console.warn('Falha ao carregar schema persistido do form:', err); }
+      }
+      if (!cancelled) {
+        lastSerialized.current = JSON.stringify(clean ?? {});
+        setReady(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [modeler]);
 
-  const previewSchema = useMemo(() => buildFormJsSchema(groups, fields, masks.data ?? []), [groups, fields, masks.data]);
+  // 2) Polling: detecta mudanças no schema do editor e propaga (form-js não emite "changed" confiável).
+  useEffect(() => {
+    if (!ready) return;
+    const interval = window.setInterval(() => {
+      try {
+        const schema = builderRef.current?.saveSchema();
+        if (!schema) return;
+        const serialized = JSON.stringify(schema);
+        if (serialized === lastSerialized.current) return;
+        lastSerialized.current = serialized;
+        propagate(schema, modeler, setFields, layoutRef.current);
+      } catch (err) {
+        void err; // saveSchema lança se o editor não estiver pronto — ignora
+      }
+    }, POLL_MS);
+    return () => window.clearInterval(interval);
+  }, [ready, modeler, setFields]);
 
-  function persist(g: FormGroup[], f: FormField[]) {
-    const schema = buildFormJsSchema(g, f, masks.data ?? []);
-    setStoreFields(extractFields(schema as any));
-    persistFormToLocalStorage(schema);
-    if (modeler) setEmbeddedFormSchema(modeler, schema);
+  function changeLayout(l: GroupLayout) {
+    setGroupLayout(l);
+    layoutRef.current = l;
+    const schema = builderRef.current?.saveSchema();
+    if (schema) propagate(schema, modeler, setFields, l);
   }
-  function setGroups(g: FormGroup[]) { setGroupsState(g); persist(g, fields); }
-  function setFields(f: FormField[]) { setFieldsState(f); persist(groups, f); }
 
   async function handleReset() {
     const ok = await confirm({
@@ -63,57 +102,57 @@ export function FormularioView({ modeler }: Props) {
       confirmLabel: 'Descartar', destructive: true,
     });
     if (!ok) return;
-    setGroupsState([]); setFieldsState([]);
-    setStoreFields([]);
+    await builderRef.current?.reset();
+    lastSerialized.current = '';
+    setFields([]);
     persistFormToLocalStorage(null);
     if (modeler) setEmbeddedFormSchema(modeler, { type: 'default', components: [], schemaVersion: 17 });
     toast.success('Formulário descartado.');
   }
-
-  function addSampleGroup() {
-    const g: FormGroup[] = [...groups, { key: 'geral', name: 'Geral', order: groups.length, columns: 1 }];
-    setGroups(g);
-  }
-
-  const maskOptions = [{ value: '', label: '— nenhuma —' }, ...(masks.data ?? []).map((m) => ({ value: m.id, label: m.name }))];
-  const dsOptions = [{ value: '', label: '— nenhuma —' }, ...(dataSources.data ?? []).map((d) => ({ value: d.id, label: d.name }))];
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <header className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-2">
         <div>
           <h2 className="text-sm font-semibold text-slate-900">Formulário do processo</h2>
-          <p className="text-xs text-slate-500">Os campos ficam disponíveis nos painéis das tarefas e na matriz "Tarefas × Campos".</p>
+          <p className="text-xs text-slate-500">
+            Configure cada campo no painel à direita (máscara, fonte de dados, ajuda, visibilidade).
+          </p>
         </div>
-        <div className="flex gap-2">
-          <IconButton onClick={() => setShowPreview((p) => !p)}><Eye size={14} /> Pré-visualizar</IconButton>
+        <div className="flex items-center gap-2">
+          {/* Layout dos grupos principais — só afeta a EXECUÇÃO (não o editor) */}
+          <span className="text-xs text-slate-400">Grupos na execução:</span>
+          <div className="flex overflow-hidden rounded-md border border-slate-300" title="Como exibir os grupos principais quando o serviço/tarefa é aberto (não muda o editor)">
+            <button type="button" onClick={() => changeLayout('stacked')}
+              className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium ${groupLayout === 'stacked' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
+              <Rows3 size={13} /> Empilhados
+            </button>
+            <button type="button" onClick={() => changeLayout('tabs')}
+              className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium ${groupLayout === 'tabs' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
+              <Columns3 size={13} /> Abas
+            </button>
+          </div>
           <IconButton onClick={() => setMasksOpen(true)}><Regex size={14} /> Máscaras</IconButton>
           <IconButton onClick={handleReset}><RefreshCcw size={14} /> Limpar formulário</IconButton>
+          <IconButton variant="primary" onClick={() => builderRef.current?.importSchema(EMPTY_GROUP_TEMPLATE)}>
+            <LayoutTemplate size={14} /> Modelo com agrupamento
+          </IconButton>
         </div>
       </header>
-
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 overflow-auto p-6">
-          {!ready ? (
-            <p className="text-sm text-slate-400">Carregando…</p>
-          ) : groups.length === 0 && fields.length === 0 ? (
-            <div className="mx-auto max-w-md py-12 text-center">
-              <p className="text-sm font-medium text-slate-700">Formulário vazio</p>
-              <p className="mt-1 text-sm text-slate-500">Adicione campos e grupos para montar o formulário do processo.</p>
-              <button type="button" onClick={addSampleGroup} className="mt-4 rounded-md border border-slate-300 px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Começar com um grupo</button>
-            </div>
-          ) : (
-            <div className={showPreview ? '' : 'mx-auto max-w-3xl'}>
-              <FormFieldsBuilder groups={groups} fields={fields} onGroups={setGroups} onFields={setFields} maskOptions={maskOptions} dsOptions={dsOptions} />
-            </div>
-          )}
-        </div>
-        {showPreview && (
-          <div className="w-[440px] shrink-0 overflow-auto border-l border-slate-200 bg-white p-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Pré-visualização</p>
-            <ReactForm schema={previewSchema} />
+      <div className="septem-cockpit flex flex-1 overflow-hidden">
+        <FormFieldsPalette onAdd={(t) => builderRef.current?.addField(t)} />
+        {/* Canvas ocupa todo o meio entre a paleta e o painel de config. */}
+        <div className="flex flex-1 flex-col overflow-hidden bg-slate-100 p-3">
+          <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+            <FormBuilder ref={builderRef} onSelect={setSelectedField} />
           </div>
-        )}
+        </div>
+        <FieldConfigPanel
+          field={selectedField}
+          editField={(f, p, v) => builderRef.current?.editField(f, p, v)}
+          masks={maskOptions}
+          dataSources={dsOptions}
+        />
       </div>
       {masksOpen && <MasksDialog onClose={() => setMasksOpen(false)} />}
     </div>
@@ -122,6 +161,12 @@ export function FormularioView({ modeler }: Props) {
 
 // ─── persistência auxiliar ──────────────────────────────────────────────────
 const FORM_LS_KEY = 'septem.modelador.form';
+
+function stripLayout(schema: any): any {
+  if (!schema || typeof schema !== 'object') return schema;
+  const { septemGroupLayout: _omit, ...clean } = schema;
+  return clean;
+}
 
 function readFormFromLocalStorage(): unknown | null {
   try { const raw = window.localStorage.getItem(FORM_LS_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
@@ -132,3 +177,17 @@ function persistFormToLocalStorage(schema: unknown | null) {
     else window.localStorage.setItem(FORM_LS_KEY, JSON.stringify(schema));
   } catch { /* storage cheio / safari privado — ignora */ }
 }
+function propagate(schema: unknown, modeler: any | null, setFields: (fs: ReturnType<typeof extractFields>) => void, layout: GroupLayout) {
+  const stored = { ...(schema as object), septemGroupLayout: layout };
+  setFields(extractFields(schema as any));
+  persistFormToLocalStorage(stored);
+  if (modeler) setEmbeddedFormSchema(modeler, stored);
+}
+
+const EMPTY_GROUP_TEMPLATE = {
+  type: 'default',
+  components: [
+    { type: 'group', label: 'Geral', components: [{ type: 'textfield', key: 'nome', label: 'Nome' }] },
+  ],
+  schemaVersion: 17,
+};

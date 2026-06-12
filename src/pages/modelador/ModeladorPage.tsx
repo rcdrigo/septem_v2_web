@@ -7,6 +7,8 @@ import { FormularioView } from '@/components/modelador/views/FormularioView';
 import { TarefasCamposView } from '@/components/modelador/views/TarefasCamposView';
 import { ConfiguracoesView } from '@/components/modelador/views/ConfiguracoesView';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+import { Toaster } from '@/components/ui/Toaster';
+import { ConfirmDialogHost } from '@/components/ui/ConfirmDialog';
 import { useModeladorStore } from '@/stores/modelador';
 import { useProcessNameSync } from '@/lib/useProcessNameSync';
 import { useKeyboardShortcuts } from '@/lib/useKeyboardShortcuts';
@@ -208,11 +210,16 @@ export function ModeladorPage() {
         <div className={currentView === 'fluxo' ? 'flex flex-1 overflow-hidden' : 'hidden flex-1'}>
           <FluxoView ref={modelerHandleRef} onReady={onReady} modelerInstance={modeler} />
         </div>
-        {currentView === 'formulario' && (
+        {/*
+          O editor de Formulário (form-js) também fica SEMPRE montado (oculto via
+          `hidden`): remontá-lo ao trocar de view fazia a paleta de componentes
+          sumir e recriava o editor desnecessariamente.
+        */}
+        <div className={currentView === 'formulario' ? 'flex flex-1 overflow-hidden' : 'hidden flex-1'}>
           <ErrorBoundary context="o editor de formulário">
             <FormularioView modeler={modeler} />
           </ErrorBoundary>
-        )}
+        </div>
         {currentView === 'tarefasXcampos' && (
           <ErrorBoundary context="a matriz Tarefas × Campos">
             <TarefasCamposView modeler={modeler} />
@@ -225,6 +232,9 @@ export function ModeladorPage() {
         )}
       </div>
       <ShortcutsListener recursos={recursos} />
+      {/* Standalone (fora do AppShell): precisa dos hosts de toast/confirm aqui. */}
+      <Toaster />
+      <ConfirmDialogHost />
     </div>
   );
 }

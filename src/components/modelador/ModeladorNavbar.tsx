@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
+  ArrowLeft,
   Workflow,
   FormInput,
   Table2,
@@ -56,6 +58,7 @@ type Props = {
  *  - Centro/Direita: 4 botões de view + dropdown "Recursos" + Salvar/Publicar
  */
 export function ModeladorNavbar({ recursos, modeler, persistence }: Props) {
+  const navigate = useNavigate();
   const processName = useModeladorStore((s) => s.processName);
   const setProcessName = useModeladorStore((s) => s.setProcessName);
   const currentView = useModeladorStore((s) => s.currentView);
@@ -63,6 +66,13 @@ export function ModeladorNavbar({ recursos, modeler, persistence }: Props) {
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(processName);
+
+  function goBack() {
+    if (persistence?.dirty && !window.confirm('Há alterações não salvas. Sair mesmo assim?')) return;
+    // Aba aberta via "Novo/Editar": fecha; se não der (URL direta), volta para a lista.
+    window.close();
+    navigate('/admin/processos');
+  }
 
   function startEdit() {
     setDraft(processName);
@@ -80,6 +90,14 @@ export function ModeladorNavbar({ recursos, modeler, persistence }: Props) {
   return (
     <header className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-2.5">
       <div className="flex min-w-0 items-center gap-2">
+        <button
+          type="button"
+          onClick={goBack}
+          className="shrink-0 rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+          title="Voltar para Processos"
+        >
+          <ArrowLeft size={18} />
+        </button>
         {editing ? (
           <input
             autoFocus
