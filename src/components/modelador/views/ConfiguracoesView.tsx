@@ -74,7 +74,7 @@ export function ConfiguracoesView({ modeler }: Props) {
 
   return (
     <div className="flex flex-1 overflow-hidden">
-      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col overflow-y-auto bg-white">
+      <div className="flex w-full flex-1 flex-col overflow-y-auto bg-white">
         <header className="border-b border-slate-200 bg-slate-50 px-6 py-3">
           <h2 className="text-sm font-semibold text-slate-900">Configurações do processo</h2>
           <p className="text-xs text-slate-500">

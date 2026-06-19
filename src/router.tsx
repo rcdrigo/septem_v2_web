@@ -20,6 +20,8 @@ import { RelatoriosPage } from './pages/admin/RelatoriosPage';
 import { FontesDadosPage } from './pages/admin/FontesDadosPage';
 import { ModelosEmailPage } from './pages/admin/ModelosEmailPage';
 import { ServicoFormPage } from './pages/ServicoFormPage';
+import { TarefaPage } from './pages/TarefaPage';
+import { SolicitacaoPage } from './pages/SolicitacaoPage';
 import { StubPage } from './pages/StubPage';
 
 /** Açúcar para registrar uma rota que ainda só tem placeholder. */
@@ -32,6 +34,10 @@ export const router = createBrowserRouter(
     { path: '/login', element: <LoginPage /> },
     // Aba limpa (sem menus) para preencher e iniciar um serviço.
     { path: '/servico/:processKey', element: <ServicoFormPage /> },
+    // Tarefa pendente em aba própria (sem menus), como a de início.
+    { path: '/tarefa/:taskId', element: <TarefaPage /> },
+    // Relatório/acompanhamento da solicitação em aba própria (sem menus).
+    { path: '/solicitacao/:instanceId', element: <SolicitacaoPage /> },
     // Modelador em aba própria (sem menu lateral) — aberto via "Novo/Editar".
     { path: '/processos/editar', element: <ModeladorPage /> },
     {

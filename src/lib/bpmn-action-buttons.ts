@@ -6,6 +6,10 @@ export type ActionButton = {
   primaryColor: string;
   textColor: string;
   validateForm: boolean;
+  /** Nome do ícone lucide (catálogo curado) exibido à esquerda do rótulo. */
+  icon?: string;
+  /** Orientações exibidas ao executor (tooltip no hover do botão). */
+  hint?: string;
 };
 
 const SCHEMA: CollectionSchema = {
@@ -29,6 +33,8 @@ export function getActionButtons(element: any): ActionButton[] {
     primaryColor: raw.primaryColor ?? DEFAULTS.primaryColor,
     textColor: raw.textColor ?? DEFAULTS.textColor,
     validateForm: raw.validateForm ?? true,
+    icon: raw.icon ?? undefined,
+    hint: raw.hint ?? undefined,
   }));
 }
 

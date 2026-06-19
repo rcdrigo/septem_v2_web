@@ -14,6 +14,13 @@ type Item = { type: string; label: string; icon: typeof Type };
  */
 const CATEGORIES: { title: string; items: Item[] }[] = [
   {
+    title: 'Container',
+    items: [
+      { type: 'group', label: 'Grupo', icon: GroupIcon },
+      { type: 'dynamiclist', label: 'Lista dinâmica', icon: Rows3 },
+    ],
+  },
+  {
     title: 'Entrada',
     items: [
       { type: 'textfield', label: 'Texto', icon: Type },
@@ -42,13 +49,6 @@ const CATEGORIES: { title: string; items: Item[] }[] = [
       { type: 'table', label: 'Tabela', icon: TableIcon },
       { type: 'separator', label: 'Separador', icon: Minus },
       { type: 'spacer', label: 'Espaçador', icon: MoveVertical },
-    ],
-  },
-  {
-    title: 'Container',
-    items: [
-      { type: 'group', label: 'Grupo', icon: GroupIcon },
-      { type: 'dynamiclist', label: 'Lista dinâmica', icon: Rows3 },
     ],
   },
 ];

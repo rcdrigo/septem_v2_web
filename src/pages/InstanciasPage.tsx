@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Search, Workflow } from 'lucide-react';
 import { useInstances, useInstance, type InstanceListItem } from '@/lib/api/execution';
-import { Dialog } from '@/components/ui/Dialog';
 
 const STATUS = { em_andamento: { label: 'Em andamento', cls: 'bg-sky-100 text-sky-700' }, concluido: { label: 'Concluído', cls: 'bg-emerald-100 text-emerald-700' }, cancelado: { label: 'Cancelado', cls: 'bg-rose-100 text-rose-700' } } as Record<string, { label: string; cls: string }>;
 const TASK_STATUS = { pendente: 'bg-amber-100 text-amber-700', concluida: 'bg-emerald-100 text-emerald-700' } as Record<string, string>;
@@ -25,8 +24,9 @@ export function InstanciasPage({ title = 'Tarefas executadas', lockMine = false,
   const [status, setStatus] = useState(initialStatus);
   const [mine, setMine] = useState(lockMine);
   const [page, setPage] = useState(1);
-  const [openId, setOpenId] = useState<string | null>(null);
   const pageSize = 20;
+  // Relatório da instância abre em nova aba (sem menus), não mais em modal.
+  const openReport = (id: string) => window.open(`/solicitacao/${id}`, '_blank', 'noopener');
 
   const list = useInstances({ q: q || undefined, status: status || undefined, mine, page, pageSize });
   const total = list.data?.total ?? 0;
@@ -68,7 +68,7 @@ export function InstanciasPage({ title = 'Tarefas executadas', lockMine = false,
                     <td className="px-4 py-2"><StatusBadge status={i.status} /></td>
                     <td className="px-4 py-2 text-slate-600">{i.pendingTasks}</td>
                     <td className="px-4 py-2 text-slate-500">{fmt(i.startedAt)}</td>
-                    <td className="px-4 py-2 text-right"><button type="button" onClick={() => setOpenId(i.id)} className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">Ver</button></td>
+                    <td className="px-4 py-2 text-right"><button type="button" onClick={() => openReport(i.id)} className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">Ver</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -84,18 +84,16 @@ export function InstanciasPage({ title = 'Tarefas executadas', lockMine = false,
           </>
         )}
       </div>
-      {openId && <InstanceDialog id={openId} onClose={() => setOpenId(null)} />}
     </div>
   );
 }
 
-export function InstanceDialog({ id, onClose }: { id: string; onClose: () => void }) {
+/** Conteúdo do relatório de uma instância (reusado na página em nova aba e no modal legado). */
+export function InstanceReport({ id }: { id: string }) {
   const inst = useInstance(id);
   const data = (inst.data?.data ?? {}) as Record<string, unknown>;
-
+  if (inst.isLoading) return <p className="text-sm text-slate-400">Carregando...</p>;
   return (
-    <Dialog open onClose={onClose} width="lg" title={inst.data?.process ?? 'Instância'} footer={<button onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Fechar</button>}>
-      {inst.isLoading ? <p className="text-sm text-slate-400">Carregando...</p> : (
         <div className="space-y-4">
           <div className="flex items-center gap-3 text-sm">
             <StatusBadge status={inst.data!.status} />
@@ -132,8 +130,6 @@ export function InstanceDialog({ id, onClose }: { id: string; onClose: () => voi
             </div>
           </div>
         </div>
-      )}
-    </Dialog>
   );
 }
 

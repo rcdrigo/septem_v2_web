@@ -5,6 +5,7 @@ import { Dialog } from '@/components/ui/Dialog';
 import { Field, TextInput, Checkbox } from '@/components/ui/Field';
 import { toast } from '@/stores/toast';
 import { slugify } from '@/lib/slugify';
+import { regexToTemplate, applyMask } from '@/lib/mask';
 
 /** Gestão de máscaras de campo (Forms F2) com campo de teste ao vivo do regex. */
 export function MasksDialog({ onClose }: { onClose: () => void }) {
@@ -44,6 +45,7 @@ function MaskForm({ mask, onDone }: { mask: FormMask | null; onDone: () => void 
   const [shouldValidate, setShouldValidate] = useState(mask?.shouldValidate ?? false);
   const [test, setTest] = useState('');
 
+  const template = regexToTemplate(regex);
   const result = testRegex(regex, test);
 
   async function submit(e: React.FormEvent) {
@@ -62,9 +64,13 @@ function MaskForm({ mask, onDone }: { mask: FormMask | null; onDone: () => void 
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{mask ? 'Editar máscara' : 'Nova máscara'}</p>
       <Field label="Nome"><TextInput required value={name} onChange={(e) => setName(e.target.value)} /></Field>
       <Field label="Regex" hint="Expressão de validação do campo."><TextInput required value={regex} onChange={(e) => setRegex(e.target.value)} className="font-mono text-xs" placeholder="\d{3}\.\d{3}\.\d{3}-\d{2}" /></Field>
-      <Field label="Testar máscara" hint="Digite um valor para ver se casa com a regex.">
+      <Field label="Testar máscara" hint={template ? 'A formatação é aplicada ao digitar.' : 'Digite um valor para ver se casa com a regex.'}>
         <div className="flex items-center gap-2">
-          <TextInput value={test} onChange={(e) => setTest(e.target.value)} placeholder="ex: 123.456.789-00" />
+          <TextInput
+            value={test}
+            onChange={(e) => setTest(template ? applyMask(template, e.target.value) : e.target.value)}
+            placeholder={template ?? 'ex: 123.456.789-00'}
+          />
           <span className="w-28 shrink-0 text-xs font-medium">
             {!regex || !test ? <span className="text-slate-400">—</span>
               : result === 'invalid' ? <span className="text-rose-600">regex inválida</span>

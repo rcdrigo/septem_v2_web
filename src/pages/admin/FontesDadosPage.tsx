@@ -30,7 +30,8 @@ export function FontesDadosPage() {
   const [params] = useSearchParams();
   const scope: DataSourceScope = params.get('scope') === 'report' ? 'report' : 'process';
   const list = useDataSourcesList(scope);
-  const [editId, setEditId] = useState<string | null>(null);
+  // Deep-link: ?edit=<id> abre direto o editor da fonte (vindo da config do campo).
+  const [editId, setEditId] = useState<string | null>(() => params.get('edit'));
   const [creating, setCreating] = useState(false);
   const del = useDeleteDataSource();
 

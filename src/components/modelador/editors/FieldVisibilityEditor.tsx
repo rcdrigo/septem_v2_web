@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Eye, EyeOff, Pencil } from 'lucide-react';
-import { Field, PlaceholderBox, TextInput } from '@/components/ui/Field';
+import { Database, Eye, EyeOff, Pencil } from 'lucide-react';
+import { Field, PlaceholderBox } from '@/components/ui/Field';
+import { Dialog } from '@/components/ui/Dialog';
+import { DataSourceSelect } from '@/components/modelador/fields/DataSourceSelect';
+import { useDataSources } from '@/lib/api/catalog';
 import { selectFieldGroups, useFormStore, type FormFieldDescriptor } from '@/stores/form';
 import {
   getFormFieldEntries,
@@ -101,8 +104,20 @@ function FieldRow({
   onVisibility: (v: FieldVisibility) => void;
   onDataSource: (v: string) => void;
 }) {
-  const [ds, setDs] = useState(entry.dataSourceRef ?? '');
-  useEffect(() => setDs(entry.dataSourceRef ?? ''), [entry.dataSourceRef]);
+  const current = entry.dataSourceRef ?? '';
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(current);
+  useEffect(() => setDraft(current), [current]);
+
+  const sources = useDataSources();
+  const currentLabel = current
+    ? (sources.data?.find((d) => d.id === current)?.name ?? current)
+    : null;
+
+  function confirm() {
+    onDataSource(draft);
+    setOpen(false);
+  }
 
   return (
     <li className="flex flex-col gap-2 px-3 py-2">
@@ -116,14 +131,32 @@ function FieldRow({
         <VisibilityToggle value={entry.visibility} onChange={onVisibility} />
       </div>
       {entry.visibility !== 'hidden' && (
-        <Field label="Fonte de dados (opcional)">
-          <TextInput
-            value={ds}
-            onChange={(e) => setDs(e.target.value)}
-            onBlur={() => onDataSource(ds)}
-            placeholder="Identificador da fonte"
-          />
-        </Field>
+        <button
+          type="button"
+          onClick={() => { setDraft(current); setOpen(true); }}
+          className="inline-flex items-center gap-1.5 self-start rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50"
+          title="Fonte de dados"
+        >
+          <Database size={13} />
+          {currentLabel ? <span className="font-medium text-slate-800">{currentLabel}</span> : 'Definir fonte de dados'}
+        </button>
+      )}
+      {open && (
+        <Dialog
+          open
+          onClose={() => setOpen(false)}
+          title="Fonte de dados do campo"
+          footer={
+            <>
+              <button type="button" onClick={() => setOpen(false)} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Cancelar</button>
+              <button type="button" onClick={confirm} className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700">Confirmar</button>
+            </>
+          }
+        >
+          <Field label={`Campo: ${field.label || field.id}`} hint="Opcional. Popula as opções do campo a partir de uma fonte cadastrada.">
+            <DataSourceSelect value={draft} onChange={setDraft} placeholder="Sem fonte (manter como está)" />
+          </Field>
+        </Dialog>
       )}
     </li>
   );

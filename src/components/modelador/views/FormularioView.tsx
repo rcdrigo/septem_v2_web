@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutTemplate, Rows3, Columns3, RefreshCcw, Regex } from 'lucide-react';
+import { LayoutTemplate, Rows3, Columns3, RefreshCcw, Regex, Eye } from 'lucide-react';
 import { IconButton } from '@/components/ui/IconButton';
+import { Dialog } from '@/components/ui/Dialog';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { FormBuilder, type FormBuilderHandle } from '@/components/form/FormBuilder';
 import { FormFieldsPalette } from '@/components/form/FormFieldsPalette';
 import { FieldConfigPanel } from '@/components/form/FieldConfigPanel';
+import { ReactForm } from '@/components/form/ReactForm';
 import { MasksDialog } from '@/components/form/MasksDialog';
 import { extractFields } from '@/lib/form-schema';
 import { useFormStore } from '@/stores/form';
@@ -32,6 +34,7 @@ export function FormularioView({ modeler }: Props) {
   const dataSources = useDataSources();
   const [ready, setReady] = useState(false);
   const [masksOpen, setMasksOpen] = useState(false);
+  const [preview, setPreview] = useState<unknown | null>(null);
   const [selectedField, setSelectedField] = useState<any | null>(null);
   const [groupLayout, setGroupLayout] = useState<GroupLayout>('stacked');
   const layoutRef = useRef<GroupLayout>('stacked');
@@ -132,6 +135,7 @@ export function FormularioView({ modeler }: Props) {
               <Columns3 size={13} /> Abas
             </button>
           </div>
+          <IconButton onClick={() => setPreview(builderRef.current?.saveSchema() ?? { type: 'default', components: [], schemaVersion: 17 })}><Eye size={14} /> Pré-visualizar</IconButton>
           <IconButton onClick={() => setMasksOpen(true)}><Regex size={14} /> Máscaras</IconButton>
           <IconButton onClick={handleReset}><RefreshCcw size={14} /> Limpar formulário</IconButton>
           <IconButton variant="primary" onClick={() => builderRef.current?.importSchema(EMPTY_GROUP_TEMPLATE)}>
@@ -155,6 +159,12 @@ export function FormularioView({ modeler }: Props) {
         />
       </div>
       {masksOpen && <MasksDialog onClose={() => setMasksOpen(false)} />}
+      {preview != null && (
+        <Dialog open onClose={() => setPreview(null)} width="lg" title="Pré-visualização do formulário"
+          footer={<button type="button" onClick={() => setPreview(null)} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Fechar</button>}>
+          <ReactForm schema={preview} />
+        </Dialog>
+      )}
     </div>
   );
 }

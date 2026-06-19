@@ -5,6 +5,13 @@ import emptySchema from '@/assets/empty-form.json';
 /** MIME usado no drag-and-drop dos cards da paleta para o canvas. */
 export const DND_TYPE = 'application/x-septem-field';
 
+/** Campos novos de entrada nascem obrigatórios por padrão (têm `key`). */
+function applyNewFieldDefaults(editor: any, field: any) {
+  if (!field?.key) return; // apresentação/container não têm chave
+  try { editor.get('modeling').editFormField(field, ['validate'], { ...(field.validate || {}), required: true }); }
+  catch { /* ignora se o tipo não aceitar validate */ }
+}
+
 /** Adiciona um campo do tipo dado no índice (de topo) correspondente à posição Y solta. */
 function addTypeAt(editor: any, container: HTMLElement, type: string, clientY: number) {
   try {
@@ -20,6 +27,7 @@ function addTypeAt(editor: any, container: HTMLElement, type: string, clientY: n
       if (clientY < r.top + r.height / 2) { index = i; break; }
     }
     const field = modeling.addFormField({ type }, root, index);
+    applyNewFieldDefaults(editor, field);
     try { editor.get('selection').set(field); } catch { /* seleciona o novo campo, se der */ }
   } catch (err) {
     console.error('Falha ao soltar campo no canvas:', err);
@@ -112,6 +120,7 @@ export const FormBuilder = forwardRef<FormBuilderHandle, FormBuilderProps>(({ on
           const root = registry.getForm();
           const index = Array.isArray(root?.components) ? root.components.length : 0;
           const field = modeling.addFormField({ type }, root, index);
+          applyNewFieldDefaults(editor, field);
           try { editor.get('selection').set(field); } catch { /* seleciona o novo campo, se der */ }
         } catch (err) {
           console.error('Falha ao adicionar campo:', err);

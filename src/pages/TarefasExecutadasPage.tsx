@@ -1,15 +1,13 @@
-import { useState } from 'react';
 import { ClipboardCheck } from 'lucide-react';
 import { useExecutedTasks, type ExecutedTask } from '@/lib/api/execution';
-import { InstanceDialog } from '@/pages/InstanciasPage';
 
 /**
  * Geral › Tarefas executadas: tarefas que o usuário concluiu (não estão mais com
- * ele). Clicar abre o detalhe da instância a que a tarefa pertence.
+ * ele). Clicar abre o relatório da instância em nova aba (sem menus).
  */
 export function TarefasExecutadasPage() {
   const tasks = useExecutedTasks();
-  const [openInstance, setOpenInstance] = useState<string | null>(null);
+  const openReport = (id: string) => window.open(`/solicitacao/${id}`, '_blank', 'noopener');
   const empty = !tasks.isLoading && (tasks.data?.length ?? 0) === 0;
 
   return (
@@ -44,7 +42,7 @@ export function TarefasExecutadasPage() {
                   <td className="px-4 py-2 text-slate-500">{t.action ?? '—'}</td>
                   <td className="px-4 py-2 text-slate-500">{t.completedAt ? new Date(t.completedAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—'}</td>
                   <td className="px-4 py-2 text-right">
-                    <button type="button" onClick={() => setOpenInstance(t.executionId)} className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">Ver</button>
+                    <button type="button" onClick={() => openReport(t.executionId)} className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">Ver</button>
                   </td>
                 </tr>
               ))}
@@ -52,7 +50,6 @@ export function TarefasExecutadasPage() {
           </table>
         )}
       </div>
-      {openInstance && <InstanceDialog id={openInstance} onClose={() => setOpenInstance(null)} />}
     </div>
   );
 }

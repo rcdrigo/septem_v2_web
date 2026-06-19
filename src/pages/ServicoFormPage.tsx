@@ -1,9 +1,12 @@
 import { useRef, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
-import { CheckCircle2, Play } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { useProcessDefinition } from '@/lib/api/process-definitions';
-import { useProcessForm, useStartInstance } from '@/lib/api/execution';
-import { ReactForm, type ReactFormHandle } from '@/components/form/ReactForm';
+import { useProcessForm, useStartInstance, type TaskButton } from '@/lib/api/execution';
+import { ReactForm, FormSkeleton, type ReactFormHandle } from '@/components/form/ReactForm';
+import { CompletionScreen } from '@/pages/TarefasPage';
+import { Tooltip } from '@/components/ui/Tooltip';
+import { renderIcon } from '@/lib/icon-catalog';
 import { Toaster } from '@/components/ui/Toaster';
 import { useSessionStore } from '@/stores/session';
 import { toast } from '@/stores/toast';
@@ -21,20 +24,21 @@ export function ServicoFormPage() {
   const form = useProcessForm(processKey ?? null);
   const start = useStartInstance();
   const fillRef = useRef<ReactFormHandle>(null);
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState<{ nextTaskForMe?: string | null; executionId?: string } | null>(null);
 
   if (!token) return <Navigate to="/login" replace />;
 
-  async function submit() {
+  async function submit(button?: TaskButton) {
     const { data, errors } = fillRef.current?.submit() ?? { data: {}, errors: {} };
-    if (Object.keys(errors).length) { toast.error('Preencha os campos obrigatórios.'); return; }
+    if ((button?.validateForm ?? true) && Object.keys(errors).length) { toast.error('Preencha os campos obrigatórios.'); return; }
     try {
-      await start.mutateAsync({ key: processKey!, data });
-      setDone(true);
+      const r = await start.mutateAsync({ key: processKey!, data });
+      setDone({ nextTaskForMe: r.nextTaskForMe, executionId: r.executionId });
     } catch { toast.error('Não foi possível iniciar o processo.'); }
   }
 
   const name = detail.data?.name ?? 'Serviço';
+  const buttons = form.data?.buttons ?? [];
 
   return (
     <div className="flex h-screen flex-col bg-slate-100">
@@ -44,33 +48,31 @@ export function ServicoFormPage() {
       </header>
 
       {done ? (
-        <main className="flex flex-1 items-center justify-center p-6">
-          <div className="flex flex-col items-center rounded-md border border-slate-200 bg-white px-10 py-14 text-center">
-            <CheckCircle2 size={44} className="mb-3 text-emerald-500" />
-            <p className="text-base font-medium text-slate-800">Solicitação iniciada!</p>
-            <p className="mt-1 text-sm text-slate-500">Você pode acompanhar o andamento em "Minhas tarefas" e "Tarefas executadas".</p>
-            <button type="button" onClick={() => window.close()} className="mt-5 rounded-md border border-slate-300 px-4 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
-              Fechar
-            </button>
-          </div>
+        <main className="flex-1 overflow-auto">
+          <CompletionScreen next={done.nextTaskForMe} executionId={done.executionId} onClose={() => window.close()} />
         </main>
       ) : (
         <>
-          {/* Container ocupa toda a largura da página (req. 3) */}
+          {/* Cada grupo renderiza seu próprio card (sem container único). */}
           <main className="flex-1 overflow-auto p-6">
-            <div className="rounded-md border border-slate-200 bg-white p-6">
-              {form.isLoading ? (
-                <p className="text-sm text-slate-400">Carregando formulário…</p>
-              ) : (
-                <ReactForm ref={fillRef} schema={form.data} />
-              )}
-            </div>
+            {form.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={form.data?.formSchema} />}
           </main>
-          {/* Botão de conclusão sempre visível, na margem inferior (req. 4) */}
-          <footer className="flex justify-end border-t border-slate-200 bg-white px-6 py-3">
-            <button type="button" onClick={submit} disabled={start.isPending || form.isLoading} className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">
-              <Play size={15} /> Iniciar
-            </button>
+          {/* Botões de início — usa os configurados no evento de início; senão, "Iniciar". */}
+          <footer className="flex justify-start gap-2 border-t border-slate-200 bg-white px-6 py-3">
+            {buttons.length === 0 ? (
+              <button type="button" onClick={() => submit()} disabled={start.isPending || form.isLoading} className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">
+                <Play size={15} /> Iniciar
+              </button>
+            ) : buttons.map((b) => (
+              <Tooltip key={b.id} text={b.hint}>
+                <button type="button" onClick={() => submit(b)} disabled={start.isPending || form.isLoading}
+                  style={b.primaryColor ? { backgroundColor: b.primaryColor, color: b.textColor ?? '#fff' } : undefined}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium disabled:opacity-60 ${b.primaryColor ? '' : 'bg-slate-900 text-white hover:bg-slate-700'}`}>
+                  {renderIcon(b.icon, 15)}
+                  {b.label}
+                </button>
+              </Tooltip>
+            ))}
           </footer>
         </>
       )}

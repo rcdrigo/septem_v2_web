@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { Checkbox, Field, TextInput } from '@/components/ui/Field';
+import { Checkbox, Field, TextArea, TextInput } from '@/components/ui/Field';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { IconButton } from '@/components/ui/IconButton';
+import { IconPicker } from '@/components/ui/IconPicker';
+import { renderIcon } from '@/lib/icon-catalog';
 import { slugify } from '@/lib/slugify';
 import { uid } from '@/lib/uid';
 import {
@@ -87,11 +89,19 @@ function ActionButtonRow({
 }) {
   const [draftLabel, setDraftLabel] = useState(button.label);
   const [draftId, setDraftId] = useState(button.id);
+  const [draftHint, setDraftHint] = useState(button.hint ?? '');
 
   useEffect(() => {
     setDraftLabel(button.label);
     setDraftId(button.id);
-  }, [button.label, button.id]);
+    setDraftHint(button.hint ?? '');
+  }, [button.label, button.id, button.hint]);
+
+  function commitHint() {
+    const trimmed = draftHint.trim();
+    if (trimmed === (button.hint ?? '')) return;
+    onChange({ hint: trimmed || undefined });
+  }
 
   function commitLabel() {
     const trimmed = draftLabel.trim();
@@ -115,7 +125,10 @@ function ActionButtonRow({
         className="-mx-3 -mt-3 mb-3 flex items-center justify-between rounded-t-md px-3 py-2 text-sm font-medium"
         style={{ backgroundColor: button.primaryColor, color: button.textColor }}
       >
-        <span className="truncate">{button.label || 'Sem nome'}</span>
+        <span className="inline-flex min-w-0 items-center gap-1.5">
+          {renderIcon(button.icon, 15)}
+          <span className="truncate">{button.label || 'Sem nome'}</span>
+        </span>
         <button
           type="button"
           onClick={onRemove}
@@ -162,6 +175,22 @@ function ActionButtonRow({
             />
           </Field>
         </div>
+
+        <Field label="Ícone" hint="Exibido à esquerda do rótulo do botão.">
+          <div>
+            <IconPicker value={button.icon} onChange={(icon) => onChange({ icon })} />
+          </div>
+        </Field>
+
+        <Field label="Orientações" hint="Aviso exibido ao executor quando o cursor passa sobre o botão.">
+          <TextArea
+            value={draftHint}
+            onChange={(e) => setDraftHint(e.target.value)}
+            onBlur={commitHint}
+            rows={2}
+            placeholder="ex: Use este botão para aprovar e seguir para a próxima etapa."
+          />
+        </Field>
 
         <Checkbox
           checked={button.validateForm}

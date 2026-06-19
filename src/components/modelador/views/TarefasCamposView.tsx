@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Eye, EyeOff, Pencil } from 'lucide-react';
 import { selectFieldGroups, useFormStore } from '@/stores/form';
+import { extractFields } from '@/lib/form-schema';
+import { getEmbeddedFormSchema } from '@/lib/bpmn-process';
 import {
   getFormFieldEntries,
   setFormFieldEntries,
@@ -32,7 +34,17 @@ const HUMAN_TASK_TYPES = new Set(['bpmn:UserTask', 'bpmn:StartEvent']);
  */
 export function TarefasCamposView({ modeler }: Props) {
   const formFields = useFormStore((s) => s.fields);
+  const setFields = useFormStore((s) => s.setFields);
   const fieldGroups = useMemo(() => selectFieldGroups(formFields), [formFields]);
+
+  // A matriz lê os campos do store, populado pelo polling do FormulárioView.
+  // Ao abrir direto nesta aba, o store pode estar vazio — sincroniza a partir do
+  // schema embutido no XML.
+  useEffect(() => {
+    if (!modeler) return;
+    const schema = getEmbeddedFormSchema(modeler);
+    if (schema) setFields(extractFields(schema as any));
+  }, [modeler, setFields]);
 
   const [tasks, setTasks] = useState<TaskInfo[]>([]);
   const [entriesByTask, setEntriesByTask] = useState<Record<string, FormFieldEntry[]>>({});
@@ -86,6 +98,17 @@ export function TarefasCamposView({ modeler }: Props) {
     return e ?? { fieldRef, visibility: 'visible' };
   }
 
+  /** Aplica uma visibilidade a vários campos de uma tarefa de uma vez. */
+  function setMany(taskId: string, fieldRefs: string[], visibility: FieldVisibility) {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    let next = entriesByTask[taskId] ?? [];
+    for (const ref of fieldRefs) next = upsertFieldEntry(next, ref, { visibility });
+    setFormFieldEntries(modeler, task.element, next);
+    setEntriesByTask((m) => ({ ...m, [taskId]: next }));
+  }
+  const allFieldIds = fieldGroups.flatMap((g) => g.fields.map((f) => f.id));
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <header className="border-b border-slate-200 bg-slate-50 px-5 py-2.5">
@@ -108,9 +131,10 @@ export function TarefasCamposView({ modeler }: Props) {
                   className="border-b border-slate-200 px-3 py-2 text-center text-xs font-semibold text-slate-700"
                   title={t.id}
                 >
-                  <div className="flex flex-col items-center">
+                  <div className="flex flex-col items-center gap-1">
                     <span className="truncate">{t.label}</span>
                     <span className="text-[10px] font-normal text-slate-400">{t.kind}</span>
+                    <BulkToggle title="Aplicar a todos os campos do formulário" onPick={(v) => setMany(t.id, allFieldIds, v)} />
                   </div>
                 </th>
               ))}
@@ -119,13 +143,17 @@ export function TarefasCamposView({ modeler }: Props) {
           <tbody>
             {fieldGroups.map(({ group, fields }) => (
               <>
-                <tr key={`group-${group}`}>
+                <tr key={`group-${group}`} className="bg-slate-100">
                   <th
-                    colSpan={tasks.length + 1}
-                    className="sticky left-0 bg-slate-100 px-4 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600"
+                    className="sticky left-0 z-10 bg-slate-100 px-4 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600"
                   >
                     {group}
                   </th>
+                  {tasks.map((t) => (
+                    <td key={t.id} className="px-3 py-1.5 text-center">
+                      <BulkToggle title={`Aplicar a todos os campos de "${group}"`} onPick={(v) => setMany(t.id, fields.map((f) => f.id), v)} />
+                    </td>
+                  ))}
                 </tr>
                 {fields.map((field) => (
                   <tr key={`${group}-${field.id}`} className="hover:bg-slate-50">
@@ -191,6 +219,26 @@ function CellToggle({
   );
 }
 
+/** Toggle de aplicação em massa (sem estado ativo — só dispara a escolha). */
+function BulkToggle({ onPick, title }: { onPick: (v: FieldVisibility) => void; title: string }) {
+  return (
+    <div className="inline-flex overflow-hidden rounded border border-slate-300" title={title}>
+      {VIS_STATES.map(({ value: v, icon: Icon, label }) => (
+        <button
+          key={v}
+          type="button"
+          aria-label={`${label} — todos`}
+          title={`${label} — todos`}
+          onClick={() => onPick(v)}
+          className="flex h-5 w-5 items-center justify-center bg-white text-slate-400 transition-colors hover:bg-slate-900 hover:text-white"
+        >
+          <Icon size={10} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function EmptyState({ text }: { text: string }) {
   return (
     <div className="flex flex-1 items-center justify-center bg-slate-100">
@@ -211,17 +259,27 @@ type TaskInfo = {
 function listHumanTasks(modeler: any): TaskInfo[] {
   const registry: any = modeler.get('elementRegistry');
   const out: TaskInfo[] = [];
+  const seen = new Set<string>();
   registry.forEach((el: any) => {
+    // Pula labels externos (compartilham o businessObject do StartEvent → coluna
+    // duplicada) e conexões.
+    if (el.type === 'label' || el.labelTarget || el.waypoints) return;
     const type = el.businessObject?.$type;
     if (!HUMAN_TASK_TYPES.has(type)) return;
+    const id = el.businessObject.id;
+    if (seen.has(id)) return;
+    seen.add(id);
     out.push({
-      id: el.businessObject.id,
+      id,
       label: el.businessObject.name || el.businessObject.id,
       kind: type === 'bpmn:StartEvent' ? 'Início' : 'Tarefa humana',
       element: el,
     });
   });
-  // Estável: ordem por id pra evitar embaralhamento entre renders
-  out.sort((a, b) => a.id.localeCompare(b.id));
+  // Início primeiro; depois por id (estável entre renders).
+  out.sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === 'Início' ? -1 : 1;
+    return a.id.localeCompare(b.id);
+  });
   return out;
 }

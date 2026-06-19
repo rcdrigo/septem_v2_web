@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
-import { MousePointerClick } from 'lucide-react';
+import { MousePointerClick, Pencil, ExternalLink } from 'lucide-react';
+import { Dialog } from '@/components/ui/Dialog';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
+import { Combobox } from '@/components/ui/Combobox';
+import { IconSearchPicker } from '@/components/ui/IconSearchPicker';
+import { slugify } from '@/lib/slugify';
+import { fetchDataSourceOptions } from '@/lib/api/catalog';
+import { toast } from '@/stores/toast';
 
 type Opt = { value: string; label: string };
 type MaskOpt = Opt & { regex: string; shouldValidate: boolean };
-type Tab = 'geral' | 'aparencia' | 'validacao' | 'septem' | 'eventos';
+type Tab = 'geral' | 'validacao' | 'aparencia';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'geral', label: 'Geral' },
   { id: 'aparencia', label: 'Aparência' },
   { id: 'validacao', label: 'Validação' },
-  { id: 'septem', label: 'Septem' },
-  { id: 'eventos', label: 'Eventos' },
 ];
 
 const EVENT_TYPES: Opt[] = [
@@ -27,6 +32,8 @@ const CONTAINER = new Set(['group', 'dynamiclist']);
 const VALIDATABLE = new Set(['textfield', 'textarea', 'number', 'datetime']);
 /** Tipos sem "rótulo" (conteúdo vem de outras propriedades, ou nenhum). */
 const NO_LABEL = new Set(['text', 'html', 'image', 'spacer', 'separator']);
+/** Tipos que exibem o seletor de Fonte de dados na aba Geral. */
+const FONTE_DADOS_TYPES = new Set(['textfield', 'number', 'datetime', 'select', 'radio', 'checklist', 'taglist', 'text', 'image']);
 
 /** Divide as abas em linhas que sempre preenchem 100% (no máx. 3 por linha). */
 function chunkTabs<T>(arr: T[]): T[][] {
@@ -38,25 +45,20 @@ function chunkTabs<T>(arr: T[]): T[][] {
   return rows;
 }
 
-/** Ids das abas relevantes para o tipo do campo (áudio: "reorganizar conforme o tipo"). */
+/** Ids das abas relevantes para o tipo do campo. */
 function availableTabIds(field: any): Tab[] {
   const type = field?.type;
-  const isPresentation = PRESENTATION.has(type);
-  const isContainer = CONTAINER.has(type);
-  const isInput = !!field?.key && !isPresentation && !isContainer;
   return TABS.filter((t) => {
     switch (t.id) {
-      case 'validacao': return VALIDATABLE.has(type);
-      case 'septem': return isInput || isContainer;
-      case 'eventos': return isInput;
+      case 'validacao': return type === 'number';
       default: return true; // geral, aparencia
     }
   }).map((t) => t.id);
 }
 
 /**
- * Painel de configuração do CAMPO selecionado, agrupado por categoria em abas
- * (cockpit). Lê/edita o campo via a engine do form-js (`editField`).
+ * Painel de configuração do CAMPO selecionado, em 3 abas (Geral, Validação,
+ * Aparência). Lê/edita o campo via a engine do form-js (`editField`).
  */
 export function FieldConfigPanel({ field, editField, masks, dataSources }: {
   field: any | null;
@@ -65,7 +67,12 @@ export function FieldConfigPanel({ field, editField, masks, dataSources }: {
   dataSources: Opt[];
 }) {
   const [tab, setTab] = useState<Tab>('geral');
+  const [helpOpen, setHelpOpen] = useState(false);
   const [, force] = useState(0);
+  // Drafts de Nome/Chave commitados no blur — evita re-render por tecla (que
+  // tirava o foco, ex.: título da lista dinâmica).
+  const [draftLabel, setDraftLabel] = useState('');
+  const [draftKey, setDraftKey] = useState('');
 
   // Se o tipo do campo mudou e a aba ativa não existe mais, volta pra Geral.
   // (Hook ANTES de qualquer early return — senão a contagem de hooks varia.)
@@ -73,6 +80,13 @@ export function FieldConfigPanel({ field, editField, masks, dataSources }: {
     if (field && !availableTabIds(field).includes(tab)) setTab('geral');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [field?.type]);
+
+  // Sincroniza os drafts quando troca o campo selecionado.
+  useEffect(() => {
+    setDraftLabel(field?.label ?? '');
+    setDraftKey(field?.key ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [field?.id]);
 
   if (!field) {
     return (
@@ -91,10 +105,34 @@ export function FieldConfigPanel({ field, editField, masks, dataSources }: {
   const validate: Record<string, unknown> = field.validate || {};
   const appearance: Record<string, string> = field.appearance || {};
   const isInput = !!field.key && !PRESENTATION.has(field.type) && !CONTAINER.has(field.type);
+  const isContainer = CONTAINER.has(field.type);
   const supportsOptions = OPTION_TYPES.has(field.type);
+  const helpType = props.septemHelpType ?? 'inline';
 
   const ids = availableTabIds(field);
   const availableTabs = TABS.filter((t) => ids.includes(t.id));
+
+  /** Commit do Nome (label) no blur; se a Chave ainda era derivada do nome, sincroniza. */
+  function changeLabel(v: string) {
+    const prevAuto = slugify(field.label ?? '');
+    const keyFollows = isInput && (!field.key || field.key === prevAuto);
+    editField(field, ['label'], v);
+    if (keyFollows) {
+      const nextKey = slugify(v);
+      if (nextKey && nextKey !== field.key) {
+        try { editField(field, ['key'], nextKey); setDraftKey(nextKey); } catch { /* unicidade — ignora */ }
+      }
+    }
+    force((n) => n + 1);
+  }
+
+  /** Commit da Chave no blur (slug). form-js valida unicidade. */
+  function changeKey(v: string) {
+    const slug = slugify(v);
+    setDraftKey(slug);
+    try { editField(field, ['key'], slug); } catch { /* dup — ignora */ }
+    force((n) => n + 1);
+  }
 
   // events: persistido como JSON em properties.septemEvents (array de {type, action}).
   const events: { type: string; action: string }[] = (() => {
@@ -110,7 +148,7 @@ export function FieldConfigPanel({ field, editField, masks, dataSources }: {
         <p className="text-xs text-slate-400">{labelOfType(field.type)}{field.key ? ` · ${field.key}` : ''}</p>
       </div>
 
-      {/* Abas dinâmicas por tipo; cada linha preenche 100% (no máx. 3 por linha). */}
+      {/* Abas (sempre 3, no máx). */}
       <div className="m-3 flex flex-col gap-1 rounded-md bg-slate-100 p-1">
         {chunkTabs(availableTabs).map((row, ri) => (
           <div key={ri} className="flex gap-1">
@@ -132,10 +170,71 @@ export function FieldConfigPanel({ field, editField, masks, dataSources }: {
             {field.type === 'html' && <TextArea label="Conteúdo (HTML)" value={field.content ?? ''} onChange={(v) => set(['content'], v)} />}
             {field.type === 'image' && <Text label="Origem (URL ou expressão)" value={field.source ?? ''} onChange={(v) => set(['source'], v)} />}
             {field.type === 'image' && <Text label="Texto alternativo" value={field.alt ?? ''} onChange={(v) => set(['alt'], v)} />}
-            {!NO_LABEL.has(field.type) && <Text label="Rótulo" value={field.label ?? ''} onChange={(v) => set(['label'], v)} />}
-            {isInput && <Text label="Chave (identificador)" value={field.key ?? ''} readOnly hint="Gerado a partir do rótulo." />}
+
+            {!NO_LABEL.has(field.type) && <Text label="Nome" value={draftLabel} onChange={setDraftLabel} onBlur={() => changeLabel(draftLabel)} />}
+            {isInput && <Text label="Chave (identificador)" value={draftKey} onChange={setDraftKey} onBlur={() => changeKey(draftKey)} hint="Sincroniza com o nome; pode ser editada." />}
+
+            {field.type === 'group' && (
+              <>
+                <div>
+                  <Lbl>Ícone do grupo</Lbl>
+                  <IconSearchPicker value={props.septemGroupIcon} onChange={(cls) => merge('properties', { septemGroupIcon: cls || undefined })} />
+                </div>
+                <Check label="Exibir contador de pendências" checked={props.septemShowPending !== 'no'}
+                  onChange={(b) => merge('properties', { septemShowPending: b ? undefined : 'no' })} />
+              </>
+            )}
+
+            {(isInput || isContainer) && (
+              <div>
+                <Lbl>Tipo de ajuda</Lbl>
+                <select className={fieldCls} value={helpType} onChange={(e) => merge('properties', { septemHelpType: e.target.value })}>
+                  <option value="inline">Inline</option>
+                  <option value="popover">Popover</option>
+                </select>
+                {helpType === 'popover' ? (
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <button type="button" onClick={() => setHelpOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
+                      <Pencil size={13} /> Editar orientações
+                    </button>
+                    <span className="text-[11px] text-slate-400">{props.septemHelpText ? 'definidas' : 'vazias'}</span>
+                  </div>
+                ) : (
+                  <textarea rows={2} className={`${fieldCls} mt-1.5`} value={props.septemHelpText ?? ''}
+                    onChange={(e) => merge('properties', { septemHelpText: e.target.value || undefined })} placeholder="Orientações exibidas abaixo do campo." />
+                )}
+              </div>
+            )}
+
+            {FONTE_DADOS_TYPES.has(field.type) && (
+              <div>
+                <Lbl>Fonte de dados</Lbl>
+                <Combobox value={props.septemDataSourceId ?? ''} options={dataSources} clearLabel="— nenhuma —"
+                  placeholder="Selecione a fonte de dados"
+                  onChange={(v) => {
+                    merge('properties', { septemDataSourceId: v || undefined });
+                    // Campos de opção: carrega as opções da fonte direto no campo.
+                    if (v && supportsOptions) {
+                      fetchDataSourceOptions(v)
+                        .then((opts) => { set(['values'], opts); toast.success(`${opts.length} opç${opts.length === 1 ? 'ão' : 'ões'} carregada${opts.length === 1 ? '' : 's'}.`); })
+                        .catch(() => toast.error('Não foi possível carregar as opções da fonte.'));
+                    }
+                  }} />
+                {props.septemDataSourceId && (
+                  <button type="button"
+                    onClick={() => window.open(`/admin/fontes-dados?edit=${encodeURIComponent(props.septemDataSourceId)}`, '_blank')}
+                    className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900">
+                    <ExternalLink size={12} /> Editar fonte de dados
+                  </button>
+                )}
+              </div>
+            )}
+
             {isInput && <Check label="Obrigatório" checked={!!validate.required} onChange={(b) => merge('validate', { required: b })} />}
-            {isInput && <TextArea label="Descrição (ajuda inline)" value={field.description ?? ''} onChange={(v) => set(['description'], v)} />}
+            {(isInput || isContainer) && <Check label="Visível no relatório" checked={props.septemVisReport !== 'no'} onChange={(b) => merge('properties', { septemVisReport: b ? undefined : 'no' })} />}
+            {(isInput || isContainer) && <Check label="Visível ao requisitante" checked={props.septemVisRequester !== 'no'} onChange={(b) => merge('properties', { septemVisRequester: b ? undefined : 'no' })} />}
+
             {(field.type === 'spacer' || field.type === 'separator') && (
               <p className="text-sm text-slate-400">Este elemento não tem configurações em Geral.</p>
             )}
@@ -144,27 +243,6 @@ export function FieldConfigPanel({ field, editField, masks, dataSources }: {
 
         {tab === 'aparencia' && (
           <div className="flex flex-col gap-3">
-            {isInput && <Text label="Prefixo" value={appearance.prefixAdorner ?? ''} onChange={(v) => merge('appearance', { prefixAdorner: v || undefined })} />}
-            {isInput && <Text label="Sufixo" value={appearance.suffixAdorner ?? ''} onChange={(v) => merge('appearance', { suffixAdorner: v || undefined })} />}
-            <NumberInput label="Colunas (no container)" value={field.layout?.columns}
-              onChange={(n) => merge('layout', { columns: n })} hint="Quantas colunas do grid o campo ocupa." />
-            <NumberInput label="Largura (px)" value={props.septemWidth}
-              onChange={(n) => merge('properties', { septemWidth: n != null ? String(n) : undefined })} hint="Vazio = largura da coluna." />
-          </div>
-        )}
-
-        {tab === 'validacao' && (
-          <div className="flex flex-col gap-3">
-            <NumberInput label="Mín. caracteres" value={validate.minLength} onChange={(n) => merge('validate', { minLength: n })} />
-            <NumberInput label="Máx. caracteres" value={validate.maxLength} onChange={(n) => merge('validate', { maxLength: n })} />
-            {field.type === 'number' && <NumberInput label="Valor mínimo" value={validate.min} onChange={(n) => merge('validate', { min: n })} />}
-            {field.type === 'number' && <NumberInput label="Valor máximo" value={validate.max} onChange={(n) => merge('validate', { max: n })} />}
-            {!isInput && <p className="text-sm text-slate-400">Este elemento não tem validação.</p>}
-          </div>
-        )}
-
-        {tab === 'septem' && (
-          <div className="flex flex-col gap-3">
             {MASKABLE.has(field.type) && (
               <Select label="Máscara" value={props.septemMaskId ?? ''} options={[{ value: '', label: '— nenhuma —' }, ...masks]}
                 onChange={(v) => {
@@ -172,46 +250,54 @@ export function FieldConfigPanel({ field, editField, masks, dataSources }: {
                   merge('properties', { septemMaskId: v || undefined, septemMaskRegex: m?.regex, septemMaskValidate: m?.shouldValidate ? 'true' : undefined });
                 }} />
             )}
-            {supportsOptions && (
-              <Select label="Fonte de dados (opções)" value={props.septemDataSourceId ?? ''} options={[{ value: '', label: '— nenhuma —' }, ...dataSources]}
-                onChange={(v) => merge('properties', { septemDataSourceId: v || undefined })} />
+            {isInput && <Text label="Prefixo" value={appearance.prefixAdorner ?? ''} onChange={(v) => merge('appearance', { prefixAdorner: v || undefined })} />}
+            {isInput && <Text label="Sufixo" value={appearance.suffixAdorner ?? ''} onChange={(v) => merge('appearance', { suffixAdorner: v || undefined })} />}
+            <NumberInput label="Colunas (no container)" value={field.layout?.columns}
+              onChange={(n) => merge('layout', { columns: n })} hint="Quantas colunas do grid o campo ocupa." />
+            <NumberInput label="Largura (px)" value={props.septemWidth}
+              onChange={(n) => merge('properties', { septemWidth: n != null ? String(n) : undefined })} hint="Vazio = largura da coluna." />
+            {VALIDATABLE.has(field.type) && <NumberInput label="Mín. caracteres" value={validate.minLength} onChange={(n) => merge('validate', { minLength: n })} />}
+            {VALIDATABLE.has(field.type) && <NumberInput label="Máx. caracteres" value={validate.maxLength} onChange={(n) => merge('validate', { maxLength: n })} />}
+
+            {(isInput || supportsOptions) && (
+              <div className="mt-1 flex flex-col gap-2 border-t border-slate-200 pt-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Eventos</p>
+                {events.length === 0 && <p className="text-sm text-slate-400">Nenhum evento. Adicione abaixo.</p>}
+                {events.map((ev, i) => (
+                  <div key={i} className="flex flex-col gap-2 rounded-md border border-slate-200 p-2">
+                    <Select label="Evento" value={ev.type} options={EVENT_TYPES}
+                      onChange={(v) => setEvents(events.map((e, j) => (j === i ? { ...e, type: v } : e)))} />
+                    <TextArea label="Ação" value={ev.action}
+                      onChange={(v) => setEvents(events.map((e, j) => (j === i ? { ...e, action: v } : e)))} />
+                    <button type="button" className="self-end text-xs font-medium text-red-600 hover:underline"
+                      onClick={() => setEvents(events.filter((_, j) => j !== i))}>Remover</button>
+                  </div>
+                ))}
+                <button type="button" className="rounded-md border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  onClick={() => setEvents([...events, { type: 'change', action: '' }])}>+ Adicionar evento</button>
+              </div>
             )}
-            <Select label="Tipo de ajuda" value={props.septemHelpType ?? 'inline'} options={[{ value: 'inline', label: 'Inline' }, { value: 'popover', label: 'Popover' }]}
-              onChange={(v) => merge('properties', { septemHelpType: v })} />
-            <TextArea label="Texto de ajuda" value={props.septemHelpText ?? ''} onChange={(v) => merge('properties', { septemHelpText: v || undefined })} />
-            <Select label="Visível no relatório" value={props.septemVisReport === 'no' ? 'no' : 'yes'} options={YESNO}
-              onChange={(v) => merge('properties', { septemVisReport: v === 'no' ? 'no' : undefined })} />
-            <Select label="Visível ao requisitante" value={props.septemVisRequester === 'no' ? 'no' : 'yes'} options={YESNO}
-              onChange={(v) => merge('properties', { septemVisRequester: v === 'no' ? 'no' : undefined })} />
           </div>
         )}
 
-        {tab === 'eventos' && (
+        {tab === 'validacao' && (
           <div className="flex flex-col gap-3">
-            {events.length === 0 && <p className="text-sm text-slate-400">Nenhum evento. Adicione abaixo.</p>}
-            {events.map((ev, i) => (
-              <div key={i} className="flex flex-col gap-2 rounded-md border border-slate-200 p-2">
-                <Select label="Evento" value={ev.type} options={EVENT_TYPES}
-                  onChange={(v) => setEvents(events.map((e, j) => (j === i ? { ...e, type: v } : e)))} />
-                <TextArea label="Ação" value={ev.action}
-                  onChange={(v) => setEvents(events.map((e, j) => (j === i ? { ...e, action: v } : e)))} />
-                <button type="button" className="self-end text-xs font-medium text-red-600 hover:underline"
-                  onClick={() => setEvents(events.filter((_, j) => j !== i))}>Remover</button>
-              </div>
-            ))}
-            <button type="button" className="rounded-md border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-              onClick={() => setEvents([...events, { type: 'change', action: '' }])}>+ Adicionar evento</button>
-            <p className="text-[11px] text-slate-400">
-              Ação: função a chamar com seus parâmetros — pode ser o próprio campo, variáveis ou outros campos do formulário.
-            </p>
+            <NumberInput label="Valor mínimo" value={validate.min} onChange={(n) => merge('validate', { min: n })} />
+            <NumberInput label="Valor máximo" value={validate.max} onChange={(n) => merge('validate', { max: n })} />
           </div>
         )}
       </div>
+
+      {helpOpen && (
+        <Dialog open onClose={() => setHelpOpen(false)} width="lg" title="Orientações do campo (popover)"
+          footer={<button type="button" onClick={() => setHelpOpen(false)} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Fechar</button>}>
+          <RichTextEditor value={props.septemHelpText ?? ''} onChange={(html) => merge('properties', { septemHelpText: html || undefined })} />
+        </Dialog>
+      )}
     </aside>
   );
 }
 
-const YESNO: Opt[] = [{ value: 'yes', label: 'Sim' }, { value: 'no', label: 'Não' }];
 const TYPE_LABELS: Record<string, string> = {
   textfield: 'Texto', textarea: 'Área de texto', number: 'Número', datetime: 'Data/Hora',
   select: 'Lista', radio: 'Opções', checkbox: 'Caixa de seleção', checklist: 'Múltipla escolha',
@@ -225,8 +311,8 @@ const fieldCls = 'w-full rounded-md border border-slate-300 bg-white px-3 py-1.5
 function Lbl({ children }: { children: React.ReactNode }) {
   return <label className="mb-1 block text-xs font-medium text-slate-600">{children}</label>;
 }
-function Text({ label, value, onChange, readOnly, hint }: { label: string; value: string; onChange?: (v: string) => void; readOnly?: boolean; hint?: string }) {
-  return <div><Lbl>{label}</Lbl><input className={fieldCls} value={value} readOnly={readOnly} onChange={(e) => onChange?.(e.target.value)} />{hint && <span className="mt-0.5 block text-[11px] text-slate-400">{hint}</span>}</div>;
+function Text({ label, value, onChange, onBlur, readOnly, hint }: { label: string; value: string; onChange?: (v: string) => void; onBlur?: () => void; readOnly?: boolean; hint?: string }) {
+  return <div><Lbl>{label}</Lbl><input className={fieldCls} value={value} readOnly={readOnly} onChange={(e) => onChange?.(e.target.value)} onBlur={onBlur} />{hint && <span className="mt-0.5 block text-[11px] text-slate-400">{hint}</span>}</div>;
 }
 function TextArea({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return <div><Lbl>{label}</Lbl><textarea rows={2} className={fieldCls} value={value} onChange={(e) => onChange(e.target.value)} /></div>;

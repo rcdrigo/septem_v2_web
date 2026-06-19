@@ -32,6 +32,12 @@ export function useDataSources() {
   return useQuery({ queryKey: ['catalog', 'data-sources'], queryFn: () => api.get<DataSource[]>('/api/v1/data-sources') });
 }
 
+/** Resolve as opções (value/label) de uma fonte de dados — usado ao aplicar a fonte a um campo de opções. */
+export async function fetchDataSourceOptions(dataSourceId: string): Promise<{ value: string; label: string }[]> {
+  const r = await api.post<{ options: { value: string; label: string }[] }>('/api/v1/workflow/field-options', { dataSourceId });
+  return r.options ?? [];
+}
+
 export function useEmailTemplates() {
   return useQuery({ queryKey: ['catalog', 'email-templates'], queryFn: () => api.get<EmailTemplate[]>('/api/v1/email-templates') });
 }

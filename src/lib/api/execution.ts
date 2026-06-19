@@ -1,21 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
-export type StartedInstance = { executionId: string; status: string; tasks: { id: string; name: string | null }[] };
+export type StartedInstance = { executionId: string; status: string; tasks: { id: string; name: string | null }[]; nextTaskForMe?: string | null };
 export type MyTask = { id: string; name: string | null; executionId: string; createdAt: string; dueAt: string | null; process?: string | null };
 export type ExecutedTask = { id: string; name: string | null; executionId: string; process: string | null; completedAt: string | null; action: string | null };
-export type TaskButton = { id: string; label: string; validateForm: boolean; primaryColor?: string | null; textColor?: string | null };
+export type TaskButton = { id: string; label: string; validateForm: boolean; primaryColor?: string | null; textColor?: string | null; icon?: string | null; hint?: string | null };
 export type TaskDetail = {
   id: string; name: string | null; status: string; executionId: string;
+  process?: string | null; documentationUrl?: string | null;
   formSchema: unknown; data: unknown; buttons: TaskButton[];
 };
-export type CompleteResult = { taskStatus: string; executionStatus: string; pendingTasks: number };
+export type CompleteResult = { taskStatus: string; executionStatus: string; pendingTasks: number; executionId?: string; nextTaskForMe?: string | null };
 
 const execKeys = { tasks: ['workflow', 'tasks'] as const, task: (id: string) => ['workflow', 'task', id] as const };
 
 /** Schema form-js do processo (formulário inicial de "Iniciar"). */
+export type StartForm = { formSchema: unknown; buttons: TaskButton[] };
 export function useProcessForm(key: string | null) {
-  return useQuery({ queryKey: ['workflow', 'process-form', key], queryFn: () => api.get<unknown>(`/api/v1/workflow/process-definitions/${key}/form`), enabled: !!key });
+  return useQuery({ queryKey: ['workflow', 'process-form', key], queryFn: () => api.get<StartForm>(`/api/v1/workflow/process-definitions/${key}/form`), enabled: !!key });
 }
 
 export function useStartInstance() {

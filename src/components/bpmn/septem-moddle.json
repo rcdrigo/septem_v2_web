@@ -29,7 +29,9 @@
         { "name": "label", "isAttr": true, "type": "String" },
         { "name": "primaryColor", "isAttr": true, "type": "String" },
         { "name": "textColor", "isAttr": true, "type": "String" },
-        { "name": "validateForm", "isAttr": true, "type": "Boolean", "default": true }
+        { "name": "validateForm", "isAttr": true, "type": "Boolean", "default": true },
+        { "name": "icon", "isAttr": true, "type": "String" },
+        { "name": "hint", "isAttr": true, "type": "String" }
       ]
     },
     {

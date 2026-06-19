@@ -1,6 +1,7 @@
-import { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { ChevronDown, HelpCircle } from 'lucide-react';
+import { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, HelpCircle, Plus, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { regexToTemplate, applyMask, isAllDigits } from '@/lib/mask';
 
 /** Mesmo contrato do FormFill (form-js), para ser intercambiável. */
 export type FormFillResult = { data: Record<string, unknown>; errors: Record<string, unknown> };
@@ -20,9 +21,19 @@ type Component = {
   values?: { label: string; value: string }[];
   validate?: { required?: boolean; minLength?: number; maxLength?: number; min?: number; max?: number };
   components?: Component[];
-  /** Config rica gravada pelo painel do form-js (field.properties): septemMask*, septemDataSourceId, septemHelp*, septemEvents. */
+  /** Layout no grid de 16 colunas do form-js (columns null/0 = linha inteira). */
+  layout?: { columns?: number | null };
+  /** Config rica gravada pelo painel do form-js (field.properties): septemMask*, septemDataSourceId, septemHelp*, septemEvents, septemGroupIcon, septemShowPending. */
   properties?: Record<string, string>;
 };
+
+const GRID_COLS = 16;
+/** span de colunas de um componente (default = linha inteira). */
+function colSpan(c: Component): number {
+  const n = c.layout?.columns;
+  if (!n || n < 1) return GRID_COLS;
+  return Math.min(GRID_COLS, n);
+}
 
 type OptionsMap = Record<string, { value: string; label: string }[]>;
 type FieldState = Record<string, { hidden?: boolean; disabled?: boolean }>;
@@ -31,6 +42,7 @@ const INPUT_TYPES = new Set(['textfield', 'textarea', 'number', 'checkbox', 'sel
 
 function collectInputs(components: Component[] | undefined, acc: Component[]) {
   for (const c of components ?? []) {
+    if (c.type === 'dynamiclist') continue; // itens da lista têm escopo próprio (array)
     if (c.key && INPUT_TYPES.has(c.type ?? '')) acc.push(c);
     if (c.components) collectInputs(c.components, acc);
   }
@@ -81,6 +93,12 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [dsOptions, setDsOptions] = useState<OptionsMap>({});
     const [fieldState, setFieldState] = useState<FieldState>({});
+    // #28: só exibe o form depois que todas as fontes de dados carregarem.
+    const hasDsFields = useMemo(
+      () => inputs.some((c) => c.properties?.septemDataSourceId && (c.type === 'select' || c.type === 'radio')),
+      [inputs],
+    );
+    const [dsLoading, setDsLoading] = useState(hasDsFields);
 
     // Ref pro valor mais recente — o runtime de eventos lê de forma síncrona.
     const valuesRef = useRef(values);
@@ -89,8 +107,9 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
     // Carrega as opções dos selects/radios alimentados por fonte de dados.
     useEffect(() => {
       const dsFields = inputs.filter((c) => c.properties?.septemDataSourceId && (c.type === 'select' || c.type === 'radio'));
-      if (dsFields.length === 0) return;
+      if (dsFields.length === 0) { setDsLoading(false); return; }
       let cancelled = false;
+      setDsLoading(true);
       (async () => {
         for (const c of dsFields) {
           try {
@@ -101,6 +120,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
             setDsOptions((prev) => ({ ...prev, [c.key!]: opts }));
           } catch { /* sem permissão/erro: degrada para as opções estáticas */ }
         }
+        if (!cancelled) setDsLoading(false);
       })();
       return () => { cancelled = true; };
     }, [inputs]);
@@ -166,26 +186,24 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
     const layout = (root as { septemGroupLayout?: string }).septemGroupLayout;
     const runtime: Runtime = { values, errors, set, dsOptions, readOnly, fieldState, runEvent };
 
-    // Abas: grupos principais (containers de topo) viram abas; campos soltos de topo
-    // ficam acima. Subgrupos seguem aninhados dentro de cada aba.
+    // Cada grupo de topo vira um card; os cards se distribuem no grid de 16 col
+    // (8+8 = lado a lado). Em "abas", a barra fica num card e o conteúdo noutro.
+    const isGroup = (c: Component) => !!(c.components && !c.key);
     let body: React.ReactNode;
     if (layout === 'tabs') {
-      const groups = comps.filter((c) => c.components && !c.key);
-      const loose = comps.filter((c) => !(c.components && !c.key));
+      const groups = comps.filter(isGroup);
+      const loose = comps.filter((c) => !isGroup(c));
       body = (
         <div className="flex flex-col gap-4">
-          {loose.map((c, i) => <Node key={c.id ?? i} comp={c} />)}
-          {groups.length > 0 && <GroupTabs groups={groups} />}
+          {loose.length > 0 && <LayoutGrid components={loose} render={(c) => <Node comp={c} />} />}
+          {groups.length > 0 && <GroupTabsCards groups={groups} />}
         </div>
       );
     } else {
-      body = (
-        <div className="flex flex-col gap-4">
-          {comps.map((c, i) => <Node key={c.id ?? i} comp={c} />)}
-        </div>
-      );
+      body = <LayoutGrid components={comps} render={(c) => (isGroup(c) ? <GroupCard group={c} /> : <Node comp={c} />)} />;
     }
 
+    if (dsLoading) return <FormSkeleton />;
     return <RuntimeCtx.Provider value={runtime}>{body}</RuntimeCtx.Provider>;
   },
 );
@@ -194,11 +212,13 @@ ReactForm.displayName = 'ReactForm';
 function Node({ comp }: { comp: Component }) {
   const { values, errors, set, dsOptions, readOnly, fieldState, runEvent } = useRuntime();
 
+  if (comp.type === 'dynamiclist') return <DynamicList comp={comp} />;
+
   if (comp.components && !comp.key) {
-    // Grupo/subgrupo = seção recolhível (título + chevron), aberta por padrão.
+    // Subgrupo = seção recolhível (título + chevron), aberta por padrão.
     return (
       <CollapsibleSection label={comp.label}>
-        {comp.components.map((c, i) => <Node key={c.id ?? i} comp={c} />)}
+        <LayoutGrid components={comp.components} render={(c) => <Node comp={c} />} />
       </CollapsibleSection>
     );
   }
@@ -238,9 +258,12 @@ function Node({ comp }: { comp: Component }) {
   };
   const setAndEmit = (val: unknown, e: unknown) => { set(key, val); runEvent(comp, 'change', e); };
 
+  const reqMark = comp.validate?.required
+    ? <span className="text-rose-500"> *</span>
+    : <span className="ml-1 text-[11px] font-normal text-slate-400">(opcional)</span>;
   const labelEl = comp.label && (
     <span className="flex items-center gap-1 text-sm font-medium text-slate-700">
-      {comp.label}{comp.validate?.required && <span className="text-rose-500"> *</span>}
+      {comp.label}{reqMark}
       {popoverHelp && <HelpPopover html={popoverHelp} />}
     </span>
   );
@@ -272,7 +295,7 @@ function Node({ comp }: { comp: Component }) {
     control = (
       <label className="flex items-center gap-2 text-sm text-slate-700">
         <input type="checkbox" disabled={disabled} checked={Boolean(v)} {...evt} onChange={(e) => setAndEmit(e.target.checked, e)} />
-        {comp.label}{comp.validate?.required && <span className="text-rose-500"> *</span>}
+        {comp.label}{reqMark}
         {popoverHelp && <HelpPopover html={popoverHelp} />}
       </label>
     );
@@ -280,7 +303,7 @@ function Node({ comp }: { comp: Component }) {
     const input = (
       <input
         type={maskTemplate ? 'text' : comp.type === 'number' ? 'number' : comp.type === 'email' ? 'email' : comp.type === 'datetime' ? 'datetime-local' : comp.type === 'password' ? 'password' : 'text'}
-        inputMode={maskTemplate ? 'numeric' : undefined}
+        inputMode={maskTemplate ? (isAllDigits(maskTemplate) ? 'numeric' : undefined) : undefined}
         maxLength={maskTemplate ? maskTemplate.length : maxLength}
         disabled={disabled}
         className={prefixAdorner || suffixAdorner ? `${base} rounded-none border-0 focus:ring-0` : base}
@@ -322,6 +345,51 @@ function Node({ comp }: { comp: Component }) {
   );
 }
 
+/**
+ * Lista dinâmica: repete o template de campos por linha, com botões de incluir
+ * e excluir. Os dados ficam em `values[key]` como array de objetos (cada linha
+ * roda num runtime com escopo próprio).
+ */
+function DynamicList({ comp }: { comp: Component }) {
+  const rt = useRuntime();
+  const key = comp.key!;
+  const rows = Array.isArray(rt.values[key]) ? (rt.values[key] as Record<string, unknown>[]) : [];
+  const setRows = (next: Record<string, unknown>[]) => rt.set(key, next);
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <header className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
+        <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          {comp.properties?.septemGroupIcon && <i className={`${comp.properties.septemGroupIcon} text-slate-500`} />}
+          {comp.label || 'Lista'}
+        </span>
+        {!rt.readOnly && (
+          <button type="button" onClick={() => setRows([...rows, {}])}
+            className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">
+            <Plus size={13} /> Adicionar
+          </button>
+        )}
+      </header>
+      <div className="flex flex-col gap-3 p-4">
+        {rows.length === 0 && <p className="text-sm text-slate-400">Nenhum item. Clique em "Adicionar".</p>}
+        {rows.map((row, i) => (
+          <div key={i} className="relative rounded-md border border-slate-200 p-3">
+            {!rt.readOnly && (
+              <button type="button" onClick={() => setRows(rows.filter((_, j) => j !== i))}
+                className="absolute right-2 top-2 rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" aria-label="Remover item">
+                <Trash2 size={14} />
+              </button>
+            )}
+            <RuntimeCtx.Provider value={{ ...rt, values: row, errors: {}, set: (k, v) => setRows(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r))) }}>
+              <LayoutGrid components={comp.components ?? []} render={(c) => <Node comp={c} />} />
+            </RuntimeCtx.Provider>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Grupo/subgrupo como seção recolhível (título + chevron), aberta por padrão. */
 function CollapsibleSection({ label, children }: { label?: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(true);
@@ -337,89 +405,147 @@ function CollapsibleSection({ label, children }: { label?: string; children: Rea
   );
 }
 
-function GroupTabs({ groups }: { groups: Component[] }) {
-  const [active, setActive] = useState(0);
-  const idx = Math.min(active, groups.length - 1);
-  const g = groups[idx];
+/** Skeleton simulando um formulário enquanto carrega (tarefa / fontes de dados). */
+export function FormSkeleton() {
   return (
-    <div>
-      <div className="mb-3 flex flex-wrap gap-1 border-b border-slate-200">
-        {groups.map((grp, i) => (
-          <button key={grp.id ?? i} type="button" onClick={() => setActive(i)}
-            className={`-mb-px border-b-2 px-3 py-1.5 text-sm font-medium ${i === idx ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-            {grp.label || `Grupo ${i + 1}`}
-          </button>
-        ))}
-      </div>
-      <div className="flex flex-col gap-3">
-        {(g?.components ?? []).map((c, i) => <Node key={c.id ?? i} comp={c} />)}
+    <div className="animate-pulse space-y-4" aria-hidden>
+      {[0, 1].map((g) => (
+        <div key={g} className="rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5"><div className="h-4 w-40 rounded bg-slate-200" /></div>
+          <div className="grid grid-cols-2 gap-4 p-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="space-y-1.5">
+                <div className="h-3 w-24 rounded bg-slate-200" />
+                <div className="h-8 w-full rounded bg-slate-100" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Grid de 16 colunas; cada item ocupa `colSpan` colunas (8+8 = lado a lado). */
+function LayoutGrid({ components, render }: { components: Component[]; render: (c: Component) => React.ReactNode }) {
+  return (
+    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${GRID_COLS}, minmax(0, 1fr))` }}>
+      {components.map((c, i) => {
+        const span = colSpan(c);
+        return (
+          <div key={c.id ?? i} style={{ gridColumn: `span ${span} / span ${span}` }}>
+            {render(c)}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Conta campos obrigatórios não preenchidos dentro de um grupo (pill de pendências). */
+function countPendingRequired(group: Component, values: Record<string, unknown>): number {
+  let n = 0;
+  for (const c of collectInputs(group.components, [])) {
+    if (!c.validate?.required) continue;
+    const v = values[c.key!];
+    const empty = v === '' || v === undefined || v === null || (c.type === 'checkbox' && v === false);
+    if (empty) n++;
+  }
+  return n;
+}
+
+/** Grupo de topo como card próprio: ícone à esquerda + pill de pendências à direita. */
+function GroupCard({ group }: { group: Component }) {
+  const { values } = useRuntime();
+  const icon = group.properties?.septemGroupIcon;
+  const showPending = group.properties?.septemShowPending !== 'no';
+  const pending = showPending ? countPendingRequired(group, values) : 0;
+  return (
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <header className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
+        <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          {icon && <i className={`${icon} text-slate-500`} />}
+          {group.label || 'Grupo'}
+        </span>
+        {showPending && pending > 0 && (
+          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+            {pending} pendente{pending > 1 ? 's' : ''}
+          </span>
+        )}
+      </header>
+      <div className="p-4">
+        <LayoutGrid components={group.components ?? []} render={(c) => <Node comp={c} />} />
       </div>
     </div>
   );
 }
 
+/** Abas dos grupos: barra num card; conteúdo do grupo ativo noutro card. */
+function GroupTabsCards({ groups }: { groups: Component[] }) {
+  const [active, setActive] = useState(0);
+  const idx = Math.min(active, groups.length - 1);
+  const g = groups[idx];
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+        <div className="flex flex-wrap gap-1">
+          {groups.map((grp, i) => (
+            <button key={grp.id ?? i} type="button" onClick={() => setActive(i)}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium ${i === idx ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+              {grp.properties?.septemGroupIcon && <i className={grp.properties.septemGroupIcon} />}
+              {grp.label || `Grupo ${i + 1}`}
+            </button>
+          ))}
+        </div>
+      </div>
+      {g && <GroupCard group={g} />}
+    </div>
+  );
+}
+
 /**
- * Converte um regex simples (grupos de dígitos + literais) num template de
- * máscara: `#` = dígito, demais chars = literais. Ex.: `\d{3}\.\d{3}\.\d{3}-\d{2}`
- * → `###.###.###-##`. Retorna null para regex com construções não-mapeáveis
- * (classes, quantificadores variáveis, alternâncias) — aí fica só validação.
+ * Ícone de ajuda com aviso no hover/foco. O balão usa `position: fixed`,
+ * largura automática (limitada à janela) e é reposicionado para caber no
+ * viewport: prefere acima do ícone; se não couber, vai abaixo; clampa na
+ * horizontal para não cortar nas bordas.
  */
-function regexToTemplate(rx: string): string | null {
-  let s = rx;
-  if (s.startsWith('^')) s = s.slice(1);
-  if (s.endsWith('$')) s = s.slice(0, -1);
-  let out = '';
-  let i = 0;
-  while (i < s.length) {
-    const c = s[i];
-    if (c === '\\') {
-      const n = s[i + 1];
-      if (n === 'd') {
-        let count = 1;
-        let j = i + 2;
-        if (s[j] === '{') {
-          const close = s.indexOf('}', j);
-          if (close < 0) return null;
-          const inner = s.slice(j + 1, close);
-          if (!/^\d+$/.test(inner)) return null; // ranges {4,5} não viram template fixo
-          count = parseInt(inner, 10);
-          j = close + 1;
-        }
-        out += '#'.repeat(count);
-        i = j;
-        continue;
-      }
-      out += n; // literal escapado (\. \- \/ ...)
-      i += 2;
-      continue;
-    }
-    if ('+*?[](){}|^$.'.includes(c)) return null; // construção não-mapeável
-    out += c;
-    i++;
-  }
-  return out.includes('#') ? out : null;
-}
-
-/** Aplica o template à entrada bruta: preenche os `#` com dígitos e insere os literais. */
-function applyMask(template: string, raw: string): string {
-  const digits = raw.replace(/\D/g, '');
-  let out = '';
-  let di = 0;
-  for (let i = 0; i < template.length && di < digits.length; i++) {
-    out += template[i] === '#' ? digits[di++] : template[i];
-  }
-  return out;
-}
-
 function HelpPopover({ html }: { html: string }) {
   const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const [style, setStyle] = useState<React.CSSProperties>({ visibility: 'hidden' });
+
+  useLayoutEffect(() => {
+    if (!open || !btnRef.current || !popRef.current) return;
+    const margin = 8;
+    const br = btnRef.current.getBoundingClientRect();
+    const pr = popRef.current.getBoundingClientRect();
+    let left = br.left + br.width / 2 - pr.width / 2;
+    left = Math.max(margin, Math.min(left, window.innerWidth - pr.width - margin));
+    const fitsAbove = br.top - pr.height - margin >= 0;
+    const top = fitsAbove ? br.top - pr.height - 6 : br.bottom + 6;
+    setStyle({ position: 'fixed', left, top, visibility: 'visible' });
+  }, [open]);
+
   return (
-    <span className="relative inline-flex">
-      <button type="button" onClick={() => setOpen((o) => !o)} className="text-slate-400 hover:text-slate-600" title="Ajuda">
+    <span className="relative inline-flex" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <button
+        ref={btnRef}
+        type="button"
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        className="text-slate-400 hover:text-slate-600"
+        title="Ajuda"
+      >
         <HelpCircle size={14} />
       </button>
       {open && (
-        <span className="absolute left-5 top-0 z-10 w-64 rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 shadow-lg" dangerouslySetInnerHTML={{ __html: html }} />
+        <div
+          ref={popRef}
+          style={style}
+          className="pointer-events-none z-50 w-max max-w-[min(20rem,90vw)] rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 shadow-lg"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
       )}
     </span>
   );
