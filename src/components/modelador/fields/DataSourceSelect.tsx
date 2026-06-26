@@ -1,9 +1,9 @@
-import { Select } from '@/components/ui/Field';
+import { Combobox } from '@/components/ui/Combobox';
 import { useDataSources } from '@/lib/api/catalog';
 
 /**
- * Select de fonte de dados (T1). Grava o id (publicId) da fonte; mantém valores
- * legados (refs digitados antes do catálogo) selecionáveis.
+ * Seletor de fonte de dados (T1) — combobox pesquisável. Grava o id (publicId);
+ * mantém valores legados (refs digitados antes do catálogo) selecionáveis.
  */
 export function DataSourceSelect({
   value, onChange, placeholder,
@@ -14,14 +14,16 @@ export function DataSourceSelect({
 }) {
   const ds = useDataSources();
   const base = (ds.data ?? []).map((d) => ({ value: d.id, label: d.name }));
+  // Mantém o valor selecionado visível mesmo se não estiver na lista carregada.
   const options = value && !base.some((o) => o.value === value) ? [{ value, label: value }, ...base] : base;
   return (
-    <Select
+    <Combobox
       value={value}
       options={options}
+      onChange={onChange}
+      clearLabel="— nenhuma —"
       placeholder={ds.isLoading ? 'Carregando…' : (placeholder ?? 'Selecione a fonte de dados')}
       disabled={ds.isLoading}
-      onChange={(e) => onChange(e.target.value)}
     />
   );
 }

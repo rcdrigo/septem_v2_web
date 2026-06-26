@@ -28,9 +28,10 @@ export function ServicosPage() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {list.data?.items.map((p) => (
               <div key={p.key} className="flex flex-col rounded-md border border-slate-200 bg-white p-4">
-                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-slate-500"><Workflow size={18} /></div>
+                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-slate-500">{p.icon ? <i className={p.icon} /> : <Workflow size={18} />}</div>
                 <p className="font-medium text-slate-800">{p.name}</p>
                 <p className="text-xs text-slate-500">{p.category ?? 'Sem categoria'}{p.area ? ` · ${p.area}` : ''}</p>
+                {p.description && <p className="mt-1 line-clamp-3 text-xs text-slate-600">{p.description}</p>}
                 <button type="button" onClick={() => startService(p.key)} className="mt-3 inline-flex items-center justify-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700">
                   <Play size={15} /> Iniciar
                 </button>

@@ -22,6 +22,7 @@ import { ModelosEmailPage } from './pages/admin/ModelosEmailPage';
 import { ServicoFormPage } from './pages/ServicoFormPage';
 import { TarefaPage } from './pages/TarefaPage';
 import { SolicitacaoPage } from './pages/SolicitacaoPage';
+import { FonteDadosPage } from './pages/FonteDadosPage';
 import { StubPage } from './pages/StubPage';
 
 /** Açúcar para registrar uma rota que ainda só tem placeholder. */
@@ -38,6 +39,8 @@ export const router = createBrowserRouter(
     { path: '/tarefa/:taskId', element: <TarefaPage /> },
     // Relatório/acompanhamento da solicitação em aba própria (sem menus).
     { path: '/solicitacao/:instanceId', element: <SolicitacaoPage /> },
+    // Criar/editar fonte de dados em aba própria (sem menus).
+    { path: '/fonte-dados/:id', element: <FonteDadosPage /> },
     // Modelador em aba própria (sem menu lateral) — aberto via "Novo/Editar".
     { path: '/processos/editar', element: <ModeladorPage /> },
     {

@@ -78,8 +78,8 @@ function useRuntime() {
  * e popover), counter de min/max, opções de select via fonte de dados e o runtime de
  * eventos do campo (change/click/blur/focus → action com contexto).
  */
-export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: Record<string, unknown>; readOnly?: boolean }>(
-  ({ schema, data, readOnly }, ref) => {
+export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: Record<string, unknown>; readOnly?: boolean; optionsByField?: OptionsMap }>(
+  ({ schema, data, readOnly, optionsByField }, ref) => {
     const root = (schema ?? {}) as { components?: Component[] };
     const inputs = useMemo(() => collectInputs(root.components, []), [schema]);
 
@@ -91,14 +91,13 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
       return init;
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
-    const [dsOptions, setDsOptions] = useState<OptionsMap>({});
+    // Opções resolvidas no servidor (form já populado) entram como estado inicial.
+    const [dsOptions, setDsOptions] = useState<OptionsMap>(() => optionsByField ?? {});
     const [fieldState, setFieldState] = useState<FieldState>({});
-    // #28: só exibe o form depois que todas as fontes de dados carregarem.
-    const hasDsFields = useMemo(
-      () => inputs.some((c) => c.properties?.septemDataSourceId && (c.type === 'select' || c.type === 'radio')),
-      [inputs],
-    );
-    const [dsLoading, setDsLoading] = useState(hasDsFields);
+    // #28: só exibe o form depois que as fontes pendentes (não embutidas) carregarem.
+    const needsFetch = (c: Component) =>
+      !!c.properties?.septemDataSourceId && (c.type === 'select' || c.type === 'radio') && !optionsByField?.[c.key!];
+    const [dsLoading, setDsLoading] = useState(() => inputs.some(needsFetch));
 
     // Ref pro valor mais recente — o runtime de eventos lê de forma síncrona.
     const valuesRef = useRef(values);
@@ -106,7 +105,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
 
     // Carrega as opções dos selects/radios alimentados por fonte de dados.
     useEffect(() => {
-      const dsFields = inputs.filter((c) => c.properties?.septemDataSourceId && (c.type === 'select' || c.type === 'radio'));
+      const dsFields = inputs.filter(needsFetch);
       if (dsFields.length === 0) { setDsLoading(false); return; }
       let cancelled = false;
       setDsLoading(true);
@@ -217,7 +216,7 @@ function Node({ comp }: { comp: Component }) {
   if (comp.components && !comp.key) {
     // Subgrupo = seção recolhível (título + chevron), aberta por padrão.
     return (
-      <CollapsibleSection label={comp.label}>
+      <CollapsibleSection comp={comp}>
         <LayoutGrid components={comp.components} render={(c) => <Node comp={c} />} />
       </CollapsibleSection>
     );
@@ -238,8 +237,9 @@ function Node({ comp }: { comp: Component }) {
   const helpText = comp.properties?.septemHelpText;
   const popoverHelp = helpType === 'popover' ? helpText : null;
   const inlineHelp = helpType !== 'popover' ? helpText : null;
-  // Máscara: deriva um template (ex.: ###.###.###-##) do regex p/ formatar ao digitar.
-  const maskTemplate = comp.properties?.septemMaskRegex ? regexToTemplate(comp.properties.septemMaskRegex) : null;
+  // Máscara: usa o Formato explícito (septemMaskTemplate) ou deriva do regex.
+  const maskTemplate = comp.properties?.septemMaskTemplate
+    || (comp.properties?.septemMaskRegex ? regexToTemplate(comp.properties.septemMaskRegex) : null);
   // Prefixo/sufixo: o form-js grava em `appearance`; aceitamos os dois formatos.
   const prefixAdorner = comp.prefixAdorner ?? comp.appearance?.prefixAdorner;
   const suffixAdorner = comp.suffixAdorner ?? comp.appearance?.suffixAdorner;
@@ -270,8 +270,15 @@ function Node({ comp }: { comp: Component }) {
   const base = `w-full rounded-md border ${err ? 'border-rose-400' : 'border-slate-300'} bg-white px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500`;
 
   let control: React.ReactNode;
-  if (comp.type === 'textarea') {
+  if (disabled) {
+    // Campo só-leitura (visível): exibe o valor como texto (não input desabilitado).
+    const optLabel = options.find((o) => o.value === String(v ?? ''))?.label;
+    const display = comp.type === 'checkbox' ? (v ? 'Sim' : 'Não') : (optLabel ?? String(v ?? ''));
+    control = <div className="min-h-[1.75rem] whitespace-pre-wrap py-1 text-sm text-slate-800">{display || <span className="text-slate-400">—</span>}</div>;
+  } else if (comp.type === 'textarea') {
     control = <textarea rows={3} disabled={disabled} className={base} value={String(v ?? '')} {...evt} onChange={(e) => setAndEmit(e.target.value, e)} />;
+  } else if (comp.type === 'filepicker') {
+    control = <input type="file" multiple className={`${base} file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-0.5 file:text-xs`} {...evt} onChange={(e) => setAndEmit(Array.from(e.target.files ?? []).map((f) => f.name).join(', '), e)} />;
   } else if (comp.type === 'select') {
     control = (
       <select disabled={disabled} className={base} value={String(v ?? '')} {...evt} onChange={(e) => setAndEmit(e.target.value, e)}>
@@ -324,9 +331,10 @@ function Node({ comp }: { comp: Component }) {
     ) : input;
   }
 
+  const widthPx = comp.properties?.septemWidth ? Number(comp.properties.septemWidth) : undefined;
   return (
-    <div className="flex flex-col gap-1">
-      {comp.type !== 'checkbox' && labelEl}
+    <div className="flex flex-col gap-1" style={widthPx && !Number.isNaN(widthPx) ? { maxWidth: widthPx } : undefined}>
+      {(comp.type !== 'checkbox' || disabled) && labelEl}
       {control}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -359,9 +367,10 @@ function DynamicList({ comp }: { comp: Component }) {
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <header className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
-        <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+        <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
           {comp.properties?.septemGroupIcon && <i className={`${comp.properties.septemGroupIcon} text-slate-500`} />}
           {comp.label || 'Lista'}
+          <GroupHelp comp={comp} />
         </span>
         {!rt.readOnly && (
           <button type="button" onClick={() => setRows([...rows, {}])}
@@ -391,13 +400,18 @@ function DynamicList({ comp }: { comp: Component }) {
 }
 
 /** Grupo/subgrupo como seção recolhível (título + chevron), aberta por padrão. */
-function CollapsibleSection({ label, children }: { label?: string; children: React.ReactNode }) {
+function CollapsibleSection({ comp, children }: { comp: Component; children: React.ReactNode }) {
   const [open, setOpen] = useState(true);
-  if (!label) return <div className="flex flex-col gap-3">{children}</div>;
+  const icon = comp.properties?.septemGroupIcon;
+  if (!comp.label) return <div className="flex flex-col gap-3">{children}</div>;
   return (
     <div className="overflow-hidden rounded-md border border-slate-200">
       <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between bg-slate-50 px-3 py-2 text-left hover:bg-slate-100">
-        <span className="text-sm font-semibold uppercase tracking-wide text-slate-600">{label}</span>
+        <span className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-slate-600">
+          {icon && <i className={`${icon} text-slate-400`} />}
+          {comp.label}
+          <GroupHelp comp={comp} />
+        </span>
         <ChevronDown size={16} className={`text-slate-400 transition-transform ${open ? '' : '-rotate-90'}`} />
       </button>
       {open && <div className="flex flex-col gap-3 border-t border-slate-100 p-3">{children}</div>}
@@ -426,10 +440,12 @@ export function FormSkeleton() {
   );
 }
 
-/** Grid de 16 colunas; cada item ocupa `colSpan` colunas (8+8 = lado a lado). */
+/** Grid de 16 colunas; cada item ocupa `colSpan` colunas (8+8 = lado a lado).
+ * Em telas pequenas colapsa para 1 coluna (cada campo vira uma linha) — regra
+ * `.septem-form-grid` em globals.css. */
 function LayoutGrid({ components, render }: { components: Component[]; render: (c: Component) => React.ReactNode }) {
   return (
-    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${GRID_COLS}, minmax(0, 1fr))` }}>
+    <div className="septem-form-grid grid gap-3">
       {components.map((c, i) => {
         const span = colSpan(c);
         return (
@@ -440,6 +456,15 @@ function LayoutGrid({ components, render }: { components: Component[]; render: (
       })}
     </div>
   );
+}
+
+/** Ajuda (popover/inline) de um container (grupo/lista). */
+function GroupHelp({ comp }: { comp: Component }) {
+  const t = comp.properties?.septemHelpType ?? 'inline';
+  const txt = comp.properties?.septemHelpText;
+  if (!txt) return null;
+  if (t === 'popover') return <HelpPopover html={txt} />;
+  return <span className="text-xs font-normal text-slate-400" dangerouslySetInnerHTML={{ __html: txt }} />;
 }
 
 /** Conta campos obrigatórios não preenchidos dentro de um grupo (pill de pendências). */
@@ -463,9 +488,10 @@ function GroupCard({ group }: { group: Component }) {
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <header className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
-        <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+        <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
           {icon && <i className={`${icon} text-slate-500`} />}
           {group.label || 'Grupo'}
+          <GroupHelp comp={group} />
         </span>
         {showPending && pending > 0 && (
           <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
@@ -482,6 +508,7 @@ function GroupCard({ group }: { group: Component }) {
 
 /** Abas dos grupos: barra num card; conteúdo do grupo ativo noutro card. */
 function GroupTabsCards({ groups }: { groups: Component[] }) {
+  const { values } = useRuntime();
   const [active, setActive] = useState(0);
   const idx = Math.min(active, groups.length - 1);
   const g = groups[idx];
@@ -489,13 +516,19 @@ function GroupTabsCards({ groups }: { groups: Component[] }) {
     <div className="flex flex-col gap-3">
       <div className="rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
         <div className="flex flex-wrap gap-1">
-          {groups.map((grp, i) => (
-            <button key={grp.id ?? i} type="button" onClick={() => setActive(i)}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium ${i === idx ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
-              {grp.properties?.septemGroupIcon && <i className={grp.properties.septemGroupIcon} />}
-              {grp.label || `Grupo ${i + 1}`}
-            </button>
-          ))}
+          {groups.map((grp, i) => {
+            const pending = grp.properties?.septemShowPending !== 'no' ? countPendingRequired(grp, values) : 0;
+            return (
+              <button key={grp.id ?? i} type="button" onClick={() => setActive(i)}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium ${i === idx ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+                {grp.properties?.septemGroupIcon && <i className={grp.properties.septemGroupIcon} />}
+                {grp.label || `Grupo ${i + 1}`}
+                {pending > 0 && (
+                  <span className={`ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold ${i === idx ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'}`}>{pending}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
       {g && <GroupCard group={g} />}

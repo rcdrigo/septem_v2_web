@@ -4,6 +4,7 @@ import { ActionButtonsSection } from '../sections/ActionButtonsSection';
 import { DeadlineActorSection } from '../sections/DeadlineActorSection';
 import { SignatureSection } from '../sections/SignatureSection';
 import { RoutinesSection } from '../sections/RoutinesSection';
+import { useEnsureFormFields } from '@/lib/use-ensure-form-fields';
 import type { PanelProps } from './types';
 
 /**
@@ -12,6 +13,8 @@ import type { PanelProps } from './types';
  * Reúne toda a configuração de uma tarefa humana — o painel mais completo do modelador.
  */
 export function UserTaskPanel({ modeler, element }: PanelProps) {
+  // Popula os campos do formulário (matriz/visibilidade e seletores) ao abrir.
+  useEnsureFormFields(modeler);
   return (
     <>
       <GeneralInfoSection modeler={modeler} element={element} />

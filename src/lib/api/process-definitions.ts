@@ -7,6 +7,7 @@ export type ProcessStatus = 'draft' | 'published' | 'inactive';
 export type ProcessListItem = {
   key: string;
   name: string;
+  description: string | null;
   version: number;
   status: ProcessStatus;
   icon: string | null;

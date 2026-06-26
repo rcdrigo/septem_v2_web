@@ -8,11 +8,13 @@ import {
   useUpdateDataSource,
   useDeleteDataSource,
   useTestDataSource,
+  useDataSourceUsages,
   type DataSourceListItem,
   type DataSourceScope,
   type DataSourceType,
   type TestResult,
 } from '@/lib/api/data-sources';
+import { openTab } from '@/lib/nav';
 import { Dialog } from '@/components/ui/Dialog';
 import { Field, TextInput, TextArea, Select } from '@/components/ui/Field';
 import { confirm } from '@/components/ui/ConfirmDialog';
@@ -30,9 +32,8 @@ export function FontesDadosPage() {
   const [params] = useSearchParams();
   const scope: DataSourceScope = params.get('scope') === 'report' ? 'report' : 'process';
   const list = useDataSourcesList(scope);
-  // Deep-link: ?edit=<id> abre direto o editor da fonte (vindo da config do campo).
-  const [editId, setEditId] = useState<string | null>(() => params.get('edit'));
-  const [creating, setCreating] = useState(false);
+  // Criar/editar abre em nova aba (sem menus).
+  const openEditor = (id?: string) => openTab(`/fonte-dados/${id ?? 'nova'}?scope=${scope}`);
   const del = useDeleteDataSource();
 
   async function askDelete(d: DataSourceListItem) {
@@ -49,7 +50,7 @@ export function FontesDadosPage() {
           Fontes de dados <span className="text-sm font-normal text-slate-400">· {scope === 'report' ? 'Relatórios' : 'Processos'}</span>
         </h1>
         <div className="flex gap-2">
-          <button type="button" onClick={() => setCreating(true)} className="flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-700">
+          <button type="button" onClick={() => openEditor()} className="flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-700">
             <Plus size={16} /> Nova fonte
           </button>
         </div>
@@ -76,7 +77,7 @@ export function FontesDadosPage() {
                   <td className="px-4 py-2 text-slate-600">{d.description ?? '—'}</td>
                   <td className="px-4 py-2">
                     <div className="flex justify-end gap-1">
-                      <button type="button" onClick={() => setEditId(d.id)} className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800" title="Editar"><Pencil size={15} /></button>
+                      <button type="button" onClick={() => openEditor(d.id)} className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800" title="Editar"><Pencil size={15} /></button>
                       <button type="button" onClick={() => askDelete(d)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="Excluir"><Trash2 size={15} /></button>
                     </div>
                   </td>
@@ -87,8 +88,6 @@ export function FontesDadosPage() {
         )}
       </div>
 
-      {creating && <DataSourceDialog scope={scope} onClose={() => setCreating(false)} />}
-      {editId && <DataSourceDialog id={editId} scope={scope} onClose={() => setEditId(null)} />}
     </div>
   );
 }
@@ -97,7 +96,7 @@ export function FontesDadosPage() {
 type FixedItem = { value: string; label: string };
 type ApiHeader = { k: string; v: string };
 
-function DataSourceDialog({ id, scope, onClose }: { id?: string; scope: DataSourceScope; onClose: () => void }) {
+export function DataSourceDialog({ id, scope, onClose }: { id?: string; scope: DataSourceScope; onClose: () => void }) {
   const detail = useDataSource(id ?? null);
   const create = useCreateDataSource();
   const update = useUpdateDataSource();
@@ -176,7 +175,31 @@ function DataSourceDialog({ id, scope, onClose }: { id?: string; scope: DataSour
 
         {result && <ResultTable result={result} />}
       </form>
+      {id && <UsagesSection id={id} />}
     </Dialog>
+  );
+}
+
+/** Lista onde a fonte de dados é utilizada (campos, tarefas, rotinas, relatórios). */
+function UsagesSection({ id }: { id: string }) {
+  const usages = useDataSourceUsages(id);
+  const items = usages.data?.usages ?? [];
+  return (
+    <div className="mt-4 border-t border-slate-200 pt-3">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Onde é utilizada</p>
+      {usages.isLoading ? <p className="text-sm text-slate-400">Carregando…</p>
+        : items.length === 0 ? <p className="text-sm text-slate-400">Não está sendo utilizada em nenhum local.</p>
+        : (
+          <ul className="divide-y divide-slate-100 overflow-hidden rounded-md border border-slate-200">
+            {items.map((u, i) => (
+              <li key={i} className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
+                <span className="text-slate-800">{u.label}</span>
+                <span className="shrink-0 text-xs text-slate-400">{u.kind}{u.process ? ` · ${u.process}` : ''}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+    </div>
   );
 }
 

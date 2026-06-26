@@ -42,19 +42,22 @@ function MaskForm({ mask, onDone }: { mask: FormMask | null; onDone: () => void 
   const update = useUpdateFormMask();
   const [name, setName] = useState(mask?.name ?? '');
   const [regex, setRegex] = useState(mask?.regex ?? '');
+  const [templateInput, setTemplateInput] = useState(mask?.template ?? '');
   const [shouldValidate, setShouldValidate] = useState(mask?.shouldValidate ?? false);
   const [test, setTest] = useState('');
 
-  const template = regexToTemplate(regex);
+  // Formato explícito tem prioridade; senão deriva do regex (compat).
+  const template = templateInput.trim() || regexToTemplate(regex);
   const result = testRegex(regex, test);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    const tpl = templateInput.trim() || undefined;
     try {
-      if (mask) await update.mutateAsync({ id: mask.id, body: { name, regex, shouldValidate } });
-      else await create.mutateAsync({ key: slugify(name), name, regex, shouldValidate });
+      if (mask) await update.mutateAsync({ id: mask.id, body: { name, regex, template: tpl, shouldValidate } });
+      else await create.mutateAsync({ key: slugify(name), name, regex, template: tpl, shouldValidate });
       toast.success(mask ? 'Máscara atualizada.' : 'Máscara criada.');
-      setName(''); setRegex(''); setShouldValidate(false); setTest('');
+      setName(''); setRegex(''); setTemplateInput(''); setShouldValidate(false); setTest('');
       onDone();
     } catch { toast.error('Não foi possível salvar a máscara.'); }
   }
@@ -63,8 +66,11 @@ function MaskForm({ mask, onDone }: { mask: FormMask | null; onDone: () => void 
     <form onSubmit={submit} className="flex flex-col gap-3 rounded-md border border-slate-200 bg-slate-50 p-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{mask ? 'Editar máscara' : 'Nova máscara'}</p>
       <Field label="Nome"><TextInput required value={name} onChange={(e) => setName(e.target.value)} /></Field>
-      <Field label="Regex" hint="Expressão de validação do campo."><TextInput required value={regex} onChange={(e) => setRegex(e.target.value)} className="font-mono text-xs" placeholder="\d{3}\.\d{3}\.\d{3}-\d{2}" /></Field>
-      <Field label="Testar máscara" hint={template ? 'A formatação é aplicada ao digitar.' : 'Digite um valor para ver se casa com a regex.'}>
+      <Field label="Formato" hint="# dígito · A letra · * alfanumérico. Ex.: (##) #####-#### ou ###.###.###-##">
+        <TextInput value={templateInput} onChange={(e) => setTemplateInput(e.target.value)} className="font-mono text-xs" placeholder="(##) #####-####" />
+      </Field>
+      <Field label="Regex (validação, opcional)" hint="Usado só para validar; o formato acima é quem formata."><TextInput value={regex} onChange={(e) => setRegex(e.target.value)} className="font-mono text-xs" placeholder="\d{3}\.\d{3}\.\d{3}-\d{2}" /></Field>
+      <Field label="Testar máscara" hint={template ? 'A formatação é aplicada ao digitar.' : 'Defina um Formato para ver a formatação.'}>
         <div className="flex items-center gap-2">
           <TextInput
             value={test}
@@ -80,7 +86,7 @@ function MaskForm({ mask, onDone }: { mask: FormMask | null; onDone: () => void 
         </div>
       </Field>
       <Checkbox checked={shouldValidate} onChange={setShouldValidate} label="Obrigatória (bloqueia concluir a tarefa se não casar)" />
-      <button type="submit" disabled={!name || !regex} className="self-start rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">{mask ? 'Salvar' : 'Adicionar'}</button>
+      <button type="submit" disabled={!name || (!regex && !templateInput.trim())} className="self-start rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">{mask ? 'Salvar' : 'Adicionar'}</button>
     </form>
   );
 }

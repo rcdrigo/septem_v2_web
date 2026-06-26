@@ -1,5 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { useInstance } from '@/lib/api/execution';
+import { useDocumentTitle } from '@/lib/use-document-title';
 import { InstanceReport } from './InstanciasPage';
 
 /**
@@ -10,6 +11,7 @@ import { InstanceReport } from './InstanciasPage';
 export function SolicitacaoPage() {
   const { instanceId } = useParams<{ instanceId: string }>();
   const inst = useInstance(instanceId ?? '');
+  useDocumentTitle(inst.data?.process ?? 'Solicitação');
   if (!instanceId) return null;
   return (
     <div className="flex h-screen flex-col bg-slate-100">

@@ -1,13 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Building2, ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   useOrgUnitsTree,
+  useOrgUnitsFlat,
   useCreateOrgUnit,
   useUpdateOrgUnit,
   useDeleteOrgUnit,
   type OrgUnitNode,
 } from '@/lib/api/org-units';
+import { useUsersList } from '@/lib/api/users';
 import { Dialog } from '@/components/ui/Dialog';
+import { Combobox } from '@/components/ui/Combobox';
 import { Field, TextInput, Checkbox } from '@/components/ui/Field';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
@@ -185,12 +188,20 @@ function CreateUnitDialog({ ctx, onClose }: { ctx: { parentId: string | null; pa
 function EditUnitDialog({ unit, onClose }: { unit: OrgUnitNode; onClose: () => void }) {
   const [name, setName] = useState(unit.name);
   const [active, setActive] = useState(unit.active);
+  const [titular, setTitular] = useState('');
   const update = useUpdateOrgUnit();
+  const flat = useOrgUnitsFlat();
+  const users = useUsersList({ page: 1, pageSize: 200 });
+
+  // Titular atual vem da listagem flat (a árvore não o traz).
+  const currentTitular = flat.data?.find((u) => u.id === unit.id)?.titularUserId ?? '';
+  useEffect(() => { setTitular(currentTitular); }, [currentTitular]);
+  const userOptions = (users.data?.items ?? []).map((u) => ({ value: u.id, label: u.name }));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await update.mutateAsync({ id: unit.id, body: { name, active } });
+      await update.mutateAsync({ id: unit.id, body: { name, active, titularUserId: titular || null } });
       toast.success('Alterações salvas.');
       onClose();
     } catch {
@@ -212,6 +223,9 @@ function EditUnitDialog({ unit, onClose }: { unit: OrgUnitNode; onClose: () => v
         </Field>
         <Field label="Chave">
           <TextInput value={unit.key} readOnly className="bg-slate-50 text-slate-500" />
+        </Field>
+        <Field label="Titular" hint="Pode personificar os usuários desta unidade e subunidades.">
+          <Combobox value={titular} options={userOptions} onChange={setTitular} placeholder="Selecionar usuário…" clearLabel="Sem titular" />
         </Field>
         <Checkbox checked={active} onChange={setActive} label="Unidade ativa" />
       </form>

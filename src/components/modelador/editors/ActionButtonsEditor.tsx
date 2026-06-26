@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { Checkbox, Field, TextArea, TextInput } from '@/components/ui/Field';
+import { Checkbox, Field, TextInput } from '@/components/ui/Field';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { IconButton } from '@/components/ui/IconButton';
-import { IconPicker } from '@/components/ui/IconPicker';
-import { renderIcon } from '@/lib/icon-catalog';
+import { IconSearchPicker } from '@/components/ui/IconSearchPicker';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { slugify } from '@/lib/slugify';
 import { uid } from '@/lib/uid';
 import {
@@ -97,8 +97,8 @@ function ActionButtonRow({
     setDraftHint(button.hint ?? '');
   }, [button.label, button.id, button.hint]);
 
-  function commitHint() {
-    const trimmed = draftHint.trim();
+  function commitHint(html: string) {
+    const trimmed = html.trim();
     if (trimmed === (button.hint ?? '')) return;
     onChange({ hint: trimmed || undefined });
   }
@@ -126,7 +126,7 @@ function ActionButtonRow({
         style={{ backgroundColor: button.primaryColor, color: button.textColor }}
       >
         <span className="inline-flex min-w-0 items-center gap-1.5">
-          {renderIcon(button.icon, 15)}
+          {button.icon && <i className={button.icon} />}
           <span className="truncate">{button.label || 'Sem nome'}</span>
         </span>
         <button
@@ -178,17 +178,15 @@ function ActionButtonRow({
 
         <Field label="Ícone" hint="Exibido à esquerda do rótulo do botão.">
           <div>
-            <IconPicker value={button.icon} onChange={(icon) => onChange({ icon })} />
+            <IconSearchPicker value={button.icon} onChange={(icon) => onChange({ icon })} />
           </div>
         </Field>
 
-        <Field label="Orientações" hint="Aviso exibido ao executor quando o cursor passa sobre o botão.">
-          <TextArea
+        <Field label="Orientações" hint="Aviso (rich-text) exibido ao executor no hover do botão.">
+          <RichTextEditor
             value={draftHint}
-            onChange={(e) => setDraftHint(e.target.value)}
-            onBlur={commitHint}
-            rows={2}
-            placeholder="ex: Use este botão para aprovar e seguir para a próxima etapa."
+            onChange={setDraftHint}
+            onBlur={() => commitHint(draftHint)}
           />
         </Field>
 

@@ -2,6 +2,7 @@ import { Checkbox, Field, RadioGroup, Section, Select, TextInput, type SelectOpt
 import { useExtensionState } from '@/lib/useExtensionState';
 import { useAreas, useAreaPositions } from '@/lib/api/catalog';
 import { DataSourceSelect } from '../fields/DataSourceSelect';
+import { FormFieldSelect } from '../fields/FormFieldSelect';
 import { DeadlineAlertsEditor } from '../editors/DeadlineAlertsEditor';
 
 type Props = {
@@ -139,13 +140,8 @@ export function DeadlineActorSection({ modeler, element }: Props) {
       )}
 
       {actor.state.actorType === 'formField' && (
-        <Field label="Campo do formulário" hint="Vira combobox de campos na Fase 4.3.">
-          <TextInput
-            value={actor.state.fieldRef}
-            onChange={(e) => actor.update({ fieldRef: e.target.value })}
-            onBlur={() => actor.commit('fieldRef')}
-            placeholder="ex: usuario_responsavel"
-          />
+        <Field label="Campo do formulário">
+          <FormFieldSelect value={actor.state.fieldRef} onChange={(v) => actor.flush({ fieldRef: v })} />
         </Field>
       )}
 
@@ -168,12 +164,7 @@ export function DeadlineActorSection({ modeler, element }: Props) {
           />
         </Field>
         <Field label="…ou campo do formulário">
-          <TextInput
-            value={deadline.state.expiresInFieldRef}
-            onChange={(e) => deadline.update({ expiresInFieldRef: e.target.value })}
-            onBlur={() => deadline.commit('expiresInFieldRef')}
-            placeholder="ex: prazo_dias"
-          />
+          <FormFieldSelect value={deadline.state.expiresInFieldRef} onChange={(v) => deadline.flush({ expiresInFieldRef: v })} placeholder="Campo (nº de dias)" />
         </Field>
       </div>
     </Section>

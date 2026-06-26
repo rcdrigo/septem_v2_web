@@ -17,6 +17,8 @@ export type SessionUser = {
   perms: string[];
   hasDashboard: boolean;
   accessProfiles: { id: string; name: string }[];
+  /** Nome do ator real quando esta sessão é personificada. */
+  impersonatedBy?: string | null;
 };
 
 export type Tenant = {
@@ -43,6 +45,7 @@ type SessionState = {
   bootstrap: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   impersonate: (userId: string) => Promise<void>;
+  stopImpersonation: () => Promise<void>;
   refresh: () => Promise<string | null>;
   logout: () => Promise<void>;
   setAccessMode: (mode: AccessMode) => void;
@@ -68,6 +71,7 @@ type MeResponse = {
   hasDashboard: boolean;
   perms: string[];
   accessProfiles: { id: string; name: string }[];
+  impersonatedBy?: string | null;
 };
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -89,7 +93,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         return;
       }
       const user = await api.get<MeResponse>('/api/v1/me');
-      set({ status: 'authenticated', tenant, user });
+      set({ status: 'authenticated', tenant, user, isImpersonating: !!user.impersonatedBy });
     } catch (err) {
       // Token expirado / inválido sem refresh válido → cai pra unauthenticated.
       const tenant = get().tenant;
@@ -115,6 +119,15 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
     const user = await api.get<MeResponse>('/api/v1/me');
     set({ status: 'authenticated', user, isImpersonating: true });
+  },
+
+  stopImpersonation: async () => {
+    const tokens = await api.post<TokenResponse>('/api/v1/impersonate/stop');
+    localStorage.setItem(ACCESS_KEY, tokens.accessToken);
+    localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
+    set({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
+    const user = await api.get<MeResponse>('/api/v1/me');
+    set({ status: 'authenticated', user, isImpersonating: false });
   },
 
   refresh: async () => {

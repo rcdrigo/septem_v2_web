@@ -8,6 +8,9 @@ import {
   type ProcessStatus,
 } from '@/lib/bpmn-process';
 import { useModeladorStore } from '@/stores/modelador';
+import { Combobox } from '@/components/ui/Combobox';
+import { IconSearchPicker } from '@/components/ui/IconSearchPicker';
+import { useOrgUnitsFlat } from '@/lib/api/org-units';
 
 type Props = {
   modeler: any | null;
@@ -43,6 +46,7 @@ export function ConfiguracoesView({ modeler }: Props) {
   const setProcessName = useModeladorStore((s) => s.setProcessName);
 
   const [cfg, setCfg] = useState<ProcessConfig>(PROCESS_CONFIG_DEFAULTS);
+  const orgUnits = useOrgUnitsFlat();
   const [draftName, setDraftName] = useState(processName);
 
   useEffect(() => {
@@ -108,23 +112,19 @@ export function ConfiguracoesView({ modeler }: Props) {
                 options={CATEGORY_OPTIONS}
               />
             </Field>
-            <Field label="Área responsável" hint="ID da unidade organizacional.">
-              <TextInput
+            <Field label="Área responsável" hint="Unidade organizacional.">
+              <Combobox
                 value={cfg.areaId}
-                onChange={(e) => setCfg((c) => ({ ...c, areaId: e.target.value }))}
-                onBlur={() => patch({ areaId: cfg.areaId })}
-                placeholder="ex: protocolo-sp"
+                options={(orgUnits.data ?? []).map((u) => ({ value: u.key, label: u.name }))}
+                onChange={(v) => { setCfg((c) => ({ ...c, areaId: v })); patch({ areaId: v }); }}
+                clearLabel="— nenhuma —"
+                placeholder="Selecione a unidade"
               />
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Ícone" hint="Identificador da iconografia (ex: file-text).">
-              <TextInput
-                value={cfg.icon}
-                onChange={(e) => setCfg((c) => ({ ...c, icon: e.target.value }))}
-                onBlur={() => patch({ icon: cfg.icon })}
-                placeholder="ex: file-text"
-              />
+            <Field label="Ícone" hint="Ícone do processo (FontAwesome).">
+              <IconSearchPicker value={cfg.icon} onChange={(cls) => { setCfg((c) => ({ ...c, icon: cls ?? '' })); patch({ icon: cls ?? '' }); }} />
             </Field>
             <Field label="URL da documentação">
               <TextInput

@@ -2,20 +2,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 export type StartedInstance = { executionId: string; status: string; tasks: { id: string; name: string | null }[]; nextTaskForMe?: string | null };
-export type MyTask = { id: string; name: string | null; executionId: string; createdAt: string; dueAt: string | null; process?: string | null };
-export type ExecutedTask = { id: string; name: string | null; executionId: string; process: string | null; completedAt: string | null; action: string | null };
+export type RequestSummary = { label: string; value: string };
+export type MyTask = { id: string; name: string | null; executionId: string; createdAt: string; dueAt: string | null; process?: string | null; processNumber?: number; requester?: string | null; summary?: RequestSummary[] };
+export type ExecutedTask = { id: string; name: string | null; executionId: string; process: string | null; completedAt: string | null; action: string | null; processNumber?: number; requester?: string | null; summary?: RequestSummary[] };
 export type TaskButton = { id: string; label: string; validateForm: boolean; primaryColor?: string | null; textColor?: string | null; icon?: string | null; hint?: string | null };
+export type FieldOptions = Record<string, { value: string; label: string }[]>;
 export type TaskDetail = {
   id: string; name: string | null; status: string; executionId: string;
   process?: string | null; documentationUrl?: string | null;
-  formSchema: unknown; data: unknown; buttons: TaskButton[];
+  formSchema: unknown; data: unknown; buttons: TaskButton[]; fieldOptions?: FieldOptions;
 };
 export type CompleteResult = { taskStatus: string; executionStatus: string; pendingTasks: number; executionId?: string; nextTaskForMe?: string | null };
 
 const execKeys = { tasks: ['workflow', 'tasks'] as const, task: (id: string) => ['workflow', 'task', id] as const };
 
 /** Schema form-js do processo (formulário inicial de "Iniciar"). */
-export type StartForm = { formSchema: unknown; buttons: TaskButton[] };
+export type StartForm = { formSchema: unknown; buttons: TaskButton[]; fieldOptions?: FieldOptions };
 export function useProcessForm(key: string | null) {
   return useQuery({ queryKey: ['workflow', 'process-form', key], queryFn: () => api.get<StartForm>(`/api/v1/workflow/process-definitions/${key}/form`), enabled: !!key });
 }
@@ -50,10 +52,19 @@ export function useCompleteTask() {
   });
 }
 
+/** Salva (rascunho) os dados do formulário da tarefa sem concluir. */
+export function useSaveTask() {
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data?: unknown }) =>
+      api.post<{ taskStatus: string }>(`/api/v1/workflow/tasks/${id}/save`, { data }),
+  });
+}
+
 // ── instâncias (acompanhamento) ───────────────────────────────────────
 export type InstanceListItem = { id: string; process: string | null; status: string; startedAt: string; endedAt: string | null; pendingTasks: number };
 export type InstancesPage = { items: InstanceListItem[]; total: number; page: number; pageSize: number };
-export type InstanceTask = { id: string; name: string | null; status: string; assignee: string | null; completedBy: string | null; createdAt: string; completedAt: string | null; dueAt: string | null; action: string | null };
+export type FieldChange = { changedAt: string; changedBy: string | null; impersonator: string | null; action: string; group: string | null; field: string; changeType: string; oldValue: string | null; newValue: string | null };
+export type InstanceTask = { id: string; name: string | null; status: string; assignee: string | null; completedBy: string | null; completedByImpersonator?: string | null; createdAt: string; completedAt: string | null; dueAt: string | null; action: string | null; fieldHistory?: FieldChange[] };
 export type InstanceDetail = { id: string; process: string | null; status: string; startedAt: string; endedAt: string | null; data: unknown; tasks: InstanceTask[] };
 export type InstancesParams = { q?: string; status?: string; mine?: boolean; page?: number; pageSize?: number };
 

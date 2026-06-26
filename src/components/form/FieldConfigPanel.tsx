@@ -2,20 +2,22 @@ import { useEffect, useState } from 'react';
 import { MousePointerClick, Pencil, ExternalLink } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
-import { Combobox } from '@/components/ui/Combobox';
+import { DataSourceSelect } from '@/components/modelador/fields/DataSourceSelect';
 import { IconSearchPicker } from '@/components/ui/IconSearchPicker';
 import { slugify } from '@/lib/slugify';
 import { fetchDataSourceOptions } from '@/lib/api/catalog';
+import { openTab } from '@/lib/nav';
 import { toast } from '@/stores/toast';
 
 type Opt = { value: string; label: string };
-type MaskOpt = Opt & { regex: string; shouldValidate: boolean };
-type Tab = 'geral' | 'validacao' | 'aparencia';
+type MaskOpt = Opt & { regex: string; template?: string | null; shouldValidate: boolean };
+type Tab = 'geral' | 'validacao' | 'aparencia' | 'eventos';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'geral', label: 'Geral' },
   { id: 'aparencia', label: 'Aparência' },
   { id: 'validacao', label: 'Validação' },
+  { id: 'eventos', label: 'Eventos' },
 ];
 
 const EVENT_TYPES: Opt[] = [
@@ -48,9 +50,11 @@ function chunkTabs<T>(arr: T[]): T[][] {
 /** Ids das abas relevantes para o tipo do campo. */
 function availableTabIds(field: any): Tab[] {
   const type = field?.type;
+  const isInput = !!field?.key && !PRESENTATION.has(type) && !CONTAINER.has(type);
   return TABS.filter((t) => {
     switch (t.id) {
       case 'validacao': return type === 'number';
+      case 'eventos': return isInput;
       default: return true; // geral, aparencia
     }
   }).map((t) => t.id);
@@ -60,11 +64,10 @@ function availableTabIds(field: any): Tab[] {
  * Painel de configuração do CAMPO selecionado, em 3 abas (Geral, Validação,
  * Aparência). Lê/edita o campo via a engine do form-js (`editField`).
  */
-export function FieldConfigPanel({ field, editField, masks, dataSources }: {
+export function FieldConfigPanel({ field, editField, masks }: {
   field: any | null;
   editField: (field: any, path: string[], value: unknown) => void;
   masks: MaskOpt[];
-  dataSources: Opt[];
 }) {
   const [tab, setTab] = useState<Tab>('geral');
   const [helpOpen, setHelpOpen] = useState(false);
@@ -73,6 +76,9 @@ export function FieldConfigPanel({ field, editField, masks, dataSources }: {
   // tirava o foco, ex.: título da lista dinâmica).
   const [draftLabel, setDraftLabel] = useState('');
   const [draftKey, setDraftKey] = useState('');
+  // Orientações também via draft (commit no blur/fechar) — evita re-render por
+  // tecla que tirava o foco do editor/textarea.
+  const [helpDraft, setHelpDraft] = useState('');
 
   // Se o tipo do campo mudou e a aba ativa não existe mais, volta pra Geral.
   // (Hook ANTES de qualquer early return — senão a contagem de hooks varia.)
@@ -85,6 +91,7 @@ export function FieldConfigPanel({ field, editField, masks, dataSources }: {
   useEffect(() => {
     setDraftLabel(field?.label ?? '');
     setDraftKey(field?.key ?? '');
+    setHelpDraft(field?.properties?.septemHelpText ?? '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [field?.id]);
 
@@ -174,14 +181,16 @@ export function FieldConfigPanel({ field, editField, masks, dataSources }: {
             {!NO_LABEL.has(field.type) && <Text label="Nome" value={draftLabel} onChange={setDraftLabel} onBlur={() => changeLabel(draftLabel)} />}
             {isInput && <Text label="Chave (identificador)" value={draftKey} onChange={setDraftKey} onBlur={() => changeKey(draftKey)} hint="Sincroniza com o nome; pode ser editada." />}
 
-            {field.type === 'group' && (
+            {isContainer && (
               <>
                 <div>
-                  <Lbl>Ícone do grupo</Lbl>
+                  <Lbl>Ícone do {field.type === 'dynamiclist' ? 'lista' : 'grupo'}</Lbl>
                   <IconSearchPicker value={props.septemGroupIcon} onChange={(cls) => merge('properties', { septemGroupIcon: cls || undefined })} />
                 </div>
-                <Check label="Exibir contador de pendências" checked={props.septemShowPending !== 'no'}
-                  onChange={(b) => merge('properties', { septemShowPending: b ? undefined : 'no' })} />
+                {field.type === 'group' && (
+                  <Check label="Exibir contador de pendências" checked={props.septemShowPending !== 'no'}
+                    onChange={(b) => merge('properties', { septemShowPending: b ? undefined : 'no' })} />
+                )}
               </>
             )}
 
@@ -198,11 +207,13 @@ export function FieldConfigPanel({ field, editField, masks, dataSources }: {
                       className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
                       <Pencil size={13} /> Editar orientações
                     </button>
-                    <span className="text-[11px] text-slate-400">{props.septemHelpText ? 'definidas' : 'vazias'}</span>
+                    <span className="text-[11px] text-slate-400">{helpDraft ? 'definidas' : 'vazias'}</span>
                   </div>
                 ) : (
-                  <textarea rows={2} className={`${fieldCls} mt-1.5`} value={props.septemHelpText ?? ''}
-                    onChange={(e) => merge('properties', { septemHelpText: e.target.value || undefined })} placeholder="Orientações exibidas abaixo do campo." />
+                  <textarea rows={2} className={`${fieldCls} mt-1.5`} value={helpDraft}
+                    onChange={(e) => setHelpDraft(e.target.value)}
+                    onBlur={() => merge('properties', { septemHelpText: helpDraft.trim() || undefined })}
+                    placeholder="Orientações exibidas abaixo do campo." />
                 )}
               </div>
             )}
@@ -210,8 +221,7 @@ export function FieldConfigPanel({ field, editField, masks, dataSources }: {
             {FONTE_DADOS_TYPES.has(field.type) && (
               <div>
                 <Lbl>Fonte de dados</Lbl>
-                <Combobox value={props.septemDataSourceId ?? ''} options={dataSources} clearLabel="— nenhuma —"
-                  placeholder="Selecione a fonte de dados"
+                <DataSourceSelect value={props.septemDataSourceId ?? ''}
                   onChange={(v) => {
                     merge('properties', { septemDataSourceId: v || undefined });
                     // Campos de opção: carrega as opções da fonte direto no campo.
@@ -223,7 +233,7 @@ export function FieldConfigPanel({ field, editField, masks, dataSources }: {
                   }} />
                 {props.septemDataSourceId && (
                   <button type="button"
-                    onClick={() => window.open(`/admin/fontes-dados?edit=${encodeURIComponent(props.septemDataSourceId)}`, '_blank')}
+                    onClick={() => openTab(`/fonte-dados/${encodeURIComponent(props.septemDataSourceId)}`)}
                     className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900">
                     <ExternalLink size={12} /> Editar fonte de dados
                   </button>
@@ -247,7 +257,7 @@ export function FieldConfigPanel({ field, editField, masks, dataSources }: {
               <Select label="Máscara" value={props.septemMaskId ?? ''} options={[{ value: '', label: '— nenhuma —' }, ...masks]}
                 onChange={(v) => {
                   const m = masks.find((o) => o.value === v);
-                  merge('properties', { septemMaskId: v || undefined, septemMaskRegex: m?.regex, septemMaskValidate: m?.shouldValidate ? 'true' : undefined });
+                  merge('properties', { septemMaskId: v || undefined, septemMaskRegex: m?.regex, septemMaskTemplate: m?.template || undefined, septemMaskValidate: m?.shouldValidate ? 'true' : undefined });
                 }} />
             )}
             {isInput && <Text label="Prefixo" value={appearance.prefixAdorner ?? ''} onChange={(v) => merge('appearance', { prefixAdorner: v || undefined })} />}
@@ -258,25 +268,6 @@ export function FieldConfigPanel({ field, editField, masks, dataSources }: {
               onChange={(n) => merge('properties', { septemWidth: n != null ? String(n) : undefined })} hint="Vazio = largura da coluna." />
             {VALIDATABLE.has(field.type) && <NumberInput label="Mín. caracteres" value={validate.minLength} onChange={(n) => merge('validate', { minLength: n })} />}
             {VALIDATABLE.has(field.type) && <NumberInput label="Máx. caracteres" value={validate.maxLength} onChange={(n) => merge('validate', { maxLength: n })} />}
-
-            {(isInput || supportsOptions) && (
-              <div className="mt-1 flex flex-col gap-2 border-t border-slate-200 pt-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Eventos</p>
-                {events.length === 0 && <p className="text-sm text-slate-400">Nenhum evento. Adicione abaixo.</p>}
-                {events.map((ev, i) => (
-                  <div key={i} className="flex flex-col gap-2 rounded-md border border-slate-200 p-2">
-                    <Select label="Evento" value={ev.type} options={EVENT_TYPES}
-                      onChange={(v) => setEvents(events.map((e, j) => (j === i ? { ...e, type: v } : e)))} />
-                    <TextArea label="Ação" value={ev.action}
-                      onChange={(v) => setEvents(events.map((e, j) => (j === i ? { ...e, action: v } : e)))} />
-                    <button type="button" className="self-end text-xs font-medium text-red-600 hover:underline"
-                      onClick={() => setEvents(events.filter((_, j) => j !== i))}>Remover</button>
-                  </div>
-                ))}
-                <button type="button" className="rounded-md border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                  onClick={() => setEvents([...events, { type: 'change', action: '' }])}>+ Adicionar evento</button>
-              </div>
-            )}
           </div>
         )}
 
@@ -286,14 +277,35 @@ export function FieldConfigPanel({ field, editField, masks, dataSources }: {
             <NumberInput label="Valor máximo" value={validate.max} onChange={(n) => merge('validate', { max: n })} />
           </div>
         )}
+
+        {tab === 'eventos' && (
+          <div className="flex flex-col gap-3">
+            {events.length === 0 && <p className="text-sm text-slate-400">Nenhum evento. Adicione abaixo.</p>}
+            {events.map((ev, i) => (
+              <div key={i} className="flex flex-col gap-2 rounded-md border border-slate-200 p-2">
+                <Select label="Evento" value={ev.type} options={EVENT_TYPES}
+                  onChange={(v) => setEvents(events.map((e, j) => (j === i ? { ...e, type: v } : e)))} />
+                <TextArea label="Ação" value={ev.action}
+                  onChange={(v) => setEvents(events.map((e, j) => (j === i ? { ...e, action: v } : e)))} />
+                <button type="button" className="self-end text-xs font-medium text-red-600 hover:underline"
+                  onClick={() => setEvents(events.filter((_, j) => j !== i))}>Remover</button>
+              </div>
+            ))}
+            <button type="button" className="rounded-md border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              onClick={() => setEvents([...events, { type: 'change', action: '' }])}>+ Adicionar evento</button>
+          </div>
+        )}
       </div>
 
-      {helpOpen && (
-        <Dialog open onClose={() => setHelpOpen(false)} width="lg" title="Orientações do campo (popover)"
-          footer={<button type="button" onClick={() => setHelpOpen(false)} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Fechar</button>}>
-          <RichTextEditor value={props.septemHelpText ?? ''} onChange={(html) => merge('properties', { septemHelpText: html || undefined })} />
-        </Dialog>
-      )}
+      {helpOpen && (() => {
+        const commitHelp = () => merge('properties', { septemHelpText: helpDraft.trim() || undefined });
+        return (
+          <Dialog open onClose={() => { commitHelp(); setHelpOpen(false); }} width="lg" title="Orientações do campo (popover)"
+            footer={<button type="button" onClick={() => { commitHelp(); setHelpOpen(false); }} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Fechar</button>}>
+            <RichTextEditor value={helpDraft} onChange={setHelpDraft} onBlur={commitHelp} />
+          </Dialog>
+        );
+      })()}
     </aside>
   );
 }

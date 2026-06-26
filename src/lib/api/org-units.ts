@@ -15,6 +15,7 @@ export type OrgUnitFlat = {
   name: string;
   parentId: string | null;
   active: boolean;
+  titularUserId?: string | null;
 };
 
 const orgKeys = {
@@ -43,7 +44,7 @@ export function useCreateOrgUnit() {
 export function useUpdateOrgUnit() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: { name?: string; active?: boolean } }) =>
+    mutationFn: ({ id, body }: { id: string; body: { name?: string; active?: boolean; titularUserId?: string | null } }) =>
       api.put<void>(`/api/v1/org-units/${id}`, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: orgKeys.all }),
   });

@@ -13,6 +13,7 @@ import {
 import { useDataSourcesList } from '@/lib/api/data-sources';
 import { Dialog } from '@/components/ui/Dialog';
 import { Field, TextInput } from '@/components/ui/Field';
+import { Combobox } from '@/components/ui/Combobox';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
@@ -190,10 +191,13 @@ function RelatorioDialog({ editKey, onClose }: { editKey: string | null; onClose
           <Field label="Nome"><TextInput required minLength={2} value={name} onChange={(e) => setName(e.target.value)} autoFocus /></Field>
           <Field label="Descrição"><TextInput value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
           <Field label="Fonte de dados (relatório)">
-            <select value={dataSourceId} onChange={(e) => setDataSourceId(e.target.value)} className="w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm">
-              <option value="">Selecione…</option>
-              {sources.data?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
+            <Combobox
+              value={dataSourceId}
+              options={(sources.data ?? []).map((d) => ({ value: d.id, label: d.name }))}
+              onChange={setDataSourceId}
+              clearLabel="— nenhuma —"
+              placeholder="Selecione…"
+            />
             {sources.data && sources.data.length === 0 && <span className="mt-0.5 block text-xs text-slate-400">Nenhuma fonte com escopo "relatório". Crie em Configurações › Fontes de dados.</span>}
           </Field>
         </form>

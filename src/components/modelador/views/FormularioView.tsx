@@ -12,7 +12,6 @@ import { MasksDialog } from '@/components/form/MasksDialog';
 import { extractFields } from '@/lib/form-schema';
 import { useFormStore } from '@/stores/form';
 import { useFormMasks } from '@/lib/api/forms';
-import { useDataSources } from '@/lib/api/catalog';
 import { getEmbeddedFormSchema, setEmbeddedFormSchema } from '@/lib/bpmn-process';
 
 type Props = { modeler: any | null };
@@ -31,7 +30,6 @@ export function FormularioView({ modeler }: Props) {
   const builderRef = useRef<FormBuilderHandle>(null);
   const setFields = useFormStore((s) => s.setFields);
   const masks = useFormMasks();
-  const dataSources = useDataSources();
   const [ready, setReady] = useState(false);
   const [masksOpen, setMasksOpen] = useState(false);
   const [preview, setPreview] = useState<unknown | null>(null);
@@ -42,12 +40,8 @@ export function FormularioView({ modeler }: Props) {
   const lastSerialized = useRef<string>('');
 
   const maskOptions = useMemo(
-    () => (masks.data ?? []).map((m) => ({ value: m.id, label: m.name, regex: m.regex, shouldValidate: m.shouldValidate })),
+    () => (masks.data ?? []).map((m) => ({ value: m.id, label: m.name, regex: m.regex, template: m.template, shouldValidate: m.shouldValidate })),
     [masks.data],
-  );
-  const dsOptions = useMemo(
-    () => (dataSources.data ?? []).map((d) => ({ value: d.id, label: d.name })),
-    [dataSources.data],
   );
 
   // 1) Carrega o schema persistido (prefere o XML; cai pra localStorage); extrai a flag.
@@ -155,7 +149,6 @@ export function FormularioView({ modeler }: Props) {
           field={selectedField}
           editField={(f, p, v) => builderRef.current?.editField(f, p, v)}
           masks={maskOptions}
-          dataSources={dsOptions}
         />
       </div>
       {masksOpen && <MasksDialog onClose={() => setMasksOpen(false)} />}

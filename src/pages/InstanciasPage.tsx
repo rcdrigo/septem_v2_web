@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Search, Workflow } from 'lucide-react';
 import { useInstances, useInstance, type InstanceListItem } from '@/lib/api/execution';
+import { openTab } from '@/lib/nav';
 
 const STATUS = { em_andamento: { label: 'Em andamento', cls: 'bg-sky-100 text-sky-700' }, concluido: { label: 'Concluído', cls: 'bg-emerald-100 text-emerald-700' }, cancelado: { label: 'Cancelado', cls: 'bg-rose-100 text-rose-700' } } as Record<string, { label: string; cls: string }>;
 const TASK_STATUS = { pendente: 'bg-amber-100 text-amber-700', concluida: 'bg-emerald-100 text-emerald-700' } as Record<string, string>;
@@ -26,7 +27,7 @@ export function InstanciasPage({ title = 'Tarefas executadas', lockMine = false,
   const [page, setPage] = useState(1);
   const pageSize = 20;
   // Relatório da instância abre em nova aba (sem menus), não mais em modal.
-  const openReport = (id: string) => window.open(`/solicitacao/${id}`, '_blank', 'noopener');
+  const openReport = (id: string) => openTab(`/solicitacao/${id}`);
 
   const list = useInstances({ q: q || undefined, status: status || undefined, mine, page, pageSize });
   const total = list.data?.total ?? 0;
@@ -114,17 +115,34 @@ export function InstanceReport({ id }: { id: string }) {
             <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Histórico de tarefas</p>
             <div className="overflow-hidden rounded-md border border-slate-200">
               {inst.data!.tasks.map((t) => (
-                <div key={t.id} className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-sm last:border-b-0">
-                  <span className="flex items-center gap-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TASK_STATUS[t.status] ?? 'bg-slate-100 text-slate-600'}`}>{t.status}</span>
-                    <span className="text-slate-800">{t.name ?? 'Tarefa'}</span>
-                    {t.action && <span className="text-xs text-slate-400">· {t.action}</span>}
-                  </span>
-                  <span className="text-right text-xs text-slate-400">
-                    {t.completedAt
-                      ? <>concluída {fmt(t.completedAt)}{t.completedBy && <> · por {t.completedBy}</>}</>
-                      : <>criada {fmt(t.createdAt)}{t.assignee && <> · com {t.assignee}</>}</>}
-                  </span>
+                <div key={t.id} className="border-b border-slate-100 px-3 py-2 text-sm last:border-b-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TASK_STATUS[t.status] ?? 'bg-slate-100 text-slate-600'}`}>{t.status}</span>
+                      <span className="text-slate-800">{t.name ?? 'Tarefa'}</span>
+                      {t.action && <span className="text-xs text-slate-400">· {t.action}</span>}
+                    </span>
+                    <span className="text-right text-xs text-slate-400">
+                      {t.completedAt
+                        ? (t.completedByImpersonator
+                            ? <>concluída {fmt(t.completedAt)} · por {t.completedByImpersonator} em nome de {t.completedBy}</>
+                            : <>concluída {fmt(t.completedAt)}{t.completedBy && <> · por {t.completedBy}</>}</>)
+                        : <>criada {fmt(t.createdAt)}{t.assignee && <> · com {t.assignee}</>}</>}
+                    </span>
+                  </div>
+                  {t.fieldHistory && t.fieldHistory.length > 0 && (
+                    <ul className="mt-1.5 space-y-0.5 border-l-2 border-slate-100 pl-3 text-xs text-slate-500">
+                      {t.fieldHistory.map((c, i) => (
+                        <li key={i}>
+                          <span className="font-medium text-slate-700">{c.field}</span>
+                          {c.group && <span className="text-slate-400"> ({c.group})</span>}: {' '}
+                          <span className="text-rose-600 line-through">{c.oldValue || '—'}</span> → <span className="text-emerald-700">{c.newValue || '—'}</span>
+                          {' · '}{c.action === 'complete' ? 'concluiu' : 'salvou'} · {c.impersonator ? <>{c.impersonator} em nome de {c.changedBy}</> : (c.changedBy ?? '—')}
+                          {' · '}{fmt(c.changedAt)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               ))}
             </div>

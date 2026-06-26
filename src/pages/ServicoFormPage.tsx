@@ -6,7 +6,7 @@ import { useProcessForm, useStartInstance, type TaskButton } from '@/lib/api/exe
 import { ReactForm, FormSkeleton, type ReactFormHandle } from '@/components/form/ReactForm';
 import { CompletionScreen } from '@/pages/TarefasPage';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { renderIcon } from '@/lib/icon-catalog';
+import { useDocumentTitle } from '@/lib/use-document-title';
 import { Toaster } from '@/components/ui/Toaster';
 import { useSessionStore } from '@/stores/session';
 import { toast } from '@/stores/toast';
@@ -25,6 +25,7 @@ export function ServicoFormPage() {
   const start = useStartInstance();
   const fillRef = useRef<ReactFormHandle>(null);
   const [done, setDone] = useState<{ nextTaskForMe?: string | null; executionId?: string } | null>(null);
+  useDocumentTitle(detail.data?.name ?? 'Serviço');
 
   if (!token) return <Navigate to="/login" replace />;
 
@@ -55,7 +56,7 @@ export function ServicoFormPage() {
         <>
           {/* Cada grupo renderiza seu próprio card (sem container único). */}
           <main className="flex-1 overflow-auto p-6">
-            {form.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={form.data?.formSchema} />}
+            {form.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={form.data?.formSchema} optionsByField={form.data?.fieldOptions} />}
           </main>
           {/* Botões de início — usa os configurados no evento de início; senão, "Iniciar". */}
           <footer className="flex justify-start gap-2 border-t border-slate-200 bg-white px-6 py-3">
@@ -68,7 +69,7 @@ export function ServicoFormPage() {
                 <button type="button" onClick={() => submit(b)} disabled={start.isPending || form.isLoading}
                   style={b.primaryColor ? { backgroundColor: b.primaryColor, color: b.textColor ?? '#fff' } : undefined}
                   className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium disabled:opacity-60 ${b.primaryColor ? '' : 'bg-slate-900 text-white hover:bg-slate-700'}`}>
-                  {renderIcon(b.icon, 15)}
+                  {b.icon && <i className={b.icon} />}
                   {b.label}
                 </button>
               </Tooltip>

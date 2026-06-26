@@ -3,9 +3,17 @@ import { Bold, Italic, Underline, List, ListOrdered, Link2, Eraser } from 'lucid
 
 /**
  * Editor rich-text leve (contentEditable + execCommand) — sem dependência extra.
- * Usado no help_text popover (forms) e no corpo dos modelos de e-mail. Emite HTML.
+ * Usado no help_text popover (forms), nas orientações dos botões e no corpo dos
+ * modelos de e-mail. Emite HTML. `onBlur` permite commitar só ao sair (evita
+ * churn por tecla em quem persiste no onChange).
  */
-export function RichTextEditor({ value, onChange }: { value: string; onChange: (html: string) => void }) {
+export function RichTextEditor({
+  value, onChange, onBlur,
+}: {
+  value: string;
+  onChange: (html: string) => void;
+  onBlur?: (html: string) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
 
   // Seta o HTML inicial só na montagem (evita pular o cursor a cada digitação).
@@ -15,7 +23,8 @@ export function RichTextEditor({ value, onChange }: { value: string; onChange: (
   }, []);
 
   const emit = () => onChange(ref.current?.innerHTML ?? '');
-  const exec = (cmd: string, arg?: string) => { document.execCommand(cmd, false, arg); ref.current?.focus(); emit(); };
+  // Foca ANTES do comando — senão sem caret o execCommand (listas) não aplica.
+  const exec = (cmd: string, arg?: string) => { ref.current?.focus(); document.execCommand(cmd, false, arg); emit(); };
   const addLink = () => { const url = window.prompt('URL do link:'); if (url) exec('createLink', url); };
 
   return (
@@ -36,7 +45,8 @@ export function RichTextEditor({ value, onChange }: { value: string; onChange: (
         contentEditable
         suppressContentEditableWarning
         onInput={emit}
-        className="prose prose-sm min-h-[120px] max-w-none p-2 text-sm focus:outline-none"
+        onBlur={() => onBlur?.(ref.current?.innerHTML ?? '')}
+        className="min-h-[120px] max-w-none p-2 text-sm focus:outline-none [&_a]:text-sky-600 [&_a]:underline [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5"
       />
     </div>
   );

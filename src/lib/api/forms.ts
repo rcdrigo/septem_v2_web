@@ -18,7 +18,7 @@ export type FormListItem = { id: string; name: string; version: number };
 export type FormDetail = { id: string; name: string; version: number; groups: FormGroup[]; fields: FormField[] };
 export type FormWrite = { name: string; groups: FormGroup[]; fields: FormField[] };
 
-export type FormMask = { id: string; key: string; name: string; regex: string; shouldValidate: boolean };
+export type FormMask = { id: string; key: string; name: string; regex: string; template?: string | null; shouldValidate: boolean };
 
 const formKeys = { all: ['forms'] as const, detail: (id: string) => ['forms', id] as const };
 const maskKeys = { all: ['form-masks'] as const };
@@ -47,11 +47,11 @@ export function useFormMasks() {
 }
 export function useCreateFormMask() {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: (body: { key: string; name: string; regex: string; shouldValidate: boolean }) => api.post<{ id: string }>('/api/v1/form-masks/', body), onSuccess: () => qc.invalidateQueries({ queryKey: maskKeys.all }) });
+  return useMutation({ mutationFn: (body: { key: string; name: string; regex: string; template?: string; shouldValidate: boolean }) => api.post<{ id: string }>('/api/v1/form-masks/', body), onSuccess: () => qc.invalidateQueries({ queryKey: maskKeys.all }) });
 }
 export function useUpdateFormMask() {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: ({ id, body }: { id: string; body: { name: string; regex: string; shouldValidate: boolean } }) => api.put<void>(`/api/v1/form-masks/${id}`, body), onSuccess: () => qc.invalidateQueries({ queryKey: maskKeys.all }) });
+  return useMutation({ mutationFn: ({ id, body }: { id: string; body: { name: string; regex: string; template?: string; shouldValidate: boolean } }) => api.put<void>(`/api/v1/form-masks/${id}`, body), onSuccess: () => qc.invalidateQueries({ queryKey: maskKeys.all }) });
 }
 export function useDeleteFormMask() {
   const qc = useQueryClient();

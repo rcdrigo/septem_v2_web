@@ -41,3 +41,16 @@ summary {
 .fjs-container {
   height: 100%;
 }
+
+/* Grid de campos do formulário (16 col); em telas pequenas vira 1 coluna. */
+.septem-form-grid {
+  grid-template-columns: repeat(16, minmax(0, 1fr));
+}
+@media (max-width: 640px) {
+  .septem-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .septem-form-grid > * {
+    grid-column: 1 / -1 !important;
+  }
+}

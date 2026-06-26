@@ -128,19 +128,21 @@ function FieldRow({
             {field.id} • {field.type}
           </span>
         </div>
-        <VisibilityToggle value={entry.visibility} onChange={onVisibility} />
+        <div className="flex shrink-0 items-center gap-1.5">
+          <VisibilityToggle value={entry.visibility} onChange={onVisibility} />
+          {entry.visibility !== 'hidden' && (
+            <button
+              type="button"
+              onClick={() => { setDraft(current); setOpen(true); }}
+              title={currentLabel ? `Fonte: ${currentLabel}` : 'Definir fonte de dados'}
+              aria-label="Fonte de dados"
+              className={`flex h-7 w-7 items-center justify-center rounded-md border ${current ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-50'}`}
+            >
+              <Database size={13} />
+            </button>
+          )}
+        </div>
       </div>
-      {entry.visibility !== 'hidden' && (
-        <button
-          type="button"
-          onClick={() => { setDraft(current); setOpen(true); }}
-          className="inline-flex items-center gap-1.5 self-start rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50"
-          title="Fonte de dados"
-        >
-          <Database size={13} />
-          {currentLabel ? <span className="font-medium text-slate-800">{currentLabel}</span> : 'Definir fonte de dados'}
-        </button>
-      )}
       {open && (
         <Dialog
           open

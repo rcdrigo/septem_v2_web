@@ -26,6 +26,15 @@ export function useDataSource(id: string | null) {
   return useQuery({ queryKey: dsKeys.detail(id ?? ''), queryFn: () => api.get<DataSourceDetail>(`/api/v1/data-sources/${id}`), enabled: !!id });
 }
 
+export type DataSourceUsage = { kind: string; process: string | null; label: string };
+export function useDataSourceUsages(id: string | null) {
+  return useQuery({
+    queryKey: ['data-sources', id, 'usages'],
+    queryFn: () => api.get<{ usages: DataSourceUsage[] }>(`/api/v1/data-sources/${id}/usages`),
+    enabled: !!id,
+  });
+}
+
 export function useCreateDataSource() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: (body: DataSourceWrite) => api.post<{ id: string }>('/api/v1/data-sources/', body), onSuccess: () => qc.invalidateQueries({ queryKey: dsKeys.all }) });
