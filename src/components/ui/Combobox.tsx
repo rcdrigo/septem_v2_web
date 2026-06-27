@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronsUpDown, Check, X } from 'lucide-react';
 
 export type ComboOption = { value: string; label: string };
@@ -20,15 +21,35 @@ type Props = {
 export function Combobox({ value, options, onChange, placeholder, clearLabel, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [rect, setRect] = useState<{ left: number; top: number; width: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const selected = options.find((o) => o.value === value) ?? null;
 
+  // Posiciona o painel (fixed) sob o botão — recalcula em scroll/resize.
+  useLayoutEffect(() => {
+    if (!open) return;
+    function place() {
+      const r = rootRef.current?.getBoundingClientRect();
+      if (r) setRect({ left: r.left, top: r.bottom + 4, width: r.width });
+    }
+    place();
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     function onDocClick(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (rootRef.current?.contains(t) || panelRef.current?.contains(t)) return;
+      setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false);
@@ -63,8 +84,12 @@ export function Combobox({ value, options, onChange, placeholder, clearLabel, di
         <ChevronsUpDown size={14} className="shrink-0 text-slate-400" />
       </button>
 
-      {open && (
-        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+      {open && rect && createPortal(
+        <div
+          ref={panelRef}
+          style={{ position: 'fixed', left: rect.left, top: rect.top, width: rect.width, zIndex: 60 }}
+          className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg"
+        >
           <div className="border-b border-slate-100 p-1.5">
             <input
               ref={inputRef}
@@ -96,7 +121,8 @@ export function Combobox({ value, options, onChange, placeholder, clearLabel, di
             ))}
             {filtered.length === 0 && <li className="px-3 py-2 text-slate-400">Nenhum resultado.</li>}
           </ul>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

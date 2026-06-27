@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 type Props = {
@@ -29,7 +30,9 @@ export function Dialog({ open, onClose, title, children, footer, width = 'md' }:
 
   const widthClass = width === 'sm' ? 'max-w-md' : width === 'lg' ? 'max-w-2xl' : 'max-w-lg';
 
-  return (
+  // Portal para o body: evita que o modal fique "preso" dentro de ancestrais com
+  // transform (ex.: o sidenav off-canvas) — garante centralização na viewport.
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -54,6 +57,7 @@ export function Dialog({ open, onClose, title, children, footer, width = 'md' }:
         <div className="px-5 py-4">{children}</div>
         {footer && <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

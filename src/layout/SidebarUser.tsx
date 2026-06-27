@@ -11,12 +11,18 @@ import { toast } from '@/stores/toast';
 export function SidebarUser() {
   const user = useSessionStore((s) => s.user);
   const logout = useSessionStore((s) => s.logout);
-  const can = useSessionStore((s) => s.can);
+  const stopImpersonation = useSessionStore((s) => s.stopImpersonation);
   const isImpersonating = useSessionStore((s) => s.isImpersonating);
   const navigate = useNavigate();
-  const [impersonateOpen, setImpersonateOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   if (!user) return null;
+
+  async function leaveImpersonation() {
+    setLeaving(true);
+    try { await stopImpersonation(); navigate('/', { replace: true }); }
+    catch { toast.error('Não foi possível sair da personificação.'); setLeaving(false); }
+  }
 
   const initials = user.name
     .split(/\s+/)
@@ -36,8 +42,8 @@ export function SidebarUser() {
           <span className="min-w-0 truncate">
             Personificando <strong className="font-semibold">{user.name}</strong>
           </span>
-          <button type="button" onClick={endSession} className="shrink-0 font-medium underline hover:text-amber-900">
-            Encerrar
+          <button type="button" disabled={leaving} onClick={leaveImpersonation} className="shrink-0 font-medium underline hover:text-amber-900 disabled:opacity-60">
+            Sair
           </button>
         </div>
       )}
@@ -70,11 +76,6 @@ export function SidebarUser() {
             <MenuItem onClick={() => { close(); navigate('/me/senha'); }}>
               <KeyRound size={15} /> Mudar senha
             </MenuItem>
-            {can('users:impersonate') && !isImpersonating && (
-              <MenuItem onClick={() => { close(); setImpersonateOpen(true); }}>
-                <UserCog size={15} /> Personificar usuário
-              </MenuItem>
-            )}
             <MenuDivider />
             <MenuItem destructive onClick={async () => { close(); await endSession(); }}>
               <LogOut size={15} /> Sair
@@ -82,13 +83,12 @@ export function SidebarUser() {
           </>
         )}
       </Popover>
-
-      {impersonateOpen && <ImpersonateDialog selfId={user.id} onClose={() => setImpersonateOpen(false)} />}
     </div>
   );
 }
 
-function ImpersonateDialog({ selfId, onClose }: { selfId: string; onClose: () => void }) {
+/** Modal de seleção de usuário p/ personificar. Acionado pelo rodapé do sidenav. */
+export function ImpersonateDialog({ selfId, onClose }: { selfId: string; onClose: () => void }) {
   const impersonate = useSessionStore((s) => s.impersonate);
   const navigate = useNavigate();
   const [q, setQ] = useState('');
@@ -113,7 +113,7 @@ function ImpersonateDialog({ selfId, onClose }: { selfId: string; onClose: () =>
       <button onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Fechar</button>
     }>
       <p className="mb-3 text-sm text-slate-600">
-        Você assumirá a sessão do usuário selecionado. Para voltar, encerre a personificação e entre novamente.
+        Você assumirá a sessão do usuário selecionado. Para voltar, use "Sair da personificação" — você retorna à sua conta sem precisar logar de novo.
       </p>
       <div className="relative mb-3">
         <Search size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />

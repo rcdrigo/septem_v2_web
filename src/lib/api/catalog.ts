@@ -32,6 +32,14 @@ export function useDataSources() {
   return useQuery({ queryKey: ['catalog', 'data-sources'], queryFn: () => api.get<DataSource[]>('/api/v1/data-sources') });
 }
 
+export type PlaceholderGroup = { group: string; items: { token: string; label: string }[] };
+export function usePlaceholders(flowKey?: string) {
+  return useQuery({
+    queryKey: ['catalog', 'placeholders', flowKey ?? null],
+    queryFn: () => api.get<{ groups: PlaceholderGroup[] }>(`/api/v1/placeholders${flowKey ? `?flowKey=${encodeURIComponent(flowKey)}` : ''}`),
+  });
+}
+
 /** Resolve as opções (value/label) de uma fonte de dados — usado ao aplicar a fonte a um campo de opções. */
 export async function fetchDataSourceOptions(dataSourceId: string): Promise<{ value: string; label: string }[]> {
   const r = await api.post<{ options: { value: string; label: string }[] }>('/api/v1/workflow/field-options', { dataSourceId });

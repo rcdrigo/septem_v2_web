@@ -4,7 +4,7 @@ import { Play } from 'lucide-react';
 import { useProcessDefinition } from '@/lib/api/process-definitions';
 import { useProcessForm, useStartInstance, type TaskButton } from '@/lib/api/execution';
 import { ReactForm, FormSkeleton, type ReactFormHandle } from '@/components/form/ReactForm';
-import { CompletionScreen } from '@/pages/TarefasPage';
+import { CompletionScreen, DocBanner } from '@/pages/TarefasPage';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { Toaster } from '@/components/ui/Toaster';
@@ -56,6 +56,7 @@ export function ServicoFormPage() {
         <>
           {/* Cada grupo renderiza seu próprio card (sem container único). */}
           <main className="flex-1 overflow-auto p-6">
+            {form.data?.documentationUrl && <DocBanner url={form.data.documentationUrl} />}
             {form.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={form.data?.formSchema} optionsByField={form.data?.fieldOptions} />}
           </main>
           {/* Botões de início — usa os configurados no evento de início; senão, "Iniciar". */}

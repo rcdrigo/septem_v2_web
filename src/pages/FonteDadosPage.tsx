@@ -16,9 +16,9 @@ export function FonteDadosPage() {
   const editId = id && id !== 'nova' ? id : undefined;
   useDocumentTitle(editId ? 'Editar fonte de dados' : 'Nova fonte de dados');
   return (
-    <div className="h-screen bg-slate-100">
-      <DataSourceDialog id={editId} scope={scope} onClose={() => window.close()} />
+    <>
+      <DataSourceDialog id={editId} scope={scope} fullPage onClose={() => window.close()} />
       <Toaster />
-    </div>
+    </>
   );
 }

@@ -93,8 +93,9 @@ function ImpersonationBanner() {
   const stop = useSessionStore((s) => s.stopImpersonation);
   const [leaving, setLeaving] = useState(false);
   if (!isImpersonating) return null;
+  // Só no mobile (sem sidenav visível). No desktop o aviso fica no rodapé do sidenav.
   return (
-    <div className="flex items-center justify-between gap-2 bg-amber-500 px-4 py-1.5 text-sm text-white">
+    <div className="flex items-center justify-between gap-2 bg-amber-500 px-4 py-1.5 text-sm text-white lg:hidden">
       <span className="inline-flex items-center gap-2">
         <UserCog size={15} />
         Você está personificando <b>{user?.name}</b>{user?.impersonatedBy ? <> (como {user.impersonatedBy})</> : null}

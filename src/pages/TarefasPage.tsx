@@ -33,14 +33,24 @@ export function TarefasPage() {
           </div>
         ) : (
           <table className="w-full overflow-hidden rounded-md border border-slate-200 bg-white text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-2 text-left">Tarefa</th><th className="px-4 py-2 text-left">Processo</th><th className="px-4 py-2 text-left">Requisitante</th><th className="px-4 py-2 text-left">Prazo</th><th className="px-4 py-2 w-24" /></tr></thead>
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-2 text-left w-16">#</th><th className="px-4 py-2 text-left">Tarefa</th><th className="px-4 py-2 text-left">Processo</th><th className="px-4 py-2 text-left">Requisitante</th><th className="px-4 py-2 text-left">Inbox</th><th className="px-4 py-2 text-left">Prazo</th><th className="px-4 py-2 w-24" /></tr></thead>
             <tbody>
-              {tasks.isLoading && <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Carregando...</td></tr>}
+              {tasks.isLoading && <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">Carregando...</td></tr>}
               {tasks.data?.map((t: MyTask) => (
                 <tr key={t.id} className="border-t border-slate-100 hover:bg-slate-50">
+                  <td className="px-4 py-2">
+                    {t.processNumber != null
+                      ? <button type="button" onClick={() => openTab(`/solicitacao/${t.executionId}`)} title="Ver relatório do processo" className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-600 hover:bg-slate-200">#{t.processNumber}</button>
+                      : <span className="text-slate-400">—</span>}
+                  </td>
                   <td className="px-4 py-2 font-medium text-slate-800">{t.name ?? 'Tarefa'}</td>
-                  <td className="px-4 py-2 text-slate-500">{t.process ?? '—'}{t.processNumber ? ` #${t.processNumber}` : ''}</td>
+                  <td className="px-4 py-2 text-slate-500">{t.process ?? '—'}</td>
                   <td className="px-4 py-2 text-slate-500">{t.requester ?? '—'}</td>
+                  <td className="px-4 py-2 text-xs text-slate-500">
+                    {t.summary && t.summary.length > 0
+                      ? <dl className="space-y-0.5">{t.summary.map((s, i) => (<div key={i} className="flex gap-1.5"><dt className="shrink-0 text-slate-400">{s.label}:</dt><dd className="truncate text-slate-700">{s.value}</dd></div>))}</dl>
+                      : '—'}
+                  </td>
                   <td className="px-4 py-2"><DuePill dueAt={t.dueAt} /></td>
                   <td className="px-4 py-2 text-right">
                     <button type="button" onClick={() => openTask(t.id)} className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700">Abrir</button>
@@ -68,7 +78,7 @@ function EmptyTasks() {
 /** Card de tarefa do inbox: header (tarefa/processo/nº) · footer (prazo, requisitante, acessar). */
 function TaskCard({ t, onOpen }: { t: MyTask; onOpen: () => void }) {
   return (
-    <div className="flex flex-col rounded-lg border border-slate-200 bg-white shadow-sm">
+    <div className="flex h-full flex-col rounded-lg border border-slate-200 bg-white shadow-sm">
       <header className="flex items-start justify-between gap-2 border-b border-slate-100 px-4 py-3">
         <div className="min-w-0">
           <p className="truncate font-medium text-slate-800">{t.name ?? 'Tarefa'}</p>
@@ -79,7 +89,7 @@ function TaskCard({ t, onOpen }: { t: MyTask; onOpen: () => void }) {
             className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 hover:bg-slate-200">#{t.processNumber}</button>
         )}
       </header>
-      <div className="space-y-1 px-4 py-2 text-xs">
+      <div className="flex-1 space-y-1 px-4 py-2 text-xs">
         <span className="inline-flex items-center gap-1 text-slate-500"><Clock size={12} /> Recebida {new Date(t.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</span>
         {t.summary && t.summary.length > 0 && (
           <dl className="mt-1 space-y-0.5">
@@ -171,7 +181,6 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
 
       {/* Cada grupo renderiza seu próprio card (sem container único). */}
       <main className="flex-1 overflow-auto p-6">
-        {task.data?.documentationUrl && <DocBanner url={task.data.documentationUrl} />}
         {task.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={task.data?.formSchema} data={task.data?.data as Record<string, unknown> | undefined} optionsByField={task.data?.fieldOptions} />}
       </main>
 
@@ -191,8 +200,10 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
             </button>
           </Tooltip>
         ))}
-        <button type="button" onClick={saveDraft} disabled={save.isPending || task.isLoading} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">Salvar</button>
-        <button type="button" onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Fechar</button>
+        <div className="ml-auto flex gap-2">
+          <button type="button" onClick={saveDraft} disabled={save.isPending || task.isLoading} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">Salvar</button>
+          <button type="button" onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Cancelar</button>
+        </div>
       </footer>
     </div>
   );
@@ -239,7 +250,7 @@ export function CompletionScreen({ next, executionId, onClose }: { next?: string
 }
 
 /** Aviso de documentação do processo (dispensável); abre o guia em nova aba. */
-function DocBanner({ url }: { url: string }) {
+export function DocBanner({ url }: { url: string }) {
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   return (

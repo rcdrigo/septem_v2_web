@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Database, Pencil, Plus, Play, Trash2, X } from 'lucide-react';
+import { Braces, Database, Pencil, Plus, Play, Trash2, X } from 'lucide-react';
+import { usePlaceholders } from '@/lib/api/catalog';
 import {
   useDataSourcesList,
   useDataSource,
@@ -96,7 +97,7 @@ export function FontesDadosPage() {
 type FixedItem = { value: string; label: string };
 type ApiHeader = { k: string; v: string };
 
-export function DataSourceDialog({ id, scope, onClose }: { id?: string; scope: DataSourceScope; onClose: () => void }) {
+export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string; scope: DataSourceScope; onClose: () => void; fullPage?: boolean }) {
   const detail = useDataSource(id ?? null);
   const create = useCreateDataSource();
   const update = useUpdateDataSource();
@@ -146,14 +147,41 @@ export function DataSourceDialog({ id, scope, onClose }: { id?: string; scope: D
     } catch { toast.error('Não foi possível salvar a fonte.'); }
   }
 
+  const title = id ? 'Editar fonte de dados' : 'Nova fonte de dados';
+  const footer = (
+    <>
+      <button onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Cancelar</button>
+      <button type="button" onClick={runTest} disabled={test.isPending} className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"><Play size={14} /> Testar</button>
+      <button form="ds-form" type="submit" disabled={!name} className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">Salvar</button>
+    </>
+  );
+
+  if (fullPage) {
+    return (
+      <div className="flex h-screen flex-col bg-slate-100">
+        <header className="border-b border-slate-200 bg-white px-6 py-4">
+          <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
+        </header>
+        <main className="flex-1 overflow-auto p-6">
+          <div className="mx-auto max-w-3xl space-y-4">
+            {renderForm()}
+            {id && <UsagesSection id={id} />}
+          </div>
+        </main>
+        <footer className="flex justify-end gap-2 border-t border-slate-200 bg-white px-6 py-3">{footer}</footer>
+      </div>
+    );
+  }
+
   return (
-    <Dialog open onClose={onClose} width="lg" title={id ? 'Editar fonte de dados' : 'Nova fonte de dados'} footer={
-      <>
-        <button onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Cancelar</button>
-        <button type="button" onClick={runTest} disabled={test.isPending} className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"><Play size={14} /> Testar</button>
-        <button form="ds-form" type="submit" disabled={!name} className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">Salvar</button>
-      </>
-    }>
+    <Dialog open onClose={onClose} width="lg" title={title} footer={footer}>
+      {renderForm()}
+      {id && <UsagesSection id={id} />}
+    </Dialog>
+  );
+
+  function renderForm() {
+    return (
       <form id="ds-form" className="flex flex-col gap-3" onSubmit={save}>
         <div className="grid grid-cols-2 gap-2">
           <Field label="Nome"><TextInput required autoFocus value={name} onChange={(e) => setName(e.target.value)} /></Field>
@@ -165,19 +193,24 @@ export function DataSourceDialog({ id, scope, onClose }: { id?: string; scope: D
 
         {type === 'fixed' && <FixedEditor items={items} setItems={setItems} />}
         {type === 'sql' && (
-          <Field label="Consulta (SELECT ou procedure — somente leitura)" hint="Roda no banco do tenant. 1 coluna → valor=texto; 2 → valor,texto. Use @parametros.">
-            <TextArea rows={5} value={query} onChange={(e) => setQuery(e.target.value)} className="font-mono text-xs" placeholder="SELECT id, nome FROM setores ORDER BY nome" />
-          </Field>
+          <>
+            <Field label="Consulta (SELECT ou procedure — somente leitura)" hint="Roda no banco do tenant. 1 coluna → valor=texto; 2 → valor,texto. Use @parametros. Suporta {{placeholders}} (resolvidos como parâmetro na execução).">
+              <TextArea rows={5} value={query} onChange={(e) => setQuery(e.target.value)} className="font-mono text-xs" placeholder="SELECT id, nome FROM setores WHERE responsavel = {{requisitante.nome}}" />
+            </Field>
+            <PlaceholderHelp />
+          </>
         )}
         {type === 'api' && (
-          <ApiEditor url={url} setUrl={setUrl} method={method} setMethod={setMethod} headers={headers} setHeaders={setHeaders} body={body} setBody={setBody} mapping={mapping} setMapping={setMapping} />
+          <>
+            <ApiEditor url={url} setUrl={setUrl} method={method} setMethod={setMethod} headers={headers} setHeaders={setHeaders} body={body} setBody={setBody} mapping={mapping} setMapping={setMapping} />
+            <PlaceholderHelp />
+          </>
         )}
 
         {result && <ResultTable result={result} />}
       </form>
-      {id && <UsagesSection id={id} />}
-    </Dialog>
-  );
+    );
+  }
 }
 
 /** Lista onde a fonte de dados é utilizada (campos, tarefas, rotinas, relatórios). */
@@ -289,6 +322,36 @@ function ResultTable({ result }: { result: TestResult }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+/** Lista os placeholders disponíveis; clicar copia o token para a área de transferência. */
+function PlaceholderHelp() {
+  const [open, setOpen] = useState(false);
+  const ph = usePlaceholders();
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 p-2">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900">
+        <Braces size={12} /> {open ? 'Ocultar' : 'Ver'} placeholders
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          <p className="text-[11px] text-slate-400">Use {`{{escopo.campo}}`} na consulta/URL/corpo — resolvido na execução. Clique para copiar.</p>
+          {(ph.data?.groups ?? []).map((g) => (
+            <div key={g.group}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{g.group}</p>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {g.items.map((it) => (
+                  <button key={it.token} type="button" title={`${it.label} — clique para copiar`}
+                    onClick={() => { navigator.clipboard?.writeText(it.token); toast.success('Placeholder copiado.'); }}
+                    className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[11px] text-slate-700 hover:bg-slate-100">{it.token}</button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

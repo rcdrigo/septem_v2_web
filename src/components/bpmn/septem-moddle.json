@@ -179,7 +179,8 @@
         { "name": "status", "isAttr": true, "type": "String", "default": "draft" },
         { "name": "allowMessages", "isAttr": true, "type": "Boolean", "default": true },
         { "name": "allowCancel", "isAttr": true, "type": "Boolean", "default": true },
-        { "name": "allowAnonymous", "isAttr": true, "type": "Boolean", "default": false }
+        { "name": "allowAnonymous", "isAttr": true, "type": "Boolean", "default": false },
+        { "name": "accessRules", "isAttr": true, "type": "String" }
       ]
     },
     {

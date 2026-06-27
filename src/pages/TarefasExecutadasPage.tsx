@@ -29,7 +29,7 @@ export function TarefasExecutadasPage() {
         ) : view === 'cards' ? (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {tasks.data?.map((t) => (
-              <div key={t.id} className="flex flex-col rounded-lg border border-slate-200 bg-white shadow-sm">
+              <div key={t.id} className="flex h-full flex-col rounded-lg border border-slate-200 bg-white shadow-sm">
                 <header className="flex items-start justify-between gap-2 border-b border-slate-100 px-4 py-3">
                   <div className="min-w-0">
                     <p className="truncate font-medium text-slate-800">{t.name ?? 'Tarefa'}</p>
@@ -40,7 +40,7 @@ export function TarefasExecutadasPage() {
                       className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 hover:bg-slate-200">#{t.processNumber}</button>
                   )}
                 </header>
-                <div className="space-y-1 px-4 py-2 text-xs">
+                <div className="flex-1 space-y-1 px-4 py-2 text-xs">
                   <div className="text-slate-500">
                     Concluída {t.completedAt ? new Date(t.completedAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—'}
                     {t.action && <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">{t.action}</span>}
@@ -67,20 +67,32 @@ export function TarefasExecutadasPage() {
           <table className="w-full overflow-hidden rounded-md border border-slate-200 bg-white text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
+                <th className="px-4 py-2 text-left w-16">#</th>
                 <th className="px-4 py-2 text-left">Processo</th>
                 <th className="px-4 py-2 text-left">Tarefa</th>
                 <th className="px-4 py-2 text-left">Ação</th>
+                <th className="px-4 py-2 text-left">Inbox</th>
                 <th className="px-4 py-2 text-left">Concluída em</th>
                 <th className="px-4 py-2 w-20" />
               </tr>
             </thead>
             <tbody>
-              {tasks.isLoading && <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Carregando...</td></tr>}
+              {tasks.isLoading && <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">Carregando...</td></tr>}
               {tasks.data?.map((t: ExecutedTask) => (
                 <tr key={t.id} className="border-t border-slate-100 hover:bg-slate-50">
+                  <td className="px-4 py-2">
+                    {t.processNumber != null
+                      ? <button type="button" onClick={() => openReport(t.executionId)} title="Ver relatório do processo" className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-600 hover:bg-slate-200">#{t.processNumber}</button>
+                      : <span className="text-slate-400">—</span>}
+                  </td>
                   <td className="px-4 py-2 font-medium text-slate-800">{t.process ?? '—'}</td>
                   <td className="px-4 py-2 text-slate-600">{t.name ?? 'Tarefa'}</td>
                   <td className="px-4 py-2 text-slate-500">{t.action ?? '—'}</td>
+                  <td className="px-4 py-2 text-xs text-slate-500">
+                    {t.summary && t.summary.length > 0
+                      ? <dl className="space-y-0.5">{t.summary.map((s, i) => (<div key={i} className="flex gap-1.5"><dt className="shrink-0 text-slate-400">{s.label}:</dt><dd className="truncate text-slate-700">{s.value}</dd></div>))}</dl>
+                      : '—'}
+                  </td>
                   <td className="px-4 py-2 text-slate-500">{t.completedAt ? new Date(t.completedAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—'}</td>
                   <td className="px-4 py-2 text-right">
                     <button type="button" onClick={() => openReport(t.executionId)} className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">Ver</button>

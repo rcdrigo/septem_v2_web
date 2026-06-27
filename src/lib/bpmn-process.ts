@@ -24,6 +24,8 @@ export type ProcessConfig = {
   allowMessages: boolean;
   allowCancel: boolean;
   allowAnonymous: boolean;
+  /** Regras de controle de acesso, serializadas como JSON array. */
+  accessRules: string;
 };
 
 export const PROCESS_CONFIG_DEFAULTS: ProcessConfig = {
@@ -37,6 +39,7 @@ export const PROCESS_CONFIG_DEFAULTS: ProcessConfig = {
   allowMessages: true,
   allowCancel: true,
   allowAnonymous: false,
+  accessRules: '',
 };
 
 /** Retorna o shape do `bpmn:Process` (raiz do canvas). */

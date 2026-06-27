@@ -156,7 +156,7 @@ function FormRulesEditor({
       )}
 
       {rules.map((rule, idx) => (
-        <div key={idx} className="grid grid-cols-[1.4fr_1fr_1.4fr_auto] items-end gap-2 rounded-md border border-slate-200 bg-white p-2">
+        <div key={idx} className="grid grid-cols-[1.4fr_1fr_1.4fr_auto] items-end gap-2 rounded-md border border-slate-200 bg-white p-2 [&>*]:min-w-0">
           <Field label="Campo">
             <FieldRefSelect
               value={rule.fieldRef}
@@ -219,7 +219,7 @@ function FieldRefSelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+      className="w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
     >
       <option value="">Selecione…</option>
       {fieldGroups.map((g) => (

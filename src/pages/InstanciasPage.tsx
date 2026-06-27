@@ -1,7 +1,11 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Search, Workflow } from 'lucide-react';
-import { useInstances, useInstance, type InstanceListItem } from '@/lib/api/execution';
+import { ChevronLeft, ChevronRight, LayoutDashboard, ListTree, FileText, Pencil, Search, Trash2, Workflow, XCircle } from 'lucide-react';
+import { useInstances, useInstance, useCancelInstance, useDeleteInstance, type InstanceListItem } from '@/lib/api/execution';
 import { openTab } from '@/lib/nav';
+import { ReactForm } from '@/components/form/ReactForm';
+import { useSessionStore } from '@/stores/session';
+import { confirm } from '@/components/ui/ConfirmDialog';
+import { toast } from '@/stores/toast';
 
 const STATUS = { em_andamento: { label: 'Em andamento', cls: 'bg-sky-100 text-sky-700' }, concluido: { label: 'Concluído', cls: 'bg-emerald-100 text-emerald-700' }, cancelado: { label: 'Cancelado', cls: 'bg-rose-100 text-rose-700' } } as Record<string, { label: string; cls: string }>;
 const TASK_STATUS = { pendente: 'bg-amber-100 text-amber-700', concluida: 'bg-emerald-100 text-emerald-700' } as Record<string, string>;
@@ -89,65 +93,154 @@ export function InstanciasPage({ title = 'Tarefas executadas', lockMine = false,
   );
 }
 
-/** Conteúdo do relatório de uma instância (reusado na página em nova aba e no modal legado). */
+/** Conteúdo do relatório de uma instância: abas Visão geral + Formulário (só-leitura) + Tramitação. */
 export function InstanceReport({ id }: { id: string }) {
   const inst = useInstance(id);
-  const data = (inst.data?.data ?? {}) as Record<string, unknown>;
+  const canWrite = useSessionStore((s) => s.can('workflow:write'));
+  const cancel = useCancelInstance();
+  const del = useDeleteInstance();
+  const [tab, setTab] = useState<'overview' | 'form' | 'history'>('overview');
   if (inst.isLoading) return <p className="text-sm text-slate-400">Carregando...</p>;
+  const d = inst.data!;
+  const data = (d.data ?? {}) as Record<string, unknown>;
+
+  async function doCancel() {
+    if (!(await confirm({ title: 'Cancelar processo', message: 'A instância será marcada como cancelada. Continuar?' }))) return;
+    try { await cancel.mutateAsync(id); toast.success('Processo cancelado.'); } catch { toast.error('Não foi possível cancelar.'); }
+  }
+  async function doDelete() {
+    if (!(await confirm({ title: 'Excluir processo', message: 'A instância sairá das listagens (histórico preservado). Continuar?' }))) return;
+    try { await del.mutateAsync(id); toast.success('Processo excluído.'); window.close(); } catch { toast.error('Não foi possível excluir.'); }
+  }
+
+  const TABS = [
+    { key: 'overview' as const, label: 'Visão geral', icon: LayoutDashboard },
+    { key: 'form' as const, label: 'Formulário', icon: FileText },
+    { key: 'history' as const, label: 'Tramitação', icon: ListTree },
+  ];
+
   return (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 text-sm">
-            <StatusBadge status={inst.data!.status} />
-            <span className="text-slate-500">Início: {fmt(inst.data!.startedAt)}</span>
-            {inst.data!.endedAt && <span className="text-slate-500">Fim: {fmt(inst.data!.endedAt)}</span>}
-          </div>
-
-          <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Dados do formulário</p>
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
-              {Object.keys(data).length === 0 ? <span className="text-slate-400">Sem dados.</span> : Object.entries(data).map(([k, v]) => (
-                <div key={k} className="flex gap-2 py-0.5"><span className="text-slate-500">{k}:</span><span className="text-slate-800">{String(v)}</span></div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Histórico de tarefas</p>
-            <div className="overflow-hidden rounded-md border border-slate-200">
-              {inst.data!.tasks.map((t) => (
-                <div key={t.id} className="border-b border-slate-100 px-3 py-2 text-sm last:border-b-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TASK_STATUS[t.status] ?? 'bg-slate-100 text-slate-600'}`}>{t.status}</span>
-                      <span className="text-slate-800">{t.name ?? 'Tarefa'}</span>
-                      {t.action && <span className="text-xs text-slate-400">· {t.action}</span>}
-                    </span>
-                    <span className="text-right text-xs text-slate-400">
-                      {t.completedAt
-                        ? (t.completedByImpersonator
-                            ? <>concluída {fmt(t.completedAt)} · por {t.completedByImpersonator} em nome de {t.completedBy}</>
-                            : <>concluída {fmt(t.completedAt)}{t.completedBy && <> · por {t.completedBy}</>}</>)
-                        : <>criada {fmt(t.createdAt)}{t.assignee && <> · com {t.assignee}</>}</>}
-                    </span>
-                  </div>
-                  {t.fieldHistory && t.fieldHistory.length > 0 && (
-                    <ul className="mt-1.5 space-y-0.5 border-l-2 border-slate-100 pl-3 text-xs text-slate-500">
-                      {t.fieldHistory.map((c, i) => (
-                        <li key={i}>
-                          <span className="font-medium text-slate-700">{c.field}</span>
-                          {c.group && <span className="text-slate-400"> ({c.group})</span>}: {' '}
-                          <span className="text-rose-600 line-through">{c.oldValue || '—'}</span> → <span className="text-emerald-700">{c.newValue || '—'}</span>
-                          {' · '}{c.action === 'complete' ? 'concluiu' : 'salvou'} · {c.impersonator ? <>{c.impersonator} em nome de {c.changedBy}</> : (c.changedBy ?? '—')}
-                          {' · '}{fmt(c.changedAt)}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+    <div className="space-y-4">
+      {canWrite && (
+        <div className="flex flex-wrap items-center gap-2">
+          {d.flowKey && (
+            <button type="button" onClick={() => openTab(`/processos/editar?key=${encodeURIComponent(d.flowKey!)}`)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"><Pencil size={14} /> Editar processo</button>
+          )}
+          {d.status === 'em_andamento' && (
+            <button type="button" onClick={doCancel} disabled={cancel.isPending}
+              className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60"><XCircle size={14} /> Cancelar</button>
+          )}
+          <button type="button" onClick={doDelete} disabled={del.isPending}
+            className="inline-flex items-center gap-1.5 rounded-md border border-rose-300 px-3 py-1.5 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-60"><Trash2 size={14} /> Excluir</button>
         </div>
+      )}
+
+      {/* Abas */}
+      <div className="flex gap-1 border-b border-slate-200">
+        {TABS.map((t) => {
+          const Ic = t.icon;
+          return (
+            <button key={t.key} type="button" onClick={() => setTab(t.key)}
+              className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium ${tab === t.key ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+              <Ic size={15} /> {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === 'overview' && <OverviewTab d={d} />}
+      {tab === 'form' && (
+        d.formSchema
+          ? <ReactForm schema={d.formSchema} data={data} readOnly />
+          : <KeyValueData data={data} />
+      )}
+      {tab === 'history' && <TramitacaoTab d={d} />}
+    </div>
+  );
+}
+
+function OverviewTab({ d }: { d: import('@/lib/api/execution').InstanceDetail }) {
+  const s = STATUS[d.status] ?? { label: d.status, cls: 'bg-slate-100 text-slate-600' };
+  return (
+    <div className="space-y-3">
+      <div className={`rounded-md px-4 py-3 text-sm font-medium ${s.cls}`}>
+        Status do processo: {s.label}
+        {d.number ? <span className="ml-2 font-normal opacity-80">· #{d.number}</span> : null}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Tarefa ativa</p>
+          {d.activeTask ? (
+            <>
+              <p className="font-medium text-slate-800">{d.activeTask.name ?? 'Tarefa'}</p>
+              <p className="text-sm text-slate-500">{d.activeTask.assignee ?? 'Sem responsável'}</p>
+              {d.activeTask.dueAt && <p className="mt-1 text-xs text-slate-400">Prazo: {fmt(d.activeTask.dueAt)}</p>}
+            </>
+          ) : <p className="text-sm text-slate-400">Nenhuma tarefa em aberto.</p>}
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Inbox da requisição</p>
+          {d.inboxHtml
+            ? <div className="prose-sm text-sm text-slate-700 [&_a]:text-sky-600 [&_a]:underline" dangerouslySetInnerHTML={{ __html: d.inboxHtml }} />
+            : <p className="text-sm text-slate-400">Sem resumo configurado.</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KeyValueData({ data }: { data: Record<string, unknown> }) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+      {Object.keys(data).length === 0 ? <span className="text-slate-400">Sem dados.</span> : Object.entries(data).map(([k, v]) => (
+        <div key={k} className="flex gap-2 py-0.5"><span className="text-slate-500">{k}:</span><span className="text-slate-800">{String(v)}</span></div>
+      ))}
+    </div>
+  );
+}
+
+function TramitacaoTab({ d }: { d: import('@/lib/api/execution').InstanceDetail }) {
+  return (
+    <ol className="relative ml-2 border-l-2 border-slate-200">
+      {d.tasks.map((t) => {
+        const active = t.status === 'pendente';
+        return (
+          <li key={t.id} className="ml-4 pb-4 last:pb-0">
+            <span className={`absolute -left-[7px] mt-1 h-3 w-3 rounded-full ring-2 ring-white ${active ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+            <div className={`rounded-md border px-3 py-2 text-sm ${active ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TASK_STATUS[t.status] ?? 'bg-slate-100 text-slate-600'}`}>{active ? 'em andamento' : t.status}</span>
+                  <span className="font-medium text-slate-800">{t.name ?? 'Tarefa'}</span>
+                  {t.action && <span className="text-xs text-slate-400">· {t.action}</span>}
+                </span>
+                <span className="text-right text-xs text-slate-400">
+                  {t.completedAt
+                    ? (t.completedByImpersonator
+                        ? <>concluída {fmt(t.completedAt)} · por {t.completedByImpersonator} em nome de {t.completedBy}</>
+                        : <>concluída {fmt(t.completedAt)}{t.completedBy && <> · por {t.completedBy}</>}</>)
+                    : <>criada {fmt(t.createdAt)}{t.assignee && <> · com {t.assignee}</>}</>}
+                </span>
+              </div>
+              {t.fieldHistory && t.fieldHistory.length > 0 && (
+                <ul className="mt-1.5 space-y-0.5 border-l-2 border-slate-100 pl-3 text-xs text-slate-500">
+                  {t.fieldHistory.map((c, i) => (
+                    <li key={i}>
+                      <span className="font-medium text-slate-700">{c.field}</span>
+                      {c.group && <span className="text-slate-400"> ({c.group})</span>}: {' '}
+                      <span className="text-rose-600 line-through">{c.oldValue || '—'}</span> → <span className="text-emerald-700">{c.newValue || '—'}</span>
+                      {' · '}{c.action === 'complete' ? 'concluiu' : 'salvou'} · {c.impersonator ? <>{c.impersonator} em nome de {c.changedBy}</> : (c.changedBy ?? '—')}
+                      {' · '}{fmt(c.changedAt)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

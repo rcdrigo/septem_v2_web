@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Copy, Pencil, Plus, Search, Trash2, UserCog } from 'lucide-react';
-import { useSessionStore } from '@/stores/session';
+import { ChevronLeft, ChevronRight, Copy, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import {
   useUsersList,
   useUser,
@@ -40,21 +38,6 @@ export function UsuariosPage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-
-  const navigate = useNavigate();
-  const impersonate = useSessionStore((s) => s.impersonate);
-  const canImpersonate = useSessionStore((s) => s.can('users:impersonate'));
-  const currentUserId = useSessionStore((s) => s.user?.id);
-
-  async function startImpersonation(u: { id: string; name: string }) {
-    try {
-      await impersonate(u.id);
-      toast.success(`Personificando ${u.name}.`);
-      navigate('/');
-    } catch (err) {
-      toast.error(err instanceof ApiError && err.status === 403 ? 'Você não pode personificar este usuário.' : 'Não foi possível personificar.');
-    }
-  }
 
   const del = useDeleteUser();
 
@@ -137,16 +120,6 @@ export function UsuariosPage() {
                 <td className="px-4 py-2 text-slate-600">{u.isInternal ? 'Interno' : 'Externo'}</td>
                 <td className="px-4 py-2">
                   <div className="flex justify-end gap-1">
-                    {canImpersonate && u.status === 'active' && u.id !== currentUserId && (
-                      <button
-                        type="button"
-                        onClick={() => startImpersonation(u)}
-                        className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700"
-                        title="Personificar"
-                      >
-                        <UserCog size={15} />
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={() => setEditId(u.id)}

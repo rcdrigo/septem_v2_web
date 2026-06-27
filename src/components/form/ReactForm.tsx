@@ -1,4 +1,5 @@
 import { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, HelpCircle, Plus, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { regexToTemplate, applyMask, isAllDigits } from '@/lib/mask';
@@ -572,13 +573,14 @@ function HelpPopover({ html }: { html: string }) {
       >
         <HelpCircle size={14} />
       </button>
-      {open && (
+      {open && createPortal(
         <div
           ref={popRef}
           style={style}
-          className="pointer-events-none z-50 w-max max-w-[min(20rem,90vw)] rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 shadow-lg"
+          className="pointer-events-none z-[60] w-max max-w-[min(20rem,90vw)] rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 shadow-lg"
           dangerouslySetInnerHTML={{ __html: html }}
-        />
+        />,
+        document.body,
       )}
     </span>
   );

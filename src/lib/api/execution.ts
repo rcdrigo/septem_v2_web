@@ -17,7 +17,7 @@ export type CompleteResult = { taskStatus: string; executionStatus: string; pend
 const execKeys = { tasks: ['workflow', 'tasks'] as const, task: (id: string) => ['workflow', 'task', id] as const };
 
 /** Schema form-js do processo (formulário inicial de "Iniciar"). */
-export type StartForm = { formSchema: unknown; buttons: TaskButton[]; fieldOptions?: FieldOptions };
+export type StartForm = { formSchema: unknown; buttons: TaskButton[]; fieldOptions?: FieldOptions; documentationUrl?: string | null };
 export function useProcessForm(key: string | null) {
   return useQuery({ queryKey: ['workflow', 'process-form', key], queryFn: () => api.get<StartForm>(`/api/v1/workflow/process-definitions/${key}/form`), enabled: !!key });
 }
@@ -65,7 +65,8 @@ export type InstanceListItem = { id: string; process: string | null; status: str
 export type InstancesPage = { items: InstanceListItem[]; total: number; page: number; pageSize: number };
 export type FieldChange = { changedAt: string; changedBy: string | null; impersonator: string | null; action: string; group: string | null; field: string; changeType: string; oldValue: string | null; newValue: string | null };
 export type InstanceTask = { id: string; name: string | null; status: string; assignee: string | null; completedBy: string | null; completedByImpersonator?: string | null; createdAt: string; completedAt: string | null; dueAt: string | null; action: string | null; fieldHistory?: FieldChange[] };
-export type InstanceDetail = { id: string; process: string | null; status: string; startedAt: string; endedAt: string | null; data: unknown; tasks: InstanceTask[] };
+export type ActiveTask = { name: string | null; assignee: string | null; dueAt: string | null };
+export type InstanceDetail = { id: string; number?: number; process: string | null; flowKey?: string | null; status: string; startedAt: string; endedAt: string | null; data: unknown; formSchema?: unknown; inboxHtml?: string | null; activeTask?: ActiveTask | null; tasks: InstanceTask[] };
 export type InstancesParams = { q?: string; status?: string; mine?: boolean; page?: number; pageSize?: number };
 
 export function useInstances(params: InstancesParams) {
@@ -80,4 +81,20 @@ export function useInstances(params: InstancesParams) {
 
 export function useInstance(id: string | null) {
   return useQuery({ queryKey: ['workflow', 'instance', id], queryFn: () => api.get<InstanceDetail>(`/api/v1/workflow/instances/${id}`), enabled: !!id });
+}
+
+export function useCancelInstance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<void>(`/api/v1/workflow/instances/${id}/cancel`, {}),
+    onSuccess: (_d, id) => { qc.invalidateQueries({ queryKey: ['workflow', 'instance', id] }); qc.invalidateQueries({ queryKey: ['workflow', 'instances'] }); },
+  });
+}
+
+export function useDeleteInstance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del<void>(`/api/v1/workflow/instances/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['workflow', 'instances'] }),
+  });
 }

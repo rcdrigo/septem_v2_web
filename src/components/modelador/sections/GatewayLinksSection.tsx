@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { SlidersHorizontal } from 'lucide-react';
 import { PlaceholderBox, Section } from '@/components/ui/Field';
+import { Dialog } from '@/components/ui/Dialog';
 import { getIncomingConnections, getOutgoingConnections, type ConnectionRef } from '@/lib/bpmn-helpers';
 import { GatewayConditionEditor } from '../editors/GatewayConditionEditor';
 
@@ -59,7 +60,7 @@ function ConnectionItem({
   connection: ConnectionRef;
   configurable: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState(false);
   const flowBO = modeler?.get?.('elementRegistry').get(connection.id);
 
   return (
@@ -72,19 +73,25 @@ function ConnectionItem({
         {configurable && (
           <button
             type="button"
-            onClick={() => setExpanded((v) => !v)}
+            onClick={() => setOpen(true)}
             className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
           >
-            {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            <SlidersHorizontal size={12} />
             Configurar condições
           </button>
         )}
       </div>
 
-      {configurable && expanded && flowBO && (
-        <div className="border-t border-slate-200 px-3 pb-3 pt-2">
+      {configurable && open && flowBO && (
+        <Dialog
+          open
+          onClose={() => setOpen(false)}
+          title={`Condições — ${connection.otherLabel}`}
+          width="lg"
+          footer={<button type="button" onClick={() => setOpen(false)} className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700">Concluído</button>}
+        >
           <GatewayConditionEditor modeler={modeler} connection={flowBO} />
-        </div>
+        </Dialog>
       )}
     </li>
   );

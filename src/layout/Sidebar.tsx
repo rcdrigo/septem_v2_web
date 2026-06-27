@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
-import { SidebarUser } from './SidebarUser';
+import { SidebarUser, ImpersonateDialog } from './SidebarUser';
 import { AccessModeToggle } from './AccessModeToggle';
 import { MENU } from './menu/menu-config';
 import type { MenuAction, MenuGroup, MenuLink, MenuNode } from './menu/types';
@@ -13,6 +13,7 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
   const tenant = session.tenant;
   const tenantName = tenant?.clienteNome ?? 'Septem V2';
   const layout = MENU[session.effectiveMode()];
+  const [impersonateOpen, setImpersonateOpen] = useState(false);
 
   return (
     <aside
@@ -44,22 +45,32 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
 
       {/* Navegação principal */}
       <nav className="flex-1 overflow-y-auto px-2 py-3">
-        {layout.main.map((section, i) => (
-          <div key={section.label ?? i} className={i > 0 ? 'mt-5' : ''}>
-            {section.label && (
-              <p className="px-3 pb-1.5 text-[0.65rem] font-semibold uppercase tracking-wider text-slate-400">
-                {section.label}
-              </p>
-            )}
-            <ul className="space-y-0.5">
-              {section.items
-                .filter((node) => session.can(node.perm))
-                .map((node) => (
+        {layout.main.map((section, i) => {
+          // Item visível = passa na permissão E (link com predicado visible ok |
+          // grupo com ao menos um filho permitido). Seção sem itens não renderiza
+          // (esconde o título, ex.: "Admin" para quem não tem acesso).
+          const items = section.items.filter((node) =>
+            session.can(node.perm) &&
+            (node.kind === 'link'
+              ? (node.visible ? node.visible(session) : true)
+              : node.children.some((c) => session.can(c.perm))),
+          );
+          if (items.length === 0) return null;
+          return (
+            <div key={section.label ?? i} className={i > 0 ? 'mt-5' : ''}>
+              {section.label && (
+                <p className="px-3 pb-1.5 text-[0.65rem] font-semibold uppercase tracking-wider text-slate-400">
+                  {section.label}
+                </p>
+              )}
+              <ul className="space-y-0.5">
+                {items.map((node) => (
                   <NavNode key={nodeKey(node)} node={node} />
                 ))}
-            </ul>
-          </div>
-        ))}
+              </ul>
+            </div>
+          );
+        })}
       </nav>
 
       {/* Rodapé */}
@@ -67,6 +78,7 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
         <ul className="space-y-0.5">
           {layout.footer
             .filter((item) => session.can(item.perm))
+            .filter((item) => !(item.kind === 'action' && item.action === 'impersonate' && session.isImpersonating))
             .map((item) =>
               item.kind === 'link' ? (
                 <li key={item.to}>
@@ -74,12 +86,16 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
                 </li>
               ) : (
                 <li key={item.action}>
-                  <ActionRow action={item} />
+                  <ActionRow action={item} onImpersonate={() => setImpersonateOpen(true)} />
                 </li>
               ),
             )}
         </ul>
       </div>
+
+      {impersonateOpen && session.user && (
+        <ImpersonateDialog selfId={session.user.id} onClose={() => setImpersonateOpen(false)} />
+      )}
     </aside>
   );
 }
@@ -92,9 +108,11 @@ function NavNode({ node }: { node: MenuNode }) {
   const can = useSessionStore((s) => s.can);
   const visible = useSessionStore((s) => (node.kind === 'link' && node.visible ? node.visible(s) : true));
   if (!visible) return null;
-  return node.kind === 'group' ? (
-    <GroupRow group={{ ...node, children: node.children.filter((c) => can(c.perm)) }} />
-  ) : (
+  if (node.kind === 'group') {
+    const children = node.children.filter((c) => can(c.perm));
+    return children.length ? <GroupRow group={{ ...node, children }} /> : null;
+  }
+  return (
     <li>
       <LinkRow link={node} />
     </li>
@@ -163,11 +181,11 @@ function GroupRow({ group }: { group: MenuGroup }) {
   );
 }
 
-function ActionRow({ action }: { action: MenuAction }) {
+function ActionRow({ action, onImpersonate }: { action: MenuAction; onImpersonate?: () => void }) {
   const Icon = action.icon;
   function run() {
     if (action.action === 'logout') toast.info('Sessão encerrada (mock).');
-    else if (action.action === 'impersonate') toast.info('Personificar — em construção.');
+    else if (action.action === 'impersonate') onImpersonate?.();
   }
   return (
     <button type="button" onClick={run} className={[rowBase, 'w-full text-slate-700 hover:bg-slate-100'].join(' ')}>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Checkbox, Field, RadioGroup, Select, Section, TextArea, TextInput } from '@/components/ui/Field';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import {
   PROCESS_CONFIG_DEFAULTS,
   getProcessConfig,
@@ -8,9 +9,13 @@ import {
   type ProcessStatus,
 } from '@/lib/bpmn-process';
 import { useModeladorStore } from '@/stores/modelador';
+import { Plus, Trash2 } from 'lucide-react';
 import { Combobox } from '@/components/ui/Combobox';
 import { IconSearchPicker } from '@/components/ui/IconSearchPicker';
 import { useOrgUnitsFlat } from '@/lib/api/org-units';
+import { useAccessProfiles } from '@/lib/api/access-profiles';
+import { useUsersList } from '@/lib/api/users';
+import { usePositions } from '@/lib/api/positions';
 
 type Props = {
   modeler: any | null;
@@ -95,13 +100,11 @@ export function ConfiguracoesView({ modeler }: Props) {
               placeholder="Nome do processo"
             />
           </Field>
-          <Field label="Descrição">
-            <TextArea
-              value={cfg.description}
-              onChange={(e) => setCfg((c) => ({ ...c, description: e.target.value }))}
+          <Field label="Descrição" hint="Aceita formatação (negrito, listas, links) e quebras de linha — exibido nas listagens de serviço.">
+            <RichTextEditor
+              value={cfg.description ?? ''}
+              onChange={(html) => setCfg((c) => ({ ...c, description: html }))}
               onBlur={() => patch({ description: cfg.description })}
-              rows={3}
-              placeholder="Resumo objetivo do processo (1-3 linhas)"
             />
           </Field>
           <div className="grid grid-cols-2 gap-3">
@@ -182,7 +185,84 @@ export function ConfiguracoesView({ modeler }: Props) {
             hint="Requer formulário aceitando dados sem autenticação."
           />
         </Section>
+
+        <AccessControlSection value={cfg.accessRules} onChange={(json) => patch({ accessRules: json })} />
       </div>
+    </div>
+  );
+}
+
+type AccessRule = {
+  type: 'user' | 'profile' | 'orgUnit' | 'position' | 'orgUnitPosition';
+  action: 'allow' | 'deny';
+  userId?: string;
+  profileId?: string;
+  orgUnitId?: string;
+  positionId?: string;
+};
+
+const RULE_TYPES = [
+  { value: 'user', label: 'Usuário específico' },
+  { value: 'profile', label: 'Perfil de acesso' },
+  { value: 'orgUnit', label: 'Unidade organizacional' },
+  { value: 'position', label: 'Posição' },
+  { value: 'orgUnitPosition', label: 'Unidade + posição' },
+] as const;
+
+/** Controle de acesso ao processo: regras permitir/bloquear (padrão liberado). */
+function AccessControlSection({ value, onChange }: { value: string; onChange: (json: string) => void }) {
+  let rules: AccessRule[] = [];
+  try { const p = JSON.parse(value || '[]'); if (Array.isArray(p)) rules = p; } catch { /* ignora */ }
+
+  function commit(next: AccessRule[]) { onChange(JSON.stringify(next)); }
+  function update(i: number, patch: Partial<AccessRule>) { commit(rules.map((r, j) => (j === i ? { ...r, ...patch } : r))); }
+  function remove(i: number) { commit(rules.filter((_, j) => j !== i)); }
+  function add() { commit([...rules, { type: 'user', action: 'allow' }]); }
+
+  return (
+    <Section
+      title="Controle de acesso"
+      description="Mesmo publicado, restrinja quem vê/inicia o processo. Sem regras = liberado a todos. Regras 'Bloquear' restringem; 'Permitir' é exceção (libera mesmo se bloqueado). Administradores sempre acessam."
+    >
+      {rules.length === 0 && <p className="text-xs text-slate-500">Nenhuma regra — processo liberado para todos.</p>}
+      <div className="flex flex-col gap-2">
+        {rules.map((rule, i) => <AccessRuleRow key={i} rule={rule} onChange={(p) => update(i, p)} onRemove={() => remove(i)} />)}
+      </div>
+      <button type="button" onClick={add} className="mt-2 inline-flex w-fit items-center gap-1 rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">
+        <Plus size={13} /> Adicionar regra
+      </button>
+    </Section>
+  );
+}
+
+function AccessRuleRow({ rule, onChange, onRemove }: { rule: AccessRule; onChange: (p: Partial<AccessRule>) => void; onRemove: () => void }) {
+  const users = useUsersList({ page: 1, pageSize: 200 });
+  const profiles = useAccessProfiles();
+  const orgUnits = useOrgUnitsFlat();
+  const needsPosition = rule.type === 'position' || rule.type === 'orgUnitPosition';
+  const positions = usePositions(needsPosition ? (rule.orgUnitId ?? null) : null);
+
+  return (
+    <div className="grid grid-cols-[1.3fr_1.6fr_1fr_auto] items-end gap-2 rounded-md border border-slate-200 bg-white p-2 [&>*]:min-w-0">
+      <Field label="Aplicar a">
+        <Select value={rule.type} options={RULE_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+          onChange={(e) => onChange({ type: e.target.value as AccessRule['type'], userId: undefined, profileId: undefined, orgUnitId: undefined, positionId: undefined })} />
+      </Field>
+      <Field label="Valor">
+        {rule.type === 'user' && <Combobox value={rule.userId ?? ''} options={(users.data?.items ?? []).map((u) => ({ value: u.id, label: u.name }))} onChange={(v) => onChange({ userId: v })} placeholder="Selecionar usuário…" />}
+        {rule.type === 'profile' && <Combobox value={rule.profileId ?? ''} options={(profiles.data ?? []).map((p) => ({ value: p.id, label: p.name }))} onChange={(v) => onChange({ profileId: v })} placeholder="Selecionar perfil…" />}
+        {rule.type === 'orgUnit' && <Combobox value={rule.orgUnitId ?? ''} options={(orgUnits.data ?? []).map((o) => ({ value: o.id, label: o.name }))} onChange={(v) => onChange({ orgUnitId: v })} placeholder="Selecionar unidade…" />}
+        {needsPosition && (
+          <div className="flex flex-col gap-1.5">
+            <Combobox value={rule.orgUnitId ?? ''} options={(orgUnits.data ?? []).map((o) => ({ value: o.id, label: o.name }))} onChange={(v) => onChange({ orgUnitId: v, positionId: undefined })} placeholder="Unidade…" />
+            <Combobox value={rule.positionId ?? ''} options={(positions.data ?? []).map((p) => ({ value: p.id, label: p.name }))} onChange={(v) => onChange({ positionId: v })} placeholder={rule.orgUnitId ? 'Posição…' : 'Escolha a unidade primeiro'} disabled={!rule.orgUnitId} />
+          </div>
+        )}
+      </Field>
+      <Field label="Ação">
+        <Select value={rule.action} options={[{ value: 'allow', label: 'Permitir' }, { value: 'deny', label: 'Bloquear' }]} onChange={(e) => onChange({ action: e.target.value as AccessRule['action'] })} />
+      </Field>
+      <button type="button" onClick={onRemove} aria-label="Remover regra" className="rounded p-1.5 text-rose-600 hover:bg-rose-50"><Trash2 size={14} /></button>
     </div>
   );
 }
