@@ -223,14 +223,29 @@ function UsagesSection({ id }: { id: string }) {
       {usages.isLoading ? <p className="text-sm text-slate-400">Carregando…</p>
         : items.length === 0 ? <p className="text-sm text-slate-400">Não está sendo utilizada em nenhum local.</p>
         : (
-          <ul className="divide-y divide-slate-100 overflow-hidden rounded-md border border-slate-200">
-            {items.map((u, i) => (
-              <li key={i} className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
-                <span className="text-slate-800">{u.label}</span>
-                <span className="shrink-0 text-xs text-slate-400">{u.kind}{u.process ? ` · ${u.process}` : ''}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-hidden rounded-md border border-slate-200">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium">Processo / Tarefa</th>
+                  <th className="px-3 py-2 text-left font-medium">Campo</th>
+                  <th className="px-3 py-2 text-left font-medium">Uso</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {items.map((u, i) => (
+                  <tr key={i}>
+                    <td className="px-3 py-2 align-top">
+                      <div className="text-slate-800">{u.process ?? '—'}</div>
+                      {u.task && <div className="text-xs text-slate-400">{u.task}</div>}
+                    </td>
+                    <td className="px-3 py-2 align-top text-slate-700">{u.field ?? '—'}</td>
+                    <td className="px-3 py-2 align-top text-xs text-slate-400">{u.kind}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
     </div>
   );

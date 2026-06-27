@@ -26,7 +26,7 @@ export function useDataSource(id: string | null) {
   return useQuery({ queryKey: dsKeys.detail(id ?? ''), queryFn: () => api.get<DataSourceDetail>(`/api/v1/data-sources/${id}`), enabled: !!id });
 }
 
-export type DataSourceUsage = { kind: string; process: string | null; label: string };
+export type DataSourceUsage = { kind: string; process: string | null; task: string | null; field: string | null };
 export function useDataSourceUsages(id: string | null) {
   return useQuery({
     queryKey: ['data-sources', id, 'usages'],
