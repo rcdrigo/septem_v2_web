@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, LayoutDashboard, ListTree, Pencil, Search, Trash2, Workflow, XCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, LayoutDashboard, ListTree, Pencil, Search, Trash2, User, Workflow, XCircle } from 'lucide-react';
 import { useInstances, useInstance, useCancelInstance, useDeleteInstance, type InstanceListItem } from '@/lib/api/execution';
 import { openTab } from '@/lib/nav';
 import { ReactForm } from '@/components/form/ReactForm';
@@ -156,30 +156,60 @@ function OverviewTab({ d }: { d: import('@/lib/api/execution').InstanceDetail })
   const s = STATUS[d.status] ?? { label: d.status, cls: 'bg-slate-100 text-slate-600' };
   return (
     <div className="space-y-3">
-      <div className={`rounded-md px-4 py-3 text-sm font-medium ${s.cls}`}>
-        Status do processo: {s.label}
-        {d.number ? <span className="ml-2 font-normal opacity-80">· #{d.number}</span> : null}
+      <div className={`flex items-center gap-2 rounded-md px-4 py-3 text-sm font-medium ${s.cls}`}>
+        <Clock size={15} /> Status do processo: {s.label}
+        {d.number != null ? <span className="font-normal opacity-80">· nº {d.number}</span> : null}
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Tarefa ativa</p>
-          {d.activeTask ? (
-            <>
-              <p className="font-medium text-slate-800">{d.activeTask.name ?? 'Tarefa'}</p>
-              <p className="text-sm text-slate-500">{d.activeTask.assignee ?? 'Sem responsável'}</p>
-              {d.activeTask.dueAt && <p className="mt-1 text-xs text-slate-400">Prazo: {fmt(d.activeTask.dueAt)}</p>}
-            </>
-          ) : <p className="text-sm text-slate-400">Nenhuma tarefa em aberto.</p>}
+
+      {/* Resumo */}
+      <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <p className="mb-2 text-sm font-semibold text-slate-700">Resumo</p>
+        <div className="space-y-1.5 text-sm text-slate-600">
+          <p className="flex items-center gap-2"><Workflow size={14} className="shrink-0 text-slate-400" /> {d.process ?? '—'}{d.number != null ? <span className="text-slate-400"> · Sequencial nº {d.number}</span> : null}</p>
+          <p className="flex items-center gap-2"><Clock size={14} className="shrink-0 text-slate-400" /> Iniciado em <b className="text-slate-800">{fmt(d.startedAt)}</b></p>
+          <p className="flex items-center gap-2"><User size={14} className="shrink-0 text-slate-400" /> Requerente: <b className="text-slate-800">{d.requester ?? '—'}</b></p>
+          {d.activeTask?.assignee && <p className="flex items-center gap-2"><User size={14} className="shrink-0 text-slate-400" /> Responsável atual: <b className="text-slate-800">{d.activeTask.assignee}</b></p>}
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Inbox da requisição</p>
-          {d.inboxHtml
-            ? <div className="prose-sm text-sm text-slate-700 [&_a]:text-sky-600 [&_a]:underline" dangerouslySetInnerHTML={{ __html: d.inboxHtml }} />
-            : <p className="text-sm text-slate-400">Sem resumo configurado.</p>}
+      </div>
+
+      {/* Tarefa atual (destaque verde) */}
+      {d.activeTask && (
+        <div className="rounded-lg border-2 border-emerald-300 bg-white p-4">
+          <p className="mb-2 text-sm font-semibold text-slate-700">Tarefa atual</p>
+          <p className="font-medium text-slate-800">{d.activeTask.name ?? 'Tarefa'}</p>
+          <p className="mt-0.5 flex items-center gap-2 text-sm text-slate-500"><User size={13} className="text-slate-400" /> {d.activeTask.assignee ?? 'Sem responsável'}</p>
+          {d.activeTask.startedAt && <p className="mt-0.5 flex items-center gap-2 text-xs text-slate-400"><Clock size={12} /> Iniciada em {fmt(d.activeTask.startedAt)}</p>}
+          {d.activeTask.dueAt && (
+            <p className="mt-0.5 flex items-center gap-2 text-xs text-slate-400">
+              <Clock size={12} /> Prazo: {fmt(d.activeTask.dueAt)} <DuePill iso={d.activeTask.dueAt} />
+            </p>
+          )}
         </div>
+      )}
+
+      {/* Inbox da requisição */}
+      <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <p className="mb-1 text-sm font-semibold text-slate-700">Inbox da requisição</p>
+        {d.inboxHtml
+          ? <div className="prose-sm text-sm text-slate-700 [&_a]:text-sky-600 [&_a]:underline" dangerouslySetInnerHTML={{ __html: d.inboxHtml }} />
+          : <p className="text-sm text-slate-400">Sem resumo configurado.</p>}
       </div>
     </div>
   );
+}
+
+/** Pílula de status do processo (com ícone). Reaproveitada no header do relatório. */
+export function StatusPill({ status }: { status: string }) {
+  const v = STATUS[status] ?? { label: status, cls: 'bg-slate-100 text-slate-600' };
+  return <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-medium ${v.cls}`}><Clock size={14} /> {v.label}</span>;
+}
+
+/** Pílula de prazo: verde (>24h), laranja (<24h), vermelho (vencido). */
+function DuePill({ iso }: { iso: string }) {
+  const diff = new Date(iso).getTime() - Date.now();
+  const cls = diff < 0 ? 'bg-rose-100 text-rose-700' : diff < 24 * 3600_000 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
+  const days = Math.round(diff / 86_400_000);
+  return <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${cls}`}>{days < 0 ? `${days} dia(s)` : days === 0 ? 'hoje' : `${days} dia(s)`}</span>;
 }
 
 function KeyValueData({ data }: { data: Record<string, unknown> }) {

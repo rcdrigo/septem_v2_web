@@ -65,8 +65,8 @@ export type InstanceListItem = { id: string; process: string | null; status: str
 export type InstancesPage = { items: InstanceListItem[]; total: number; page: number; pageSize: number };
 export type FieldChange = { changedAt: string; changedBy: string | null; impersonator: string | null; action: string; group: string | null; field: string; changeType: string; oldValue: string | null; newValue: string | null };
 export type InstanceTask = { id: string; name: string | null; status: string; assignee: string | null; completedBy: string | null; completedByImpersonator?: string | null; createdAt: string; completedAt: string | null; dueAt: string | null; action: string | null; fieldHistory?: FieldChange[] };
-export type ActiveTask = { name: string | null; assignee: string | null; dueAt: string | null };
-export type InstanceDetail = { id: string; number?: number; process: string | null; flowKey?: string | null; status: string; startedAt: string; endedAt: string | null; data: unknown; formSchema?: unknown; inboxHtml?: string | null; activeTask?: ActiveTask | null; tasks: InstanceTask[] };
+export type ActiveTask = { name: string | null; assignee: string | null; startedAt?: string | null; dueAt: string | null };
+export type InstanceDetail = { id: string; number?: number; process: string | null; category?: string | null; flowKey?: string | null; requester?: string | null; status: string; startedAt: string; endedAt: string | null; data: unknown; formSchema?: unknown; inboxHtml?: string | null; activeTask?: ActiveTask | null; tasks: InstanceTask[] };
 export type InstancesParams = { q?: string; status?: string; mine?: boolean; page?: number; pageSize?: number };
 
 export function useInstances(params: InstancesParams) {
