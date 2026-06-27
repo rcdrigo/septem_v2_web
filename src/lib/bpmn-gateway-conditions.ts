@@ -28,11 +28,13 @@ const RULES_SCHEMA: CollectionSchema = {
   itemType: 'septem:FormRule',
 };
 
-const MODE_DEFAULTS = { mode: 'formValues' as GatewayConditionMode, buttonId: '' };
+export type RuleLogic = 'all' | 'any';
+const MODE_DEFAULTS = { mode: 'formValues' as GatewayConditionMode, buttonId: '', logic: 'all' as RuleLogic };
 
 export function getGatewayCondition(connection: any): {
   mode: GatewayConditionMode;
   buttonId: string;
+  logic: RuleLogic;
   rules: FormRule[];
 } {
   const meta = getExtensionConfig(connection, 'septem:GatewayCondition', MODE_DEFAULTS);
@@ -41,7 +43,11 @@ export function getGatewayCondition(connection: any): {
     operator: (raw.operator as ComparisonOperator) ?? 'eq',
     value: raw.value ?? '',
   }));
-  return { mode: meta.mode, buttonId: meta.buttonId, rules };
+  return { mode: meta.mode, buttonId: meta.buttonId, logic: meta.logic === 'any' ? 'any' : 'all', rules };
+}
+
+export function setGatewayLogic(modeler: any, connection: any, logic: RuleLogic) {
+  setExtensionConfig(modeler, connection, 'septem:GatewayCondition', { mode: 'formValues', logic });
 }
 
 export function setGatewayConditionMode(modeler: any, connection: any, mode: GatewayConditionMode) {

@@ -6,11 +6,13 @@ import {
   getGatewayCondition,
   setGatewayButton,
   setGatewayConditionMode,
+  setGatewayLogic,
   setGatewayRules,
   OPERATOR_OPTIONS,
   type ComparisonOperator,
   type FormRule,
   type GatewayConditionMode,
+  type RuleLogic,
 } from '@/lib/bpmn-gateway-conditions';
 import { getAllProcessButtons } from '@/lib/bpmn-action-buttons';
 import { useFormStore, selectFieldGroups } from '@/stores/form';
@@ -71,6 +73,11 @@ export function GatewayConditionEditor({ modeler, connection }: Props) {
     setCond((c) => ({ ...c, rules: next, mode: 'formValues' }));
   }
 
+  function changeLogic(logic: RuleLogic) {
+    setGatewayLogic(modeler, connection, logic);
+    setCond((c) => ({ ...c, logic, mode: 'formValues' }));
+  }
+
   return (
     <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-slate-50 p-3">
       <Field label="Quando este caminho é seguido">
@@ -85,7 +92,7 @@ export function GatewayConditionEditor({ modeler, connection }: Props) {
       {cond.mode === 'button' && <ButtonChooser groups={buttonGroups} value={cond.buttonId} onChange={changeButton} />}
 
       {cond.mode === 'formValues' && (
-        <FormRulesEditor rules={cond.rules} fieldGroups={fieldGroups} onChange={changeRules} />
+        <FormRulesEditor rules={cond.rules} logic={cond.logic} fieldGroups={fieldGroups} onChange={changeRules} onLogicChange={changeLogic} />
       )}
 
       {cond.mode === 'else' && (
@@ -132,12 +139,16 @@ function ButtonChooser({
 
 function FormRulesEditor({
   rules,
+  logic,
   fieldGroups,
   onChange,
+  onLogicChange,
 }: {
   rules: FormRule[];
+  logic: RuleLogic;
   fieldGroups: ReturnType<typeof selectFieldGroups>;
   onChange: (next: FormRule[]) => void;
+  onLogicChange: (logic: RuleLogic) => void;
 }) {
   function update(idx: number, patch: Partial<FormRule>) {
     onChange(rules.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
@@ -151,6 +162,20 @@ function FormRulesEditor({
 
   return (
     <div className="flex flex-col gap-2">
+      {rules.length >= 2 && (
+        <Field label="Combinar regras">
+          <RadioGroup<RuleLogic>
+            name={`rule-logic-${rules.length}`}
+            direction="horizontal"
+            value={logic}
+            onChange={onLogicChange}
+            options={[
+              { value: 'all', label: 'Todas (E)' },
+              { value: 'any', label: 'Qualquer (OU)' },
+            ]}
+          />
+        </Field>
+      )}
       {rules.length === 0 && (
         <p className="text-xs text-slate-500">Nenhuma regra. Adicione comparações com campos do formulário.</p>
       )}
