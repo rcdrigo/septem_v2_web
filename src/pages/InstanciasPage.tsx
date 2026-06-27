@@ -101,7 +101,10 @@ export function InstanceReport({ id }: { id: string }) {
   const cancel = useCancelInstance();
   const del = useDeleteInstance();
   if (inst.isLoading) return <p className="text-sm text-slate-400">Carregando...</p>;
-  const d = inst.data!;
+  if (inst.isError || !inst.data) {
+    return <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-700">Não foi possível carregar o relatório desta solicitação. Você pode não ter permissão para visualizá-la.</p>;
+  }
+  const d = inst.data;
   const data = (d.data ?? {}) as Record<string, unknown>;
 
   async function doCancel() {
