@@ -53,6 +53,7 @@ export function ConfiguracoesView({ modeler }: Props) {
   const [cfg, setCfg] = useState<ProcessConfig>(PROCESS_CONFIG_DEFAULTS);
   const orgUnits = useOrgUnitsFlat();
   const [draftName, setDraftName] = useState(processName);
+  const [tab, setTab] = useState<'geral' | 'acesso'>('geral');
 
   useEffect(() => {
     if (!modeler) return;
@@ -91,102 +92,94 @@ export function ConfiguracoesView({ modeler }: Props) {
           </p>
         </header>
 
-        <Section title="Identificação">
-          <Field label="Nome" hint="Mesmo nome exibido na barra superior.">
-            <TextInput
-              value={draftName}
-              onChange={(e) => setDraftName(e.target.value)}
-              onBlur={commitName}
-              placeholder="Nome do processo"
-            />
-          </Field>
-          <Field label="Descrição" hint="Aceita formatação (negrito, listas, links) e quebras de linha — exibido nas listagens de serviço.">
-            <RichTextEditor
-              value={cfg.description ?? ''}
-              onChange={(html) => setCfg((c) => ({ ...c, description: html }))}
-              onBlur={() => patch({ description: cfg.description })}
-            />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Categoria">
-              <Select
-                value={cfg.categoryId}
-                onChange={(e) => patch({ categoryId: e.target.value })}
-                options={CATEGORY_OPTIONS}
-              />
-            </Field>
-            <Field label="Área responsável" hint="Unidade organizacional.">
-              <Combobox
-                value={cfg.areaId}
-                options={(orgUnits.data ?? []).map((u) => ({ value: u.key, label: u.name }))}
-                onChange={(v) => { setCfg((c) => ({ ...c, areaId: v })); patch({ areaId: v }); }}
-                clearLabel="— nenhuma —"
-                placeholder="Selecione a unidade"
-              />
-            </Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Ícone" hint="Ícone do processo (FontAwesome).">
-              <IconSearchPicker value={cfg.icon} onChange={(cls) => { setCfg((c) => ({ ...c, icon: cls ?? '' })); patch({ icon: cls ?? '' }); }} />
-            </Field>
-            <Field label="URL da documentação">
-              <TextInput
-                type="url"
-                value={cfg.documentationUrl}
-                onChange={(e) => setCfg((c) => ({ ...c, documentationUrl: e.target.value }))}
-                onBlur={() => patch({ documentationUrl: cfg.documentationUrl })}
-                placeholder="https://…"
-              />
-            </Field>
-          </div>
-        </Section>
+        {/* Abas */}
+        <div className="flex gap-1 border-b border-slate-200 px-6 pt-2">
+          {([['geral', 'Informações gerais'], ['acesso', 'Controle de acesso']] as const).map(([k, label]) => (
+            <button key={k} type="button" onClick={() => setTab(k)}
+              className={`border-b-2 px-3 py-2 text-sm font-medium ${tab === k ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
 
-        <Section
-          title="Inbox / resumo da requisição"
-          description="HTML curto mostrado nas listagens de processo. Variáveis podem ser inseridas com {{campo}}."
-        >
-          <Field label="Conteúdo">
-            <TextArea
-              value={cfg.inbox}
-              onChange={(e) => setCfg((c) => ({ ...c, inbox: e.target.value }))}
-              onBlur={() => patch({ inbox: cfg.inbox })}
-              rows={5}
-              placeholder="<strong>{{titulo}}</strong> — solicitado por {{requisitante}}"
-            />
-          </Field>
-        </Section>
+        {tab === 'geral' && (
+          <>
+            <Section title="Identificação">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-3 lg:grid-cols-2">
+                {/* Coluna 1 */}
+                <div className="flex flex-col gap-3">
+                  <Field label="Nome" hint="Mesmo nome exibido na barra superior.">
+                    <TextInput value={draftName} onChange={(e) => setDraftName(e.target.value)} onBlur={commitName} placeholder="Nome do processo" />
+                  </Field>
+                  <Field label="Categoria">
+                    <Select value={cfg.categoryId} onChange={(e) => patch({ categoryId: e.target.value })} options={CATEGORY_OPTIONS} />
+                  </Field>
+                  <Field label="Área responsável" hint="Unidade organizacional.">
+                    <Combobox
+                      value={cfg.areaId}
+                      options={(orgUnits.data ?? []).map((u) => ({ value: u.key, label: u.name }))}
+                      onChange={(v) => { setCfg((c) => ({ ...c, areaId: v })); patch({ areaId: v }); }}
+                      clearLabel="— nenhuma —"
+                      placeholder="Selecione a unidade"
+                    />
+                  </Field>
+                  <Field label="URL da documentação">
+                    <TextInput type="url" value={cfg.documentationUrl}
+                      onChange={(e) => setCfg((c) => ({ ...c, documentationUrl: e.target.value }))}
+                      onBlur={() => patch({ documentationUrl: cfg.documentationUrl })} placeholder="https://…" />
+                  </Field>
+                  <Field label="Ícone" hint="Ícone do processo (FontAwesome).">
+                    <IconSearchPicker value={cfg.icon} onChange={(cls) => { setCfg((c) => ({ ...c, icon: cls ?? '' })); patch({ icon: cls ?? '' }); }} />
+                  </Field>
+                </div>
+                {/* Coluna 2 */}
+                <div className="flex flex-col gap-3">
+                  <Field label="Descrição" hint="Aceita formatação (negrito, listas, links) e quebras de linha — exibido nas listagens de serviço.">
+                    <RichTextEditor
+                      value={cfg.description ?? ''}
+                      onChange={(html) => setCfg((c) => ({ ...c, description: html }))}
+                      onBlur={() => patch({ description: cfg.description })}
+                    />
+                  </Field>
+                  <Field label="Inbox / resumo da requisição" hint="HTML curto mostrado nas listagens. Variáveis com {{campo}}.">
+                    <TextArea
+                      value={cfg.inbox}
+                      onChange={(e) => setCfg((c) => ({ ...c, inbox: e.target.value }))}
+                      onBlur={() => patch({ inbox: cfg.inbox })}
+                      rows={5}
+                      placeholder="<strong>{{titulo}}</strong> — solicitado por {{requisitante}}"
+                    />
+                  </Field>
+                </div>
+              </div>
+            </Section>
 
-        <Section title="Publicação">
-          <Field label="Status">
-            <RadioGroup<ProcessStatus>
-              name="proc-status"
-              value={cfg.status}
-              onChange={(v) => patch({ status: v })}
-              options={STATUS_OPTIONS as any}
-            />
-          </Field>
-        </Section>
+            <Section title="Publicação e permissões">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-3 lg:grid-cols-2">
+                {/* Coluna 1 */}
+                <div className="flex flex-col gap-3">
+                  <Field label="Status">
+                    <RadioGroup<ProcessStatus> name="proc-status" value={cfg.status} onChange={(v) => patch({ status: v })} options={STATUS_OPTIONS as any} />
+                  </Field>
+                </div>
+                {/* Coluna 2 */}
+                <div className="flex flex-col gap-2">
+                  <Field label="Permissões durante a execução">
+                    <div className="flex flex-col gap-2">
+                      <Checkbox checked={cfg.allowMessages} onChange={(v) => patch({ allowMessages: v })} label="Permitir inserção de mensagens nas execuções" />
+                      <Checkbox checked={cfg.allowCancel} onChange={(v) => patch({ allowCancel: v })} label="Permitir cancelamento do processo" />
+                      <Checkbox checked={cfg.allowAnonymous} onChange={(v) => patch({ allowAnonymous: v })} label="Permitir requisições anônimas (portal)" hint="Requer formulário aceitando dados sem autenticação." />
+                    </div>
+                  </Field>
+                </div>
+              </div>
+            </Section>
+          </>
+        )}
 
-        <Section title="Comportamentos durante a execução">
-          <Checkbox
-            checked={cfg.allowMessages}
-            onChange={(v) => patch({ allowMessages: v })}
-            label="Permitir inserção de mensagens nas execuções"
-          />
-          <Checkbox
-            checked={cfg.allowCancel}
-            onChange={(v) => patch({ allowCancel: v })}
-            label="Permitir cancelamento do processo"
-          />
-          <Checkbox
-            checked={cfg.allowAnonymous}
-            onChange={(v) => patch({ allowAnonymous: v })}
-            label="Permitir requisições anônimas (portal)"
-            hint="Requer formulário aceitando dados sem autenticação."
-          />
-        </Section>
-
-        <AccessControlSection value={cfg.accessRules} onChange={(json) => patch({ accessRules: json })} />
+        {tab === 'acesso' && (
+          <AccessControlSection value={cfg.accessRules} onChange={(json) => patch({ accessRules: json })} />
+        )}
       </div>
     </div>
   );

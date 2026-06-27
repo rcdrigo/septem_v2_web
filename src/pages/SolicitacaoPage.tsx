@@ -1,7 +1,9 @@
+import { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Printer } from 'lucide-react';
 import { useInstance } from '@/lib/api/execution';
 import { useDocumentTitle } from '@/lib/use-document-title';
+import { useSessionStore } from '@/stores/session';
 import { InstanceReport, StatusPill } from './InstanciasPage';
 
 /**
@@ -11,6 +13,11 @@ import { InstanceReport, StatusPill } from './InstanciasPage';
  */
 export function SolicitacaoPage() {
   const { instanceId } = useParams<{ instanceId: string }>();
+  // Rota fora do AppShell (nova aba): bootstrap próprio p/ carregar user+perms,
+  // senão can('workflow:write') fica falso e a barra de ações admin some.
+  const status = useSessionStore((s) => s.status);
+  const bootstrap = useSessionStore((s) => s.bootstrap);
+  useEffect(() => { if (status === 'idle') void bootstrap(); }, [status, bootstrap]);
   const inst = useInstance(instanceId ?? '');
   const d = inst.data;
   useDocumentTitle(d?.process ?? 'Solicitação');
