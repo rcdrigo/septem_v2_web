@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Clock, LayoutDashboard, ListTree, Pencil, Search, Trash2, User, Workflow, XCircle } from 'lucide-react';
-import { useInstances, useInstance, useCancelInstance, useDeleteInstance, type InstanceListItem } from '@/lib/api/execution';
+import { ChevronLeft, ChevronRight, Clock, History, LayoutDashboard, ListTree, Pencil, Search, Trash2, User, Workflow, XCircle } from 'lucide-react';
+import { useInstances, useInstance, useCancelInstance, useDeleteInstance, type InstanceListItem, type InstanceTask, type FieldChange } from '@/lib/api/execution';
 import { openTab } from '@/lib/nav';
+import { Dialog } from '@/components/ui/Dialog';
 import { ReactForm } from '@/components/form/ReactForm';
 import { useSessionStore } from '@/stores/session';
 import { confirm } from '@/components/ui/ConfirmDialog';
@@ -223,47 +224,96 @@ function KeyValueData({ data }: { data: Record<string, unknown> }) {
 }
 
 function TramitacaoTab({ d }: { d: import('@/lib/api/execution').InstanceDetail }) {
+  const [hist, setHist] = useState<InstanceTask | null>(null);
   return (
-    <ol className="relative ml-2 border-l-2 border-slate-200">
-      {d.tasks.map((t) => {
-        const active = t.status === 'pendente';
-        return (
-          <li key={t.id} className="ml-4 pb-4 last:pb-0">
-            <span className={`absolute -left-[7px] mt-1 h-3 w-3 rounded-full ring-2 ring-white ${active ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-            <div className={`rounded-md border px-3 py-2 text-sm ${active ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'}`}>
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-2">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TASK_STATUS[t.status] ?? 'bg-slate-100 text-slate-600'}`}>{active ? 'em andamento' : t.status}</span>
-                  <span className="font-medium text-slate-800">{t.name ?? 'Tarefa'}</span>
-                  {t.action && <span className="text-xs text-slate-400">· {t.action}</span>}
-                </span>
-                <span className="text-right text-xs text-slate-400">
-                  {t.completedAt
-                    ? (t.completedByImpersonator
-                        ? <>concluída {fmt(t.completedAt)} · por {t.completedByImpersonator} em nome de {t.completedBy}</>
-                        : <>concluída {fmt(t.completedAt)}{t.completedBy && <> · por {t.completedBy}</>}</>)
-                    : <>criada {fmt(t.createdAt)}{t.assignee && <> · com {t.assignee}</>}</>}
-                </span>
+    <>
+      <ol className="relative ml-2 border-l-2 border-slate-200">
+        {d.tasks.map((t) => {
+          const active = t.status === 'pendente';
+          const changes = t.fieldHistory?.length ?? 0;
+          return (
+            <li key={t.id} className="ml-4 pb-4 last:pb-0">
+              <span className={`absolute -left-[7px] mt-1 h-3 w-3 rounded-full ring-2 ring-white ${active ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+              <div className={`rounded-md border px-3 py-2 text-sm ${active ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TASK_STATUS[t.status] ?? 'bg-slate-100 text-slate-600'}`}>{active ? 'em andamento' : t.status}</span>
+                    <span className="font-medium text-slate-800">{t.name ?? 'Tarefa'}</span>
+                  </span>
+                  {changes > 0 && (
+                    <button type="button" onClick={() => setHist(t)}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                      <History size={12} /> Ver histórico de alterações
+                    </button>
+                  )}
+                </div>
+                <dl className="mt-1.5 grid gap-x-6 gap-y-0.5 text-xs text-slate-500 sm:grid-cols-2">
+                  <Info label={active ? 'Com' : 'Concluída por'}>
+                    {active
+                      ? (t.assignee ?? 'Sem responsável')
+                      : (t.completedByImpersonator ? `${t.completedByImpersonator} em nome de ${t.completedBy}` : (t.completedBy ?? '—'))}
+                  </Info>
+                  <Info label="Recebida em">{fmt(t.createdAt)}</Info>
+                  {t.completedAt && <Info label="Concluída em">{fmt(t.completedAt)}</Info>}
+                  {t.action && <Info label="Botão utilizado">{t.action}</Info>}
+                </dl>
               </div>
-              {t.fieldHistory && t.fieldHistory.length > 0 && (
-                <ul className="mt-1.5 space-y-0.5 border-l-2 border-slate-100 pl-3 text-xs text-slate-500">
-                  {t.fieldHistory.map((c, i) => (
-                    <li key={i}>
-                      <span className="font-medium text-slate-700">{c.field}</span>
-                      {c.group && <span className="text-slate-400"> ({c.group})</span>}: {' '}
-                      <span className="text-rose-600 line-through">{c.oldValue || '—'}</span> → <span className="text-emerald-700">{c.newValue || '—'}</span>
-                      {' · '}{c.action === 'complete' ? 'concluiu' : 'salvou'} · {c.impersonator ? <>{c.impersonator} em nome de {c.changedBy}</> : (c.changedBy ?? '—')}
-                      {' · '}{fmt(c.changedAt)}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+            </li>
+          );
+        })}
+      </ol>
+      {hist && <FieldHistoryDialog task={hist} onClose={() => setHist(null)} />}
+    </>
   );
+}
+
+function Info({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div><dt className="inline text-slate-400">{label}: </dt><dd className="inline font-medium text-slate-700">{children}</dd></div>;
+}
+
+/** Modal do histórico de alterações de uma tarefa, agrupado por usuário + timestamp (um "salvar"/"concluir"). */
+function FieldHistoryDialog({ task, onClose }: { task: InstanceTask; onClose: () => void }) {
+  const groups = groupChanges(task.fieldHistory ?? []);
+  return (
+    <Dialog open onClose={onClose} width="lg" title={`Histórico de alterações — ${task.name ?? 'Tarefa'}`}
+      footer={<button type="button" onClick={onClose} className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700">Fechar</button>}>
+      {groups.length === 0 ? (
+        <p className="text-sm text-slate-400">Sem alterações registradas.</p>
+      ) : (
+        <div className="space-y-3">
+          {groups.map((g, i) => (
+            <div key={i} className="overflow-hidden rounded-md border border-slate-200">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-3 py-1.5 text-xs">
+                <span className="font-medium text-slate-700">{g.impersonator ? `${g.impersonator} em nome de ${g.changedBy}` : (g.changedBy ?? '—')}</span>
+                <span className="text-slate-400">{g.action === 'complete' ? 'concluiu' : 'salvou'} · {fmt(g.changedAt)}</span>
+              </div>
+              <ul className="divide-y divide-slate-100">
+                {g.items.map((c, j) => (
+                  <li key={j} className="px-3 py-1.5 text-sm text-slate-600">
+                    <span className="font-medium text-slate-700">{c.field}</span>
+                    {c.group && <span className="text-slate-400"> ({c.group})</span>}:{' '}
+                    <span className="text-rose-600 line-through">{c.oldValue || '—'}</span> → <span className="text-emerald-700">{c.newValue || '—'}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </Dialog>
+  );
+}
+
+type ChangeGroup = { changedBy: string | null; impersonator: string | null; changedAt: string; action: string; items: FieldChange[] };
+function groupChanges(items: FieldChange[]): ChangeGroup[] {
+  const map = new Map<string, ChangeGroup>();
+  for (const c of items) {
+    const key = `${c.changedBy}|${c.impersonator}|${c.changedAt}|${c.action}`;
+    let g = map.get(key);
+    if (!g) { g = { changedBy: c.changedBy, impersonator: c.impersonator, changedAt: c.changedAt, action: c.action, items: [] }; map.set(key, g); }
+    g.items.push(c);
+  }
+  return [...map.values()].sort((a, b) => (a.changedAt < b.changedAt ? 1 : -1));
 }
 
 function StatusBadge({ status }: { status: string }) {
