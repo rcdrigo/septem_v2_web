@@ -163,7 +163,7 @@ export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string
           <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
         </header>
         <main className="flex-1 overflow-auto p-6">
-          <div className="mx-auto max-w-3xl space-y-4">
+          <div className="w-full space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
             {renderForm()}
             {id && <UsagesSection id={id} />}
           </div>
