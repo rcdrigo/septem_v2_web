@@ -45,9 +45,15 @@ export function getGatewayCondition(connection: any): {
 }
 
 export function setGatewayConditionMode(modeler: any, connection: any, mode: GatewayConditionMode) {
-  setExtensionConfig(modeler, connection, 'septem:GatewayCondition', { mode });
-  if (mode !== 'button') setExtensionConfig(modeler, connection, 'septem:GatewayCondition', { buttonId: '' });
+  // IMPORTANTE: limpar a coleção de regras com [] REMOVE o nó GatewayCondition inteiro
+  // (setExtensionCollection apaga o container quando fica vazio). Por isso limpamos as
+  // regras PRIMEIRO e gravamos o `mode` por ÚLTIMO — senão o modo recém-escrito é perdido
+  // e a releitura cai no default "formValues".
   if (mode !== 'formValues') setExtensionCollection(modeler, connection, RULES_SCHEMA, []);
+  setExtensionConfig(modeler, connection, 'septem:GatewayCondition', {
+    mode,
+    ...(mode !== 'button' ? { buttonId: '' } : {}),
+  });
 }
 
 export function setGatewayButton(modeler: any, connection: any, buttonId: string) {
