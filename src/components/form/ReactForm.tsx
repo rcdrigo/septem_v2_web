@@ -79,8 +79,10 @@ function useRuntime() {
  * e popover), counter de min/max, opções de select via fonte de dados e o runtime de
  * eventos do campo (change/click/blur/focus → action com contexto).
  */
-export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: Record<string, unknown>; readOnly?: boolean; optionsByField?: OptionsMap }>(
-  ({ schema, data, readOnly, optionsByField }, ref) => {
+export type ExtraTab = { id: string; label: string; icon?: React.ReactNode; render: () => React.ReactNode };
+
+export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: Record<string, unknown>; readOnly?: boolean; optionsByField?: OptionsMap; extraTabs?: { leading?: ExtraTab[]; trailing?: ExtraTab[] } }>(
+  ({ schema, data, readOnly, optionsByField, extraTabs }, ref) => {
     const root = (schema ?? {}) as { components?: Component[] };
     const inputs = useMemo(() => collectInputs(root.components, []), [schema]);
 
@@ -189,14 +191,17 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
     // Cada grupo de topo vira um card; os cards se distribuem no grid de 16 col
     // (8+8 = lado a lado). Em "abas", a barra fica num card e o conteúdo noutro.
     const isGroup = (c: Component) => !!(c.components && !c.key);
+    // Abas quando o form pede tabs OU quando há abas extras (ex.: relatório com
+    // "Visão geral"/"Tramitação"): tudo numa única barra de abas.
+    const useTabs = layout === 'tabs' || !!extraTabs;
     let body: React.ReactNode;
-    if (layout === 'tabs') {
+    if (useTabs) {
       const groups = comps.filter(isGroup);
       const loose = comps.filter((c) => !isGroup(c));
       body = (
         <div className="flex flex-col gap-4">
           {loose.length > 0 && <LayoutGrid components={loose} render={(c) => <Node comp={c} />} />}
-          {groups.length > 0 && <GroupTabsCards groups={groups} />}
+          <GroupTabsCards groups={groups} extra={extraTabs} />
         </div>
       );
     } else {
@@ -509,32 +514,43 @@ function GroupCard({ group }: { group: Component }) {
   );
 }
 
-/** Abas dos grupos: barra num card; conteúdo do grupo ativo noutro card. */
-function GroupTabsCards({ groups }: { groups: Component[] }) {
+/** Abas: barra num card; conteúdo da aba ativa noutro card. Abas extras
+ * (leading/trailing) entram na mesma barra (ex.: "Visão geral"/"Tramitação"). */
+function GroupTabsCards({ groups, extra }: { groups: Component[]; extra?: { leading?: ExtraTab[]; trailing?: ExtraTab[] } }) {
   const { values } = useRuntime();
+  const lead = extra?.leading ?? [];
+  const trail = extra?.trailing ?? [];
+  type Tab = { key: string; label: string; icon?: React.ReactNode; pending: number; content: React.ReactNode };
+  const tabs: Tab[] = [
+    ...lead.map((t) => ({ key: `x:${t.id}`, label: t.label, icon: t.icon, pending: 0, content: t.render() })),
+    ...groups.map((grp, i) => ({
+      key: grp.id ?? `g${i}`,
+      label: grp.label || `Grupo ${i + 1}`,
+      icon: grp.properties?.septemGroupIcon ? <i className={grp.properties.septemGroupIcon} /> : undefined,
+      pending: grp.properties?.septemShowPending !== 'no' ? countPendingRequired(grp, values) : 0,
+      content: <GroupCard group={grp} />,
+    })),
+    ...trail.map((t) => ({ key: `x:${t.id}`, label: t.label, icon: t.icon, pending: 0, content: t.render() })),
+  ];
   const [active, setActive] = useState(0);
-  const idx = Math.min(active, groups.length - 1);
-  const g = groups[idx];
+  const idx = Math.min(active, Math.max(0, tabs.length - 1));
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
         <div className="flex flex-wrap gap-1">
-          {groups.map((grp, i) => {
-            const pending = grp.properties?.septemShowPending !== 'no' ? countPendingRequired(grp, values) : 0;
-            return (
-              <button key={grp.id ?? i} type="button" onClick={() => setActive(i)}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium ${i === idx ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
-                {grp.properties?.septemGroupIcon && <i className={grp.properties.septemGroupIcon} />}
-                {grp.label || `Grupo ${i + 1}`}
-                {pending > 0 && (
-                  <span className={`ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold ${i === idx ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'}`}>{pending}</span>
-                )}
-              </button>
-            );
-          })}
+          {tabs.map((tab, i) => (
+            <button key={tab.key} type="button" onClick={() => setActive(i)}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium ${i === idx ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+              {tab.icon}
+              {tab.label}
+              {tab.pending > 0 && (
+                <span className={`ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold ${i === idx ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'}`}>{tab.pending}</span>
+              )}
+            </button>
+          ))}
         </div>
       </div>
-      {g && <GroupCard group={g} />}
+      {tabs[idx]?.content}
     </div>
   );
 }

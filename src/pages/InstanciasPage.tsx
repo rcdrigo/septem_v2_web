@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, LayoutDashboard, ListTree, FileText, Pencil, Search, Trash2, Workflow, XCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LayoutDashboard, ListTree, Pencil, Search, Trash2, Workflow, XCircle } from 'lucide-react';
 import { useInstances, useInstance, useCancelInstance, useDeleteInstance, type InstanceListItem } from '@/lib/api/execution';
 import { openTab } from '@/lib/nav';
 import { ReactForm } from '@/components/form/ReactForm';
@@ -99,7 +99,6 @@ export function InstanceReport({ id }: { id: string }) {
   const canWrite = useSessionStore((s) => s.can('workflow:write'));
   const cancel = useCancelInstance();
   const del = useDeleteInstance();
-  const [tab, setTab] = useState<'overview' | 'form' | 'history'>('overview');
   if (inst.isLoading) return <p className="text-sm text-slate-400">Carregando...</p>;
   const d = inst.data!;
   const data = (d.data ?? {}) as Record<string, unknown>;
@@ -112,12 +111,6 @@ export function InstanceReport({ id }: { id: string }) {
     if (!(await confirm({ title: 'Excluir processo', message: 'A instância sairá das listagens (histórico preservado). Continuar?' }))) return;
     try { await del.mutateAsync(id); toast.success('Processo excluído.'); window.close(); } catch { toast.error('Não foi possível excluir.'); }
   }
-
-  const TABS = [
-    { key: 'overview' as const, label: 'Visão geral', icon: LayoutDashboard },
-    { key: 'form' as const, label: 'Formulário', icon: FileText },
-    { key: 'history' as const, label: 'Tramitação', icon: ListTree },
-  ];
 
   return (
     <div className="space-y-4">
@@ -136,26 +129,25 @@ export function InstanceReport({ id }: { id: string }) {
         </div>
       )}
 
-      {/* Abas */}
-      <div className="flex gap-1 border-b border-slate-200">
-        {TABS.map((t) => {
-          const Ic = t.icon;
-          return (
-            <button key={t.key} type="button" onClick={() => setTab(t.key)}
-              className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium ${tab === t.key ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-              <Ic size={15} /> {t.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {tab === 'overview' && <OverviewTab d={d} />}
-      {tab === 'form' && (
-        d.formSchema
-          ? <ReactForm schema={d.formSchema} data={data} readOnly />
-          : <KeyValueData data={data} />
+      {/* Mesma estrutura do formulário (read-only) com Visão geral (1ª) e Tramitação (última)
+          na mesma barra de abas. Sem schema (instâncias legadas) → fallback empilhado. */}
+      {d.formSchema ? (
+        <ReactForm
+          schema={d.formSchema}
+          data={data}
+          readOnly
+          extraTabs={{
+            leading: [{ id: 'overview', label: 'Visão geral', icon: <LayoutDashboard size={15} />, render: () => <OverviewTab d={d} /> }],
+            trailing: [{ id: 'history', label: 'Tramitação', icon: <ListTree size={15} />, render: () => <TramitacaoTab d={d} /> }],
+          }}
+        />
+      ) : (
+        <div className="space-y-4">
+          <OverviewTab d={d} />
+          <KeyValueData data={data} />
+          <TramitacaoTab d={d} />
+        </div>
       )}
-      {tab === 'history' && <TramitacaoTab d={d} />}
     </div>
   );
 }
