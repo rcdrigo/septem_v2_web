@@ -87,7 +87,7 @@ export function Combobox({ value, options, onChange, placeholder, clearLabel, di
       {open && rect && createPortal(
         <div
           ref={panelRef}
-          style={{ position: 'fixed', left: rect.left, top: rect.top, width: rect.width, zIndex: 60 }}
+          style={{ position: 'fixed', left: rect.left, top: rect.top, width: rect.width, zIndex: 1010 }}
           className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg"
         >
           <div className="border-b border-slate-100 p-1.5">

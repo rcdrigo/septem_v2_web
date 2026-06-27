@@ -36,7 +36,7 @@ export function Dialog({ open, onClose, title, children, footer, width = 'md' }:
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/40 px-4"
       onClick={onClose}
     >
       <div

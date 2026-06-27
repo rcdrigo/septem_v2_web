@@ -48,7 +48,7 @@ export function Tooltip({ text, children }: Props) {
           ref={tipRef}
           role="tooltip"
           style={style}
-          className="pointer-events-none z-[60] w-max max-w-[min(24rem,90vw)] whitespace-normal break-words rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-normal text-slate-700 shadow-lg [&_ol]:list-decimal [&_ol]:pl-4 [&_ul]:list-disc [&_ul]:pl-4"
+          className="pointer-events-none z-[1010] w-max max-w-[min(24rem,90vw)] whitespace-normal break-words rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-normal text-slate-700 shadow-lg [&_ol]:list-decimal [&_ol]:pl-4 [&_ul]:list-disc [&_ul]:pl-4"
           dangerouslySetInnerHTML={{ __html: text }}
         />,
         document.body,

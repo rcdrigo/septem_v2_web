@@ -78,7 +78,7 @@ export function ConfirmDialogHost() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-slate-900/40 p-4">
       <div className="w-full max-w-md rounded-lg bg-white shadow-2xl">
         <div className="flex items-start gap-3 p-5">
           {destructive && (

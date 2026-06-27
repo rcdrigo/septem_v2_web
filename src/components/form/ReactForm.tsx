@@ -577,7 +577,7 @@ function HelpPopover({ html }: { html: string }) {
         <div
           ref={popRef}
           style={style}
-          className="pointer-events-none z-[60] w-max max-w-[min(20rem,90vw)] rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 shadow-lg"
+          className="pointer-events-none z-[1010] w-max max-w-[min(20rem,90vw)] rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 shadow-lg"
           dangerouslySetInnerHTML={{ __html: html }}
         />,
         document.body,
