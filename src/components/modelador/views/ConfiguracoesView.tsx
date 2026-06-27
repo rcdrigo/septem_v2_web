@@ -186,7 +186,7 @@ export function ConfiguracoesView({ modeler }: Props) {
 }
 
 type AccessRule = {
-  type: 'user' | 'profile' | 'orgUnit' | 'position' | 'orgUnitPosition';
+  type: 'all' | 'user' | 'profile' | 'orgUnit' | 'position' | 'orgUnitPosition';
   action: 'allow' | 'deny';
   userId?: string;
   profileId?: string;
@@ -195,6 +195,7 @@ type AccessRule = {
 };
 
 const RULE_TYPES = [
+  { value: 'all', label: 'Todos os usuários' },
   { value: 'user', label: 'Usuário específico' },
   { value: 'profile', label: 'Perfil de acesso' },
   { value: 'orgUnit', label: 'Unidade organizacional' },
@@ -215,9 +216,9 @@ function AccessControlSection({ value, onChange }: { value: string; onChange: (j
   return (
     <Section
       title="Controle de acesso"
-      description="Mesmo publicado, restrinja quem vê/inicia o processo. Sem regras = liberado a todos. Regras 'Bloquear' restringem; 'Permitir' é exceção (libera mesmo se bloqueado). Administradores sempre acessam."
+      description="Defina quem vê/inicia o processo. Sem nenhuma regra = ninguém vê (exceto administradores). Adicione 'Todos os usuários' para liberar a todos, ou regras 'Permitir' para grupos específicos. 'Bloquear' é exceção e vence o 'Permitir'. Administradores sempre acessam."
     >
-      {rules.length === 0 && <p className="text-xs text-slate-500">Nenhuma regra — processo liberado para todos.</p>}
+      {rules.length === 0 && <p className="text-xs text-amber-600">Nenhuma regra — processo oculto para todos (só administradores). Adicione "Todos os usuários" para liberar.</p>}
       <div className="flex flex-col gap-2">
         {rules.map((rule, i) => <AccessRuleRow key={i} rule={rule} onChange={(p) => update(i, p)} onRemove={() => remove(i)} />)}
       </div>
@@ -242,6 +243,7 @@ function AccessRuleRow({ rule, onChange, onRemove }: { rule: AccessRule; onChang
           onChange={(e) => onChange({ type: e.target.value as AccessRule['type'], userId: undefined, profileId: undefined, orgUnitId: undefined, positionId: undefined })} />
       </Field>
       <Field label="Valor">
+        {rule.type === 'all' && <p className="py-1.5 text-xs text-slate-400">Aplica-se a todos os usuários.</p>}
         {rule.type === 'user' && <Combobox value={rule.userId ?? ''} options={(users.data?.items ?? []).map((u) => ({ value: u.id, label: u.name }))} onChange={(v) => onChange({ userId: v })} placeholder="Selecionar usuário…" />}
         {rule.type === 'profile' && <Combobox value={rule.profileId ?? ''} options={(profiles.data ?? []).map((p) => ({ value: p.id, label: p.name }))} onChange={(v) => onChange({ profileId: v })} placeholder="Selecionar perfil…" />}
         {rule.type === 'orgUnit' && <Combobox value={rule.orgUnitId ?? ''} options={(orgUnits.data ?? []).map((o) => ({ value: o.id, label: o.name }))} onChange={(v) => onChange({ orgUnitId: v })} placeholder="Selecionar unidade…" />}
