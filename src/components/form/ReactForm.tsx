@@ -234,6 +234,8 @@ function Node({ comp }: { comp: Component }) {
   const v = values[key];
   const err = errors[key];
   const options = dsOptions[key] ?? comp.values ?? [];
+  // Campo alimentado por fonte de dados vira um select (mesmo que o tipo base seja textfield).
+  const dsHasOptions = (dsOptions[key]?.length ?? 0) > 0;
   const helpType = comp.properties?.septemHelpType ?? 'inline';
   const helpText = comp.properties?.septemHelpText;
   const popoverHelp = helpType === 'popover' ? helpText : null;
@@ -280,7 +282,7 @@ function Node({ comp }: { comp: Component }) {
     control = <textarea rows={3} disabled={disabled} className={base} value={String(v ?? '')} {...evt} onChange={(e) => setAndEmit(e.target.value, e)} />;
   } else if (comp.type === 'filepicker') {
     control = <input type="file" multiple className={`${base} file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-0.5 file:text-xs`} {...evt} onChange={(e) => setAndEmit(Array.from(e.target.files ?? []).map((f) => f.name).join(', '), e)} />;
-  } else if (comp.type === 'select') {
+  } else if (comp.type === 'select' || (dsHasOptions && comp.type !== 'radio' && comp.type !== 'checkbox')) {
     control = (
       <select disabled={disabled} className={base} value={String(v ?? '')} {...evt} onChange={(e) => setAndEmit(e.target.value, e)}>
         <option value="">Selecione…</option>
