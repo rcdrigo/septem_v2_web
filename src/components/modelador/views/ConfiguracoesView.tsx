@@ -188,6 +188,8 @@ export function ConfiguracoesView({ modeler }: Props) {
 type AccessRule = {
   type: 'all' | 'user' | 'profile' | 'orgUnit' | 'position' | 'orgUnitPosition';
   action: 'allow' | 'deny';
+  /** view = ver/iniciar (padrão); edit/cancel/delete = ações sobre a instância no relatório. */
+  capability?: 'view' | 'edit' | 'cancel' | 'delete';
   userId?: string;
   profileId?: string;
   orgUnitId?: string;
@@ -203,7 +205,14 @@ const RULE_TYPES = [
   { value: 'orgUnitPosition', label: 'Unidade + posição' },
 ] as const;
 
-/** Controle de acesso ao processo: regras permitir/bloquear (padrão liberado). */
+const CAPABILITIES = [
+  { value: 'view', label: 'Ver / iniciar' },
+  { value: 'edit', label: 'Editar' },
+  { value: 'cancel', label: 'Cancelar' },
+  { value: 'delete', label: 'Excluir' },
+] as const;
+
+/** Controle de acesso ao processo: regras permitir/bloquear por capacidade (padrão DENY: sem regra = ninguém, exceto admin). */
 function AccessControlSection({ value, onChange }: { value: string; onChange: (json: string) => void }) {
   let rules: AccessRule[] = [];
   try { const p = JSON.parse(value || '[]'); if (Array.isArray(p)) rules = p; } catch { /* ignora */ }
@@ -211,7 +220,7 @@ function AccessControlSection({ value, onChange }: { value: string; onChange: (j
   function commit(next: AccessRule[]) { onChange(JSON.stringify(next)); }
   function update(i: number, patch: Partial<AccessRule>) { commit(rules.map((r, j) => (j === i ? { ...r, ...patch } : r))); }
   function remove(i: number) { commit(rules.filter((_, j) => j !== i)); }
-  function add() { commit([...rules, { type: 'user', action: 'allow' }]); }
+  function add() { commit([...rules, { type: 'user', action: 'allow', capability: 'view' }]); }
 
   return (
     <Section
@@ -237,7 +246,7 @@ function AccessRuleRow({ rule, onChange, onRemove }: { rule: AccessRule; onChang
   const positions = usePositions(needsPosition ? (rule.orgUnitId ?? null) : null);
 
   return (
-    <div className="grid grid-cols-[1.3fr_1.6fr_1fr_auto] items-end gap-2 rounded-md border border-slate-200 bg-white p-2 [&>*]:min-w-0">
+    <div className="grid grid-cols-[1.2fr_1.5fr_0.9fr_0.9fr_auto] items-end gap-2 rounded-md border border-slate-200 bg-white p-2 [&>*]:min-w-0">
       <Field label="Aplicar a">
         <Select value={rule.type} options={RULE_TYPES.map((t) => ({ value: t.value, label: t.label }))}
           onChange={(e) => onChange({ type: e.target.value as AccessRule['type'], userId: undefined, profileId: undefined, orgUnitId: undefined, positionId: undefined })} />
@@ -253,6 +262,9 @@ function AccessRuleRow({ rule, onChange, onRemove }: { rule: AccessRule; onChang
             <Combobox value={rule.positionId ?? ''} options={(positions.data ?? []).map((p) => ({ value: p.id, label: p.name }))} onChange={(v) => onChange({ positionId: v })} placeholder={rule.orgUnitId ? 'Posição…' : 'Escolha a unidade primeiro'} disabled={!rule.orgUnitId} />
           </div>
         )}
+      </Field>
+      <Field label="Capacidade">
+        <Select value={rule.capability ?? 'view'} options={CAPABILITIES.map((c) => ({ value: c.value, label: c.label }))} onChange={(e) => onChange({ capability: e.target.value as AccessRule['capability'] })} />
       </Field>
       <Field label="Ação">
         <Select value={rule.action} options={[{ value: 'allow', label: 'Permitir' }, { value: 'deny', label: 'Bloquear' }]} onChange={(e) => onChange({ action: e.target.value as AccessRule['action'] })} />

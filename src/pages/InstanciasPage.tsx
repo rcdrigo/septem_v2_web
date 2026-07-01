@@ -1,10 +1,9 @@
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Clock, History, LayoutDashboard, ListTree, Pencil, Search, Trash2, User, Workflow, XCircle } from 'lucide-react';
-import { useInstances, useInstance, useCancelInstance, useDeleteInstance, type InstanceListItem, type InstanceTask, type FieldChange } from '@/lib/api/execution';
+import { useRef, useState } from 'react';
+import { ChevronDown, ChevronLeft, ChevronRight, Clock, History, LayoutDashboard, ListTree, Pencil, Play, Printer, Save, Search, Trash2, User, Workflow, X, XCircle } from 'lucide-react';
+import { useInstances, useInstance, useCancelInstance, useDeleteInstance, useUpdateInstance, type InstanceListItem, type InstanceTask, type FieldChange } from '@/lib/api/execution';
 import { openTab } from '@/lib/nav';
 import { Dialog } from '@/components/ui/Dialog';
-import { ReactForm } from '@/components/form/ReactForm';
-import { useSessionStore } from '@/stores/session';
+import { ReactForm, type ReactFormHandle } from '@/components/form/ReactForm';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 
@@ -97,49 +96,91 @@ export function InstanciasPage({ title = 'Tarefas executadas', lockMine = false,
 /** Conteúdo do relatório de uma instância: abas Visão geral + Formulário (só-leitura) + Tramitação. */
 export function InstanceReport({ id }: { id: string }) {
   const inst = useInstance(id);
-  const canWrite = useSessionStore((s) => s.can('workflow:write'));
+  const update = useUpdateInstance();
   const cancel = useCancelInstance();
   const del = useDeleteInstance();
+  const formRef = useRef<ReactFormHandle>(null);
+  const [editing, setEditing] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+
   if (inst.isLoading) return <p className="text-sm text-slate-400">Carregando...</p>;
   if (inst.isError || !inst.data) {
     return <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-700">Não foi possível carregar o relatório desta solicitação. Você pode não ter permissão para visualizá-la.</p>;
   }
   const d = inst.data;
   const data = (d.data ?? {}) as Record<string, unknown>;
+  const canEditForm = !!d.canEdit && !!d.formSchema; // edição inline só quando há schema
+  const hasActions = !!d.canCancel || !!d.canDelete;
 
+  async function doSave() {
+    const res = formRef.current?.submit();
+    if (!res) return;
+    if (Object.keys(res.errors).length > 0) { toast.error('Corrija os campos destacados antes de salvar.'); return; }
+    try { await update.mutateAsync({ id, data: res.data }); toast.success('Alterações salvas.'); setEditing(false); }
+    catch { toast.error('Não foi possível salvar as alterações.'); }
+  }
   async function doCancel() {
+    setActionsOpen(false);
     if (!(await confirm({ title: 'Cancelar processo', message: 'A instância será marcada como cancelada. Continuar?' }))) return;
     try { await cancel.mutateAsync(id); toast.success('Processo cancelado.'); } catch { toast.error('Não foi possível cancelar.'); }
   }
   async function doDelete() {
+    setActionsOpen(false);
     if (!(await confirm({ title: 'Excluir processo', message: 'A instância sairá das listagens (histórico preservado). Continuar?' }))) return;
     try { await del.mutateAsync(id); toast.success('Processo excluído.'); window.close(); } catch { toast.error('Não foi possível excluir.'); }
   }
 
   return (
     <div className="space-y-4">
-      {canWrite && (
-        <div className="flex flex-wrap items-center gap-2">
-          {d.flowKey && (
-            <button type="button" onClick={() => openTab(`/processos/editar?key=${encodeURIComponent(d.flowKey!)}`)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"><Pencil size={14} /> Editar processo</button>
-          )}
-          {d.status === 'em_andamento' && (
-            <button type="button" onClick={doCancel} disabled={cancel.isPending}
-              className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60"><XCircle size={14} /> Cancelar</button>
-          )}
-          <button type="button" onClick={doDelete} disabled={del.isPending}
-            className="inline-flex items-center gap-1.5 rounded-md border border-rose-300 px-3 py-1.5 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-60"><Trash2 size={14} /> Excluir</button>
-        </div>
-      )}
+      {/* Barra de ações: Imprimir · Editar/Salvar · Ações (cancelar/excluir) */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button type="button" onClick={() => window.print()}
+          className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"><Printer size={15} /> Imprimir</button>
 
-      {/* Mesma estrutura do formulário (read-only) com Visão geral (1ª) e Tramitação (última)
-          na mesma barra de abas. Sem schema (instâncias legadas) → fallback empilhado. */}
+        {canEditForm && !editing && (
+          <button type="button" onClick={() => setEditing(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"><Pencil size={15} /> Editar</button>
+        )}
+        {canEditForm && editing && (
+          <>
+            <button type="button" onClick={() => setEditing(false)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"><X size={15} /> Cancelar edição</button>
+            <button type="button" onClick={doSave} disabled={update.isPending}
+              className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60"><Save size={15} /> Salvar</button>
+          </>
+        )}
+
+        {hasActions && !editing && (
+          <div className="relative">
+            <button type="button" onClick={() => setActionsOpen((o) => !o)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Ações <ChevronDown size={14} /></button>
+            {actionsOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setActionsOpen(false)} />
+                <div className="absolute right-0 z-20 mt-1 w-48 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+                  {d.canCancel && (
+                    <button type="button" onClick={doCancel}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-amber-700 hover:bg-amber-50"><XCircle size={14} /> Cancelar processo</button>
+                  )}
+                  {d.canDelete && (
+                    <button type="button" onClick={doDelete}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-rose-700 hover:bg-rose-50"><Trash2 size={14} /> Excluir processo</button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Mesma estrutura do formulário com Visão geral (1ª) e Tramitação (última) na mesma
+          barra de abas. Editável quando "editing"; senão só-leitura. Sem schema (legado) → fallback. */}
       {d.formSchema ? (
         <ReactForm
+          ref={formRef}
           schema={d.formSchema}
           data={data}
-          readOnly
+          readOnly={!editing}
           extraTabs={{
             leading: [{ id: 'overview', label: 'Visão geral', icon: <LayoutDashboard size={15} />, render: () => <OverviewTab d={d} /> }],
             trailing: [{ id: 'history', label: 'Tramitação', icon: <ListTree size={15} />, render: () => <TramitacaoTab d={d} /> }],
@@ -231,6 +272,20 @@ function TramitacaoTab({ d }: { d: import('@/lib/api/execution').InstanceDetail 
   return (
     <>
       <ol className="relative ml-2 border-l-2 border-slate-200">
+        {/* Nó de abertura: o início do processo (requerente + data), sempre no topo. */}
+        <li className="ml-4 pb-4">
+          <span className="absolute -left-[7px] mt-1 h-3 w-3 rounded-full bg-sky-500 ring-2 ring-white" />
+          <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
+            <span className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700"><Play size={11} /> início</span>
+              <span className="font-medium text-slate-800">Processo iniciado</span>
+            </span>
+            <dl className="mt-1.5 grid gap-x-6 gap-y-0.5 text-xs text-slate-500 sm:grid-cols-2">
+              <Info label="Por">{d.requester ?? '—'}</Info>
+              <Info label="Em">{fmt(d.startedAt)}</Info>
+            </dl>
+          </div>
+        </li>
         {d.tasks.map((t) => {
           const active = t.status === 'pendente';
           const changes = t.fieldHistory?.length ?? 0;

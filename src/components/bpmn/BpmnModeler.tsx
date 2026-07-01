@@ -48,10 +48,14 @@ export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, re
     modelerRef.current = modeler;
     onReady?.(modeler);
 
-    const stored = readStoredXml();
-    void loadDiagram(modeler, stored ?? emptyDiagram);
+    // Começa SEMPRE em branco: um processo existente é importado por ModeladorPage
+    // (via ?key=), e "Novo processo" (sem key) fica em branco. NÃO restauramos do
+    // localStorage aqui — o rascunho era global e, como o auto-save gravava qualquer
+    // diagrama aberto, "Novo" acabava restaurando o último processo editado.
+    void loadDiagram(modeler, emptyDiagram);
+    window.localStorage.removeItem(STORAGE_KEY); // limpa rascunho global legado (contaminado)
 
-    // Auto-save em localStorage + store, com debounce
+    // Espelha o XML no store (consumido por outras views), com debounce.
     let saveTimer: number | undefined;
     const scheduleSave = () => {
       window.clearTimeout(saveTimer);
@@ -59,7 +63,6 @@ export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, re
         try {
           const { xml } = await modeler.saveXML({ format: true });
           if (modelerRef.current !== modeler) return;
-          window.localStorage.setItem(STORAGE_KEY, xml as string);
           setXml(xml as string);
         } catch (err) {
           console.warn('Auto-save falhou:', err);
@@ -112,11 +115,3 @@ export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, re
 });
 
 BpmnModeler.displayName = 'BpmnModeler';
-
-function readStoredXml(): string | null {
-  try {
-    return window.localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}

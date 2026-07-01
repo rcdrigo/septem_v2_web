@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { Field, RadioGroup, Select, TextInput } from '@/components/ui/Field';
+import { RadioGroup, Select, TextInput } from '@/components/ui/Field';
 import { IconButton } from '@/components/ui/IconButton';
 import {
   getGatewayCondition,
   setGatewayButton,
+  setGatewayButtonConnector,
   setGatewayConditionMode,
   setGatewayRules,
   OPERATOR_OPTIONS,
@@ -25,14 +26,9 @@ type Props = {
 
 const MODE_OPTIONS: ReadonlyArray<{ value: GatewayConditionMode; label: string; hint?: string }> = [
   {
-    value: 'button',
-    label: 'Botão de conclusão clicado',
-    hint: 'O fluxo segue por aqui quando o usuário clicar em um botão específico da última tarefa.',
-  },
-  {
-    value: 'formValues',
-    label: 'Valores do formulário',
-    hint: 'Avalia campos do formulário com operadores de comparação.',
+    value: 'rules',
+    label: 'Por botão de ação clicado e/ou valores do formulário',
+    hint: 'Combine o botão clicado na última tarefa com comparações de campos do formulário.',
   },
   {
     value: 'else',
@@ -42,10 +38,10 @@ const MODE_OPTIONS: ReadonlyArray<{ value: GatewayConditionMode; label: string; 
 ];
 
 /**
- * Editor de condições por conexão de saída de gateway condicional, com
- * operadores `=, <>, >, <, >=, <=`, além de `contains`/`startsWith`.
- *
- * Renderizado inline em `GatewayLinksSection` ao expandir uma linha.
+ * Editor de condições por conexão de saída de gateway condicional. No modo
+ * `rules`, combina "último botão de ação clicado" E/OU "valores do formulário"
+ * (com operadores `=, <>, >, <, >=, <=`, `contains`/`startsWith` e agrupamento
+ * por parênteses). Renderizado num modal por `GatewayLinksSection`.
  */
 export function GatewayConditionEditor({ modeler, connection }: Props) {
   const [cond, setCond] = useState(() => getGatewayCondition(connection));
@@ -65,29 +61,48 @@ export function GatewayConditionEditor({ modeler, connection }: Props) {
 
   function changeButton(buttonId: string) {
     setGatewayButton(modeler, connection, buttonId);
-    setCond((c) => ({ ...c, buttonId, mode: 'button' }));
+    setCond((c) => ({ ...c, buttonId, mode: 'rules' }));
+  }
+
+  function changeButtonConnector(buttonConnector: RuleConnector) {
+    setGatewayButtonConnector(modeler, connection, buttonConnector);
+    setCond((c) => ({ ...c, buttonConnector, mode: 'rules' }));
   }
 
   function changeRules(next: FormRule[]) {
     setGatewayRules(modeler, connection, next);
-    setCond((c) => ({ ...c, rules: next, mode: 'formValues' }));
+    setCond((c) => ({ ...c, rules: next, mode: 'rules' }));
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-slate-50 p-3">
-      <Field label="Quando este caminho é seguido">
+    <div className="flex flex-col gap-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+      {/* Seletor de modo — NÃO usar <Field> (que é um <label>): aninhar um
+          RadioGroup dentro de um <label> faz o clique borbulhar e sempre voltar
+          pra 1ª opção. Renderizamos com <span> + RadioGroup soltos. */}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          Quando este caminho é seguido
+        </span>
         <RadioGroup<GatewayConditionMode>
           name={`cond-mode-${connection.id}`}
           value={cond.mode}
           onChange={changeMode}
           options={MODE_OPTIONS as any}
         />
-      </Field>
+      </div>
 
-      {cond.mode === 'button' && <ButtonChooser groups={buttonGroups} value={cond.buttonId} onChange={changeButton} />}
-
-      {cond.mode === 'formValues' && (
-        <FormRulesEditor rules={cond.rules} logic={cond.logic} fieldGroups={fieldGroups} onChange={changeRules} />
+      {cond.mode === 'rules' && (
+        <>
+          <ButtonConditionSection
+            groups={buttonGroups}
+            buttonId={cond.buttonId}
+            connector={cond.buttonConnector}
+            showConnector={cond.rules.length > 0}
+            onButton={changeButton}
+            onConnector={changeButtonConnector}
+          />
+          <FormRulesEditor rules={cond.rules} logic={cond.logic} fieldGroups={fieldGroups} onChange={changeRules} />
+        </>
       )}
 
       {cond.mode === 'else' && (
@@ -100,35 +115,66 @@ export function GatewayConditionEditor({ modeler, connection }: Props) {
   );
 }
 
-function ButtonChooser({
+/**
+ * Seção "Último botão de ação clicado": combobox com os botões do processo e,
+ * quando há regras de formulário, um conector E/OU que liga o botão às regras.
+ */
+function ButtonConditionSection({
   groups,
-  value,
-  onChange,
+  buttonId,
+  connector,
+  showConnector,
+  onButton,
+  onConnector,
 }: {
   groups: ReturnType<typeof getAllProcessButtons>;
-  value: string;
-  onChange: (v: string) => void;
+  buttonId: string;
+  connector: RuleConnector;
+  showConnector: boolean;
+  onButton: (v: string) => void;
+  onConnector: (v: RuleConnector) => void;
 }) {
-  if (groups.length === 0) {
-    return (
-      <p className="text-xs text-slate-500">
-        Nenhuma tarefa do processo tem botões configurados. Configure os botões em alguma tarefa
-        humana antes de usar este modo.
-      </p>
-    );
-  }
-
   return (
-    <Field label="Botão clicado">
-      <Select
-        value={value}
-        placeholder="Selecione um botão…"
-        onChange={(e) => onChange(e.target.value)}
-        options={groups.flatMap((g) =>
-          g.buttons.map((b) => ({ value: b.id, label: `${g.ownerLabel} → ${b.label}` })),
-        )}
-      />
-    </Field>
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        Último botão de ação clicado
+      </span>
+      {groups.length === 0 ? (
+        <p className="text-xs text-slate-500">
+          Nenhuma tarefa do processo tem botões configurados. Configure os botões em alguma tarefa
+          humana para usar esta condição.
+        </p>
+      ) : (
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <Select
+              className="w-full min-w-0"
+              value={buttonId}
+              placeholder="Selecione uma opção…"
+              onChange={(e) => onButton(e.target.value)}
+              options={groups.flatMap((g) =>
+                // Rótulo: NOME DO BOTÃO → tarefa a que pertence.
+                g.buttons.map((b) => ({ value: b.id, label: `${b.label} → ${g.ownerLabel}` })),
+              )}
+            />
+          </div>
+          {showConnector && (
+            <div className="w-16 shrink-0">
+              <Select
+                aria-label="Conector do botão com as regras"
+                className="w-full min-w-0"
+                value={connector}
+                onChange={(e) => onConnector(e.target.value as RuleConnector)}
+                options={[
+                  { value: 'and', label: 'E' },
+                  { value: 'or', label: 'OU' },
+                ]}
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -160,6 +206,7 @@ function FormRulesEditor({
 
   return (
     <div className="flex flex-col gap-2">
+      <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Valores do formulário</span>
       {rules.length === 0 && (
         <p className="text-xs text-slate-500">Nenhuma regra. Adicione comparações com campos do formulário.</p>
       )}

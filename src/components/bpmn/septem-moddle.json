@@ -150,6 +150,7 @@
       "properties": [
         { "name": "mode", "isAttr": true, "type": "String", "default": "formValues" },
         { "name": "buttonId", "isAttr": true, "type": "String" },
+        { "name": "buttonConnector", "isAttr": true, "type": "String" },
         { "name": "logic", "isAttr": true, "type": "String", "default": "all" },
         { "name": "rules", "isMany": true, "type": "FormRule" }
       ]

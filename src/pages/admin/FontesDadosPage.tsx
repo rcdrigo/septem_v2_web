@@ -229,7 +229,6 @@ function UsagesSection({ id }: { id: string }) {
                 <tr>
                   <th className="px-3 py-2 text-left font-medium">Processo / Tarefa</th>
                   <th className="px-3 py-2 text-left font-medium">Campo</th>
-                  <th className="px-3 py-2 text-left font-medium">Uso</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -240,7 +239,6 @@ function UsagesSection({ id }: { id: string }) {
                       {u.task && <div className="text-xs text-slate-400">{u.task}</div>}
                     </td>
                     <td className="px-3 py-2 align-top text-slate-700">{u.field ?? '—'}</td>
-                    <td className="px-3 py-2 align-top text-xs text-slate-400">{u.kind}</td>
                   </tr>
                 ))}
               </tbody>

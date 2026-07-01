@@ -66,7 +66,7 @@ export type InstancesPage = { items: InstanceListItem[]; total: number; page: nu
 export type FieldChange = { changedAt: string; changedBy: string | null; impersonator: string | null; action: string; group: string | null; field: string; changeType: string; oldValue: string | null; newValue: string | null };
 export type InstanceTask = { id: string; name: string | null; status: string; assignee: string | null; completedBy: string | null; completedByImpersonator?: string | null; createdAt: string; completedAt: string | null; dueAt: string | null; action: string | null; fieldHistory?: FieldChange[] };
 export type ActiveTask = { name: string | null; assignee: string | null; startedAt?: string | null; dueAt: string | null };
-export type InstanceDetail = { id: string; number?: number; process: string | null; category?: string | null; flowKey?: string | null; requester?: string | null; status: string; startedAt: string; endedAt: string | null; data: unknown; formSchema?: unknown; inboxHtml?: string | null; activeTask?: ActiveTask | null; tasks: InstanceTask[] };
+export type InstanceDetail = { id: string; number?: number; process: string | null; category?: string | null; flowKey?: string | null; requester?: string | null; status: string; startedAt: string; endedAt: string | null; data: unknown; formSchema?: unknown; inboxHtml?: string | null; activeTask?: ActiveTask | null; tasks: InstanceTask[]; canEdit?: boolean; canCancel?: boolean; canDelete?: boolean };
 export type InstancesParams = { q?: string; status?: string; mine?: boolean; page?: number; pageSize?: number };
 
 export function useInstances(params: InstancesParams) {
@@ -81,6 +81,15 @@ export function useInstances(params: InstancesParams) {
 
 export function useInstance(id: string | null) {
   return useQuery({ queryKey: ['workflow', 'instance', id], queryFn: () => api.get<InstanceDetail>(`/api/v1/workflow/instances/${id}`), enabled: !!id });
+}
+
+/** Edita (overlay) os dados do formulário de uma instância (admin ou capability 'edit'). */
+export function useUpdateInstance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: unknown }) => api.put<void>(`/api/v1/workflow/instances/${id}`, { data }),
+    onSuccess: (_d, { id }) => { qc.invalidateQueries({ queryKey: ['workflow', 'instance', id] }); qc.invalidateQueries({ queryKey: ['workflow', 'instances'] }); },
+  });
 }
 
 export function useCancelInstance() {

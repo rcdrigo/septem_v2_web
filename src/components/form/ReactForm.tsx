@@ -538,7 +538,7 @@ function GroupTabsCards({ groups, extra }: { groups: Component[]; extra?: { lead
         <div className="flex flex-wrap gap-1">
           {tabs.map((tab, i) => (
             <button key={tab.key} type="button" onClick={() => setActive(i)}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium ${i === idx ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium uppercase tracking-wide ${i === idx ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
               {tab.icon}
               {tab.label}
               {tab.pending > 0 && (

@@ -53,10 +53,17 @@ export function getAllProcessButtons(
   if (!modeler) return [];
   const registry: any = modeler.get('elementRegistry');
   const out: { ownerId: string; ownerLabel: string; buttons: ActionButton[] }[] = [];
+  // Labels e conexões do bpmn-js compartilham o MESMO businessObject do elemento
+  // dono (o label de uma tarefa aponta pro bo da tarefa). Sem filtrar, cada botão
+  // apareceria 2× no seletor. Ignoramos labels/conexões e deduplicamos por bo.id.
+  const seen = new Set<string>();
   registry.forEach((el: any) => {
+    if (el.labelTarget || el.waypoints) return;
+    const bo = el.businessObject;
+    if (!bo || seen.has(bo.id)) return;
     const buttons = getActionButtons(el);
     if (buttons.length === 0) return;
-    const bo = el.businessObject;
+    seen.add(bo.id);
     out.push({
       ownerId: bo.id,
       ownerLabel: bo.name || bo.id,
