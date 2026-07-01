@@ -13,8 +13,36 @@ import { extractFields } from '@/lib/form-schema';
 import { useFormStore } from '@/stores/form';
 import { useFormMasks } from '@/lib/api/forms';
 import { getEmbeddedFormSchema, setEmbeddedFormSchema } from '@/lib/bpmn-process';
+import { fetchDataSourceOptions } from '@/lib/api/catalog';
 
 type Props = { modeler: any | null };
+
+/**
+ * O editor do form-js só renderiza no canvas os `values` estáticos do componente —
+ * ele não conhece nossas fontes de dados. Então, antes de importar o schema, buscamos
+ * as opções de cada campo com `septemDataSourceId` e as gravamos em `values`, para o
+ * canvas exibir as opções reais (em vez do "Value" default). Em runtime o ReactForm
+ * re-busca as opções (estas ficam apenas como snapshot de exibição no modelador).
+ */
+async function enrichDataSourceOptions(schema: any): Promise<any> {
+  if (!schema || typeof schema !== 'object') return schema;
+  const cache = new Map<string, { value: string; label: string }[]>();
+  async function walk(node: any): Promise<void> {
+    if (Array.isArray(node)) { for (const c of node) await walk(c); return; }
+    if (!node || typeof node !== 'object') return;
+    const dsId: string | undefined = node.properties?.septemDataSourceId;
+    if (dsId) {
+      try {
+        if (!cache.has(dsId)) cache.set(dsId, await fetchDataSourceOptions(dsId));
+        const opts = cache.get(dsId)!;
+        if (opts.length > 0) node.values = opts;
+      } catch { /* fonte indisponível: mantém o campo como está */ }
+    }
+    if (Array.isArray(node.components)) await walk(node.components);
+  }
+  await walk(schema.components);
+  return schema;
+}
 type GroupLayout = 'stacked' | 'tabs';
 
 const POLL_MS = 600;
@@ -55,12 +83,14 @@ export function FormularioView({ modeler }: Props) {
       const clean = stripLayout(initial);
       const layout = initial?.septemGroupLayout;
       if (layout === 'tabs' || layout === 'stacked') setGroupLayout(layout);
-      if (clean && !cancelled) {
-        try { await builderRef.current!.importSchema(clean); }
+      // Enriquece com as opções das fontes p/ o canvas exibi-las (não só "Value").
+      const enriched = clean ? await enrichDataSourceOptions(clean) : clean;
+      if (enriched && !cancelled) {
+        try { await builderRef.current!.importSchema(enriched); }
         catch (err) { console.warn('Falha ao carregar schema persistido do form:', err); }
       }
       if (!cancelled) {
-        lastSerialized.current = JSON.stringify(clean ?? {});
+        lastSerialized.current = JSON.stringify(enriched ?? {});
         setReady(true);
       }
     })();
