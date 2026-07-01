@@ -138,7 +138,10 @@
       "properties": [
         { "name": "fieldRef", "isAttr": true, "type": "String" },
         { "name": "operator", "isAttr": true, "type": "String", "default": "eq" },
-        { "name": "value", "isAttr": true, "type": "String" }
+        { "name": "value", "isAttr": true, "type": "String" },
+        { "name": "connector", "isAttr": true, "type": "String" },
+        { "name": "open", "isAttr": true, "type": "Boolean" },
+        { "name": "close", "isAttr": true, "type": "Boolean" }
       ]
     },
     {

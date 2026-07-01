@@ -6,12 +6,12 @@ import {
   getGatewayCondition,
   setGatewayButton,
   setGatewayConditionMode,
-  setGatewayLogic,
   setGatewayRules,
   OPERATOR_OPTIONS,
   type ComparisonOperator,
   type FormRule,
   type GatewayConditionMode,
+  type RuleConnector,
   type RuleLogic,
 } from '@/lib/bpmn-gateway-conditions';
 import { getAllProcessButtons } from '@/lib/bpmn-action-buttons';
@@ -73,11 +73,6 @@ export function GatewayConditionEditor({ modeler, connection }: Props) {
     setCond((c) => ({ ...c, rules: next, mode: 'formValues' }));
   }
 
-  function changeLogic(logic: RuleLogic) {
-    setGatewayLogic(modeler, connection, logic);
-    setCond((c) => ({ ...c, logic, mode: 'formValues' }));
-  }
-
   return (
     <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-slate-50 p-3">
       <Field label="Quando este caminho é seguido">
@@ -92,7 +87,7 @@ export function GatewayConditionEditor({ modeler, connection }: Props) {
       {cond.mode === 'button' && <ButtonChooser groups={buttonGroups} value={cond.buttonId} onChange={changeButton} />}
 
       {cond.mode === 'formValues' && (
-        <FormRulesEditor rules={cond.rules} logic={cond.logic} fieldGroups={fieldGroups} onChange={changeRules} onLogicChange={changeLogic} />
+        <FormRulesEditor rules={cond.rules} logic={cond.logic} fieldGroups={fieldGroups} onChange={changeRules} />
       )}
 
       {cond.mode === 'else' && (
@@ -142,14 +137,17 @@ function FormRulesEditor({
   logic,
   fieldGroups,
   onChange,
-  onLogicChange,
 }: {
   rules: FormRule[];
   logic: RuleLogic;
   fieldGroups: ReturnType<typeof selectFieldGroups>;
   onChange: (next: FormRule[]) => void;
-  onLogicChange: (logic: RuleLogic) => void;
 }) {
+  // Conector default herdado do formato antigo (logic global all→E | any→OU),
+  // usado quando a regra ainda não tem conector explícito. Preserva a semântica
+  // de fluxos salvos antes do agrupamento por regra.
+  const defaultConnector: RuleConnector = logic === 'any' ? 'or' : 'and';
+
   function update(idx: number, patch: Partial<FormRule>) {
     onChange(rules.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   }
@@ -157,52 +155,90 @@ function FormRulesEditor({
     onChange(rules.filter((_, i) => i !== idx));
   }
   function addRule() {
-    onChange([...rules, { fieldRef: '', operator: 'eq', value: '' }]);
+    onChange([...rules, { fieldRef: '', operator: 'eq', value: '', connector: defaultConnector }]);
   }
 
   return (
     <div className="flex flex-col gap-2">
-      {rules.length >= 2 && (
-        <Field label="Combinar regras">
-          <RadioGroup<RuleLogic>
-            name={`rule-logic-${rules.length}`}
-            direction="horizontal"
-            value={logic}
-            onChange={onLogicChange}
-            options={[
-              { value: 'all', label: 'Todas (E)' },
-              { value: 'any', label: 'Qualquer (OU)' },
-            ]}
-          />
-        </Field>
-      )}
       {rules.length === 0 && (
         <p className="text-xs text-slate-500">Nenhuma regra. Adicione comparações com campos do formulário.</p>
       )}
+      {rules.length >= 2 && (
+        <p className="text-xs text-slate-500">
+          Combine as regras com <b>E</b>/<b>OU</b> por linha e agrupe com parênteses <code>(</code> <code>)</code>.
+          Sem parênteses, o <b>E</b> tem precedência sobre o <b>OU</b>.
+        </p>
+      )}
 
       {rules.map((rule, idx) => (
-        <div key={idx} className="grid grid-cols-[1.4fr_1fr_1.4fr_auto] items-end gap-2 rounded-md border border-slate-200 bg-white p-2 [&>*]:min-w-0">
-          <Field label="Campo">
+        <div
+          key={idx}
+          className="flex flex-wrap items-end gap-2 rounded-md border border-slate-200 bg-white p-2"
+        >
+          {/* Conector com a regra anterior — a 1ª regra não tem conector */}
+          <div className="w-16 shrink-0">
+            {idx === 0 ? (
+              <div className="h-[34px]" aria-hidden />
+            ) : (
+              <Select
+                aria-label="Conector"
+                value={rule.connector ?? defaultConnector}
+                onChange={(e) => update(idx, { connector: e.target.value as RuleConnector })}
+                options={[
+                  { value: 'and', label: 'E' },
+                  { value: 'or', label: 'OU' },
+                ]}
+              />
+            )}
+          </div>
+          {/* Abre grupo "(" */}
+          <div className="w-14 shrink-0">
+            <Select
+              aria-label="Abrir grupo"
+              value={rule.open ? '(' : ''}
+              onChange={(e) => update(idx, { open: e.target.value === '(' })}
+              options={[
+                { value: '', label: '' },
+                { value: '(', label: '(' },
+              ]}
+            />
+          </div>
+          <div className="min-w-[140px] flex-1">
             <FieldRefSelect
               value={rule.fieldRef}
               onChange={(v) => update(idx, { fieldRef: v })}
               fieldGroups={fieldGroups}
             />
-          </Field>
-          <Field label="Operador">
+          </div>
+          <div className="w-[150px] shrink-0">
             <Select
+              aria-label="Operador"
+              className="w-full min-w-0"
               value={rule.operator}
               onChange={(e) => update(idx, { operator: e.target.value as ComparisonOperator })}
               options={OPERATOR_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
             />
-          </Field>
-          <Field label="Valor">
+          </div>
+          <div className="min-w-[120px] flex-1">
             <TextInput
+              className="w-full min-w-0"
               value={rule.value}
               onChange={(e) => update(idx, { value: e.target.value })}
               placeholder="ex: 1000"
             />
-          </Field>
+          </div>
+          {/* Fecha grupo ")" */}
+          <div className="w-14 shrink-0">
+            <Select
+              aria-label="Fechar grupo"
+              value={rule.close ? ')' : ''}
+              onChange={(e) => update(idx, { close: e.target.value === ')' })}
+              options={[
+                { value: '', label: '' },
+                { value: ')', label: ')' },
+              ]}
+            />
+          </div>
           <button
             type="button"
             onClick={() => removeAt(idx)}
