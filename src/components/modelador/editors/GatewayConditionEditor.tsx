@@ -220,72 +220,63 @@ function FormRulesEditor({
       {rules.map((rule, idx) => (
         <div
           key={idx}
-          className="flex flex-wrap items-end gap-2 rounded-md border border-slate-200 bg-white p-2"
+          className="grid grid-cols-[4.5rem_3.75rem_minmax(0,1.6fr)_8.5rem_minmax(0,1.4fr)_3.75rem_auto] items-center gap-2 rounded-md border border-slate-200 bg-white p-2"
         >
           {/* Conector com a regra anterior — a 1ª regra não tem conector */}
-          <div className="w-16 shrink-0">
-            {idx === 0 ? (
-              <div className="h-[34px]" aria-hidden />
-            ) : (
-              <Select
-                aria-label="Conector"
-                value={rule.connector ?? defaultConnector}
-                onChange={(e) => update(idx, { connector: e.target.value as RuleConnector })}
-                options={[
-                  { value: 'and', label: 'E' },
-                  { value: 'or', label: 'OU' },
-                ]}
-              />
-            )}
-          </div>
+          {idx === 0 ? (
+            <span aria-hidden />
+          ) : (
+            <Select
+              aria-label="Conector"
+              className="w-full min-w-0"
+              value={rule.connector ?? defaultConnector}
+              onChange={(e) => update(idx, { connector: e.target.value as RuleConnector })}
+              options={[
+                { value: 'and', label: 'E' },
+                { value: 'or', label: 'OU' },
+              ]}
+            />
+          )}
           {/* Abre grupo "(" */}
-          <div className="w-14 shrink-0">
-            <Select
-              aria-label="Abrir grupo"
-              value={rule.open ? '(' : ''}
-              onChange={(e) => update(idx, { open: e.target.value === '(' })}
-              options={[
-                { value: '', label: '' },
-                { value: '(', label: '(' },
-              ]}
-            />
-          </div>
-          <div className="min-w-[140px] flex-1">
-            <FieldRefSelect
-              value={rule.fieldRef}
-              onChange={(v) => update(idx, { fieldRef: v })}
-              fieldGroups={fieldGroups}
-            />
-          </div>
-          <div className="w-[150px] shrink-0">
-            <Select
-              aria-label="Operador"
-              className="w-full min-w-0"
-              value={rule.operator}
-              onChange={(e) => update(idx, { operator: e.target.value as ComparisonOperator })}
-              options={OPERATOR_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-            />
-          </div>
-          <div className="min-w-[120px] flex-1">
-            <TextInput
-              className="w-full min-w-0"
-              value={rule.value}
-              onChange={(e) => update(idx, { value: e.target.value })}
-              placeholder="ex: 1000"
-            />
-          </div>
+          <Select
+            aria-label="Abrir grupo"
+            className="w-full min-w-0 px-2"
+            value={rule.open ? '(' : ''}
+            onChange={(e) => update(idx, { open: e.target.value === '(' })}
+            options={[
+              { value: '', label: '' },
+              { value: '(', label: '(' },
+            ]}
+          />
+          <FieldRefSelect
+            value={rule.fieldRef}
+            onChange={(v) => update(idx, { fieldRef: v })}
+            fieldGroups={fieldGroups}
+          />
+          <Select
+            aria-label="Operador"
+            className="w-full min-w-0"
+            value={rule.operator}
+            onChange={(e) => update(idx, { operator: e.target.value as ComparisonOperator })}
+            options={OPERATOR_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          />
+          <TextInput
+            className="w-full min-w-0"
+            value={rule.value}
+            onChange={(e) => update(idx, { value: e.target.value })}
+            placeholder="ex: 1000"
+          />
           {/* Fecha grupo ")" */}
-          <div className="w-14 shrink-0">
-            <Select
-              aria-label="Fechar grupo"
-              value={rule.close ? ')' : ''}
-              onChange={(e) => update(idx, { close: e.target.value === ')' })}
-              options={[
-                { value: '', label: '' },
-                { value: ')', label: ')' },
-              ]}
-            />
-          </div>
+          <Select
+            aria-label="Fechar grupo"
+            className="w-full min-w-0 px-2"
+            value={rule.close ? ')' : ''}
+            onChange={(e) => update(idx, { close: e.target.value === ')' })}
+            options={[
+              { value: '', label: '' },
+              { value: ')', label: ')' },
+            ]}
+          />
           <button
             type="button"
             onClick={() => removeAt(idx)}
@@ -317,6 +308,7 @@ function FieldRefSelect({
   if (fieldGroups.length === 0) {
     return (
       <TextInput
+        className="w-full min-w-0"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="id do campo"
