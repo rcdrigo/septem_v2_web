@@ -16,7 +16,9 @@ import {
   type RuleLogic,
 } from '@/lib/bpmn-gateway-conditions';
 import { getAllProcessButtons } from '@/lib/bpmn-action-buttons';
-import { useFormStore, selectFieldGroups } from '@/stores/form';
+import { useFormStore } from '@/stores/form';
+import { useEnsureFormFields } from '@/lib/use-ensure-form-fields';
+import { FormFieldSelect } from '@/components/modelador/fields/FormFieldSelect';
 
 type Props = {
   modeler: any;
@@ -51,8 +53,10 @@ export function GatewayConditionEditor({ modeler, connection }: Props) {
   }, [connection]);
 
   const buttonGroups = useMemo(() => getAllProcessButtons(modeler), [modeler, cond.mode]);
-  const fields = useFormStore((s) => s.fields);
-  const fieldGroups = useMemo(() => selectFieldGroups(fields), [fields]);
+  // Popula o formStore a partir do schema embutido no XML — sem isto, abrir o
+  // modal direto pela aba Fluxo mostrava input de texto ("id do campo") mesmo
+  // com formulário configurado, porque o store só era populado na aba Formulário.
+  useEnsureFormFields(modeler);
 
   function changeMode(next: GatewayConditionMode) {
     setGatewayConditionMode(modeler, connection, next);
@@ -101,7 +105,7 @@ export function GatewayConditionEditor({ modeler, connection }: Props) {
             onButton={changeButton}
             onConnector={changeButtonConnector}
           />
-          <FormRulesEditor rules={cond.rules} logic={cond.logic} fieldGroups={fieldGroups} onChange={changeRules} />
+          <FormRulesEditor rules={cond.rules} logic={cond.logic} onChange={changeRules} />
         </>
       )}
 
@@ -181,12 +185,10 @@ function ButtonConditionSection({
 function FormRulesEditor({
   rules,
   logic,
-  fieldGroups,
   onChange,
 }: {
   rules: FormRule[];
   logic: RuleLogic;
-  fieldGroups: ReturnType<typeof selectFieldGroups>;
   onChange: (next: FormRule[]) => void;
 }) {
   // Conector default herdado do formato antigo (logic global all→E | any→OU),
@@ -217,18 +219,26 @@ function FormRulesEditor({
         </p>
       )}
 
-      {rules.map((rule, idx) => (
+      {/* Linha da regra: no desktop (md+) tudo numa linha; em telas estreitas o grid
+          reorganiza em 3 linhas — [conector ( … ) excluir] / [campo] / [operador valor] —
+          senão os últimos controles estouram o modal e ficam cortados/inacessíveis.
+          A 1ª regra não tem conector E/OU: o grid dela suprime essa coluna (sem vão). */}
+      {rules.map((rule, idx) => {
+        const first = idx === 0;
+        return (
         <div
           key={idx}
-          className="grid grid-cols-[4.5rem_3.75rem_minmax(0,1.6fr)_8.5rem_minmax(0,1.4fr)_3.75rem_auto] items-center gap-2 rounded-md border border-slate-200 bg-white p-2"
+          className={
+            first
+              ? 'grid grid-cols-[3.25rem_minmax(0,1fr)_3.25rem_2rem] items-center gap-2 rounded-md border border-slate-200 bg-white p-2 md:grid-cols-[3.25rem_minmax(0,1.6fr)_8.5rem_minmax(0,1.4fr)_3.25rem_2rem]'
+              : 'grid grid-cols-[4.5rem_3.25rem_minmax(0,1fr)_3.25rem_2rem] items-center gap-2 rounded-md border border-slate-200 bg-white p-2 md:grid-cols-[4.5rem_3.25rem_minmax(0,1.6fr)_8.5rem_minmax(0,1.4fr)_3.25rem_2rem]'
+          }
         >
-          {/* Conector com a regra anterior — a 1ª regra não tem conector */}
-          {idx === 0 ? (
-            <span aria-hidden />
-          ) : (
+          {/* Conector com a regra anterior — a 1ª regra não tem a coluna */}
+          {!first && (
             <Select
               aria-label="Conector"
-              className="w-full min-w-0"
+              className="col-start-1 row-start-1 w-full min-w-0 md:col-auto md:row-auto"
               value={rule.connector ?? defaultConnector}
               onChange={(e) => update(idx, { connector: e.target.value as RuleConnector })}
               options={[
@@ -240,7 +250,7 @@ function FormRulesEditor({
           {/* Abre grupo "(" */}
           <Select
             aria-label="Abrir grupo"
-            className="w-full min-w-0 px-2"
+            className={`${first ? 'col-start-1' : 'col-start-2'} row-start-1 w-full min-w-0 px-2 md:col-auto md:row-auto`}
             value={rule.open ? '(' : ''}
             onChange={(e) => update(idx, { open: e.target.value === '(' })}
             options={[
@@ -248,20 +258,21 @@ function FormRulesEditor({
               { value: '(', label: '(' },
             ]}
           />
-          <FieldRefSelect
-            value={rule.fieldRef}
-            onChange={(v) => update(idx, { fieldRef: v })}
-            fieldGroups={fieldGroups}
-          />
+          <div className="col-span-full row-start-2 min-w-0 md:col-auto md:col-span-1 md:row-auto">
+            <FieldRefSelect
+              value={rule.fieldRef}
+              onChange={(v) => update(idx, { fieldRef: v })}
+            />
+          </div>
           <Select
             aria-label="Operador"
-            className="w-full min-w-0"
+            className="col-span-2 col-start-1 row-start-3 w-full min-w-0 md:col-span-1 md:col-auto md:row-auto"
             value={rule.operator}
             onChange={(e) => update(idx, { operator: e.target.value as ComparisonOperator })}
             options={OPERATOR_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
           />
           <TextInput
-            className="w-full min-w-0"
+            className={`${first ? 'col-span-2' : 'col-span-3'} col-start-3 row-start-3 w-full min-w-0 md:col-span-1 md:col-auto md:row-auto`}
             value={rule.value}
             onChange={(e) => update(idx, { value: e.target.value })}
             placeholder="ex: 1000"
@@ -269,7 +280,7 @@ function FormRulesEditor({
           {/* Fecha grupo ")" */}
           <Select
             aria-label="Fechar grupo"
-            className="w-full min-w-0 px-2"
+            className={`${first ? 'col-start-3' : 'col-start-4'} row-start-1 w-full min-w-0 px-2 md:col-auto md:row-auto`}
             value={rule.close ? ')' : ''}
             onChange={(e) => update(idx, { close: e.target.value === ')' })}
             options={[
@@ -281,12 +292,13 @@ function FormRulesEditor({
             type="button"
             onClick={() => removeAt(idx)}
             aria-label="Remover regra"
-            className="rounded p-1.5 text-rose-600 hover:bg-rose-50"
+            className={`${first ? 'col-start-4' : 'col-start-5'} row-start-1 justify-self-end rounded p-1.5 text-rose-600 hover:bg-rose-50 md:col-auto md:row-auto`}
           >
             <Trash2 size={14} />
           </button>
         </div>
-      ))}
+        );
+      })}
 
       <IconButton onClick={addRule} className="self-start">
         <Plus size={14} /> Adicionar regra
@@ -295,17 +307,10 @@ function FormRulesEditor({
   );
 }
 
-function FieldRefSelect({
-  value,
-  onChange,
-  fieldGroups,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  fieldGroups: ReturnType<typeof selectFieldGroups>;
-}) {
+function FieldRefSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const fields = useFormStore((s) => s.fields);
   // Quando não há formulário ainda, aceitamos texto livre como fallback.
-  if (fieldGroups.length === 0) {
+  if (fields.length === 0) {
     return (
       <TextInput
         className="w-full min-w-0"
@@ -315,22 +320,6 @@ function FieldRefSelect({
       />
     );
   }
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
-    >
-      <option value="">Selecione…</option>
-      {fieldGroups.map((g) => (
-        <optgroup key={g.group} label={g.group}>
-          {g.fields.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.label || f.id}
-            </option>
-          ))}
-        </optgroup>
-      ))}
-    </select>
-  );
+  // Combobox pesquisável com os campos do formulário (mesmo seletor das demais telas).
+  return <FormFieldSelect value={value} onChange={onChange} placeholder="Selecione o campo…" />;
 }

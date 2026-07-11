@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Eye, EyeOff, Pencil } from 'lucide-react';
 import { selectFieldGroups, useFormStore } from '@/stores/form';
 import { extractFields } from '@/lib/form-schema';
@@ -142,8 +142,10 @@ export function TarefasCamposView({ modeler }: Props) {
           </thead>
           <tbody>
             {fieldGroups.map(({ group, fields }) => (
-              <>
-                <tr key={`group-${group}`} className="bg-slate-100">
+              // key no Fragment (não só na <tr> interna) — sem isso o React loga
+              // "unique key" e pode re-renderizar grupos fora de ordem.
+              <Fragment key={group}>
+                <tr className="bg-slate-100">
                   <th
                     className="sticky left-0 z-10 bg-slate-100 px-4 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600"
                   >
@@ -181,7 +183,7 @@ export function TarefasCamposView({ modeler }: Props) {
                     })}
                   </tr>
                 ))}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>

@@ -50,6 +50,7 @@ export function SidebarUser() {
 
       <Popover
         align="left"
+        fullWidth
         trigger={(open) => (
           <span
             className={[

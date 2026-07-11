@@ -135,4 +135,14 @@ export const api = {
   patch: <T = unknown>(path: string, body?: unknown, opts?: ApiOptions) =>
     apiFetch<T>(path, { method: 'PATCH', body: body !== undefined ? JSON.stringify(body) : undefined, ...opts }),
   del: <T = unknown>(path: string, opts?: ApiOptions) => apiFetch<T>(path, { method: 'DELETE', ...opts }),
+  /** POST que devolve o corpo cru (Blob) — downloads (export CSV/XLSX). */
+  postBlob: async (path: string, body?: unknown): Promise<Blob> => {
+    const headers = new Headers({ 'Content-Type': 'application/json' });
+    const token = tokenProvider();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    if (TENANT_HEADER) headers.set('X-Tenant', TENANT_HEADER);
+    const resp = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: JSON.stringify(body ?? {}) });
+    if (!resp.ok) throw await readError(resp);
+    return resp.blob();
+  },
 };

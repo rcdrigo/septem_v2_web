@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { MessageSquareText, Plus, Trash2 } from 'lucide-react';
 import { Checkbox, Field, TextInput } from '@/components/ui/Field';
 import { ColorPicker } from '@/components/ui/ColorPicker';
+import { Dialog } from '@/components/ui/Dialog';
 import { IconButton } from '@/components/ui/IconButton';
 import { IconSearchPicker } from '@/components/ui/IconSearchPicker';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
@@ -90,6 +91,7 @@ function ActionButtonRow({
   const [draftLabel, setDraftLabel] = useState(button.label);
   const [draftId, setDraftId] = useState(button.id);
   const [draftHint, setDraftHint] = useState(button.hint ?? '');
+  const [hintOpen, setHintOpen] = useState(false);
 
   useEffect(() => {
     setDraftLabel(button.label);
@@ -176,19 +178,46 @@ function ActionButtonRow({
           </Field>
         </div>
 
-        <Field label="Ícone" hint="Exibido à esquerda do rótulo do botão.">
-          <div>
-            <IconSearchPicker value={button.icon} onChange={(icon) => onChange({ icon })} />
-          </div>
-        </Field>
+        {/* Ícone e Orientações lado a lado — as orientações editam num MODAL
+            (mesmo padrão dos campos do formulário), sem comer o painel. */}
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Ícone" hint="À esquerda do rótulo.">
+            <div>
+              <IconSearchPicker value={button.icon} onChange={(icon) => onChange({ icon })} />
+            </div>
+          </Field>
+          <Field label="Orientações" hint="Exibidas no hover do botão.">
+            <button
+              type="button"
+              onClick={() => setHintOpen(true)}
+              className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              <MessageSquareText size={14} className={button.hint ? 'text-sky-600' : 'text-slate-400'} />
+              {button.hint ? 'Editar…' : 'Definir…'}
+            </button>
+          </Field>
+        </div>
 
-        <Field label="Orientações" hint="Aviso (rich-text) exibido ao executor no hover do botão.">
-          <RichTextEditor
-            value={draftHint}
-            onChange={setDraftHint}
-            onBlur={() => commitHint(draftHint)}
-          />
-        </Field>
+        {hintOpen && (
+          <Dialog
+            open
+            onClose={() => { commitHint(draftHint); setHintOpen(false); }}
+            width="lg"
+            title="Orientações do botão"
+            footer={
+              <button
+                type="button"
+                onClick={() => { commitHint(draftHint); setHintOpen(false); }}
+                className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
+              >
+                Concluído
+              </button>
+            }
+          >
+            <p className="mb-2 text-xs text-slate-500">Aviso (rich-text) exibido ao executor no hover do botão.</p>
+            <RichTextEditor value={draftHint} onChange={setDraftHint} onBlur={() => commitHint(draftHint)} />
+          </Dialog>
+        )}
 
         <Checkbox
           checked={button.validateForm}

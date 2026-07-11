@@ -18,7 +18,6 @@ import {
   Network,
   ScrollText,
   ShieldCheck,
-  Tags,
   UserCog,
   Users,
   Workflow,
@@ -63,7 +62,7 @@ export const MENU: MenuByMode = {
             perm: 'workflow:read',
             children: [
               { kind: 'link', label: 'Processos', to: '/admin/processos', icon: Workflow },
-              { kind: 'link', label: 'Categorias', to: '/admin/processos/categorias', icon: Tags },
+              // Categorias não têm mais página própria: modal "Categorias" em Admin › Processos.
               { kind: 'link', label: 'Modelos de e-mails', to: '/admin/modelos-email', icon: Mail },
               { kind: 'link', label: 'Modelos de documentos', to: '/admin/modelos-doc', icon: FileStack },
               { kind: 'link', label: 'Fontes de dados', to: '/admin/fontes-dados', icon: Database },
@@ -76,7 +75,7 @@ export const MENU: MenuByMode = {
             perm: 'reports:read',
             children: [
               { kind: 'link', label: 'Relatórios', to: '/admin/relatorios', icon: FileSearch },
-              { kind: 'link', label: 'Categorias', to: '/admin/relatorios/categorias', icon: Tags },
+              // Categorias não têm mais página própria: modal "Categorias" em Admin › Relatórios.
               { kind: 'link', label: 'Dashboards', to: '/admin/dashboards', icon: BarChart3 },
               { kind: 'link', label: 'Fontes de dados', to: '/admin/fontes-dados?scope=report', icon: Database },
             ],

@@ -13,6 +13,8 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Combobox } from '@/components/ui/Combobox';
 import { IconSearchPicker } from '@/components/ui/IconSearchPicker';
 import { useOrgUnitsFlat } from '@/lib/api/org-units';
+import { useCategories } from '@/lib/api/catalog';
+import { slugify } from '@/lib/slugify';
 import { useAccessProfiles } from '@/lib/api/access-profiles';
 import { useUsersList } from '@/lib/api/users';
 import { usePositions } from '@/lib/api/positions';
@@ -27,14 +29,8 @@ const STATUS_OPTIONS: ReadonlyArray<{ value: ProcessStatus; label: string; hint?
   { value: 'inactive', label: 'Inativo', hint: 'Histórico preservado; novas instâncias bloqueadas.' },
 ];
 
-const CATEGORY_OPTIONS = [
-  { value: '', label: '—' },
-  { value: 'protocolo', label: 'Protocolo' },
-  { value: 'processos', label: 'Processos' },
-  { value: 'documentos', label: 'Documentos oficiais' },
-  { value: 'pareceres', label: 'Pareceres' },
-  { value: 'comunicacao', label: 'Comunicação interna' },
-];
+// Categorias agora vêm do backend (/api/v1/categories); o XML guarda o slug do
+// nome (mesmo algoritmo do Slugifier do backend, que resolve slug→id no save).
 
 /**
  * View "Configurações" — espelha os campos da tabela `flows` (nome, descrição,
@@ -52,6 +48,11 @@ export function ConfiguracoesView({ modeler }: Props) {
 
   const [cfg, setCfg] = useState<ProcessConfig>(PROCESS_CONFIG_DEFAULTS);
   const orgUnits = useOrgUnitsFlat();
+  const categories = useCategories();
+  const categoryOptions = [
+    { value: '', label: '—' },
+    ...(categories.data ?? []).map((c) => ({ value: slugify(c.name), label: c.name })),
+  ];
   const [draftName, setDraftName] = useState(processName);
   const [tab, setTab] = useState<'geral' | 'acesso'>('geral');
 
@@ -112,7 +113,7 @@ export function ConfiguracoesView({ modeler }: Props) {
                     <TextInput value={draftName} onChange={(e) => setDraftName(e.target.value)} onBlur={commitName} placeholder="Nome do processo" />
                   </Field>
                   <Field label="Categoria">
-                    <Select value={cfg.categoryId} onChange={(e) => patch({ categoryId: e.target.value })} options={CATEGORY_OPTIONS} />
+                    <Select value={cfg.categoryId} onChange={(e) => patch({ categoryId: e.target.value })} options={categoryOptions} />
                   </Field>
                   <Field label="Área responsável" hint="Unidade organizacional.">
                     <Combobox

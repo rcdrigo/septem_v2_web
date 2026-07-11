@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 /**
@@ -14,6 +14,35 @@ export type EmailTemplate = { id: string; name: string };
 
 export function useCategories() {
   return useQuery({ queryKey: ['catalog', 'categories'], queryFn: () => api.get<Category[]>('/api/v1/categories') });
+}
+
+// ── CRUD de categorias (modal "Categorias" em Admin › Processos) ─────────────
+
+export type CategoryInput = { name: string; description?: string; color?: string; icon?: string };
+
+export function useCreateCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CategoryInput) => api.post<Category>('/api/v1/categories', input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['catalog', 'categories'] }),
+  });
+}
+
+export function useUpdateCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...input }: CategoryInput & { id: number }) =>
+      api.put<Category>(`/api/v1/categories/${id}`, input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['catalog', 'categories'] }),
+  });
+}
+
+export function useDeleteCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.del(`/api/v1/categories/${id}`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['catalog', 'categories'] }),
+  });
 }
 
 export function useAreas() {

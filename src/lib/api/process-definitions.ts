@@ -12,6 +12,9 @@ export type ProcessListItem = {
   status: ProcessStatus;
   icon: string | null;
   category: string | null;
+  categoryId: number | null;
+  categoryColor: string | null;
+  categoryIcon: string | null;
   area: string | null;
   updatedAt: string;
 };

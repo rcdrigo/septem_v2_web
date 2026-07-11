@@ -8,7 +8,7 @@ type Props = {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
-  width?: 'sm' | 'md' | 'lg';
+  width?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 };
 
 /**
@@ -28,7 +28,12 @@ export function Dialog({ open, onClose, title, children, footer, width = 'md' }:
 
   if (!open) return null;
 
-  const widthClass = width === 'sm' ? 'max-w-md' : width === 'lg' ? 'max-w-2xl' : 'max-w-lg';
+  const widthClass =
+    width === 'sm' ? 'max-w-md'
+    : width === 'lg' ? 'max-w-2xl'
+    : width === 'xl' ? 'max-w-4xl'
+    : width === '2xl' ? 'max-w-6xl'
+    : 'max-w-lg';
 
   // Portal para o body: evita que o modal fique "preso" dentro de ancestrais com
   // transform (ex.: o sidenav off-canvas) — garante centralização na viewport.
@@ -36,14 +41,17 @@ export function Dialog({ open, onClose, title, children, footer, width = 'md' }:
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/40 px-4"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/40 px-4 py-4"
       onClick={onClose}
     >
+      {/* max-h + corpo rolável: conteúdo maior que a viewport (comum no mobile) rola
+          dentro do modal em vez de estourar — sem isso, título e rodapé ficam cortados
+          e inacessíveis (o container centraliza e o overflow-hidden corta as pontas). */}
       <div
-        className={`w-full ${widthClass} overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg`}
+        className={`flex max-h-full w-full ${widthClass} flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-3">
           <h2 className="text-base font-semibold text-slate-900">{title}</h2>
           <button
             type="button"
@@ -54,8 +62,8 @@ export function Dialog({ open, onClose, title, children, footer, width = 'md' }:
             <X size={18} />
           </button>
         </div>
-        <div className="px-5 py-4">{children}</div>
-        {footer && <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">{footer}</div>}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        {footer && <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">{footer}</div>}
       </div>
     </div>,
     document.body,

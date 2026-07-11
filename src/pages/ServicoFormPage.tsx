@@ -38,14 +38,20 @@ export function ServicoFormPage() {
     } catch { toast.error('Não foi possível iniciar o processo.'); }
   }
 
-  const name = detail.data?.name ?? 'Serviço';
+  const processName = form.data?.processName ?? detail.data?.name ?? 'Serviço';
+  // Cabeçalho no MESMO padrão das demais tarefas: processo em cima (linha
+  // pequena) e o nome da TAREFA de início em destaque.
+  const taskName = form.data?.startTaskName || processName;
   const buttons = form.data?.buttons ?? [];
 
   return (
     <div className="flex h-screen flex-col bg-slate-100">
       <header className="border-b border-slate-200 bg-white px-6 py-4">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{tenant?.clienteNome ?? 'Septem'}</p>
-        <h1 className="text-lg font-semibold text-slate-900">{name}</h1>
+        <div className="flex flex-col">
+          {form.data?.startTaskName && <span className="text-sm font-medium text-slate-500">{processName}</span>}
+          <h1 className="text-lg font-semibold text-slate-900">{taskName}</h1>
+        </div>
       </header>
 
       {done ? (
@@ -57,7 +63,7 @@ export function ServicoFormPage() {
           {/* Cada grupo renderiza seu próprio card (sem container único). */}
           <main className="flex-1 overflow-auto p-6">
             {form.data?.documentationUrl && <DocBanner url={form.data.documentationUrl} />}
-            {form.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={form.data?.formSchema} optionsByField={form.data?.fieldOptions} />}
+            {form.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={form.data?.formSchema} data={form.data?.data ?? undefined} optionsByField={form.data?.fieldOptions} />}
           </main>
           {/* Botões de início — usa os configurados no evento de início; senão, "Iniciar". */}
           <footer className="flex justify-start gap-2 border-t border-slate-200 bg-white px-6 py-3">

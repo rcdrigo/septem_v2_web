@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import { SidebarUser, ImpersonateDialog } from './SidebarUser';
 import { AccessModeToggle } from './AccessModeToggle';
@@ -121,6 +121,24 @@ function NavNode({ node }: { node: MenuNode }) {
 
 const rowBase = 'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors';
 
+/**
+ * Ativo = mesmo pathname E mesma query string (comparadas de forma canônica).
+ * Itens irmãos podem compartilhar o pathname e divergir só na query — ex.:
+ * "Fontes de dados" de Processos (/admin/fontes-dados) vs de Relatórios
+ * (/admin/fontes-dados?scope=report). O NavLink ignora a query no match, então
+ * ambos acenderiam juntos.
+ */
+function isMenuLinkActive(to: string, pathname: string, search: string): boolean {
+  const q = to.indexOf('?');
+  const toPath = q === -1 ? to : to.slice(0, q);
+  if (pathname !== toPath) return false;
+  const current = new URLSearchParams(search);
+  const target = new URLSearchParams(q === -1 ? '' : to.slice(q));
+  current.sort();
+  target.sort();
+  return current.toString() === target.toString();
+}
+
 function LinkRow({ link }: { link: MenuLink }) {
   const Icon = link.icon;
   return (
@@ -138,9 +156,14 @@ function LinkRow({ link }: { link: MenuLink }) {
 }
 
 function GroupRow({ group }: { group: MenuGroup }) {
-  const { pathname } = useLocation();
-  const hasActiveChild = group.children.some((c) => pathname === c.to || pathname.startsWith(c.to + '/'));
+  const { pathname, search } = useLocation();
+  const hasActiveChild = group.children.some((c) => isMenuLinkActive(c.to, pathname, search));
   const [open, setOpen] = useState(hasActiveChild);
+  // Abre (nunca fecha) quando um filho fica ativo após o mount — ex.: chegar por
+  // redirect (/admin/processos/categorias → /admin/processos) ou por outro link.
+  useEffect(() => {
+    if (hasActiveChild) setOpen(true);
+  }, [hasActiveChild]);
   const Icon = group.icon;
 
   return (
@@ -158,20 +181,23 @@ function GroupRow({ group }: { group: MenuGroup }) {
         <ul className="mt-0.5 space-y-0.5 border-l border-slate-200 pl-3">
           {group.children.map((child) => {
             const Ci = child.icon;
+            // Match manual (pathname + query exatos) em vez do isActive do NavLink:
+            // resolve tanto irmãos por prefixo (/admin/processos vs .../categorias)
+            // quanto irmãos que divergem só na query (?scope=report).
+            const active = isMenuLinkActive(child.to, pathname, search);
             return (
               <li key={child.to}>
-                <NavLink
+                <Link
                   to={child.to}
-                  className={({ isActive }) =>
-                    [
-                      'flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors',
-                      isActive ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-600 hover:bg-slate-50',
-                    ].join(' ')
-                  }
+                  aria-current={active ? 'page' : undefined}
+                  className={[
+                    'flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors',
+                    active ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-600 hover:bg-slate-50',
+                  ].join(' ')}
                 >
                   <Ci size={15} className="shrink-0 text-slate-400" />
                   <span className="truncate">{child.label}</span>
-                </NavLink>
+                </Link>
               </li>
             );
           })}

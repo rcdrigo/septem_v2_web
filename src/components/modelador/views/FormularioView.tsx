@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutTemplate, Rows3, Columns3, RefreshCcw, Regex, Eye } from 'lucide-react';
+import { Rows3, Columns3, Regex, Eye } from 'lucide-react';
 import { IconButton } from '@/components/ui/IconButton';
 import { Dialog } from '@/components/ui/Dialog';
-import { confirm } from '@/components/ui/ConfirmDialog';
-import { toast } from '@/stores/toast';
 import { FormBuilder, type FormBuilderHandle } from '@/components/form/FormBuilder';
 import { FormFieldsPalette } from '@/components/form/FormFieldsPalette';
 import { FieldConfigPanel } from '@/components/form/FieldConfigPanel';
@@ -66,6 +64,7 @@ export function FormularioView({ modeler }: Props) {
   const layoutRef = useRef<GroupLayout>('stacked');
   layoutRef.current = groupLayout;
   const lastSerialized = useRef<string>('');
+  const loadingRef = useRef(false);
 
   const maskOptions = useMemo(
     () => (masks.data ?? []).map((m) => ({ value: m.id, label: m.name, regex: m.regex, template: m.template, shouldValidate: m.shouldValidate })),
@@ -73,28 +72,49 @@ export function FormularioView({ modeler }: Props) {
   );
 
   // 1) Carrega o schema persistido (prefere o XML; cai pra localStorage); extrai a flag.
+  //    IMPORTANTE: quando o processo é aberto por ?key=, o XML chega DEPOIS deste
+  //    mount (fetch assíncrono + importXML). Por isso recarregamos em todo
+  //    `import.done` do modeler — sem isso o builder ficava com o schema vazio e o
+  //    polling sobrescrevia o formSchema real do XML (perda do formulário).
   useEffect(() => {
     if (!builderRef.current) return;
     let cancelled = false;
-    (async () => {
+    async function load() {
+      // Pausa o polling ENQUANTO recarrega. O ref é síncrono: fecha a janela em
+      // que um tick disparado entre o import.done e o clear do interval poderia
+      // propagar o schema velho/vazio por cima do recém-importado.
+      loadingRef.current = true;
+      setReady(false);
       const fromXml = modeler ? getEmbeddedFormSchema(modeler) : null;
       const fromLs = readFormFromLocalStorage();
       const initial = (fromXml ?? fromLs) as any;
       const clean = stripLayout(initial);
       const layout = initial?.septemGroupLayout;
-      if (layout === 'tabs' || layout === 'stacked') setGroupLayout(layout);
+      if (layout === 'tabs' || layout === 'stacked') {
+        setGroupLayout(layout);
+        layoutRef.current = layout;
+      }
       // Enriquece com as opções das fontes p/ o canvas exibi-las (não só "Value").
       const enriched = clean ? await enrichDataSourceOptions(clean) : clean;
       if (enriched && !cancelled) {
         try { await builderRef.current!.importSchema(enriched); }
         catch (err) { console.warn('Falha ao carregar schema persistido do form:', err); }
+        if (!cancelled && fromXml) setFields(extractFields(enriched));
       }
       if (!cancelled) {
         lastSerialized.current = JSON.stringify(enriched ?? {});
+        loadingRef.current = false;
         setReady(true);
       }
-    })();
-    return () => { cancelled = true; };
+    }
+    void load();
+    const bus = modeler?.get?.('eventBus');
+    const onImportDone = () => { void load(); };
+    bus?.on('import.done', onImportDone);
+    return () => {
+      cancelled = true;
+      bus?.off('import.done', onImportDone);
+    };
   }, [modeler]);
 
   // 2) Polling: detecta mudanças no schema do editor e propaga (form-js não emite "changed" confiável).
@@ -102,6 +122,7 @@ export function FormularioView({ modeler }: Props) {
     if (!ready) return;
     const interval = window.setInterval(() => {
       try {
+        if (loadingRef.current) return; // (re)carga em andamento — não propagar
         const schema = builderRef.current?.saveSchema();
         if (!schema) return;
         const serialized = JSON.stringify(schema);
@@ -120,21 +141,6 @@ export function FormularioView({ modeler }: Props) {
     layoutRef.current = l;
     const schema = builderRef.current?.saveSchema();
     if (schema) propagate(schema, modeler, setFields, l);
-  }
-
-  async function handleReset() {
-    const ok = await confirm({
-      title: 'Descartar o formulário?',
-      message: 'Todos os campos cadastrados serão removidos. Esta ação não pode ser desfeita.',
-      confirmLabel: 'Descartar', destructive: true,
-    });
-    if (!ok) return;
-    await builderRef.current?.reset();
-    lastSerialized.current = '';
-    setFields([]);
-    persistFormToLocalStorage(null);
-    if (modeler) setEmbeddedFormSchema(modeler, { type: 'default', components: [], schemaVersion: 17 });
-    toast.success('Formulário descartado.');
   }
 
   return (
@@ -161,10 +167,8 @@ export function FormularioView({ modeler }: Props) {
           </div>
           <IconButton onClick={() => setPreview(builderRef.current?.saveSchema() ?? { type: 'default', components: [], schemaVersion: 17 })}><Eye size={14} /> Pré-visualizar</IconButton>
           <IconButton onClick={() => setMasksOpen(true)}><Regex size={14} /> Máscaras</IconButton>
-          <IconButton onClick={handleReset}><RefreshCcw size={14} /> Limpar formulário</IconButton>
-          <IconButton variant="primary" onClick={() => builderRef.current?.importSchema(EMPTY_GROUP_TEMPLATE)}>
-            <LayoutTemplate size={14} /> Modelo com agrupamento
-          </IconButton>
+          {/* "Limpar formulário" e "Modelo com agrupamento" removidos a pedido do
+              dono (2026-07-10): destrutivo/raramente úteis. */}
         </div>
       </header>
       <div className="septem-cockpit flex flex-1 overflow-hidden">
@@ -217,10 +221,3 @@ function propagate(schema: unknown, modeler: any | null, setFields: (fs: ReturnT
   if (modeler) setEmbeddedFormSchema(modeler, stored);
 }
 
-const EMPTY_GROUP_TEMPLATE = {
-  type: 'default',
-  components: [
-    { type: 'group', label: 'Geral', components: [{ type: 'textfield', key: 'nome', label: 'Nome' }] },
-  ],
-  schemaVersion: 17,
-};

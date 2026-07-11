@@ -7,13 +7,16 @@ type Props = {
   children: (close: () => void) => ReactNode;
   /** Alinhamento horizontal do popover em relação ao trigger. */
   align?: 'left' | 'right';
+  /** Ocupa toda a largura do pai (block). Sem isto o container é inline-block
+      e cresce pelo conteúdo — o `truncate` do trigger nunca atua. */
+  fullWidth?: boolean;
 };
 
 /**
  * Popover de cliques (não hover). Fecha ao clicar fora ou apertar Esc.
  * Layout posicionado abaixo do trigger.
  */
-export function Popover({ trigger, children, align = 'right' }: Props) {
+export function Popover({ trigger, children, align = 'right', fullWidth = false }: Props) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -34,7 +37,7 @@ export function Popover({ trigger, children, align = 'right' }: Props) {
   }, [open]);
 
   return (
-    <div ref={containerRef} className="relative inline-block">
+    <div ref={containerRef} className={fullWidth ? 'relative block w-full min-w-0' : 'relative inline-block'}>
       <button type="button" onClick={() => setOpen((v) => !v)} className="contents">
         {trigger(open)}
       </button>

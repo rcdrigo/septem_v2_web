@@ -88,7 +88,9 @@ export function ModeladorNavbar({ recursos, modeler, persistence }: Props) {
   }
 
   return (
-    <header className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-2.5">
+    // overflow-x-auto: em telas estreitas a navbar rola horizontalmente em vez
+    // de cortar Salvar/Publicar fora da viewport (modelador é usável no mobile).
+    <header className="flex items-center justify-between gap-2 overflow-x-auto border-b border-slate-200 bg-white px-5 py-2.5">
       <div className="flex min-w-0 items-center gap-2">
         <button
           type="button"

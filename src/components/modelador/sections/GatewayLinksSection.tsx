@@ -87,7 +87,7 @@ function ConnectionItem({
           open
           onClose={() => setOpen(false)}
           title={`Condições — ${connection.otherLabel}`}
-          width="lg"
+          width="2xl"
           footer={<button type="button" onClick={() => setOpen(false)} className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700">Concluído</button>}
         >
           <GatewayConditionEditor modeler={modeler} connection={flowBO} />

@@ -17,7 +17,16 @@ export type CompleteResult = { taskStatus: string; executionStatus: string; pend
 const execKeys = { tasks: ['workflow', 'tasks'] as const, task: (id: string) => ['workflow', 'task', id] as const };
 
 /** Schema form-js do processo (formulário inicial de "Iniciar"). */
-export type StartForm = { formSchema: unknown; buttons: TaskButton[]; fieldOptions?: FieldOptions; documentationUrl?: string | null };
+export type StartForm = {
+  formSchema: unknown;
+  buttons: TaskButton[];
+  fieldOptions?: FieldOptions;
+  /** Valores iniciais vindos das fontes por campo da tarefa de início. */
+  data?: Record<string, unknown> | null;
+  documentationUrl?: string | null;
+  processName?: string | null;
+  startTaskName?: string | null;
+};
 export function useProcessForm(key: string | null) {
   return useQuery({ queryKey: ['workflow', 'process-form', key], queryFn: () => api.get<StartForm>(`/api/v1/workflow/process-definitions/${key}/form`), enabled: !!key });
 }

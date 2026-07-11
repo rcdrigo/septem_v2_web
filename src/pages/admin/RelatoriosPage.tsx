@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Archive, ChevronLeft, ChevronRight, FileSearch, Pencil, Plus, Search, Send } from 'lucide-react';
+import { Archive, ChevronLeft, ChevronRight, FileSearch, LayoutDashboard, Pencil, Plus, Search, Send, Tags } from 'lucide-react';
 import {
   useReportsList,
   useReport,
@@ -7,9 +7,14 @@ import {
   useUpdateReport,
   usePatchReportStatus,
   useDeleteReport,
+  useReportCategories,
+  useCreateReportCategory,
+  useUpdateReportCategory,
+  useDeleteReportCategory,
   type ReportListItem,
   type ReportStatus,
 } from '@/lib/api/reports';
+import { CategoryManagerDialog } from '@/components/categories/CategoryManagerDialog';
 import { useDataSourcesList } from '@/lib/api/data-sources';
 import { Dialog } from '@/components/ui/Dialog';
 import { Field, TextInput } from '@/components/ui/Field';
@@ -28,6 +33,7 @@ export function RelatoriosPage() {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [editKey, setEditKey] = useState<string | null | undefined>(undefined); // undefined=fechado, null=novo
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const pageSize = 20;
 
   const list = useReportsList({ q: q || undefined, status: status || undefined, page, pageSize });
@@ -64,12 +70,31 @@ export function RelatoriosPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-6 py-4">
         <h1 className="text-lg font-semibold text-slate-900">Relatórios</h1>
-        <button type="button" onClick={() => setEditKey(null)} className="flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700">
-          <Plus size={16} /> Novo relatório
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => setCategoriesOpen(true)} className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50">
+            <Tags size={16} /> Categorias
+          </button>
+          <button type="button" onClick={() => setEditKey(null)} className="flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700">
+            <Plus size={16} /> Novo relatório
+          </button>
+        </div>
       </header>
+
+      {categoriesOpen && (
+        <CategoryManagerDialog
+          title="Categorias de relatórios"
+          inUseHint="Relatórios vinculados impedem a exclusão."
+          api={{
+            useList: useReportCategories,
+            useCreate: useCreateReportCategory,
+            useUpdate: useUpdateReportCategory,
+            useDelete: useDeleteReportCategory,
+          }}
+          onClose={() => setCategoriesOpen(false)}
+        />
+      )}
 
       <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-6 py-3">
         <div className="relative flex-1">
@@ -116,7 +141,8 @@ export function RelatoriosPage() {
                     <td className="px-4 py-2 text-slate-500">{formatDate(r.updatedAt)}</td>
                     <td className="px-4 py-2">
                       <div className="flex justify-end gap-1">
-                        <button type="button" onClick={() => setEditKey(r.key)} className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800" title="Editar"><Pencil size={15} /></button>
+                        <button type="button" onClick={() => window.open(`${import.meta.env.BASE_URL}relatorios/editar?key=${encodeURIComponent(r.key)}`, '_blank', 'noopener')} className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800" title="Abrir no builder (blocos, filtros, preview)"><LayoutDashboard size={15} /></button>
+                        <button type="button" onClick={() => setEditKey(r.key)} className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800" title="Editar dados básicos"><Pencil size={15} /></button>
                         {r.status === 'draft' && <button type="button" onClick={() => publish(r)} className="rounded p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700" title="Publicar"><Send size={15} /></button>}
                         {r.status !== 'inactive' && <button type="button" onClick={() => inactivate(r)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="Inativar"><Archive size={15} /></button>}
                       </div>
@@ -147,24 +173,34 @@ function RelatorioDialog({ editKey, onClose }: { editKey: string | null; onClose
   const isNew = editKey === null;
   const detail = useReport(editKey);
   const sources = useDataSourcesList('report');
+  const categories = useReportCategories();
   const create = useCreateReport();
   const update = useUpdateReport();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [dataSourceId, setDataSourceId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [hydrated, setHydrated] = useState(isNew);
 
   if (!isNew && detail.data && !hydrated) {
     setName(detail.data.name);
     setDescription(detail.data.description ?? '');
     setDataSourceId(detail.data.dataSourceId ?? '');
+    setCategoryId(detail.data.categoryId != null ? String(detail.data.categoryId) : '');
     setHydrated(true);
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const body = { name, description: description || null, dataSourceId: dataSourceId || null };
+    // No PUT, campo ausente/null MANTÉM o valor da versão anterior; limpar usa
+    // sentinela (Guid vazio / 0) — ver ReportsEndpoints.
+    const body = {
+      name,
+      description,
+      dataSourceId: dataSourceId || '00000000-0000-0000-0000-000000000000',
+      categoryId: categoryId ? Number(categoryId) : 0,
+    };
     try {
       if (isNew) await create.mutateAsync(body);
       else await update.mutateAsync({ key: editKey, body });
@@ -190,6 +226,15 @@ function RelatorioDialog({ editKey, onClose }: { editKey: string | null; onClose
         <form id="report-form" className="flex flex-col gap-3" onSubmit={submit}>
           <Field label="Nome"><TextInput required minLength={2} value={name} onChange={(e) => setName(e.target.value)} autoFocus /></Field>
           <Field label="Descrição"><TextInput value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
+          <Field label="Categoria" hint="Agrupa e colore o relatório em Consultas.">
+            <Combobox
+              value={categoryId}
+              options={(categories.data ?? []).map((c) => ({ value: String(c.id), label: c.name }))}
+              onChange={setCategoryId}
+              clearLabel="— nenhuma —"
+              placeholder="Selecione…"
+            />
+          </Field>
           <Field label="Fonte de dados (relatório)">
             <Combobox
               value={dataSourceId}

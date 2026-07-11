@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Send, Workflow, Archive } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Send, Tags, Workflow, Archive } from 'lucide-react';
+import { CategoriesDialog } from './CategoriesDialog';
 import {
   useProcessList,
   usePatchProcessStatus,
@@ -26,6 +27,7 @@ export function ProcessosPage() {
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const pageSize = 20;
 
   const list = useProcessList({ q: q || undefined, status: status || undefined, page, pageSize });
@@ -67,16 +69,27 @@ export function ProcessosPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-6 py-4">
         <h1 className="text-lg font-semibold text-slate-900">Processos</h1>
-        <button
-          type="button"
-          onClick={() => openModeler()}
-          className="flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700"
-        >
-          <Plus size={16} /> Novo processo
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setCategoriesOpen(true)}
+            className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            <Tags size={16} /> Categorias
+          </button>
+          <button
+            type="button"
+            onClick={() => openModeler()}
+            className="flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700"
+          >
+            <Plus size={16} /> Novo processo
+          </button>
+        </div>
       </header>
+
+      {categoriesOpen && <CategoriesDialog onClose={() => setCategoriesOpen(false)} />}
 
       <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-6 py-3">
         <div className="relative flex-1">
