@@ -55,6 +55,22 @@ type SessionState = {
 
 const ACCESS_KEY = 'septem.accessToken';
 const REFRESH_KEY = 'septem.refreshToken';
+const TENANT_KEY = 'septem.tenant';
+
+/** Branding do tenant cacheado — evita o "flash" de fallback (Septem V2 →
+ *  Prefeitura X) a cada carga enquanto o /tenant/config responde. O bootstrap
+ *  sempre sobrescreve com o valor fresco. */
+function readCachedTenant(): Tenant | null {
+  try {
+    const raw = localStorage.getItem(TENANT_KEY);
+    return raw ? (JSON.parse(raw) as Tenant) : null;
+  } catch {
+    return null;
+  }
+}
+function cacheTenant(t: Tenant) {
+  try { localStorage.setItem(TENANT_KEY, JSON.stringify(t)); } catch { /* storage cheio */ }
+}
 
 type TokenResponse = {
   accessToken: string;
@@ -77,7 +93,7 @@ type MeResponse = {
 export const useSessionStore = create<SessionState>((set, get) => ({
   status: 'idle',
   user: null,
-  tenant: null,
+  tenant: readCachedTenant(),
   accessToken: localStorage.getItem(ACCESS_KEY),
   refreshToken: localStorage.getItem(REFRESH_KEY),
   accessMode: 'interno',
@@ -88,6 +104,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     try {
       // /tenant/config é não-autenticado — sempre tenta.
       const tenant = await api.get<Tenant>('/api/tenant/config', { anonymous: true });
+      cacheTenant(tenant);
       if (!get().accessToken) {
         set({ status: 'unauthenticated', tenant });
         return;

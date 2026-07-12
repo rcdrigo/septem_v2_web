@@ -1,0 +1,48 @@
+import { chromium } from 'playwright-core';
+let failures = 0;
+function check(ok, msg) { if (!ok) failures++; console.log(`${ok ? '✓' : '✗ FALHOU'} ${msg}`); }
+
+const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
+const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const page = await ctx.newPage();
+
+// 1ª visita: login normal (aquece o cache do tenant)
+await page.goto('http://localhost:5173/login', { waitUntil: 'networkidle' });
+await page.fill('input[type=email]', 'admin@prefeitura-x.local');
+await page.fill('input[type=password]', 'admin123');
+await page.getByRole('button', { name: 'Entrar' }).click();
+await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
+await page.waitForTimeout(1000);
+check(await page.evaluate(() => !!localStorage.getItem('septem.tenant')), 'tenant cacheado no localStorage após o bootstrap');
+
+// Aba STANDALONE (/servico) com /api/tenant/config atrasado 4s: o header deve
+// pintar "Prefeitura X" imediatamente (cache) — antes era o fallback "Septem".
+await page.route('**/api/tenant/config', async (r) => {
+  await new Promise((res) => setTimeout(res, 4000));
+  await r.continue();
+});
+await page.goto('http://localhost:5173/servico/teste_condicoes_ui', { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(1200); // bem antes dos 4s do fetch
+const standalone = await page.evaluate(() => {
+  const header = document.querySelector('header')?.innerText ?? '';
+  const up = header.toUpperCase();
+  return { prefeitura: up.includes('PREFEITURA X'), fallbackSeptem: /\bSEPTEM\b/.test(up) };
+});
+check(standalone.prefeitura, 'aba standalone pinta "Prefeitura X" do cache, sem esperar o fetch');
+check(!standalone.fallbackSeptem, 'sem fallback "Septem" no header (fim do flash)');
+
+// LOGIN: painel usa copy fixa — não depende do tenant, logo não pisca.
+await page.unroute('**/api/tenant/config');
+await page.evaluate(() => { localStorage.clear(); });
+await page.route('**/api/tenant/config', async (r) => {
+  await new Promise((res) => setTimeout(res, 4000));
+  await r.continue();
+});
+await page.goto('http://localhost:5173/login', { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(800);
+const loginText = await page.evaluate(() => document.body.innerText);
+check(loginText.includes('Prefeitura Municipal'), 'login mostra a copy fixa imediatamente (sem tenant)');
+
+console.log(failures === 0 ? 'PASSOU' : `FALHOU: ${failures} caso(s)`);
+await browser.close();
+process.exit(failures === 0 ? 0 : 1);
