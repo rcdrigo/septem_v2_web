@@ -23,10 +23,12 @@ export function getFormFieldEntries(element: any): FormFieldEntry[] {
 }
 
 export function setFormFieldEntries(modeler: any, element: any, entries: FormFieldEntry[]) {
-  // remove entradas no estado default puro (visível + sem fonte) pra manter o XML enxuto
-  const filtered = entries.filter(
-    (e) => !(e.visibility === 'visible' && !e.dataSourceRef),
-  );
+  // PERSISTE inclusive as entradas "visible": descartá-las tornava "todos os
+  // campos visíveis" indistinguível de "tarefa nunca configurada" no XML — e o
+  // backend (ApplyTaskVisibility) só aplica somente-leitura quando a tarefa tem
+  // alguma entrada, então tudo renderizava editável. Tarefa sem NENHUMA entrada
+  // continua significando "sem configuração" (tudo editável, compat).
+  const filtered = entries.filter((e) => !!e.fieldRef);
   setExtensionCollection(modeler, element, SCHEMA, filtered);
 }
 
