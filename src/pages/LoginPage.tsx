@@ -64,7 +64,9 @@ export function LoginPage() {
             <div className="flex items-center gap-2.5">
               {tenant?.logoUrl && <img src={tenant.logoUrl} alt="" className="h-8 w-auto" />}
               <div>
-                <p className="text-base font-semibold text-white">{tenant?.clienteNome ?? 'Septem'}</p>
+                {/* Copy fixa do painel institucional (mock do dono) — o branding
+                    por tenant segue no restante do app (sidenav, títulos etc.). */}
+                <p className="text-base font-semibold text-white">Prefeitura Municipal</p>
                 <p className="text-sm text-slate-400">Gestão integrada</p>
               </div>
             </div>
