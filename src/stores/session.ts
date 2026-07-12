@@ -43,7 +43,7 @@ type SessionState = {
   /** Sessão atual é uma personificação (admin agindo como outro usuário). */
   isImpersonating: boolean;
   bootstrap: () => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, keepConnected?: boolean) => Promise<void>;
   impersonate: (userId: string) => Promise<void>;
   stopImpersonation: () => Promise<void>;
   refresh: () => Promise<string | null>;
@@ -101,11 +101,16 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
   },
 
-  login: async (email, password) => {
+  login: async (email, password, keepConnected = true) => {
     const tokens = await api.post<TokenResponse>('/api/v1/auth/login', { email, password }, { anonymous: true });
     localStorage.setItem(ACCESS_KEY, tokens.accessToken);
-    localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
-    set({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
+    // "Manter-me conectado" = guardar o refresh token (sessão se renova sozinha).
+    // Desmarcado: sem refresh — quando o access token expirar, pede login de novo.
+    // (Não usamos sessionStorage: as abas standalone — modelador/tarefa/serviço —
+    // compartilham o token entre abas via localStorage.)
+    if (keepConnected) localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
+    else localStorage.removeItem(REFRESH_KEY);
+    set({ accessToken: tokens.accessToken, refreshToken: keepConnected ? tokens.refreshToken : null });
 
     const user = await api.get<MeResponse>('/api/v1/me');
     set({ status: 'authenticated', user });
