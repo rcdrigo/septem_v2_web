@@ -111,6 +111,7 @@ for (const view of [
   await page.selectOption('select[name=businessHourStart]', '9');
   await page.selectOption('select[name=businessHourEnd]', '17');
   await setDays(page, [1, 2, 3, 4, 5, 6]); // adiciona sábado
+  await page.fill('input[name=heroImageUrl]', 'https://picsum.photos/id/1015/1200/900');
   await page.fill('textarea[name=systemDescription]', 'Portal de serviços do município.');
   await page.getByRole('button', { name: 'Salvar' }).click();
   await page.waitForSelector('text=Parâmetros salvos.', { timeout: 10000 });
@@ -161,6 +162,19 @@ for (const view of [
       (await page.getByTestId('login-descricao').innerText()).includes('Portal de serviços do município.'),
     `[${view.name}] descrição do sistema aparece na tela de login`,
   );
+  const hero = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid=login-hero]');
+    if (!el) return null;
+    const bg = getComputedStyle(el).backgroundImage;
+    // o texto precisa continuar legível: sobreposição escura por cima da imagem
+    const overlay = !!el.querySelector('.bg-slate-900\\/75');
+    return { bg, overlay };
+  });
+  check(
+    !!hero && hero.bg.includes('picsum.photos'),
+    `[${view.name}] imagem de destaque vira o fundo do painel do login`,
+  );
+  check(!!hero && hero.overlay, `[${view.name}] sobreposição escura mantém o texto legível sobre a imagem`);
   await page.screenshot({ path: `${OUT}/parametros-login-${view.name}.png`, fullPage: true });
 
   await ctx.close();
@@ -176,6 +190,7 @@ for (const view of [
   await page.fill('input[name=clienteNome]', ORIG.cliente);
   await page.fill('input[name=ambienteNome]', ORIG.ambiente);
   await page.fill('input[name=primaryColor]', ORIG.cor);
+  await page.fill('input[name=heroImageUrl]', '');
   await page.fill('textarea[name=systemDescription]', '');
   await page.selectOption('select[name=businessHourStart]', '8');
   await page.selectOption('select[name=businessHourEnd]', '18');
