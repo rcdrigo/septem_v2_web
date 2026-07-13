@@ -18,10 +18,20 @@ export function SidebarUser() {
 
   if (!user) return null;
 
+  // Sair da personificação NUNCA pode deixar o usuário preso: se o stop falhar
+  // (token do ator inválido, backend fora), caímos para o logout — o pior caso é
+  // pedir login de novo, nunca continuar personificando.
   async function leaveImpersonation() {
     setLeaving(true);
-    try { await stopImpersonation(); navigate('/', { replace: true }); }
-    catch { toast.error('Não foi possível sair da personificação.'); setLeaving(false); }
+    try {
+      await stopImpersonation();
+      navigate('/', { replace: true });
+    } catch {
+      toast.error('Não foi possível voltar ao seu usuário. Encerrando a sessão.');
+      try { await logout(); } finally { navigate('/login', { replace: true }); }
+    } finally {
+      setLeaving(false);
+    }
   }
 
   const initials = user.name
@@ -77,6 +87,13 @@ export function SidebarUser() {
             <MenuItem onClick={() => { close(); navigate('/me/senha'); }}>
               <KeyRound size={15} /> Mudar senha
             </MenuItem>
+            {/* Segunda porta de saída da personificação: o banner pode ficar fora
+                da vista (scroll/mobile) — aqui está sempre a um clique. */}
+            {isImpersonating && (
+              <MenuItem onClick={async () => { close(); await leaveImpersonation(); }}>
+                <UserCog size={15} /> Sair da personificação
+              </MenuItem>
+            )}
             <MenuDivider />
             <MenuItem destructive onClick={async () => { close(); await endSession(); }}>
               <LogOut size={15} /> Sair

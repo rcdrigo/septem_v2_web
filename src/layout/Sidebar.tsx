@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import { SidebarUser, ImpersonateDialog } from './SidebarUser';
 import { AccessModeToggle } from './AccessModeToggle';
 import { MENU } from './menu/menu-config';
 import type { MenuAction, MenuGroup, MenuLink, MenuNode } from './menu/types';
 import { useSessionStore } from '@/stores/session';
-import { toast } from '@/stores/toast';
 
 export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
   const session = useSessionStore();
@@ -209,12 +208,27 @@ function GroupRow({ group }: { group: MenuGroup }) {
 
 function ActionRow({ action, onImpersonate }: { action: MenuAction; onImpersonate?: () => void }) {
   const Icon = action.icon;
-  function run() {
-    if (action.action === 'logout') toast.info('Sessão encerrada (mock).');
-    else if (action.action === 'impersonate') onImpersonate?.();
+  const navigate = useNavigate();
+  const logout = useSessionStore((s) => s.logout);
+  const [busy, setBusy] = useState(false);
+
+  // "Sair" era um mock (toast) — nunca encerrava a sessão de fato.
+  async function run() {
+    if (action.action === 'logout') {
+      if (busy) return;
+      setBusy(true);
+      try {
+        await logout(); // revoga o refresh no backend e limpa os tokens
+      } finally {
+        setBusy(false);
+        navigate('/login', { replace: true });
+      }
+      return;
+    }
+    if (action.action === 'impersonate') onImpersonate?.();
   }
   return (
-    <button type="button" onClick={run} className={[rowBase, 'w-full text-slate-700 hover:bg-slate-100'].join(' ')}>
+    <button type="button" onClick={run} disabled={busy} className={[rowBase, 'w-full text-slate-700 hover:bg-slate-100 disabled:opacity-60'].join(' ')}>
       <Icon size={18} className="shrink-0" />
       <span className="truncate text-left">{action.label}</span>
     </button>

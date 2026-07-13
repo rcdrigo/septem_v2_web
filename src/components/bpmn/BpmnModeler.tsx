@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import Modeler from 'bpmn-js/lib/Modeler';
 import emptyDiagram from '@/assets/empty-diagram.bpmn?raw';
 import { SeptemPaletteModule } from './SeptemPaletteProvider';
+import { SeptemContextPadModule } from './SeptemContextPadProvider';
 import septemModdle from './septem-moddle.json';
 import { useModeladorStore } from '@/stores/modelador';
 
@@ -41,7 +42,7 @@ export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, re
 
     const modeler = new Modeler({
       container: canvasRef.current,
-      additionalModules: [SeptemPaletteModule],
+      additionalModules: [SeptemPaletteModule, SeptemContextPadModule],
       moddleExtensions: { septem: septemModdle as any },
       // keyboard.bindTo foi removido no diagram-js atual (bind agora é implícito).
     });
