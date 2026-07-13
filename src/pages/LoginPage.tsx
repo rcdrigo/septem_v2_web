@@ -4,6 +4,7 @@ import { Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
 import { useSessionStore } from '@/stores/session';
 import { ApiError } from '@/lib/api';
 import { toast } from '@/stores/toast';
+import { useDocumentTitle } from '@/lib/use-document-title';
 
 /**
  * Página /login fora do AppShell — layout em duas colunas (proposta do dono,
@@ -17,6 +18,7 @@ export function LoginPage() {
   const login = useSessionStore((s) => s.login);
   const status = useSessionStore((s) => s.status);
   const bootstrap = useSessionStore((s) => s.bootstrap);
+  useDocumentTitle('Entrar');
 
   // Branding do tenant no /login acessado direto: o bootstrap só rodava no
   // AppShell, então o painel ficava no fallback "Septem" até logar.

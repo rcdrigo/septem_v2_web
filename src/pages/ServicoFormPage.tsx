@@ -56,7 +56,7 @@ export function ServicoFormPage() {
 
       {done ? (
         <main className="flex-1 overflow-auto">
-          <CompletionScreen next={done.nextTaskForMe} executionId={done.executionId} onClose={() => window.close()} />
+          <CompletionScreen kind="start" next={done.nextTaskForMe} executionId={done.executionId} onClose={() => window.close()} />
         </main>
       ) : (
         <>

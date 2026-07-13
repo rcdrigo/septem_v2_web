@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ArrowLeft, FileSearch, Tags } from 'lucide-react';
 import { useReportsList, useReport, type GlobalFilterDef } from '@/lib/api/reports';
 import { ReportRunViewer } from '@/components/reports/ReportViewer';
+import { useDocumentTitle } from '@/lib/use-document-title';
 import {
   FALLBACK_COLOR,
   FilterPill,
@@ -102,6 +103,7 @@ export function ConsultasPage() {
 function ReportViewer({ reportKey, name, onClose }: { reportKey: string; name: string; onClose: () => void }) {
   // Filtros globais vêm da definição do relatório publicado.
   const detail = useReport(reportKey);
+  useDocumentTitle(name); // título da aba = nome do relatório aberto
   const filtersDef = useMemo<GlobalFilterDef[]>(() => {
     try { return (JSON.parse(detail.data?.definitionJson || '{}') as { filters?: GlobalFilterDef[] }).filters ?? []; }
     catch { return []; }

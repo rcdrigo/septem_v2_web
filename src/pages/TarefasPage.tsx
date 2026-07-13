@@ -163,7 +163,7 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
     catch { toast.error('Não foi possível salvar.'); }
   }
 
-  if (done) return <CompletionScreen next={done.nextTaskForMe} executionId={done.executionId} onClose={onClose} />;
+  if (done) return <CompletionScreen kind="task" next={done.nextTaskForMe} executionId={done.executionId} onClose={onClose} />;
 
   const buttons = task.data?.buttons ?? [];
 
@@ -214,7 +214,18 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
  * carrega-a em segundos; senão, oferece fechar ou acompanhar o processo (relatório
  * da instância em nova aba).
  */
-export function CompletionScreen({ next, executionId, onClose }: { next?: string | null; executionId?: string; onClose: () => void }) {
+/**
+ * Tela de sucesso — compartilhada pelo INÍCIO do serviço e pela conclusão de uma
+ * tarefa. O texto muda conforme a origem: "Solicitação iniciada" só quando a
+ * requisição acabou de ser criada; nas demais tarefas, "Tarefa concluída".
+ */
+export function CompletionScreen({ next, executionId, onClose, kind = 'task' }: {
+  next?: string | null;
+  executionId?: string;
+  onClose: () => void;
+  /** 'start' = tarefa de início (nova solicitação) · 'task' = demais tarefas. */
+  kind?: 'start' | 'task';
+}) {
   useEffect(() => {
     if (!next) return;
     const t = setTimeout(() => navTo(`/tarefa/${next}`), 2500);
@@ -227,7 +238,9 @@ export function CompletionScreen({ next, executionId, onClose }: { next?: string
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
           <CheckCircle2 size={28} />
         </div>
-        <h2 className="text-lg font-semibold text-slate-900">Solicitação iniciada com sucesso!</h2>
+        <h2 className="text-lg font-semibold text-slate-900">
+          {kind === 'start' ? 'Solicitação iniciada com sucesso!' : 'Tarefa concluída com sucesso!'}
+        </h2>
         {next ? (
           <p className="mt-2 text-sm text-slate-600">Uma nova tarefa é sua responsabilidade e será carregada em poucos segundos…</p>
         ) : (

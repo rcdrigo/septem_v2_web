@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Send, Tags, Workflow, Archive } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Send, Tags, Trash2, Workflow, Archive } from 'lucide-react';
 import { CategoriesDialog } from './CategoriesDialog';
 import {
   useProcessList,
   usePatchProcessStatus,
   useDeleteProcess,
+  useDeleteProcessPermanently,
   type ProcessListItem,
   type ProcessStatus,
 } from '@/lib/api/process-definitions';
@@ -36,6 +37,26 @@ export function ProcessosPage() {
 
   const patch = usePatchProcessStatus();
   const del = useDeleteProcess();
+  const delPerm = useDeleteProcessPermanently();
+
+  // Excluir DE VERDADE (some da lista). Bloqueado quando há solicitações — o
+  // histórico não se apaga; nesse caso o caminho é "Inativar".
+  async function remove(p: ProcessListItem) {
+    const ok = await confirm({
+      title: 'Excluir processo?',
+      message: `"${p.name}" e todas as suas versões serão removidos permanentemente. Só é possível excluir processos SEM solicitações.`,
+      confirmLabel: 'Excluir',
+      cancelLabel: 'Cancelar',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await delPerm.mutateAsync(p.key);
+      toast.success(`"${p.name}" excluído.`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? (err.detail ?? err.message) : 'Falha ao excluir.');
+    }
+  }
 
   function edit(key: string) {
     openModeler(key);
@@ -165,6 +186,14 @@ export function ProcessosPage() {
                             <Send size={15} />
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => remove(p)}
+                          className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
+                          title="Excluir permanentemente (só sem solicitações)"
+                        >
+                          <Trash2 size={15} />
+                        </button>
                         {p.status !== 'inactive' && (
                           <button
                             type="button"

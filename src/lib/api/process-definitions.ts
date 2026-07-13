@@ -136,6 +136,15 @@ export function usePatchProcessStatus() {
   });
 }
 
+/** Exclusão PERMANENTE (some da lista). 409 quando há solicitações. */
+export function useDeleteProcessPermanently() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) => api.del(`${BASE}/${key}/permanent`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: processKeys.all }),
+  });
+}
+
 export function useDeleteProcess() {
   const qc = useQueryClient();
   return useMutation({

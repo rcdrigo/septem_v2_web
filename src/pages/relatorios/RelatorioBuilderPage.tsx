@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Eye, Plus, RefreshCcw, Save, Send, Trash2 } from 'lucide-react';
 import { useSessionStore } from '@/stores/session';
+import { useDocumentTitle } from '@/lib/use-document-title';
 import { Field, Checkbox, Select, TextInput } from '@/components/ui/Field';
 import { Combobox } from '@/components/ui/Combobox';
 import { toast } from '@/stores/toast';
@@ -54,6 +55,7 @@ export function RelatorioBuilderPage() {
   const update = useUpdateReport();
   const publish = usePublishReport();
   const sync = useSyncReportSchema();
+  useDocumentTitle(detail.data?.name ? `${detail.data.name} · Editor` : 'Editor de relatório');
 
   const [def, setDef] = useState<ReportDefinition>({});
   const [sourceType, setSourceType] = useState('dataSource');

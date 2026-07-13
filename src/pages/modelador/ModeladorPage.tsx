@@ -10,6 +10,7 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { Toaster } from '@/components/ui/Toaster';
 import { ConfirmDialogHost } from '@/components/ui/ConfirmDialog';
 import { useModeladorStore } from '@/stores/modelador';
+import { useDocumentTitle } from '@/lib/use-document-title';
 import { useProcessNameSync } from '@/lib/useProcessNameSync';
 import { useKeyboardShortcuts } from '@/lib/useKeyboardShortcuts';
 import { exportBpmn, exportPng, importBpmn } from '@/lib/recursos';
@@ -49,6 +50,9 @@ export function ModeladorPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const key = searchParams.get('key');
   const detail = useProcessDefinition(key);
+  // Título da aba: nome salvo do processo (do backend) tem precedência — o
+  // processName do store só é preenchido depois que o XML importa no modeler.
+  useDocumentTitle(detail.data?.name || processName || 'Modelador');
   const saveMut = useSaveProcess();     // POST = nova versão (Versionar)
   const updateMut = useUpdateProcess(); // PUT  = salva no lugar (Salvar)
   const patchMut = usePatchProcessStatus();
