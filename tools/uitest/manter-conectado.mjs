@@ -11,7 +11,7 @@ async function loginFresh(keep) {
   await page.goto('http://localhost:5173/login', { waitUntil: 'networkidle' });
   const cb = page.locator('label:has-text("Manter-me conectado") input');
   if (keep) await cb.check(); else await cb.uncheck();
-  await page.fill('input[type=email]', 'admin@prefeitura-x.local');
+  await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
   await page.fill('input[type=password]', 'admin123');
   await page.getByRole('button', { name: 'Entrar' }).click();
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });

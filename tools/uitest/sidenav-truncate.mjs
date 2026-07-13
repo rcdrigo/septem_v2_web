@@ -23,7 +23,7 @@ function check(ok, msg) { if (!ok) failures++; console.log(`${ok ? '✓' : '✗ 
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
 const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 })).newPage();
 await page.goto('http://localhost:5173/login', { waitUntil: 'networkidle' });
-await page.fill('input[type=email]', LONG_EMAIL);
+await page.fill('input[name=identifier]', LONG_EMAIL);
 await page.fill('input[type=password]', SENHA);
 await page.click('button[type=submit]');
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });

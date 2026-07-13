@@ -15,6 +15,11 @@ export type SessionUser = {
   name: string;
   email: string;
   isInternal: boolean;
+  /** Campos editáveis em Meus dados (Fase 2). */
+  cpf?: string | null;
+  matricula?: string | null;
+  telefone?: string | null;
+  photoUrl?: string | null;
   perms: string[];
   hasDashboard: boolean;
   accessProfiles: { id: string; name: string }[];
@@ -50,7 +55,13 @@ type SessionState = {
   bootstrap: () => Promise<void>;
   /** Recarrega o branding do tenant (usado após salvar Parâmetros › Informações gerais). */
   refreshTenant: () => Promise<void>;
-  login: (email: string, password: string, keepConnected?: boolean) => Promise<void>;
+  /**
+   * Login por e-mail OU CPF. Devolve 'ok' (entrou) ou 'two-factor' (o backend
+   * mandou um código por e-mail e espera a 2ª etapa em `completeTwoFactor`).
+   */
+  login: (identifier: string, password: string, keepConnected?: boolean) => Promise<LoginOutcome>;
+  /** 2ª etapa do login com 2FA: código do e-mail (+ confiar neste dispositivo). */
+  completeTwoFactor: (identifier: string, code: string, trustDevice: boolean, keepConnected?: boolean) => Promise<void>;
   impersonate: (userId: string) => Promise<void>;
   stopImpersonation: () => Promise<void>;
   refresh: () => Promise<string | null>;
@@ -63,6 +74,11 @@ type SessionState = {
 const ACCESS_KEY = 'septem.accessToken';
 const REFRESH_KEY = 'septem.refreshToken';
 const TENANT_KEY = 'septem.tenant';
+/** Dispositivo confiável (2FA): enviado no login para pular o desafio. */
+const DEVICE_KEY = 'septem.deviceToken';
+
+export type LoginOutcome = { kind: 'ok' } | { kind: 'two-factor'; maskedEmail: string };
+type TwoFactorChallenge = { twoFactorRequired: true; identifier: string; maskedEmail: string };
 
 /** Branding do tenant cacheado — evita o "flash" de fallback (Septem V2 →
  *  Prefeitura X) a cada carga enquanto o /tenant/config responde. O bootstrap
@@ -85,6 +101,8 @@ type TokenResponse = {
   refreshToken: string;
   accessExpiresAt: string;
   refreshExpiresAt: string;
+  /** Só vem quando o usuário marca "confiar neste dispositivo" no 2FA. */
+  deviceToken?: string | null;
 };
 
 type MeResponse = {
@@ -97,6 +115,26 @@ type MeResponse = {
   accessProfiles: { id: string; name: string }[];
   impersonatedBy?: string | null;
 };
+
+/**
+ * Guarda os tokens e conclui a sessão. "Manter-me conectado" = guardar o refresh
+ * token (a sessão se renova sozinha). Desmarcado: sem refresh — quando o access
+ * expirar, pede login de novo. (Não usamos sessionStorage: as abas standalone —
+ * modelador/tarefa/serviço — compartilham o token entre abas via localStorage.)
+ */
+async function applyTokens(
+  set: (partial: Partial<SessionState>) => void,
+  tokens: TokenResponse,
+  keepConnected: boolean,
+) {
+  localStorage.setItem(ACCESS_KEY, tokens.accessToken);
+  if (keepConnected) localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
+  else localStorage.removeItem(REFRESH_KEY);
+  set({ accessToken: tokens.accessToken, refreshToken: keepConnected ? tokens.refreshToken : null });
+
+  const user = await api.get<MeResponse>('/api/v1/me');
+  set({ status: 'authenticated', user });
+}
 
 export const useSessionStore = create<SessionState>((set, get) => ({
   status: 'idle',
@@ -132,19 +170,31 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ tenant });
   },
 
-  login: async (email, password, keepConnected = true) => {
-    const tokens = await api.post<TokenResponse>('/api/v1/auth/login', { email, password }, { anonymous: true });
-    localStorage.setItem(ACCESS_KEY, tokens.accessToken);
-    // "Manter-me conectado" = guardar o refresh token (sessão se renova sozinha).
-    // Desmarcado: sem refresh — quando o access token expirar, pede login de novo.
-    // (Não usamos sessionStorage: as abas standalone — modelador/tarefa/serviço —
-    // compartilham o token entre abas via localStorage.)
-    if (keepConnected) localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
-    else localStorage.removeItem(REFRESH_KEY);
-    set({ accessToken: tokens.accessToken, refreshToken: keepConnected ? tokens.refreshToken : null });
+  login: async (identifier, password, keepConnected = true) => {
+    const res = await api.post<TokenResponse | TwoFactorChallenge>(
+      '/api/v1/auth/login',
+      // O deviceToken é o "dispositivo confiável": com ele, o backend pula o 2FA.
+      { identifier, password, deviceToken: localStorage.getItem(DEVICE_KEY) },
+      { anonymous: true },
+    );
 
-    const user = await api.get<MeResponse>('/api/v1/me');
-    set({ status: 'authenticated', user });
+    if ('twoFactorRequired' in res) {
+      return { kind: 'two-factor', maskedEmail: res.maskedEmail };
+    }
+
+    await applyTokens(set, res, keepConnected);
+    return { kind: 'ok' };
+  },
+
+  completeTwoFactor: async (identifier, code, trustDevice, keepConnected = true) => {
+    const tokens = await api.post<TokenResponse>(
+      '/api/v1/auth/2fa',
+      { identifier, code, trustDevice },
+      { anonymous: true },
+    );
+    // O token do dispositivo confiável fica no navegador; no servidor só o hash.
+    if (tokens.deviceToken) localStorage.setItem(DEVICE_KEY, tokens.deviceToken);
+    await applyTokens(set, tokens, keepConnected);
   },
 
   impersonate: async (userId) => {

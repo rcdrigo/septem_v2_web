@@ -16,7 +16,7 @@ const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome'
 
 async function login(page) {
   await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
-  await page.fill('input[type=email]', 'admin@prefeitura-x.local');
+  await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
   await page.fill('input[type=password]', 'admin123');
   await page.click('button[type=submit]');
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
@@ -68,7 +68,8 @@ for (const view of [
 
   // 2) As 3 abas existem e "Informações gerais" é a ativa.
   const tabs = await page.locator('[role=tab]').allInnerTexts();
-  check(tabs.length === 3, `[${view.name}] 3 abas (${tabs.map((t) => t.trim()).join(' | ')})`);
+  // Fase 1: Informações gerais, E-mail, Arquivos · Fase 2 acrescentou Segurança.
+  check(tabs.length === 4, `[${view.name}] 4 abas (${tabs.map((t) => t.trim()).join(' | ')})`);
   check(
     (await page.locator('[role=tab][aria-selected=true]').innerText()).includes('Informações gerais'),
     `[${view.name}] aba ativa = Informações gerais`,
@@ -88,7 +89,7 @@ for (const view of [
       return b.right > window.innerWidth + 1 || b.left < -1;
     }).length,
   );
-  check(tabsClipped === 0, `[${view.name}] as 3 abas cabem no viewport (cortadas: ${tabsClipped})`);
+  check(tabsClipped === 0, `[${view.name}] as abas cabem no viewport (cortadas: ${tabsClipped})`);
 
   // 4) Layout: nada estoura a largura nem fica recortado.
   const L = await layout(page);

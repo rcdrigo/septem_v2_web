@@ -14,7 +14,7 @@ const page = await ctx.newPage();
 page.on('pageerror', (e) => console.log('pageerror:', e.message.slice(0, 200)));
 
 await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
-await page.fill('input[type=email]', 'admin@prefeitura-x.local');
+await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
 await page.fill('input[type=password]', 'admin123');
 await page.click('button[type=submit]');
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });

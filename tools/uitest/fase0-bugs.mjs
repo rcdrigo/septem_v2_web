@@ -8,7 +8,7 @@ const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome'
 
 async function login(page, email = 'admin@prefeitura-x.local', pass = 'admin123') {
   await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
-  await page.fill('input[type=email]', email);
+  await page.fill('input[name=identifier]', email);
   await page.fill('input[type=password]', pass);
   await page.getByRole('button', { name: 'Entrar' }).click();
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });

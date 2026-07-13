@@ -48,10 +48,18 @@ export type SettingsStorage = {
   blockedExtensions: string;
 };
 
+export type SettingsSecurity = {
+  /** off = sem 2FA · internal = só funcionários · all = todo mundo. */
+  twoFactorMode: 'off' | 'internal' | 'all';
+  maxLoginAttempts: number;
+  lockoutMinutes: number;
+};
+
 export type Settings = {
   general: SettingsGeneral;
   email: SettingsEmail;
   storage: SettingsStorage;
+  security: SettingsSecurity;
   updatedAt: string;
 };
 
@@ -134,6 +142,14 @@ export function useSaveStorage() {
 /** Testa o bucket com a config JÁ SALVA (salve antes de testar). */
 export function useTestStorage() {
   return useMutation({ mutationFn: () => api.post('/api/v1/settings/storage/test', {}) });
+}
+
+export function useSaveSecurity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: SettingsSecurity) => api.put('/api/v1/settings/security', p),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+  });
 }
 
 /** Dias úteis: ISO-8601 (1 = segunda … 7 = domingo), como o backend guarda. */

@@ -11,7 +11,6 @@ import { PerfisPage } from './pages/admin/PerfisPage';
 import { LogsPage } from './pages/admin/LogsPage';
 import { ParametrosPage } from './pages/admin/ParametrosPage';
 import { MeuDadosPage } from './pages/admin/MeuDadosPage';
-import { MudarSenhaPage } from './pages/admin/MudarSenhaPage';
 import { OrganogramaPage } from './pages/OrganogramaPage';
 import { ServicosPage } from './pages/ServicosPage';
 import { TarefasPage } from './pages/TarefasPage';
@@ -99,7 +98,8 @@ export const router = createBrowserRouter(
 
         // --- Conta / rodapé ------------------------------------------------
         { path: 'me', element: <MeuDadosPage /> },
-        { path: 'me/senha', element: <MudarSenhaPage /> },
+        // Mudar senha virou MODAL dentro de Meus dados (Fase 2) — a rota antiga redireciona.
+        { path: 'me/senha', element: <Navigate to="/me" replace /> },
         stub('suporte', 'Suporte', { phase: 'Fase 7' }),
 
         // Back-compat: a rota antiga /modelador agora abre o modelador standalone.

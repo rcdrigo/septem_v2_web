@@ -40,6 +40,13 @@ export class ApiError extends Error {
   type?: string;
   detail?: string;
   issues?: unknown;
+  /**
+   * Corpo bruto da resposta de erro. Os endpoints devolvem informação que a tela
+   * PRECISA mostrar — quantas tentativas restam antes do bloqueio, quais regras de
+   * senha faltam, o motivo real da falha do SMTP. Sem isso, tudo virava uma
+   * mensagem genérica e o usuário ficava sem saber o que corrigir.
+   */
+  body?: Record<string, unknown>;
 
   constructor(status: number, body?: { title?: string; type?: string; detail?: string; issues?: unknown }) {
     super(body?.title ?? body?.detail ?? `HTTP ${status}`);
@@ -47,6 +54,7 @@ export class ApiError extends Error {
     this.type = body?.type;
     this.detail = body?.detail;
     this.issues = body?.issues;
+    this.body = body as Record<string, unknown> | undefined;
   }
 }
 

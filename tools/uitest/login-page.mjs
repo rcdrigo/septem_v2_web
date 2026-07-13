@@ -45,7 +45,7 @@ await page.setViewportSize({ width: 1440, height: 900 });
 
 // ── login SEM "manter-me conectado": não guarda refresh token ────────────────
 await page.locator('label:has-text("Manter-me conectado") input').uncheck();
-await page.fill('input[type=email]', 'admin@prefeitura-x.local');
+await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
 await page.fill('input[type=password]', 'admin123');
 await page.getByRole('button', { name: 'Entrar' }).click();
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
@@ -58,7 +58,7 @@ check(tokens1.access && !tokens1.refresh, `desmarcado: access sim, refresh NÃO 
 // ── login COM "manter-me conectado": guarda refresh ───────────────────────────
 await page.evaluate(() => { localStorage.clear(); });
 await page.goto('http://localhost:5173/login', { waitUntil: 'networkidle' });
-await page.fill('input[type=email]', 'admin@prefeitura-x.local');
+await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
 await page.fill('input[type=password]', 'admin123');
 await page.getByRole('button', { name: 'Entrar' }).click();
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });

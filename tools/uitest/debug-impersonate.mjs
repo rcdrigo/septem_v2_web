@@ -5,7 +5,7 @@ page.on('pageerror', (e) => console.log('pageerror:', e.message.slice(0, 200)));
 page.on('response', (r) => { if (r.url().includes('impersonate')) console.log('HTTP', r.status(), r.request().method(), r.url().split('/api')[1]); });
 
 await page.goto('http://localhost:5173/login', { waitUntil: 'networkidle' });
-await page.fill('input[type=email]', 'admin@prefeitura-x.local');
+await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
 await page.fill('input[type=password]', 'admin123');
 await page.getByRole('button', { name: 'Entrar' }).click();
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });

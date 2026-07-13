@@ -77,7 +77,7 @@ for (const view of [
   const ctx = await browser.newContext({ viewport: { width: view.width, height: view.height }, deviceScaleFactor: 2 });
   const page = await ctx.newPage();
   await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
-  await page.fill('input[type=email]', 'admin@prefeitura-x.local');
+  await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
   await page.fill('input[type=password]', 'admin123');
   await page.click('button[type=submit]');
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });

@@ -2,7 +2,7 @@ import { chromium } from 'playwright-core';
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
 const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
 await page.goto('http://localhost:5173/login', { waitUntil: 'networkidle' });
-await page.fill('input[type=email]', 'admin@prefeitura-x.local');
+await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
 await page.fill('input[type=password]', 'admin123');
 await page.getByRole('button', { name: 'Entrar' }).click();
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Save, Building2, Mail, HardDrive, Loader2, Send, PlugZap } from 'lucide-react';
+import { Save, Building2, Mail, HardDrive, Loader2, Send, PlugZap, ShieldCheck } from 'lucide-react';
 import { toast } from '@/stores/toast';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { useSessionStore } from '@/stores/session';
@@ -11,6 +11,7 @@ import {
   useTestEmail,
   useSaveStorage,
   useTestStorage,
+  useSaveSecurity,
   parseDays,
   WEEKDAYS,
   type GeneralPayload,
@@ -18,14 +19,16 @@ import {
   type SettingsEmail,
   type StoragePayload,
   type SettingsStorage,
+  type SettingsSecurity,
 } from '@/lib/api/settings';
 
-type TabKey = 'geral' | 'email' | 'arquivos';
+type TabKey = 'geral' | 'email' | 'arquivos' | 'seguranca';
 
 const TABS: Array<{ key: TabKey; label: string; icon: typeof Building2 }> = [
   { key: 'geral', label: 'Informações gerais', icon: Building2 },
   { key: 'email', label: 'E-mail', icon: Mail },
   { key: 'arquivos', label: 'Arquivos', icon: HardDrive },
+  { key: 'seguranca', label: 'Segurança', icon: ShieldCheck },
 ];
 
 /**
@@ -76,6 +79,7 @@ export function ParametrosPage() {
         {data && tab === 'geral' && <GeralTab data={data.general} />}
         {data && tab === 'email' && <EmailTab data={data.email} />}
         {data && tab === 'arquivos' && <ArquivosTab data={data.storage} />}
+        {data && tab === 'seguranca' && <SegurancaTab data={data.security} />}
       </div>
     </div>
   );
@@ -237,6 +241,90 @@ function EmailTab({ data }: { data: SettingsEmail }) {
             {test.isPending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} Enviar teste
           </button>
         </div>
+      </Card>
+
+      <button
+        type="submit"
+        disabled={save.isPending}
+        className="flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-60"
+      >
+        {save.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Salvar
+      </button>
+    </form>
+  );
+}
+
+function SegurancaTab({ data }: { data: SettingsSecurity }) {
+  const save = useSaveSecurity();
+  const [form, setForm] = useState<SettingsSecurity>(data);
+
+  useEffect(() => setForm(data), [data]);
+
+  const set = <K extends keyof SettingsSecurity>(k: K, v: SettingsSecurity[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      await save.mutateAsync(form);
+      toast.success('Configuração de segurança salva.');
+    } catch (err) {
+      toast.error(detalhe(err) ?? 'Não foi possível salvar a configuração de segurança.');
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="max-w-3xl space-y-5" data-testid="form-seguranca">
+      <Card
+        title="Verificação em duas etapas"
+        hint="No login, além da senha, o usuário digita um código enviado para o e-mail dele. Exige o servidor de e-mail configurado na aba E-mail."
+      >
+        <Field label="Quando exigir o código">
+          <select
+            value={form.twoFactorMode}
+            onChange={(e) => set('twoFactorMode', e.target.value as SettingsSecurity['twoFactorMode'])}
+            className={inputCls}
+            name="twoFactorMode"
+          >
+            <option value="off">Nunca (desligado)</option>
+            <option value="internal">Somente funcionários (usuários internos)</option>
+            <option value="all">Todos os usuários</option>
+          </select>
+        </Field>
+        <p className="mt-2 text-xs text-slate-500">
+          Quem marcar "confiar neste dispositivo" não é desafiado de novo naquele aparelho — e pode
+          removê-lo a qualquer momento em Meus dados.
+        </p>
+      </Card>
+
+      <Card title="Bloqueio por tentativas" hint="Protege contra tentativa de adivinhar a senha. A tela avisa quantas tentativas restam.">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Tentativas até bloquear" required>
+            <input
+              type="number"
+              min={3}
+              max={20}
+              value={form.maxLoginAttempts}
+              onChange={(e) => set('maxLoginAttempts', Number(e.target.value))}
+              className={inputCls}
+              name="maxLoginAttempts"
+            />
+          </Field>
+          <Field label="Minutos de bloqueio" required>
+            <input
+              type="number"
+              min={1}
+              max={1440}
+              value={form.lockoutMinutes}
+              onChange={(e) => set('lockoutMinutes', Number(e.target.value))}
+              className={inputCls}
+              name="lockoutMinutes"
+            />
+          </Field>
+        </div>
+        <p className="mt-3 text-xs text-slate-500">
+          Redefinir a senha ("Esqueci minha senha") libera a conta na hora, sem esperar o bloqueio expirar.
+        </p>
       </Card>
 
       <button
