@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { applyTenantMeta } from '@/lib/tenant-meta';
 import { api, configureApi } from '@/lib/api';
 
 /**
@@ -27,6 +28,10 @@ export type Tenant = {
   ambienteNome: string;
   logoUrl?: string;
   primaryColor: string;
+  /** Imagem de destaque da tela de login (Parâmetros › Informações gerais). */
+  heroImageUrl?: string | null;
+  /** Texto de apresentação exibido na tela de login. */
+  systemDescription?: string | null;
   modulos: string[];
 };
 
@@ -43,6 +48,8 @@ type SessionState = {
   /** Sessão atual é uma personificação (admin agindo como outro usuário). */
   isImpersonating: boolean;
   bootstrap: () => Promise<void>;
+  /** Recarrega o branding do tenant (usado após salvar Parâmetros › Informações gerais). */
+  refreshTenant: () => Promise<void>;
   login: (email: string, password: string, keepConnected?: boolean) => Promise<void>;
   impersonate: (userId: string) => Promise<void>;
   stopImpersonation: () => Promise<void>;
@@ -69,6 +76,7 @@ function readCachedTenant(): Tenant | null {
   }
 }
 function cacheTenant(t: Tenant) {
+  applyTenantMeta(t);   // OG tags saem dos Parâmetros do sistema (Fase 1)
   try { localStorage.setItem(TENANT_KEY, JSON.stringify(t)); } catch { /* storage cheio */ }
 }
 
@@ -116,6 +124,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       const tenant = get().tenant;
       set({ status: tenant ? 'unauthenticated' : 'error', error: (err as Error).message });
     }
+  },
+
+  refreshTenant: async () => {
+    const tenant = await api.get<Tenant>('/api/tenant/config', { anonymous: true });
+    cacheTenant(tenant);
+    set({ tenant });
   },
 
   login: async (email, password, keepConnected = true) => {

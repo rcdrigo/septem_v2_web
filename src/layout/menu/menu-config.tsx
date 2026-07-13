@@ -18,6 +18,7 @@ import {
   Network,
   ScrollText,
   ShieldCheck,
+  SlidersHorizontal,
   UserCog,
   Users,
   Workflow,
@@ -86,6 +87,7 @@ export const MENU: MenuByMode = {
             icon: ShieldCheck,
             perm: 'admin:settings',
             children: [
+              { kind: 'link', label: 'Parâmetros do sistema', to: '/admin/parametros', icon: SlidersHorizontal },
               { kind: 'link', label: 'Manuais', to: '/admin/manuais', icon: BookOpen },
               { kind: 'link', label: 'Usuários', to: '/admin/usuarios', icon: Users },
               { kind: 'link', label: 'Unidades organizacionais', to: '/admin/unidades', icon: Building2 },

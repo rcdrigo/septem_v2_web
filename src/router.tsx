@@ -9,6 +9,7 @@ import { UnidadesPage } from './pages/admin/UnidadesPage';
 import { PosicoesPage } from './pages/admin/PosicoesPage';
 import { PerfisPage } from './pages/admin/PerfisPage';
 import { LogsPage } from './pages/admin/LogsPage';
+import { ParametrosPage } from './pages/admin/ParametrosPage';
 import { MeuDadosPage } from './pages/admin/MeuDadosPage';
 import { MudarSenhaPage } from './pages/admin/MudarSenhaPage';
 import { OrganogramaPage } from './pages/OrganogramaPage';
@@ -88,6 +89,7 @@ export const router = createBrowserRouter(
         stub('admin/dashboards', 'Dashboards', { phase: 'Fase 7' }),
 
         // --- Admin › Configurações ----------------------------------------
+        { path: 'admin/parametros', element: <ParametrosPage /> },
         stub('admin/manuais', 'Manuais', { phase: 'Fase 7' }),
         { path: 'admin/usuarios', element: <UsuariosPage /> },
         { path: 'admin/unidades', element: <UnidadesPage /> },

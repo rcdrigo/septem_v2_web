@@ -56,7 +56,13 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4 sm:p-6">
       <div className="grid w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white lg:grid-cols-2">
         {/* ── Painel institucional (esquerda) ─────────────────────────────── */}
-        <div className="relative flex flex-col justify-between overflow-hidden bg-slate-900 p-8 sm:p-10">
+        <div
+          className="relative flex flex-col justify-between overflow-hidden bg-slate-900 bg-cover bg-center p-8 sm:p-10"
+          style={tenant?.heroImageUrl ? { backgroundImage: `url(${tenant.heroImageUrl})` } : undefined}
+          data-testid="login-hero"
+        >
+          {/* Com imagem de destaque, escurece o fundo para o texto seguir legível. */}
+          {tenant?.heroImageUrl && <div aria-hidden className="absolute inset-0 bg-slate-900/75" />}
           {/* círculos decorativos */}
           <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-sky-800/40" />
           <div aria-hidden className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-sky-600/40" />
@@ -81,6 +87,11 @@ export function LoginPage() {
             <h2 className="max-w-md text-3xl font-bold leading-tight text-white sm:text-4xl">
               Processos claros, conformidade em cada decisão.
             </h2>
+            {tenant?.systemDescription && (
+              <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-300" data-testid="login-descricao">
+                {tenant.systemDescription}
+              </p>
+            )}
           </div>
 
           <div className="relative grid gap-3 sm:grid-cols-2">
