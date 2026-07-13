@@ -24,6 +24,9 @@ async function openModal(page) {
   await page.waitForTimeout(400);
 }
 
+let failures = 0;
+function check(ok, msg) { if (!ok) failures++; console.log(`${ok ? '✓' : '✗ FALHOU'} ${msg}`); }
+
 async function diagnose(page, label) {
   const info = await page.evaluate(() => {
     const dialog = document.querySelector('[role=dialog] > div');
@@ -49,7 +52,10 @@ async function diagnose(page, label) {
       selects,
     };
   });
-  console.log(`[${label}]`, JSON.stringify(info, null, 1));
+  const overflow = info.rows.some((r) => r.overflows);
+  check(!overflow, `[${label}] nenhuma linha com overflow`);
+  check(info.clipped.length === 0, `[${label}] nenhum controle cortado (clipped: ${info.clipped.length})`);
+  return info;
 }
 
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
@@ -93,3 +99,5 @@ try {
 }
 await ctx.close();
 await browser.close();
+console.log(failures === 0 ? 'PASSOU' : `FALHOU: ${failures} caso(s)`);
+process.exit(failures === 0 ? 0 : 1);
