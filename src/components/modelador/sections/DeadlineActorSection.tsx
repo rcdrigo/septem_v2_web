@@ -118,7 +118,7 @@ export function DeadlineActorSection({ modeler, element }: Props) {
             <Select
               value={actor.state.areaId}
               options={areaOptions}
-              placeholder={areas.isLoading ? 'Carregando…' : 'Selecione a área'}
+              placeholder={areas.isLoading ? 'Carregando…' : 'Selecione a unidade'}
               disabled={areas.isLoading}
               onChange={(e) => actor.flush({ areaId: e.target.value, positionId: '' })}
             />

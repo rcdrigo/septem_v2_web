@@ -10,7 +10,10 @@ for f in *.mjs; do
   if echo "$OUT" | tail -2 | grep -q "PASSOU"; then
     PASS=$((PASS+1)); printf "✅ %-30s %s checks\n" "${f%.mjs}" "$N"
   else
+    # Sem log, falha intermitente não se investiga: guarda a saída e mostra os ✗.
+    echo "$OUT" > "falhou-${f%.mjs}.log"
     FAIL=$((FAIL+1)); FAILED="$FAILED ${f%.mjs}"; printf "❌ %-30s %s\n" "${f%.mjs}" "$(echo "$OUT" | tail -1 | cut -c1-50)"
+    echo "$OUT" | grep -E "^✗|^!" | sed 's/^/     /'
   fi
 done
 echo "────────────────────────────────────────────"

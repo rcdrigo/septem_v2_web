@@ -1,7 +1,9 @@
 // Fase 3 — Unidades Organizacionais. Cria uma unidade completa pela TELA (sigla,
-// contatos, titular e preposto), confere a listagem (foto do titular + sigla em
-// destaque), abre o detalhe em aba própria e valida as abas contadas e a
-// impressão (todas as abas abertas). Web 1280 + mobile 375.
+// contatos, titular e preposto), EDITA pelo diálogo, confere a listagem (foto do
+// titular + sigla em destaque), abre o detalhe em aba própria e valida as abas
+// contadas COM CONTEÚDO REAL (um usuário lotado numa posição da unidade e um
+// processo cujo dono é a unidade, definido pelo modelador) e a impressão.
+// Web 1280 + mobile 375.
 import { chromium } from 'playwright-core';
 
 const BASE = 'http://localhost:5173';
@@ -10,6 +12,14 @@ const OUT = process.env.OUT_DIR || '.';
 const ok = [];
 const bad = [];
 const check = (cond, msg) => (cond ? ok.push(msg) : bad.push(msg));
+
+/**
+ * Processo semeado usado para provar a aba "Processos" (a unidade dona sai daqui).
+ * Tem de ser um processo COM diagrama: o Salvar do modelador serializa o canvas, e
+ * seeds sem `BPMNDiagram` (ex.: tres_tarefas_bug) não têm o que serializar.
+ */
+const PROCESSO_KEY = 'teste_condicoes_ui';
+const PROCESSO_NOME = 'Teste Condicoes UI';
 
 const api = async (token, path, method = 'GET', body) => {
   const r = await fetch(API + path, {
@@ -37,12 +47,13 @@ async function criarUsuario(nome, foto) {
     email: `${Math.floor(Math.random() * 1e9)}@teste.local`,
     isInternal: true,
   });
-  await api(token, `/api/v1/users/${r.body.id}`, 'PUT', { name: nome, photoUrl: foto });
+  if (foto) await api(token, `/api/v1/users/${r.body.id}`, 'PUT', { name: nome, photoUrl: foto });
   return { id: r.body.id, nome };
 }
 
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
 const criadas = [];
+const posicoes = [];
 
 const login = async (page) => {
   await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
@@ -51,6 +62,33 @@ const login = async (page) => {
   await page.click('button[type=submit]');
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 };
+
+/**
+ * Define (ou limpa) a unidade responsável do processo pelo MODELADOR — é o caminho
+ * real do produto: `Flow.AreaId` só é gravado pelo save do modelador, e é dele que
+ * a aba "Processos" da unidade se alimenta.
+ */
+async function definirUnidadeDoProcesso(page, rotuloUnidade) {
+  await page.goto(`${BASE}/processos/editar?key=${PROCESSO_KEY}`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(2500);
+  await page.locator('header button', { hasText: 'Configurações' }).click();
+  await page.waitForTimeout(600);
+
+  const campo = page.locator('label', { hasText: 'Unidade organizacional responsável' })
+    .locator('xpath=..').locator('button').first();
+  await campo.click();
+  await page.locator('button', { hasText: rotuloUnidade }).last().click();
+  await page.waitForTimeout(300);
+
+  const salvou = page.waitForResponse(
+    (r) => r.url().includes('/api/v1/workflow/process-definitions/') && r.request().method() === 'PUT',
+    { timeout: 20000 },
+  );
+  await page.locator('header button', { hasText: 'Salvar' }).first().click();
+  const resp = await salvou;
+  await page.waitForTimeout(800);
+  return { rotulo: (await campo.innerText()).trim(), status: resp.status() };
+}
 
 try {
   for (const view of [
@@ -101,8 +139,24 @@ try {
     check(criada?.sigla === sigla, `[${view.name}] a sigla foi gravada (${criada?.sigla})`);
     check(criada?.titular?.name === titular.nome, `[${view.name}] o titular foi gravado`);
 
-    // ── 2) Listagem: foto do titular + sigla em destaque + nome do titular ──
-    await page.reload({ waitUntil: 'networkidle' });
+    // ── 2) Popular as abas com CONTEÚDO REAL ───────────────────────────────
+    // Usuários: quem ocupa uma posição da unidade. Cria a posição e lota alguém.
+    const { body: pos } = await api(token, '/api/v1/positions', 'POST', {
+      key: `analista-${view.name}-${Math.floor(Math.random() * 1e6)}`,
+      name: 'Analista de Teste',
+      orgUnitId: criada.id,
+    });
+    posicoes.push(pos.id);
+    const lotado = await criarUsuario(`Servidor ${view.name}`, null);
+    await api(token, `/api/v1/users/${lotado.id}`, 'PUT', { name: lotado.nome, positionIds: [pos.id] });
+
+    // Processos: a unidade dona é definida na aba Configurações do modelador.
+    const salvo = await definirUnidadeDoProcesso(page, nome);
+    check(salvo.status === 200 && salvo.rotulo === nome,
+      `[${view.name}] o modelador grava a unidade responsável do processo (PUT ${salvo.status})`);
+
+    // ── 3) Listagem: foto do titular + sigla em destaque + nome do titular ──
+    await page.goto(BASE + '/admin/unidades', { waitUntil: 'networkidle' });
     await page.waitForSelector('[data-testid=unidade-linha]');
     const linha = page.locator('[data-testid=unidade-linha]', { hasText: sigla }).first();
     const texto = await linha.innerText();
@@ -112,7 +166,7 @@ try {
     check(!!foto && foto.includes('picsum'), `[${view.name}] a linha mostra a FOTO do titular (não o avatar genérico)`);
     await page.screenshot({ path: `${OUT}/unidades-lista-${view.name}.png`, fullPage: true });
 
-    // ── 3) Detalhe em aba própria ──────────────────────────────────────────
+    // ── 4) Detalhe em aba própria ──────────────────────────────────────────
     await page.goto(`${BASE}/unidade?id=${criada.id}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('[data-testid=abas-unidade]');
     const detalhe = await page.locator('body').innerText();
@@ -127,7 +181,8 @@ try {
     const fotos = await page.locator('[data-testid=pessoas-unidade] img[data-testid=avatar]').count();
     check(fotos === 2, `[${view.name}] titular e preposto aparecem com foto (${fotos}/2)`);
 
-    // Abas com contador (Manuais e Documentos ainda são 0 — módulos das Fases 10 e 6).
+    // Abas com contador. Processos e Usuários agora têm conteúdo REAL (1 cada);
+    // Manuais e Documentos ainda são 0 — os módulos entram nas Fases 10 e 6.
     const abas = await page.locator('[role=tab]').count();
     check(abas === 4, `[${view.name}] o card tem 4 abas (Processos, Manuais, Documentos, Usuários)`);
     const contadores = {};
@@ -135,20 +190,30 @@ try {
       contadores[k] = (await page.locator(`[data-testid=contador-${k}]`).innerText()).trim();
     }
     check(
-      Object.values(contadores).every((v) => /^\d+$/.test(v)),
-      `[${view.name}] cada aba tem contador (processos ${contadores.processos}, manuais ${contadores.manuais}, documentos ${contadores.documentos}, usuários ${contadores.usuarios})`,
+      contadores.processos === '1' && contadores.usuarios === '1',
+      `[${view.name}] os contadores refletem o conteúdo real (processos ${contadores.processos}, usuários ${contadores.usuarios})`,
+    );
+    check(
+      contadores.manuais === '0' && contadores.documentos === '0',
+      `[${view.name}] Manuais e Documentos existem com contador 0 (módulos das Fases 10 e 6)`,
     );
 
-    // Trocar de aba mostra o painel correspondente.
+    // Painel Processos: o processo cuja unidade dona é esta.
+    const painelProc = await page.locator('[data-testid=painel-processos]').innerText();
+    check(painelProc.includes(PROCESSO_NOME) && !/Nenhum processo/.test(painelProc),
+      `[${view.name}] a aba Processos LISTA o processo da unidade`);
+
+    // Painel Usuários: quem está lotado, com o nome da posição.
     await page.getByRole('tab', { name: /Usuários/ }).click();
     await page.waitForTimeout(300);
-    check(
-      await page.locator('[data-testid=painel-usuarios]').isVisible(),
-      `[${view.name}] clicar na aba Usuários mostra o painel dela`,
-    );
+    const painelUsers = await page.locator('[data-testid=painel-usuarios]').innerText();
+    check(await page.locator('[data-testid=painel-usuarios]').isVisible(),
+      `[${view.name}] clicar na aba Usuários mostra o painel dela`);
+    check(painelUsers.includes(lotado.nome) && painelUsers.includes('Analista de Teste'),
+      `[${view.name}] a aba Usuários mostra o servidor lotado E a posição dele`);
     await page.screenshot({ path: `${OUT}/unidade-detalhe-${view.name}.png`, fullPage: true });
 
-    // ── 4) Impressão: TODAS as abas abertas ────────────────────────────────
+    // ── 5) Impressão: TODAS as abas abertas ────────────────────────────────
     await page.emulateMedia({ media: 'print' });
     await page.waitForTimeout(300);
     const visiveisNaImpressao = await page.evaluate(
@@ -167,7 +232,60 @@ try {
     await page.screenshot({ path: `${OUT}/unidade-impressao-${view.name}.png`, fullPage: true });
     await page.emulateMedia({ media: 'screen' });
 
-    // ── 5) Layout ──────────────────────────────────────────────────────────
+    // ── 6) EDITAR pela tela: o diálogo carrega o que existe e grava a mudança ─
+    const sigla2 = `${sigla}X`;
+    await page.goto(BASE + '/admin/unidades', { waitUntil: 'networkidle' });
+    await page.waitForSelector('[data-testid=unidade-linha]');
+    await page.locator('[data-testid=unidade-linha]', { hasText: sigla })
+      .first().locator('button[title=Editar]').click();
+
+    // Enquanto o detalhe não chega, o formulário NÃO pode estar salvável: salvar cedo
+    // gravaria campos em branco por cima da unidade (apagava sigla, contatos, titular).
+    const salvarHabilitadoCedo = await page
+      .locator('button:has-text("Salvar"):not([disabled])').first()
+      .isVisible({ timeout: 150 }).catch(() => false);
+    const formCedo = await page.locator('[data-testid=form-unidade]').count();
+    check(!(salvarHabilitadoCedo && formCedo > 0),
+      `[${view.name}] o Salvar da edição fica travado até os dados carregarem`);
+
+    await page.waitForSelector('[data-testid=form-unidade]');
+
+    // O diálogo tem que vir PREENCHIDO — abrir em branco apagaria os dados no save.
+    const precarregado = await page.evaluate(() => ({
+      sigla: document.querySelector('[data-testid=form-unidade] input[name=sigla]')?.value,
+      telefone: document.querySelector('[data-testid=form-unidade] input[name=telefone]')?.value,
+    }));
+    check(precarregado.sigla === sigla && precarregado.telefone === '(11) 3333-4444',
+      `[${view.name}] o diálogo de edição abre com os campos já preenchidos`);
+
+    // O rótulo do titular é resolvido por uma 2ª busca (o combobox guarda só o id):
+    // espera pelo nome em vez de medir num instante — o que também prova que carrega.
+    const titularVisivel = await page
+      .waitForFunction(
+        (n) => document.querySelector('[data-testid=form-unidade]')?.innerText.includes(n),
+        titular.nome,
+        { timeout: 8000 },
+      )
+      .then(() => true)
+      .catch(() => false);
+    check(titularVisivel, `[${view.name}] o diálogo de edição mostra o titular já selecionado`);
+
+    await page.fill('[data-testid=form-unidade] input[name=sigla]', sigla2);
+    await page.fill('[data-testid=form-unidade] input[name=localizacao]', 'Av. Nova, 900');
+    await page.getByRole('button', { name: 'Salvar' }).click();
+    await page.waitForSelector('text=Alterações salvas.', { timeout: 10000 });
+
+    const { body: dep } = await api(token, `/api/v1/org-units/${criada.id}`);
+    check(dep.sigla === sigla2 && dep.localizacao === 'Av. Nova, 900',
+      `[${view.name}] a edição gravou sigla e localização (${dep.sigla})`);
+    check(dep.titular?.name === titular.nome && dep.preposto?.name === preposto.nome,
+      `[${view.name}] a edição NÃO apagou titular e preposto`);
+    check((await page.locator('[data-testid=unidade-linha]', { hasText: sigla2 }).count()) > 0,
+      `[${view.name}] a listagem já mostra a sigla nova`);
+
+    // ── 7) Layout ──────────────────────────────────────────────────────────
+    await page.goto(`${BASE}/unidade?id=${criada.id}`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('[data-testid=abas-unidade]');
     const L = await page.evaluate(() => {
       const doc = document.documentElement;
       const clipped = [...document.querySelectorAll('button, img, dl')].filter((el) => {
@@ -179,19 +297,45 @@ try {
     check(!L.overflows, `[${view.name}] detalhe sem overflow horizontal`);
     check(L.clipped === 0, `[${view.name}] detalhe sem elemento recortado (${L.clipped})`);
 
-    // ── 6) "Área" virou "Unidade organizacional" no modelador ──────────────
-    await page.goto(`${BASE}/processos/editar?key=tres_tarefas_bug`, { waitUntil: 'networkidle' });
+    // ── 8) "Área" virou "Unidade organizacional" no modelador ──────────────
+    // Varre TEXTO + placeholder + label + title + aria-label: `innerText` não enxerga
+    // placeholder, e foi assim que "Selecione a área" passou despercebido.
+    await page.goto(`${BASE}/processos/editar?key=${PROCESSO_KEY}`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(2500);
-    const cfg = await page.evaluate(() => document.body.innerText);
-    check(
-      !/\bÁrea responsável\b/.test(cfg),
-      `[${view.name}] o modelador não fala mais em "Área responsável"`,
-    );
+    const varrer = () =>
+      page.evaluate(() => {
+        const t = [document.body.innerText];
+        for (const el of document.querySelectorAll('*')) {
+          for (const a of ['placeholder', 'title', 'aria-label', 'alt']) {
+            const v = el.getAttribute?.(a);
+            if (v) t.push(v);
+          }
+        }
+        return t.join('\n');
+      });
+    const semArea = (txt) => !/\bárea\b/i.test(txt);
+    check(semArea(await varrer()), `[${view.name}] o modelador (fluxo) não fala em "área" em texto nem em placeholder`);
+
+    await page.locator('header button', { hasText: 'Configurações' }).click();
+    await page.waitForTimeout(800);
+    check(semArea(await varrer()), `[${view.name}] a aba Configurações não fala em "área" em texto nem em placeholder`);
 
     await ctx.close();
   }
 } finally {
-  // Remove as unidades criadas (suíte idempotente).
+  // Restaura a unidade dona do processo (senão o DELETE da unidade esbarra no vínculo)
+  // e remove o que a suíte criou — ela precisa poder rodar de novo.
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await ctx.newPage();
+  try {
+    await login(page);
+    await definirUnidadeDoProcesso(page, '— nenhuma —');
+  } catch (e) {
+    console.log('! não consegui restaurar a unidade do processo: ' + e.message);
+  }
+  await ctx.close();
+
+  for (const id of posicoes) await api(token, `/api/v1/positions/${id}`, 'DELETE');
   for (const id of criadas) await api(token, `/api/v1/org-units/${id}`, 'DELETE');
   await browser.close();
 }

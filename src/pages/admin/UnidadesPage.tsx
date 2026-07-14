@@ -392,20 +392,29 @@ function EditUnitDialog({ unit, onClose }: { unit: OrgUnitNode; onClose: () => v
     }
   }
 
+  // A árvore só tem nome/chave/ativo: os demais campos vêm do detalhe, que é assíncrono.
+  // Enquanto ele não chega, NÃO mostramos o formulário — se o usuário salvasse antes,
+  // gravaria os campos em branco por cima da unidade (apagando sigla, contatos, titular…).
+  const carregado = !!detail.data;
+
   return (
     <Dialog open onClose={onClose} width="lg" title="Editar unidade" footer={
       <>
         <button onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Cancelar</button>
-        <button form="edit-unit-form" type="submit" disabled={update.isPending}
+        <button form="edit-unit-form" type="submit" disabled={update.isPending || !carregado}
           className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">Salvar</button>
       </>
     }>
-      <form id="edit-unit-form" onSubmit={submit} data-testid="form-unidade">
-        <UnitFields form={form} set={set} keyReadOnly onName={(v) => set('name', v)} />
-        <div className="mt-3">
-          <Checkbox checked={form.active} onChange={(v) => set('active', v)} label="Unidade ativa" />
-        </div>
-      </form>
+      {!carregado ? (
+        <p className="py-8 text-center text-sm text-slate-500" data-testid="unidade-carregando">Carregando dados da unidade…</p>
+      ) : (
+        <form id="edit-unit-form" onSubmit={submit} data-testid="form-unidade">
+          <UnitFields form={form} set={set} keyReadOnly onName={(v) => set('name', v)} />
+          <div className="mt-3">
+            <Checkbox checked={form.active} onChange={(v) => set('active', v)} label="Unidade ativa" />
+          </div>
+        </form>
+      )}
     </Dialog>
   );
 }
