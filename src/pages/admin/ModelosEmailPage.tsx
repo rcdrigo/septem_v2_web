@@ -165,7 +165,7 @@ function RecipientRow({ value, onChange, onRemove }: { value: Recipient; onChang
       <div className="mt-2">
         {value.type === 'position' && (
           <div className="grid grid-cols-2 gap-2">
-            <Select value={value.orgUnitId ?? ''} placeholder="Área" options={(areas.data ?? []).map((a) => ({ value: a.id, label: a.name }))} onChange={(e) => onChange({ ...value, orgUnitId: e.target.value, positionId: null })} />
+            <Select value={value.orgUnitId ?? ''} placeholder="Unidade organizacional" options={(areas.data ?? []).map((a) => ({ value: a.id, label: a.name }))} onChange={(e) => onChange({ ...value, orgUnitId: e.target.value, positionId: null })} />
             <Select value={value.positionId ?? ''} placeholder="Posição" disabled={!areaKey} options={(positions.data ?? []).map((p) => ({ value: p.id, label: p.name }))} onChange={(e) => onChange({ ...value, positionId: e.target.value })} />
           </div>
         )}

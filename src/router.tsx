@@ -6,6 +6,7 @@ import { RelatorioBuilderPage } from './pages/relatorios/RelatorioBuilderPage';
 import { ProcessosPage } from './pages/processos/ProcessosPage';
 import { UsuariosPage } from './pages/admin/UsuariosPage';
 import { UnidadesPage } from './pages/admin/UnidadesPage';
+import { UnidadePage } from './pages/UnidadePage';
 import { PosicoesPage } from './pages/admin/PosicoesPage';
 import { PerfisPage } from './pages/admin/PerfisPage';
 import { LogsPage } from './pages/admin/LogsPage';
@@ -52,6 +53,8 @@ export const router = createBrowserRouter(
     { path: '/processos/editar', element: <ModeladorPage /> },
     // Builder de relatórios em aba própria (Admin › Relatórios › Builder).
     { path: '/relatorios/editar', element: <RelatorioBuilderPage /> },
+    // Unidade organizacional em aba própria (Fase 3) — imprimível.
+    { path: '/unidade', element: <UnidadePage /> },
     {
       path: '/',
       element: <AppShell />,

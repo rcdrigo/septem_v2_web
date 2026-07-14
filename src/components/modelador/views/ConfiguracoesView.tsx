@@ -115,7 +115,7 @@ export function ConfiguracoesView({ modeler }: Props) {
                   <Field label="Categoria">
                     <Select value={cfg.categoryId} onChange={(e) => patch({ categoryId: e.target.value })} options={categoryOptions} />
                   </Field>
-                  <Field label="Área responsável" hint="Unidade organizacional.">
+                  <Field label="Unidade organizacional responsável" hint="Secretaria/órgão dono do processo.">
                     <Combobox
                       value={cfg.areaId}
                       options={(orgUnits.data ?? []).map((u) => ({ value: u.key, label: u.name }))}

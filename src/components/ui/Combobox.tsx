@@ -12,13 +12,19 @@ type Props = {
   /** Texto do item que limpa a seleção (value ''). Se omitido, não exibe. */
   clearLabel?: string;
   disabled?: boolean;
+  /**
+   * Avisa quem chama que o texto de busca mudou. Use quando a lista é grande
+   * demais para caber no cliente (ex.: usuários de uma prefeitura): o dono da
+   * página busca no servidor e devolve `options` já filtradas.
+   */
+  onQueryChange?: (q: string) => void;
 };
 
 /**
  * Combobox pesquisável: botão mostra o rótulo atual; ao abrir, um input filtra
  * a lista por texto. Fecha no Esc / clique fora / seleção. Valor controlado.
  */
-export function Combobox({ value, options, onChange, placeholder, clearLabel, disabled }: Props) {
+export function Combobox({ value, options, onChange, placeholder, clearLabel, disabled, onQueryChange }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [rect, setRect] = useState<{ left: number; top: number; width: number } | null>(null);
@@ -33,7 +39,16 @@ export function Combobox({ value, options, onChange, placeholder, clearLabel, di
     if (!open) return;
     function place() {
       const r = rootRef.current?.getBoundingClientRect();
-      if (r) setRect({ left: r.left, top: r.bottom + 4, width: r.width });
+      if (!r) return;
+      // Sem espaço abaixo (campo no fim de um diálogo alto, ou mobile), o painel
+      // abriria fora da tela e ficaria inalcançável — nesse caso, abre para cima.
+      const alturaPainel = Math.min(panelRef.current?.offsetHeight || 260, 260);
+      const cabeAbaixo = r.bottom + 4 + alturaPainel <= window.innerHeight - 8;
+      setRect({
+        left: r.left,
+        top: cabeAbaixo ? r.bottom + 4 : Math.max(8, r.top - 4 - alturaPainel),
+        width: r.width,
+      });
     }
     place();
     window.addEventListener('scroll', place, true);
@@ -63,7 +78,9 @@ export function Combobox({ value, options, onChange, placeholder, clearLabel, di
     };
   }, [open]);
 
-  const filtered = query.trim()
+  // Com busca no servidor, `options` já vem filtrada — não filtrar de novo aqui
+  // (o texto digitado pode não casar com o rótulo exato devolvido pelo backend).
+  const filtered = query.trim() && !onQueryChange
     ? options.filter((o) => o.label.toLowerCase().includes(query.trim().toLowerCase()))
     : options;
 
@@ -94,7 +111,10 @@ export function Combobox({ value, options, onChange, placeholder, clearLabel, di
             <input
               ref={inputRef}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                onQueryChange?.(e.target.value);
+              }}
               placeholder="Pesquisar…"
               className="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:border-slate-400 focus:outline-none"
             />

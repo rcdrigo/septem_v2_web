@@ -44,7 +44,7 @@ const DEADLINE_DEFAULTS: DeadlineConfig = {
 
 const ACTOR_OPTIONS = [
   { value: 'requester', label: 'Requisitante' },
-  { value: 'areaPosition', label: 'Outro — área e posição' },
+  { value: 'areaPosition', label: 'Outro — unidade organizacional e posição' },
   { value: 'formField', label: 'Usuário selecionado em campo do formulário' },
   { value: 'dataSource', label: 'Utilizar fonte de dados' },
 ] as const;
@@ -114,7 +114,7 @@ export function DeadlineActorSection({ modeler, element }: Props) {
 
       {isAreaPosition && (
         <div className="grid grid-cols-2 gap-2">
-          <Field label="Área">
+          <Field label="Unidade organizacional">
             <Select
               value={actor.state.areaId}
               options={areaOptions}

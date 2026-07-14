@@ -145,7 +145,7 @@ export function ProcessosPage() {
                 <tr>
                   <th className="px-4 py-2 text-left">Processo</th>
                   <th className="px-4 py-2 text-left">Categoria</th>
-                  <th className="px-4 py-2 text-left">Área</th>
+                  <th className="px-4 py-2 text-left">Un. Org.</th>
                   <th className="px-4 py-2 text-left">Versão</th>
                   <th className="px-4 py-2 text-left">Status</th>
                   <th className="px-4 py-2 text-left">Atualizado</th>
