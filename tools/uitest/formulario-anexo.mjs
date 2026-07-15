@@ -107,6 +107,12 @@ try {
     await page.waitForTimeout(1500);
     check(await page.locator('text=/conclu/i').count() > 0, `[${view.name}] conclui a tarefa com o anexo`);
 
+    // EFEITO (não só a tela): o anexo PERSISTE nos dados da execução, não é só visual.
+    const det = await api(token, `/api/v1/workflow/instances/${inst.body.executionId}`);
+    const anexoSalvo = JSON.stringify(det.body?.data?.anexo ?? '');
+    check(anexoSalvo.includes('parecer.pdf') && /parecer_\d{17}\.pdf/.test(anexoSalvo),
+      `[${view.name}] o anexo persiste nos dados da execução (não some ao concluir)`);
+
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
     check(!overflow, `[${view.name}] preenchimento sem overflow horizontal`);
     await ctx.close();
