@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { FA_ICON_NAMES, FA_STYLES, faClass } from '@/lib/fa-icons';
+import { FA_ALL_ICON_NAMES, FA_REGULAR_ICON_NAMES } from '@/lib/fa-icon-names';
+
+/** Quantos renderizar de uma vez (o catálogo completo tem ~1400). */
+const MAX_RENDER = 300;
 
 type Props = {
   /** Classe FontAwesome atual (ex.: "fa-solid fa-building"). */
@@ -19,7 +23,13 @@ export function IconSearchPicker({ value, onChange }: Props) {
   const [prefix, setPrefix] = useState<string>(value?.split(' ')[0] || 'fa-solid');
 
   const term = query.trim().toLowerCase();
-  const names = term ? FA_ICON_NAMES.filter((n) => n.includes(term)) : FA_ICON_NAMES;
+  // Sem busca: lista curada de comuns (rápida). Com busca: catálogo COMPLETO (~1400).
+  // No estilo "regular", só entram os que têm regular free (senão renderiza sólido).
+  const hasRegular = prefix === 'fa-regular';
+  const pool = term ? FA_ALL_ICON_NAMES : FA_ICON_NAMES;
+  const filtered = pool.filter((n) => (!term || n.includes(term)) && (!hasRegular || FA_REGULAR_ICON_NAMES.has(n)));
+  const names = filtered.slice(0, MAX_RENDER);
+  const truncated = filtered.length > names.length;
   const shortOf = (p: string) => FA_STYLES.find((s) => s.prefix === p)?.short ?? p;
 
   return (
@@ -39,7 +49,7 @@ export function IconSearchPicker({ value, onChange }: Props) {
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Pesquisar ícone…"
+              placeholder={`Pesquisar em ${FA_ALL_ICON_NAMES.length} ícones…`}
               className="min-w-0 flex-1 rounded border border-slate-200 px-2 py-1 text-sm focus:border-slate-400 focus:outline-none"
             />
             <div className="flex overflow-hidden rounded border border-slate-200">
@@ -72,6 +82,7 @@ export function IconSearchPicker({ value, onChange }: Props) {
               );
             })}
             {names.length === 0 && <li className="px-3 py-2 text-xs text-slate-400">Nenhum ícone encontrado.</li>}
+            {truncated && <li className="px-3 py-1.5 text-[11px] text-slate-400" data-testid="icon-truncado">Refine a busca para ver mais ({filtered.length} resultados).</li>}
           </ul>
         </div>
       )}
