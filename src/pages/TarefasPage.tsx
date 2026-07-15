@@ -6,6 +6,7 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { openTab, navTo } from '@/lib/nav';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { toast } from '@/stores/toast';
+import { ApiError } from '@/lib/api';
 
 /**
  * Geral › Tarefas pendentes (B3): inbox do executor — tarefas atribuídas a ele
@@ -154,7 +155,17 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
     try {
       const r = await complete.mutateAsync({ id: taskId, data, action: button?.id });
       setDone({ nextTaskForMe: r.nextTaskForMe, executionId: r.executionId });
-    } catch { toast.error('Não foi possível concluir a tarefa.'); }
+    } catch (err) {
+      // O servidor valida de novo (autoritativo): 422 traz os campos inválidos —
+      // pinta cada um e avisa, em vez de um erro genérico.
+      const body = err instanceof ApiError ? (err.body as { error?: string; fields?: Record<string, string> } | undefined) : undefined;
+      if (body?.error === 'validation' && body.fields) {
+        fillRef.current?.setServerErrors(body.fields);
+        toast.error('Há campos com valor inválido.');
+      } else {
+        toast.error('Não foi possível concluir a tarefa.');
+      }
+    }
   }
 
   async function saveDraft() {

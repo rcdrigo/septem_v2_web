@@ -3,10 +3,15 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, HelpCircle, Plus, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { regexToTemplate, applyMask, isAllDigits } from '@/lib/mask';
+import { maskDocumento, validateDocumento, type DocKind } from '@/lib/documento';
 
 /** Mesmo contrato do FormFill (form-js), para ser intercambiável. */
 export type FormFillResult = { data: Record<string, unknown>; errors: Record<string, unknown> };
-export type ReactFormHandle = { submit: () => FormFillResult };
+export type ReactFormHandle = {
+  submit: () => FormFillResult;
+  /** Injeta erros vindos do servidor (422) no formulário, pintando os campos. */
+  setServerErrors: (errs: Record<string, string>) => void;
+};
 
 type Component = {
   id?: string;
@@ -160,10 +165,15 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
         const empty = v === '' || v === undefined || v === null || (c.type === 'checkbox' && v === false);
         if (req && empty) { errs[c.key!] = 'Campo obrigatório.'; continue; }
         if (typeof v === 'string' && v) {
+          const docKind = c.type === 'textfield' ? (c.properties?.septemDocKind as DocKind | undefined) : undefined;
+          if (docKind) {
+            const msg = validateDocumento(v, docKind);
+            if (msg) { errs[c.key!] = msg; continue; }
+          }
           if (c.validate?.minLength && v.length < c.validate.minLength) errs[c.key!] = `Mínimo de ${c.validate.minLength} caracteres.`;
           if (c.validate?.maxLength && v.length > c.validate.maxLength) errs[c.key!] = `Máximo de ${c.validate.maxLength} caracteres.`;
           const regex = c.properties?.septemMaskRegex;
-          if (c.properties?.septemMaskValidate === 'true' && regex) {
+          if (!docKind && c.properties?.septemMaskValidate === 'true' && regex) {
             try { if (!new RegExp(regex).test(v)) errs[c.key!] = 'Formato inválido.'; } catch { /* regex inválida: ignora */ }
           }
         }
@@ -182,6 +192,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
         setErrors(errs);
         return { data: values, errors: errs };
       },
+      setServerErrors: (errs) => setErrors(errs),
     }), [values, inputs, fieldState]);
 
     const comps = root.components ?? [];
@@ -243,9 +254,12 @@ function Node({ comp }: { comp: Component }) {
   const helpText = comp.properties?.septemHelpText;
   const popoverHelp = helpType === 'popover' ? helpText : null;
   const inlineHelp = helpType !== 'popover' ? helpText : null;
+  // Documento (CPF/CNPJ) tem máscara DINÂMICA própria + validação de dígito; tem
+  // precedência sobre a máscara genérica por regex.
+  const docKind = comp.type === 'textfield' ? (comp.properties?.septemDocKind as DocKind | undefined) : undefined;
   // Máscara: usa o Formato explícito (septemMaskTemplate) ou deriva do regex.
-  const maskTemplate = comp.properties?.septemMaskTemplate
-    || (comp.properties?.septemMaskRegex ? regexToTemplate(comp.properties.septemMaskRegex) : null);
+  const maskTemplate = docKind ? null : (comp.properties?.septemMaskTemplate
+    || (comp.properties?.septemMaskRegex ? regexToTemplate(comp.properties.septemMaskRegex) : null));
   // Prefixo/sufixo: o form-js grava em `appearance`; aceitamos os dois formatos.
   const prefixAdorner = comp.prefixAdorner ?? comp.appearance?.prefixAdorner;
   const suffixAdorner = comp.suffixAdorner ?? comp.appearance?.suffixAdorner;
@@ -315,14 +329,15 @@ function Node({ comp }: { comp: Component }) {
   } else {
     const input = (
       <input
-        type={maskTemplate ? 'text' : comp.type === 'number' ? 'number' : comp.type === 'email' ? 'email' : comp.type === 'datetime' ? 'datetime-local' : comp.type === 'password' ? 'password' : 'text'}
-        inputMode={maskTemplate ? (isAllDigits(maskTemplate) ? 'numeric' : undefined) : undefined}
-        maxLength={maskTemplate ? maskTemplate.length : maxLength}
+        type={docKind || maskTemplate ? 'text' : comp.type === 'number' ? 'number' : comp.type === 'email' ? 'email' : comp.type === 'datetime' ? 'datetime-local' : comp.type === 'password' ? 'password' : 'text'}
+        inputMode={docKind ? 'numeric' : maskTemplate ? (isAllDigits(maskTemplate) ? 'numeric' : undefined) : undefined}
+        maxLength={docKind ? 18 : maskTemplate ? maskTemplate.length : maxLength}
         disabled={disabled}
         className={prefixAdorner || suffixAdorner ? `${base} rounded-none border-0 focus:ring-0` : base}
         value={String(v ?? '')}
         {...evt}
         onChange={(e) => {
+          if (docKind) { setAndEmit(maskDocumento(e.target.value, docKind), e); return; }
           if (maskTemplate) { setAndEmit(applyMask(maskTemplate, e.target.value), e); return; }
           setAndEmit(comp.type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value, e);
         }}

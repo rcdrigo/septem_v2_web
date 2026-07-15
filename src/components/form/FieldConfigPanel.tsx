@@ -5,6 +5,7 @@ import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { DataSourceSelect } from '@/components/modelador/fields/DataSourceSelect';
 import { IconSearchPicker } from '@/components/ui/IconSearchPicker';
 import { slugify } from '@/lib/slugify';
+import { DOC_KIND_OPTIONS } from '@/lib/documento';
 import { fetchDataSourceOptions } from '@/lib/api/catalog';
 import { openTab } from '@/lib/nav';
 import { toast } from '@/stores/toast';
@@ -253,7 +254,12 @@ export function FieldConfigPanel({ field, editField, masks }: {
 
         {tab === 'aparencia' && (
           <div className="flex flex-col gap-3">
-            {MASKABLE.has(field.type) && (
+            {field.type === 'textfield' && (
+              <Select label="Documento" value={props.septemDocKind ?? ''} options={DOC_KIND_OPTIONS}
+                hint="CPF/CNPJ com validação de dígito verificador (máscara dinâmica). Bloqueia concluir com documento inválido."
+                onChange={(v) => merge('properties', { septemDocKind: v || undefined })} />
+            )}
+            {MASKABLE.has(field.type) && !props.septemDocKind && (
               <Select label="Máscara" value={props.septemMaskId ?? ''} options={[{ value: '', label: '— nenhuma —' }, ...masks]}
                 onChange={(v) => {
                   const m = masks.find((o) => o.value === v);
@@ -332,8 +338,8 @@ function TextArea({ label, value, onChange }: { label: string; value: string; on
 function NumberInput({ label, value, onChange, hint }: { label: string; value: unknown; onChange: (n: number | undefined) => void; hint?: string }) {
   return <div><Lbl>{label}</Lbl><input type="number" className={fieldCls} value={value === undefined || value === null ? '' : String(value)} onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))} />{hint && <span className="mt-0.5 block text-[11px] text-slate-400">{hint}</span>}</div>;
 }
-function Select({ label, value, options, onChange }: { label: string; value: string; options: Opt[]; onChange: (v: string) => void }) {
-  return <div><Lbl>{label}</Lbl><select className={fieldCls} value={value} onChange={(e) => onChange(e.target.value)}>{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>;
+function Select({ label, value, options, onChange, hint }: { label: string; value: string; options: Opt[]; onChange: (v: string) => void; hint?: string }) {
+  return <div><Lbl>{label}</Lbl><select className={fieldCls} value={value} onChange={(e) => onChange(e.target.value)}>{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>{hint && <span className="mt-0.5 block text-[11px] text-slate-400">{hint}</span>}</div>;
 }
 function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (b: boolean) => void }) {
   return <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} /> {label}</label>;
