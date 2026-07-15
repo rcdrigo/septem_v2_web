@@ -4,6 +4,7 @@ import { ChevronDown, HelpCircle, Plus, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { regexToTemplate, applyMask, isAllDigits } from '@/lib/mask';
 import { maskDocumento, validateDocumento, type DocKind } from '@/lib/documento';
+import { inputTypeForDateMode, validateDateClient, type DateMode, type DateLimit } from '@/lib/datafield';
 
 /** Mesmo contrato do FormFill (form-js), para ser intercambiável. */
 export type FormFillResult = { data: Record<string, unknown>; errors: Record<string, unknown> };
@@ -182,6 +183,10 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
           if (c.validate?.min !== undefined && n < c.validate.min) errs[c.key!] = `Valor mínimo ${c.validate.min}.`;
           if (c.validate?.max !== undefined && n > c.validate.max) errs[c.key!] = `Valor máximo ${c.validate.max}.`;
         }
+        if (c.type === 'datetime' && typeof v === 'string' && v) {
+          const msg = validateDateClient(v, c.properties?.septemDateMode as DateMode | undefined, c.properties?.septemDateLimit as DateLimit | undefined);
+          if (msg) errs[c.key!] = msg;
+        }
       }
       return errs;
     }
@@ -329,7 +334,7 @@ function Node({ comp }: { comp: Component }) {
   } else {
     const input = (
       <input
-        type={docKind || maskTemplate ? 'text' : comp.type === 'number' ? 'number' : comp.type === 'email' ? 'email' : comp.type === 'datetime' ? 'datetime-local' : comp.type === 'password' ? 'password' : 'text'}
+        type={docKind || maskTemplate ? 'text' : comp.type === 'number' ? 'number' : comp.type === 'email' ? 'email' : comp.type === 'datetime' ? inputTypeForDateMode(comp.properties?.septemDateMode as DateMode | undefined) : comp.type === 'password' ? 'password' : 'text'}
         inputMode={docKind ? 'numeric' : maskTemplate ? (isAllDigits(maskTemplate) ? 'numeric' : undefined) : undefined}
         maxLength={docKind ? 18 : maskTemplate ? maskTemplate.length : maxLength}
         disabled={disabled}

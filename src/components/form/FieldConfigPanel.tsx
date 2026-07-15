@@ -6,6 +6,7 @@ import { DataSourceSelect } from '@/components/modelador/fields/DataSourceSelect
 import { IconSearchPicker } from '@/components/ui/IconSearchPicker';
 import { slugify } from '@/lib/slugify';
 import { DOC_KIND_OPTIONS } from '@/lib/documento';
+import { DATE_MODE_OPTIONS, DATE_LIMIT_OPTIONS } from '@/lib/datafield';
 import { fetchDataSourceOptions } from '@/lib/api/catalog';
 import { openTab } from '@/lib/nav';
 import { toast } from '@/stores/toast';
@@ -54,7 +55,7 @@ function availableTabIds(field: any): Tab[] {
   const isInput = !!field?.key && !PRESENTATION.has(type) && !CONTAINER.has(type);
   return TABS.filter((t) => {
     switch (t.id) {
-      case 'validacao': return type === 'number';
+      case 'validacao': return type === 'number' || type === 'datetime';
       case 'eventos': return isInput;
       default: return true; // geral, aparencia
     }
@@ -259,7 +260,12 @@ export function FieldConfigPanel({ field, editField, masks }: {
                 hint="CPF/CNPJ com validação de dígito verificador (máscara dinâmica). Bloqueia concluir com documento inválido."
                 onChange={(v) => merge('properties', { septemDocKind: v || undefined })} />
             )}
-            {MASKABLE.has(field.type) && !props.septemDocKind && (
+            {field.type === 'datetime' && (
+              <Select label="Tipo" value={props.septemDateMode ?? 'datetime'} options={DATE_MODE_OPTIONS}
+                hint="Escolhe o seletor: data e hora, só data ou só hora."
+                onChange={(v) => merge('properties', { septemDateMode: v === 'datetime' ? undefined : v })} />
+            )}
+            {MASKABLE.has(field.type) && field.type !== 'datetime' && !props.septemDocKind && (
               <Select label="Máscara" value={props.septemMaskId ?? ''} options={[{ value: '', label: '— nenhuma —' }, ...masks]}
                 onChange={(v) => {
                   const m = masks.find((o) => o.value === v);
@@ -279,8 +285,13 @@ export function FieldConfigPanel({ field, editField, masks }: {
 
         {tab === 'validacao' && (
           <div className="flex flex-col gap-3">
-            <NumberInput label="Valor mínimo" value={validate.min} onChange={(n) => merge('validate', { min: n })} />
-            <NumberInput label="Valor máximo" value={validate.max} onChange={(n) => merge('validate', { max: n })} />
+            {field.type === 'number' && <NumberInput label="Valor mínimo" value={validate.min} onChange={(n) => merge('validate', { min: n })} />}
+            {field.type === 'number' && <NumberInput label="Valor máximo" value={validate.max} onChange={(n) => merge('validate', { max: n })} />}
+            {field.type === 'datetime' && (
+              <Select label="Restrição de data" value={props.septemDateLimit ?? ''} options={DATE_LIMIT_OPTIONS}
+                hint="A regra é conferida com a data do SERVIDOR ao salvar/concluir."
+                onChange={(v) => merge('properties', { septemDateLimit: v || undefined })} />
+            )}
           </div>
         )}
 
