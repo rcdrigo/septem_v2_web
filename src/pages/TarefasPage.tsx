@@ -192,7 +192,7 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
 
       {/* Cada grupo renderiza seu próprio card (sem container único). */}
       <main className="flex-1 overflow-auto p-6">
-        {task.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={task.data?.formSchema} data={task.data?.data as Record<string, unknown> | undefined} optionsByField={task.data?.fieldOptions} />}
+        {task.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={task.data?.formSchema} data={task.data?.data as Record<string, unknown> | undefined} optionsByField={task.data?.fieldOptions} uploadContext={{ taskId }} />}
       </main>
 
       {/* Botões de conclusão sempre visíveis no rodapé (req. 4) */}

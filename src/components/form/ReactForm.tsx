@@ -1,10 +1,11 @@
 import { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, HelpCircle, Plus, Trash2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { ChevronDown, HelpCircle, Plus, Trash2, Paperclip, X, Loader2 } from 'lucide-react';
+import { api, ApiError } from '@/lib/api';
 import { regexToTemplate, applyMask, isAllDigits } from '@/lib/mask';
 import { maskDocumento, validateDocumento, type DocKind } from '@/lib/documento';
 import { inputTypeForDateMode, validateDateClient, type DateMode, type DateLimit } from '@/lib/datafield';
+import { uploadAttachment, parseAttachments, type Attachment, type UploadContext } from '@/lib/upload';
 
 /** Mesmo contrato do FormFill (form-js), para ser intercambiável. */
 export type FormFillResult = { data: Record<string, unknown>; errors: Record<string, unknown> };
@@ -71,6 +72,7 @@ type Runtime = {
   readOnly?: boolean;
   fieldState: FieldState;
   runEvent: (comp: Component, type: string, event: unknown) => void;
+  uploadContext?: UploadContext;
 };
 const RuntimeCtx = createContext<Runtime | null>(null);
 function useRuntime() {
@@ -87,8 +89,8 @@ function useRuntime() {
  */
 export type ExtraTab = { id: string; label: string; icon?: React.ReactNode; render: () => React.ReactNode };
 
-export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: Record<string, unknown>; readOnly?: boolean; optionsByField?: OptionsMap; extraTabs?: { leading?: ExtraTab[]; trailing?: ExtraTab[] } }>(
-  ({ schema, data, readOnly, optionsByField, extraTabs }, ref) => {
+export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: Record<string, unknown>; readOnly?: boolean; optionsByField?: OptionsMap; uploadContext?: UploadContext; extraTabs?: { leading?: ExtraTab[]; trailing?: ExtraTab[] } }>(
+  ({ schema, data, readOnly, optionsByField, uploadContext, extraTabs }, ref) => {
     const root = (schema ?? {}) as { components?: Component[] };
     const inputs = useMemo(() => collectInputs(root.components, []), [schema]);
 
@@ -163,7 +165,8 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
         if (c.disabled || fieldState[c.key!]?.hidden) continue; // somente-leitura/escondido: não valida
         const v = values[c.key!];
         const req = c.validate?.required;
-        const empty = v === '' || v === undefined || v === null || (c.type === 'checkbox' && v === false);
+        const empty = v === '' || v === undefined || v === null || (c.type === 'checkbox' && v === false)
+          || (c.type === 'filepicker' && parseAttachments(v).length === 0);
         if (req && empty) { errs[c.key!] = 'Campo obrigatório.'; continue; }
         if (typeof v === 'string' && v) {
           const docKind = c.type === 'textfield' ? (c.properties?.septemDocKind as DocKind | undefined) : undefined;
@@ -202,7 +205,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
 
     const comps = root.components ?? [];
     const layout = (root as { septemGroupLayout?: string }).septemGroupLayout;
-    const runtime: Runtime = { values, errors, set, dsOptions, readOnly, fieldState, runEvent };
+    const runtime: Runtime = { values, errors, set, dsOptions, readOnly, fieldState, runEvent, uploadContext };
 
     // Cada grupo de topo vira um card; os cards se distribuem no grid de 16 col
     // (8+8 = lado a lado). Em "abas", a barra fica num card e o conteúdo noutro.
@@ -295,15 +298,15 @@ function Node({ comp }: { comp: Component }) {
   const base = `w-full rounded-md border ${err ? 'border-rose-400' : 'border-slate-300'} bg-white px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500`;
 
   let control: React.ReactNode;
-  if (disabled) {
+  if (comp.type === 'filepicker') {
+    control = <FilePickerControl comp={comp} value={v} disabled={disabled} onChange={(val) => set(key, val)} />;
+  } else if (disabled) {
     // Campo só-leitura (visível): exibe o valor como texto (não input desabilitado).
     const optLabel = options.find((o) => o.value === String(v ?? ''))?.label;
     const display = comp.type === 'checkbox' ? (v ? 'Sim' : 'Não') : (optLabel ?? String(v ?? ''));
     control = <div className="min-h-[1.75rem] whitespace-pre-wrap py-1 text-sm text-slate-800">{display || <span className="text-slate-400">—</span>}</div>;
   } else if (comp.type === 'textarea') {
     control = <textarea rows={3} disabled={disabled} className={base} value={String(v ?? '')} {...evt} onChange={(e) => setAndEmit(e.target.value, e)} />;
-  } else if (comp.type === 'filepicker') {
-    control = <input type="file" multiple className={`${base} file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-0.5 file:text-xs`} {...evt} onChange={(e) => setAndEmit(Array.from(e.target.files ?? []).map((f) => f.name).join(', '), e)} />;
   } else if (comp.type === 'select') {
     control = (
       <select disabled={disabled} className={base} value={String(v ?? '')} {...evt} onChange={(e) => setAndEmit(e.target.value, e)}>
@@ -384,6 +387,77 @@ function Node({ comp }: { comp: Component }) {
  * e excluir. Os dados ficam em `values[key]` como array de objetos (cada linha
  * roda num runtime com escopo próprio).
  */
+/**
+ * Campo de anexo (Fase 4c): upload REAL para o storage do tenant. Cada arquivo é
+ * enviado na hora (o servidor aplica extensões perigosas + tamanho + extensões do
+ * campo, põe timestamp e a hierarquia no bucket) e o valor guarda [{name,url,size}].
+ */
+function FilePickerControl({ comp, value, disabled, onChange }: { comp: Component; value: unknown; disabled?: boolean; onChange: (v: Attachment[]) => void }) {
+  const { uploadContext } = useRuntime();
+  const anexos = parseAttachments(value);
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const allowed = (comp.properties?.septemAllowedExts ?? '')
+    .split(',').map((e) => e.trim().replace(/^\./, '').toLowerCase()).filter(Boolean);
+  const accept = allowed.map((e) => `.${e}`).join(',') || undefined;
+
+  async function enviar(files: FileList | null) {
+    if (!files?.length || !uploadContext) return;
+    setEnviando(true); setErro(null);
+    const novos: Attachment[] = [];
+    try {
+      for (const f of Array.from(files)) {
+        try { novos.push(await uploadAttachment(uploadContext, comp.key!, f)); }
+        catch (e) {
+          const body = e instanceof ApiError ? (e.body as { detail?: string } | undefined) : undefined;
+          setErro(body?.detail ?? `Falha ao enviar ${f.name}.`);
+        }
+      }
+      if (novos.length) onChange([...anexos, ...novos]);
+    } finally {
+      setEnviando(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2" data-testid="anexo-campo">
+      {anexos.length > 0 && (
+        <ul className="flex flex-col gap-1">
+          {anexos.map((a, i) => (
+            <li key={i} className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm" data-testid="anexo-item">
+              <Paperclip size={14} className="shrink-0 text-slate-400" />
+              <a href={a.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-slate-700 hover:underline">{a.name}</a>
+              <span className="shrink-0 text-xs text-slate-400">{Math.max(1, Math.round(a.size / 1024))} KB</span>
+              {!disabled && (
+                <button type="button" onClick={() => onChange(anexos.filter((_, j) => j !== i))} className="shrink-0 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-rose-600" aria-label={`Remover ${a.name}`}>
+                  <X size={14} />
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {!disabled && (
+        <div>
+          <input
+            ref={inputRef} type="file" multiple accept={accept} disabled={enviando}
+            data-testid="anexo-input"
+            className="block w-full text-sm text-slate-600 file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-slate-200 disabled:opacity-60"
+            onChange={(e) => enviar(e.target.files)}
+          />
+          {allowed.length > 0 && <p className="mt-1 text-[11px] text-slate-400">Aceita: {allowed.join(', ')}.</p>}
+          {enviando && <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-500"><Loader2 size={12} className="animate-spin" /> Enviando…</p>}
+          {erro && <p className="mt-1 text-[11px] text-rose-600" data-testid="anexo-erro">{erro}</p>}
+        </div>
+      )}
+      {disabled && anexos.length === 0 && <span className="text-sm text-slate-400">—</span>}
+    </div>
+  );
+}
+
 function DynamicList({ comp }: { comp: Component }) {
   const rt = useRuntime();
   const key = comp.key!;

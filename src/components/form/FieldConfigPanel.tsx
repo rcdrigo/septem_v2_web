@@ -7,6 +7,7 @@ import { IconSearchPicker } from '@/components/ui/IconSearchPicker';
 import { slugify } from '@/lib/slugify';
 import { DOC_KIND_OPTIONS } from '@/lib/documento';
 import { DATE_MODE_OPTIONS, DATE_LIMIT_OPTIONS } from '@/lib/datafield';
+import { ExtensionPicker } from '@/components/form/ExtensionPicker';
 import { fetchDataSourceOptions } from '@/lib/api/catalog';
 import { openTab } from '@/lib/nav';
 import { toast } from '@/stores/toast';
@@ -241,6 +242,10 @@ export function FieldConfigPanel({ field, editField, masks }: {
                   </button>
                 )}
               </div>
+            )}
+
+            {field.type === 'filepicker' && (
+              <ExtensionPicker value={props.septemAllowedExts} onChange={(csv) => merge('properties', { septemAllowedExts: csv || undefined })} />
             )}
 
             {isInput && <Check label="Obrigatório" checked={!!validate.required} onChange={(b) => merge('validate', { required: b })} />}

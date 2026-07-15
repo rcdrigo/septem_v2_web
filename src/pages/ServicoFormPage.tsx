@@ -63,7 +63,7 @@ export function ServicoFormPage() {
           {/* Cada grupo renderiza seu próprio card (sem container único). */}
           <main className="flex-1 overflow-auto p-6">
             {form.data?.documentationUrl && <DocBanner url={form.data.documentationUrl} />}
-            {form.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={form.data?.formSchema} data={form.data?.data ?? undefined} optionsByField={form.data?.fieldOptions} />}
+            {form.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={form.data?.formSchema} data={form.data?.data ?? undefined} optionsByField={form.data?.fieldOptions} uploadContext={{ processKey: processKey ?? undefined }} />}
           </main>
           {/* Botões de início — usa os configurados no evento de início; senão, "Iniciar". */}
           <footer className="flex justify-start gap-2 border-t border-slate-200 bg-white px-6 py-3">

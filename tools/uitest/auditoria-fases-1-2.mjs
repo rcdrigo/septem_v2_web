@@ -51,6 +51,13 @@ async function restaurar() {
     host: null, port: 587, useSsl: false, authMode: 'none', user: null,
     fromName: 'Teste', fromAddress: 'no-reply@teste.local', password: '',
   });
+  // Limpa o bucket S3 fake que a suíte configura; senão os uploads de outras suítes
+  // tentariam esse S3 inexistente (o storage cai no disco local sem bucket).
+  await api(token, '/api/v1/settings/storage', 'PUT', {
+    bucketName: null, region: null, endpoint: null, accessKey: null, baseFolder: null,
+    cdnUrl: null, useSignedUrls: false, urlExpirationMinutes: 60, storageClass: null,
+    encryption: null, maxUploadMb: 25, blockedExtensions: 'exe,bat,cmd', secretKey: '',
+  });
 }
 
 try {
