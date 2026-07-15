@@ -34,6 +34,7 @@ export type ProcessDetail = {
   updatedAt: string;
   category: { id: number; name: string } | null;
   area: { id: string; key: string; name: string } | null;
+  hasInstances?: boolean;
 };
 
 export type ProcessIssue = {

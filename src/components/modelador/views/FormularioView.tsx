@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Rows3, Columns3, Regex, Eye } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Rows3, Columns3, Regex, Eye, FileUp } from 'lucide-react';
 import { IconButton } from '@/components/ui/IconButton';
 import { Dialog } from '@/components/ui/Dialog';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { FormBuilder, type FormBuilderHandle } from '@/components/form/FormBuilder';
 import { FormFieldsPalette } from '@/components/form/FormFieldsPalette';
 import { FieldConfigPanel } from '@/components/form/FieldConfigPanel';
 import { ReactForm } from '@/components/form/ReactForm';
 import { MasksDialog } from '@/components/form/MasksDialog';
+import { ImportFormDialog } from '@/components/form/ImportFormDialog';
+import { useProcessDefinition } from '@/lib/api/process-definitions';
 import { extractFields } from '@/lib/form-schema';
 import { useFormStore } from '@/stores/form';
 import { useFormMasks } from '@/lib/api/forms';
@@ -58,6 +62,10 @@ export function FormularioView({ modeler }: Props) {
   const masks = useFormMasks();
   const [ready, setReady] = useState(false);
   const [masksOpen, setMasksOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [params] = useSearchParams();
+  const processDef = useProcessDefinition(params.get('key'));
+  const hasInstances = !!processDef.data?.hasInstances;
   const [preview, setPreview] = useState<unknown | null>(null);
   const [selectedField, setSelectedField] = useState<any | null>(null);
   const [groupLayout, setGroupLayout] = useState<GroupLayout>('stacked');
@@ -167,6 +175,13 @@ export function FormularioView({ modeler }: Props) {
           </div>
           <IconButton onClick={() => setPreview(builderRef.current?.saveSchema() ?? { type: 'default', components: [], schemaVersion: 17 })}><Eye size={14} /> Pré-visualizar</IconButton>
           <IconButton onClick={() => setMasksOpen(true)}><Regex size={14} /> Máscaras</IconButton>
+          {hasInstances ? (
+            <Tooltip text="Este processo já tem instâncias iniciadas. Importar sobrescreveria o formulário e quebraria os dados já preenchidos.">
+              <span data-testid="import-btn-disabled" className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-300"><FileUp size={14} /> Importar</span>
+            </Tooltip>
+          ) : (
+            <IconButton onClick={() => setImportOpen(true)}><FileUp size={14} /> Importar</IconButton>
+          )}
           {/* "Limpar formulário" e "Modelo com agrupamento" removidos a pedido do
               dono (2026-07-10): destrutivo/raramente úteis. */}
         </div>
@@ -186,6 +201,12 @@ export function FormularioView({ modeler }: Props) {
         />
       </div>
       {masksOpen && <MasksDialog onClose={() => setMasksOpen(false)} />}
+      {importOpen && (
+        <ImportFormDialog
+          onClose={() => setImportOpen(false)}
+          onApply={(schema) => { void builderRef.current?.importSchema(schema); }}
+        />
+      )}
       {preview != null && (
         <Dialog open onClose={() => setPreview(null)} width="lg" title="Pré-visualização do formulário"
           footer={<button type="button" onClick={() => setPreview(null)} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Fechar</button>}>
