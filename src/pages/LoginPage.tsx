@@ -62,7 +62,11 @@ export function LoginPage() {
   /** Traduz o erro do backend — o aviso de bloqueio precisa ser específico. */
   function tratarErro(err: unknown, fallback: string) {
     if (err instanceof ApiError) {
-      const body = err.body as { error?: string; attemptsLeft?: number; lockedMinutes?: number } | undefined;
+      const body = err.body as { error?: string; detail?: string; attemptsLeft?: number; lockedMinutes?: number } | undefined;
+      if (body?.error === 'twofactor_send_failed') {
+        setAviso(body.detail ?? 'Não foi possível enviar o código de verificação. Tente novamente.');
+        return;
+      }
       if (body?.error === 'account_locked') {
         setAviso(
           `Conta bloqueada por ${body.lockedMinutes} minuto${body.lockedMinutes === 1 ? '' : 's'} ` +
