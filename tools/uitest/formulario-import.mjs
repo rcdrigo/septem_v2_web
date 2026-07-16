@@ -65,6 +65,13 @@ try {
   await page.getByRole('button', { name: 'Importar' }).click();
   await page.waitForSelector('[data-testid=import-input]', { state: 'attached', timeout: 8000 });
 
+  // Clicar em "Baixar modelo" de fato dispara o download do .xlsx (exercita o botão).
+  const download = await Promise.all([
+    page.waitForEvent('download', { timeout: 8000 }),
+    page.getByRole('button', { name: /Baixar modelo/ }).click(),
+  ]).then(([d]) => d).catch(() => null);
+  check(!!download && /\.xlsx$/.test(download.suggestedFilename()), '[web] "Baixar modelo" baixa o modelo .xlsx');
+
   // Planilha INVÁLIDA (bytes que não são xlsx) → lista de erros.
   await page.setInputFiles('[data-testid=import-input]', { name: 'ruim.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from('isto nao e uma planilha') });
   await page.waitForSelector('[data-testid=import-erros]', { timeout: 8000 });

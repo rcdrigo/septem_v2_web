@@ -154,6 +154,17 @@ export const api = {
     return resp.blob();
   },
 
+  /** GET que devolve o corpo cru (Blob) — downloads (modelo XLSX, anexos). */
+  getBlob: async (path: string): Promise<Blob> => {
+    const headers = new Headers();
+    const token = tokenProvider();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    if (TENANT_HEADER) headers.set('X-Tenant', TENANT_HEADER);
+    const resp = await fetch(`${BASE_URL}${path}`, { headers });
+    if (!resp.ok) throw await readError(resp);
+    return resp.blob();
+  },
+
   /** POST multipart (upload de arquivo) — não define Content-Type (o browser põe o boundary). */
   postForm: async <T = unknown>(path: string, form: FormData): Promise<T> => {
     const headers = new Headers();
