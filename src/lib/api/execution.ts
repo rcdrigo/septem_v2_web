@@ -5,7 +5,7 @@ export type StartedInstance = { executionId: string; status: string; tasks: { id
 export type RequestSummary = { label: string; value: string };
 export type MyTask = { id: string; name: string | null; executionId: string; createdAt: string; dueAt: string | null; process?: string | null; processNumber?: number; requester?: string | null; summary?: RequestSummary[] };
 export type ExecutedTask = { id: string; name: string | null; executionId: string; process: string | null; completedAt: string | null; action: string | null; processNumber?: number; requester?: string | null; summary?: RequestSummary[] };
-export type TaskButton = { id: string; label: string; validateForm: boolean; primaryColor?: string | null; textColor?: string | null; icon?: string | null; hint?: string | null };
+export type TaskButton = { id: string; label: string; validateForm: boolean; requireJustification?: boolean; primaryColor?: string | null; textColor?: string | null; icon?: string | null; hint?: string | null };
 export type FieldOptions = Record<string, { value: string; label: string }[]>;
 export type TaskDetail = {
   id: string; name: string | null; status: string; executionId: string;
@@ -55,8 +55,8 @@ export function useTask(id: string | null) {
 export function useCompleteTask() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data, action }: { id: string; data?: unknown; action?: string }) =>
-      api.post<CompleteResult>(`/api/v1/workflow/tasks/${id}/complete`, { data, action }),
+    mutationFn: ({ id, data, action, justification }: { id: string; data?: unknown; action?: string; justification?: string }) =>
+      api.post<CompleteResult>(`/api/v1/workflow/tasks/${id}/complete`, { data, action, justification }),
     onSuccess: () => qc.invalidateQueries({ queryKey: execKeys.tasks }),
   });
 }
@@ -73,7 +73,7 @@ export function useSaveTask() {
 export type InstanceListItem = { id: string; process: string | null; status: string; startedAt: string; endedAt: string | null; pendingTasks: number };
 export type InstancesPage = { items: InstanceListItem[]; total: number; page: number; pageSize: number };
 export type FieldChange = { changedAt: string; changedBy: string | null; impersonator: string | null; action: string; group: string | null; field: string; changeType: string; oldValue: string | null; newValue: string | null };
-export type InstanceTask = { id: string; name: string | null; status: string; assignee: string | null; completedBy: string | null; completedByImpersonator?: string | null; createdAt: string; completedAt: string | null; dueAt: string | null; action: string | null; fieldHistory?: FieldChange[] };
+export type InstanceTask = { id: string; name: string | null; status: string; assignee: string | null; completedBy: string | null; completedByImpersonator?: string | null; createdAt: string; completedAt: string | null; dueAt: string | null; action: string | null; justification?: string | null; fieldHistory?: FieldChange[] };
 export type ActiveTask = { name: string | null; assignee: string | null; startedAt?: string | null; dueAt: string | null };
 export type InstanceDetail = { id: string; number?: number; process: string | null; category?: string | null; flowKey?: string | null; requester?: string | null; status: string; startedAt: string; endedAt: string | null; data: unknown; formSchema?: unknown; inboxHtml?: string | null; activeTask?: ActiveTask | null; tasks: InstanceTask[]; canEdit?: boolean; canCancel?: boolean; canDelete?: boolean };
 export type InstancesParams = { q?: string; status?: string; mine?: boolean; page?: number; pageSize?: number };

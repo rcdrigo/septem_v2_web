@@ -7,6 +7,7 @@ import { openTab, navTo } from '@/lib/nav';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
+import { Dialog } from '@/components/ui/Dialog';
 
 /**
  * Geral › Tarefas pendentes (B3): inbox do executor — tarefas atribuídas a ele
@@ -144,6 +145,8 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
   const save = useSaveTask();
   const fillRef = useRef<ReactFormHandle>(null);
   const [done, setDone] = useState<{ nextTaskForMe?: string | null; executionId?: string } | null>(null);
+  // Botão com "Obrigar justificativa": guarda o contexto até o usuário digitar e confirmar.
+  const [justify, setJustify] = useState<{ button?: TaskButton; data: unknown } | null>(null);
   useDocumentTitle(task.data?.name ?? 'Tarefa');
 
   async function finish(button?: TaskButton) {
@@ -152,8 +155,14 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
       toast.error('Preencha os campos obrigatórios.');
       return;
     }
+    if (button?.requireJustification) { setJustify({ button, data }); return; }
+    await doComplete(data, button?.id);
+  }
+
+  async function doComplete(data: unknown, action?: string, justification?: string) {
     try {
-      const r = await complete.mutateAsync({ id: taskId, data, action: button?.id });
+      const r = await complete.mutateAsync({ id: taskId, data, action, justification });
+      setJustify(null);
       setDone({ nextTaskForMe: r.nextTaskForMe, executionId: r.executionId });
     } catch (err) {
       // O servidor valida de novo (autoritativo): 422 traz os campos inválidos —
@@ -216,7 +225,39 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
           <button type="button" onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Cancelar</button>
         </div>
       </footer>
+
+      {justify && (
+        <JustifyDialog
+          label={justify.button?.label}
+          pending={complete.isPending}
+          onCancel={() => setJustify(null)}
+          onConfirm={(texto) => doComplete(justify.data, justify.button?.id, texto)}
+        />
+      )}
     </div>
+  );
+}
+
+/** Área de texto obrigatória exibida ao concluir por um botão que exige justificativa. */
+function JustifyDialog({ label, pending, onCancel, onConfirm }: {
+  label?: string; pending: boolean; onCancel: () => void; onConfirm: (texto: string) => void;
+}) {
+  const [texto, setTexto] = useState('');
+  const valido = texto.trim().length > 0;
+  return (
+    <Dialog open onClose={onCancel} width="md" title={`Justificar: ${label ?? 'concluir'}`}
+      footer={
+        <>
+          <button type="button" onClick={onCancel} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Cancelar</button>
+          <button type="button" disabled={!valido || pending} onClick={() => onConfirm(texto.trim())} data-testid="justify-confirm"
+            className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">Confirmar</button>
+        </>
+      }>
+      <p className="mb-2 text-sm text-slate-600">Descreva o motivo desta decisão. A justificativa fica registrada na tarefa.</p>
+      <textarea autoFocus rows={4} value={texto} onChange={(e) => setTexto(e.target.value)} data-testid="justify-text"
+        placeholder="Justificativa…"
+        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none" />
+    </Dialog>
   );
 }
 

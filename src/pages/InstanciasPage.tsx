@@ -314,6 +314,7 @@ function TramitacaoTab({ d }: { d: import('@/lib/api/execution').InstanceDetail 
                   <Info label="Recebida em">{fmt(t.createdAt)}</Info>
                   {t.completedAt && <Info label="Concluída em">{fmt(t.completedAt)}</Info>}
                   {t.action && <Info label="Botão utilizado">{t.action}</Info>}
+                  {t.justification && <Info label="Justificativa">{t.justification}</Info>}
                 </dl>
               </div>
             </li>

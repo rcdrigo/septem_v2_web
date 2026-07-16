@@ -21,6 +21,38 @@ type Props = {
   defaultLabel: string;
 };
 
+/** 10 cores sóbrias para os botões de conclusão (opção primária; custom é secundário). */
+const PALETTE = [
+  '#1e293b', '#334155', '#1d4ed8', '#0369a1', '#0f766e',
+  '#047857', '#b45309', '#c2410c', '#b91c1c', '#6d28d9',
+];
+
+/** Fileira de swatches + "personalizar" (ColorPicker). */
+function PaletteField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const known = PALETTE.includes(value.toLowerCase());
+  return (
+    <div className="flex flex-col gap-1.5" data-testid="cor-paleta">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {PALETTE.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => onChange(c)}
+            aria-label={`Cor ${c}`}
+            data-testid="cor-swatch"
+            className={`h-6 w-6 rounded-full border transition ${value.toLowerCase() === c ? 'ring-2 ring-slate-900 ring-offset-1' : 'border-slate-300 hover:scale-110'}`}
+            style={{ backgroundColor: c }}
+          />
+        ))}
+        <span className="ml-1 flex items-center gap-1">
+          <ColorPicker value={value} onChange={onChange} ariaLabel="Cor personalizada" />
+          {!known && <span className="text-[11px] text-slate-400">custom</span>}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Editor de botões de ação por tarefa. Em vez de um par fixo de botões
  * positivo/negativo, permite uma lista arbitrária, cada um com cor primária,
@@ -161,22 +193,16 @@ function ActionButtonRow({
           />
         </Field>
 
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Cor primária">
-            <ColorPicker
-              value={button.primaryColor}
-              onChange={(v) => onChange({ primaryColor: v })}
-              ariaLabel="Cor primária"
-            />
-          </Field>
-          <Field label="Cor do texto">
-            <ColorPicker
-              value={button.textColor}
-              onChange={(v) => onChange({ textColor: v })}
-              ariaLabel="Cor do texto"
-            />
-          </Field>
-        </div>
+        <Field label="Cor primária">
+          <PaletteField value={button.primaryColor} onChange={(v) => onChange({ primaryColor: v })} />
+        </Field>
+        <Field label="Cor do texto">
+          <ColorPicker
+            value={button.textColor}
+            onChange={(v) => onChange({ textColor: v })}
+            ariaLabel="Cor do texto"
+          />
+        </Field>
 
         {/* Ícone e Orientações lado a lado — as orientações editam num MODAL
             (mesmo padrão dos campos do formulário), sem comer o painel. */}
@@ -223,6 +249,11 @@ function ActionButtonRow({
           checked={button.validateForm}
           onChange={(v) => onChange({ validateForm: v })}
           label="Validar campos do formulário antes de submeter"
+        />
+        <Checkbox
+          checked={!!button.requireJustification}
+          onChange={(v) => onChange({ requireJustification: v || undefined })}
+          label="Obrigar justificativa ao concluir por este botão"
         />
       </div>
     </div>
