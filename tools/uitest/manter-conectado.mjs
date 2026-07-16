@@ -24,7 +24,14 @@ async function loginFresh(keep) {
   // simula expiração corrompendo o access token (o refresh continua válido)
   await page.evaluate(() => localStorage.setItem('septem.accessToken', 'token-expirado-invalido'));
   await page.goto('http://localhost:5173/admin/usuarios', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(1500);
+  // Espera o END-STATE real (a página protegida renderizou o conteúdo após o
+  // refresh+retry), não um tempo fixo — sob carga o ciclo passa de 1500ms. Se a
+  // renovação falhasse, cairia no login e o conteúdo nunca apareceria (check falha).
+  await page.waitForFunction(
+    () => location.pathname.includes('/admin/usuarios')
+      && (document.body.innerText.includes('Usuários') || document.body.innerText.includes('usuário')),
+    { timeout: 12000 },
+  ).catch(() => {});
   const renovada = await page.evaluate(() => ({
     naPagina: location.pathname.includes('/admin/usuarios'),
     conteudo: document.body.innerText.includes('Usuários') || document.body.innerText.includes('usuário'),
@@ -40,7 +47,8 @@ async function loginFresh(keep) {
   const { ctx, page } = await loginFresh(false);
   await page.evaluate(() => localStorage.setItem('septem.accessToken', 'token-expirado-invalido'));
   await page.goto('http://localhost:5173/admin/usuarios', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(2500);
+  // Sem refresh, cai pro login: espera o redirect (sinal real), não um tempo fixo.
+  await page.waitForFunction(() => location.pathname.includes('/login'), { timeout: 10000 }).catch(() => {});
   const caiu = await page.evaluate(() => location.pathname.includes('/login'));
   check(caiu, 'desmarcado: sem refresh token, sessão expirada CAI para o login');
   await ctx.close();
