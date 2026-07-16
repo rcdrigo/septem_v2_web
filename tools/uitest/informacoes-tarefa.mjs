@@ -74,16 +74,17 @@ try {
   check(iSigla >= 0 && iNome > iSigla && iSetor > iNome, `[web] ordem Sigla → Nome → Setor (${iSigla},${iNome},${iSetor})`);
   check(!secTxt.includes('apelido'), '[web] "Apelido" foi renomeado para "Sigla"');
 
-  // Setor: o dropdown lista as raias do processo.
+  // Setor: o dropdown lista as raias do processo. Escopa às OPÇÕES do dropdown
+  // (ul li button) — os rótulos das raias no canvas são SVG, não confundem.
   const setorBtn = page.locator('label:has-text("Setor")').locator('xpath=..').locator('button').first();
   await setorBtn.click();
-  await page.waitForTimeout(600);
-  const temFin = await page.locator('button', { hasText: 'Financeiro' }).count();
-  const temJur = await page.locator('button', { hasText: 'Jurídico' }).count();
+  await page.waitForSelector('input[placeholder="Pesquisar…"]', { timeout: 5000 });
+  const temFin = await page.locator('ul li button', { hasText: 'Financeiro' }).count();
+  const temJur = await page.locator('ul li button', { hasText: 'Jurídico' }).count();
   check(temFin > 0 && temJur > 0, '[web] o Setor lista as raias do processo (Financeiro, Jurídico)');
 
   // Seleciona Financeiro + preenche a Sigla, e SALVA.
-  await page.locator('button', { hasText: 'Financeiro' }).last().click();
+  await page.locator('ul li button', { hasText: 'Financeiro' }).last().click();
   await page.waitForTimeout(300);
   const siglaInput = page.locator('label:has-text("Sigla")').locator('xpath=..').locator('input').first();
   await siglaInput.fill('analise_fin');
@@ -98,6 +99,15 @@ try {
   check(/value="Financeiro"/.test(x), '[web] round-trip: o Setor (Financeiro) sobrevive ao Salvar');
   check(/value="analise_fin"/.test(x), '[web] round-trip: a Sigla sobrevive ao Salvar');
   await page.screenshot({ path: `${OUT}/info-tarefa.png`, fullPage: true });
+
+  // Costura: o Setor é SÓ de tarefa. Selecionar o INÍCIO (usa a mesma seção) mostra
+  // Sigla/Nome mas NÃO o Setor — e não quebra.
+  const bs = await page.locator('[data-element-id="S"]').boundingBox();
+  await page.mouse.click(bs.x + bs.width / 2, bs.y + bs.height / 2);
+  await page.waitForTimeout(700);
+  const inicio = (await page.locator('text=Informações gerais').first().locator('xpath=ancestor::section[1]').innerText().catch(() => '')).toLowerCase();
+  check(inicio.includes('sigla') && inicio.includes('nome'), '[web] início ainda mostra Sigla/Nome (seção não quebra)');
+  check(!inicio.includes('setor'), '[web] Setor NÃO aparece em elemento que não é tarefa');
 
   // Processo SEM raias → o Setor mostra o estado vazio.
   await page.goto(`${BASE}/processos/editar?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });

@@ -99,10 +99,14 @@ try {
     const page = await ctx.newPage();
     await login(page);
 
-    const titular = await criarUsuario(`Titular ${view.name}`, 'https://picsum.photos/id/1005/200/200');
-    const preposto = await criarUsuario(`Preposto ${view.name}`, 'https://picsum.photos/id/1012/200/200');
-    const sigla = `SEM${view.name === 'web' ? 'W' : 'M'}`;
-    const nome = `Secretaria de Teste (${view.name})`;
+    // Sufixo único por execução: o DB de dev NÃO reseta entre runs; sem isto, uma
+    // run anterior deixa unidade/chave iguais e o create colide, e o combobox de
+    // titular acha vários "Titular web" acumulados (a escolha fica ambígua).
+    const uniq = Math.floor(Math.random() * 1e6);
+    const titular = await criarUsuario(`Titular ${view.name} ${uniq}`, 'https://picsum.photos/id/1005/200/200');
+    const preposto = await criarUsuario(`Preposto ${view.name} ${uniq}`, 'https://picsum.photos/id/1012/200/200');
+    const sigla = `SEM${view.name === 'web' ? 'W' : 'M'}${uniq}`;
+    const nome = `Secretaria de Teste ${uniq} (${view.name})`;
 
     // ── 1) Criar a unidade pela tela, com todos os campos novos ─────────────
     await page.goto(BASE + '/admin/unidades', { waitUntil: 'networkidle' });
@@ -236,16 +240,25 @@ try {
     const sigla2 = `${sigla}X`;
     await page.goto(BASE + '/admin/unidades', { waitUntil: 'networkidle' });
     await page.waitForSelector('[data-testid=unidade-linha]');
+
+    // Atrasa o GET do detalhe da unidade para o estado "carregando" ser DETERMINÍSTICO
+    // (sem race de 150ms sob carga). Enquanto não chega, o Salvar não pode estar ativo:
+    // salvar cedo gravaria campos em branco por cima da unidade.
+    // Atrasa só o 1º GET do detalhe (times:1 → auto-remove, sem unroute) para o
+    // estado "carregando" ser determinístico. Enquanto não chega, o Salvar não pode
+    // estar ativo: salvar cedo gravaria campos em branco por cima da unidade.
+    await page.route(
+      (u) => /\/api\/v1\/org-units\/[0-9a-f-]{36}/.test(u.href),
+      async (route) => { await new Promise((r) => setTimeout(r, 900)); await route.continue(); },
+      { times: 1 },
+    );
     await page.locator('[data-testid=unidade-linha]', { hasText: sigla })
       .first().locator('button[title=Editar]').click();
 
-    // Enquanto o detalhe não chega, o formulário NÃO pode estar salvável: salvar cedo
-    // gravaria campos em branco por cima da unidade (apagava sigla, contatos, titular).
-    const salvarHabilitadoCedo = await page
-      .locator('button:has-text("Salvar"):not([disabled])').first()
-      .isVisible({ timeout: 150 }).catch(() => false);
+    await page.waitForSelector('[data-testid=unidade-carregando]', { timeout: 3000 });
     const formCedo = await page.locator('[data-testid=form-unidade]').count();
-    check(!(salvarHabilitadoCedo && formCedo > 0),
+    const salvarAtivoCedo = await page.locator('button:has-text("Salvar"):not([disabled])').count();
+    check(formCedo === 0 && salvarAtivoCedo === 0,
       `[${view.name}] o Salvar da edição fica travado até os dados carregarem`);
 
     await page.waitForSelector('[data-testid=form-unidade]');
