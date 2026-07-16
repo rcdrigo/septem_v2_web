@@ -87,20 +87,40 @@ try {
     await ctx.close();
   }
 
-  // ── Modelador: paleta de cores + checkbox de justificativa ────────────────
+  // ── Modelador: ROUND-TRIP — configurar na tela, Salvar, e a prop persistir ──
+  // Processo próprio (cópia com nome único) pra não alterar o teste_condicoes_ui.
+  const orig = await api(token, '/api/v1/workflow/process-definitions/teste_condicoes_ui');
+  const nome = `Justif RT ${Math.floor(Math.random() * 1e9)}`;
+  const copiaXml = orig.body.bpmnXml.replace(/(<bpmn:process\b[^>]*\bname=")[^"]*(")/, `$1${nome}$2`);
+  const rt = await api(token, '/api/v1/workflow/process-definitions', 'POST', { bpmnXml: copiaXml });
+  const rtKey = rt.body.key;
+
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 });
   const page = await ctx.newPage();
   await login(page);
   try {
-    await page.goto(`${BASE}/processos/editar?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
-    await page.waitForSelector('[data-element-id="T005"]', { timeout: 20000 });
+    await page.goto(`${BASE}/processos/editar?key=${rtKey}`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('[data-element-id="T005"]', { state: 'attached', timeout: 20000 });
     await page.locator('[data-element-id="T005"]').click();
     await page.waitForTimeout(800);
-    // Expande a seção "Botões de ação" se estiver recolhida.
     const sec = page.locator('text=Botões de ação').first();
     if (await sec.count()) { await sec.click().catch(() => {}); await page.waitForTimeout(500); }
     check(await page.locator('[data-testid=cor-swatch]').count() >= 10, '[modelador] paleta tem 10 cores sóbrias');
     check(await page.getByText('Obrigar justificativa ao concluir por este botão').count() > 0, '[modelador] existe o checkbox "Obrigar justificativa"');
+
+    // Configura na tela: marca justificativa + escolhe a cor vermelha (#b91c1c).
+    await page.getByText('Obrigar justificativa ao concluir por este botão').click();
+    await page.waitForTimeout(300);
+    await page.locator('[data-testid=cor-swatch]').nth(8).click();
+    await page.waitForTimeout(300);
+    await page.locator('header button', { hasText: 'Salvar' }).first().click();
+    await page.waitForTimeout(3000);
+
+    // EFEITO: as props sobrevivem ao Salvar no schema persistido (não só a tela).
+    const det = await api(token, `/api/v1/workflow/process-definitions/${rtKey}`);
+    const x = det.body.bpmnXml || '';
+    check(/needsReason="true"/.test(x), '[modelador] round-trip: "Obrigar justificativa" sobrevive ao Salvar');
+    check(/primaryColor="#b91c1c"/i.test(x), '[modelador] round-trip: a cor da paleta sobrevive ao Salvar');
     await page.screenshot({ path: `${OUT}/justif-modelador.png`, fullPage: true });
   } catch (e) {
     check(false, `[modelador] falhou: ${String(e.message).slice(0, 90)}`);
