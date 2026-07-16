@@ -12,6 +12,13 @@
       ]
     },
     {
+      "name": "Setor",
+      "superClass": ["Element"],
+      "properties": [
+        { "name": "value", "isAttr": true, "type": "String" }
+      ]
+    },
+    {
       "name": "Routines",
       "superClass": ["Element"],
       "properties": [

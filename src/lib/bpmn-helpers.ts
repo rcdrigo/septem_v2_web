@@ -141,6 +141,33 @@ export function setAlias(modeler: AnyModeler, element: AnyElement, value: string
   setExtensionConfig(modeler, element, 'septem:Alias', { value });
 }
 
+/** Setor (raia) da tarefa — escolhido entre as raias do processo (Fase 5b). */
+const SETOR_DEFAULTS = { value: '' };
+export function getSetor(element: AnyElement): string {
+  return getExtensionConfig(element, 'septem:Setor', SETOR_DEFAULTS).value;
+}
+export function setSetor(modeler: AnyModeler, element: AnyElement, value: string) {
+  setExtensionConfig(modeler, element, 'septem:Setor', { value });
+}
+
+/** Nomes das raias (lanes) presentes no processo, para o dropdown de setor. */
+export function getProcessLanes(modeler: AnyModeler): string[] {
+  if (!modeler) return [];
+  try {
+    const registry: any = modeler.get('elementRegistry');
+    const names = new Set<string>();
+    registry.forEach((el: any) => {
+      if (el?.businessObject?.$type === 'bpmn:Lane') {
+        const n = (el.businessObject.name ?? '').trim();
+        if (n) names.add(n);
+      }
+    });
+    return [...names].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  } catch {
+    return [];
+  }
+}
+
 export type Routines = {
   preCreate: string;
   postCreate: string;
