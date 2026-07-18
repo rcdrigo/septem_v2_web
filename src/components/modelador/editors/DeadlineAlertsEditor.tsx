@@ -16,9 +16,9 @@ type Props = {
   element: any;
 };
 
-const KIND_OPTIONS: ReadonlyArray<{ value: AlertKind; label: string; hint?: string }> = [
-  { value: 'once', label: 'Único', hint: 'Dispara uma única vez.' },
-  { value: 'recurring', label: 'Repetido', hint: 'Repete em um intervalo.' },
+const KIND_OPTIONS: ReadonlyArray<{ value: AlertKind; label: string; help?: string }> = [
+  { value: 'once', label: 'Único', help: 'Dispara uma única vez.' },
+  { value: 'recurring', label: 'Repetido', help: 'Repete em um intervalo.' },
 ];
 
 const TRIGGER_OPTIONS: ReadonlyArray<{ value: AlertTrigger; label: string }> = [
@@ -147,24 +147,22 @@ function AlertRow({
         </Field>
 
         <div className="grid grid-cols-2 gap-2">
-          <Field label="Quantidade (N)">
+          <Field label="Quantidade (N)" help="Valor usado para calcular o momento do disparo. Exemplo: 24.">
             <TextInput
               type="number"
               min={0}
               value={String(alert.value)}
               onChange={(e) => onChange({ value: parseNumber(e.target.value) })}
-              placeholder="ex: 24"
             />
           </Field>
 
           {alert.kind === 'recurring' && (
-            <Field label="Intervalo (horas)">
+            <Field label="Intervalo (horas)" help="Intervalo entre alertas repetidos, em horas. Exemplo: 12.">
               <TextInput
                 type="number"
                 min={1}
                 value={String(alert.intervalHours ?? '')}
                 onChange={(e) => onChange({ intervalHours: parseNumber(e.target.value) })}
-                placeholder="ex: 12"
               />
             </Field>
           )}

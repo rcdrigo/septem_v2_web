@@ -16,7 +16,7 @@ export function ActionButtonsSection({ modeler, element, defaultLabel }: Props) 
   return (
     <Section
       title="Botões de ação"
-      description="Botões disponíveis ao usuário ao finalizar esta tarefa."
+      help="Botões disponíveis ao usuário ao finalizar esta tarefa."
     >
       <ActionButtonsEditor modeler={modeler} element={element} defaultLabel={defaultLabel} />
     </Section>

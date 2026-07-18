@@ -1,4 +1,4 @@
-import { Checkbox, Field, RadioGroup, Section, TextInput } from '@/components/ui/Field';
+import { Field, RadioGroup, Section, Switch, TextInput } from '@/components/ui/Field';
 import { useExtensionState } from '@/lib/useExtensionState';
 
 type Props = {
@@ -23,8 +23,8 @@ const DEFAULTS: SubprocessConfig = {
 };
 
 const SYNC_OPTIONS = [
-  { value: 'sync', label: 'Síncrono', hint: 'Aguarda o subprocesso terminar antes de seguir.' },
-  { value: 'async', label: 'Assíncrono', hint: 'Dispara o subprocesso e continua o fluxo principal.' },
+  { value: 'sync', label: 'Síncrono', help: 'Aguarda o subprocesso terminar antes de seguir.' },
+  { value: 'async', label: 'Assíncrono', help: 'Dispara o subprocesso e continua o fluxo principal.' },
 ] as const;
 
 /**
@@ -42,12 +42,11 @@ export function SubprocessConfigSection({ modeler, element }: Props) {
 
   return (
     <Section title="Configurações do subprocesso">
-      <Field label="Processo">
+      <Field label="Processo" help="Chave do processo chamado. Exemplo: flow_solicitacao_compra.">
         <TextInput
           value={state.processRef}
           onChange={(e) => update({ processRef: e.target.value })}
           onBlur={() => commit('processRef')}
-          placeholder="Chave do processo (ex: flow_solicitacao_compra)"
         />
       </Field>
 
@@ -60,13 +59,13 @@ export function SubprocessConfigSection({ modeler, element }: Props) {
         />
       </Field>
 
-      <Checkbox
+      <Switch
         checked={state.copyValues}
         onChange={(v) => flush({ copyValues: v })}
         label="Copiar valores do formulário"
-        hint="Replica os valores do formulário pai no subprocesso."
+        help="Replica os valores do formulário pai no subprocesso."
       />
-      <Checkbox
+      <Switch
         checked={state.showParentMessages}
         onChange={(v) => flush({ showParentMessages: v })}
         label="Visualizar mensagens do processo-pai"
@@ -74,13 +73,12 @@ export function SubprocessConfigSection({ modeler, element }: Props) {
 
       <Field
         label="Multi-processos"
-        hint="Agrupamento do formulário cujos itens disparam uma instância cada. Vira combobox na Fase 4.3."
+        help="Agrupamento do formulário cujos itens disparam uma instância cada. Exemplo: itens_pedido."
       >
         <TextInput
           value={state.multiInstanceGroupRef}
           onChange={(e) => update({ multiInstanceGroupRef: e.target.value })}
           onBlur={() => commit('multiInstanceGroupRef')}
-          placeholder="ex: itens_pedido"
         />
       </Field>
     </Section>

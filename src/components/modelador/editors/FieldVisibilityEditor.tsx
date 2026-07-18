@@ -155,7 +155,7 @@ function FieldRow({
             </>
           }
         >
-          <Field label={`Campo: ${field.label || field.id}`} hint="Opcional. Popula as opções do campo a partir de uma fonte cadastrada.">
+          <Field label={`Campo: ${field.label || field.id}`} help="Opcional. Popula as opções do campo a partir de uma fonte cadastrada.">
             <DataSourceSelect value={draft} onChange={setDraft} placeholder="Sem fonte (manter como está)" />
           </Field>
         </Dialog>

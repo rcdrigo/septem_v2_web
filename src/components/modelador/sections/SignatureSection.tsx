@@ -44,13 +44,12 @@ export function SignatureSection({ modeler, element }: Props) {
       {state.mode === 'electronic' && (
         <Field
           label="Campos a serem assinados"
-          hint="Um identificador por linha. Vira multi-select de campos do formulário na Fase 4."
+          help="Informe um identificador por linha. Exemplos: campo_1 e campo_2."
         >
           <TextArea
             value={state.fields}
             onChange={(e) => update({ fields: e.target.value })}
             onBlur={() => commit('fields')}
-            placeholder="campo_1&#10;campo_2"
             rows={4}
           />
         </Field>

@@ -1,6 +1,5 @@
-// Fase 5b — Informações gerais da tarefa: Sigla (era "Apelido") como 1º campo, Nome
-// como 2º, e Setor (dropdown pesquisável com as RAIAS do processo). Testa a ordem, o
-// rename, o setor lendo as lanes e o ROUND-TRIP (Sigla e Setor persistem no Salvar).
+// Informações gerais da tarefa e do início: Sigla (era "Apelido") como 1º campo,
+// Nome como 2º e Setor pesquisável com as raias. Testa ordem, rename e round-trip.
 // Modelador é desktop (canvas some no mobile) → web 1280.
 import { chromium } from 'playwright-core';
 
@@ -100,14 +99,25 @@ try {
   check(/value="analise_fin"/.test(x), '[web] round-trip: a Sigla sobrevive ao Salvar');
   await page.screenshot({ path: `${OUT}/info-tarefa.png`, fullPage: true });
 
-  // Costura: o Setor é SÓ de tarefa. Selecionar o INÍCIO (usa a mesma seção) mostra
-  // Sigla/Nome mas NÃO o Setor — e não quebra.
+  // O Início usa a mesma seção e também deve permitir configurar o Setor.
   const bs = await page.locator('[data-element-id="S"]').boundingBox();
   await page.mouse.click(bs.x + bs.width / 2, bs.y + bs.height / 2);
   await page.waitForTimeout(700);
   const inicio = (await page.locator('text=Informações gerais').first().locator('xpath=ancestor::section[1]').innerText().catch(() => '')).toLowerCase();
   check(inicio.includes('sigla') && inicio.includes('nome'), '[web] início ainda mostra Sigla/Nome (seção não quebra)');
-  check(!inicio.includes('setor'), '[web] Setor NÃO aparece em elemento que não é tarefa');
+  check(inicio.includes('setor'), '[web] Setor também aparece na tarefa de início');
+
+  const setorInicioBtn = page.locator('label:has-text("Setor")').locator('xpath=..').locator('button').first();
+  await setorInicioBtn.click();
+  await page.waitForSelector('input[placeholder="Pesquisar…"]', { timeout: 5000 });
+  await page.locator('ul li button', { hasText: 'Jurídico' }).last().click();
+  await page.waitForTimeout(300);
+  await page.locator('header button', { hasText: 'Salvar' }).first().click();
+  await page.waitForTimeout(3000);
+  const detInicio = await api(token, `/api/v1/workflow/process-definitions/${key}`);
+  const xmlInicio = detInicio.body.bpmnXml || '';
+  const startBlock = xmlInicio.match(/<bpmn:startEvent\b[\s\S]*?<\/bpmn:startEvent>/i)?.[0] ?? '';
+  check(/septem:setor\b[^>]*value="Jurídico"/i.test(startBlock), '[web] round-trip: o Setor do início sobrevive ao Salvar');
 
   // Processo SEM raias → o Setor mostra o estado vazio.
   await page.goto(`${BASE}/processos/editar?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });

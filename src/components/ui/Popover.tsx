@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type AriaRole, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 type Props = {
@@ -11,6 +11,8 @@ type Props = {
   /** Ocupa toda a largura do pai (block). Sem isto o container é inline-block
       e cresce pelo conteúdo — o `truncate` do trigger nunca atua. */
   fullWidth?: boolean;
+  panelRole?: AriaRole;
+  ariaLabel?: string;
 };
 
 /**
@@ -21,7 +23,14 @@ type Props = {
  * o frame do modelador de formulário) não corta o popover. Se não couber abaixo,
  * abre para cima. Recalcula em scroll/resize.
  */
-export function Popover({ trigger, children, align = 'right', fullWidth = false }: Props) {
+export function Popover({
+  trigger,
+  children,
+  align = 'right',
+  fullWidth = false,
+  panelRole = 'menu',
+  ariaLabel,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -70,7 +79,14 @@ export function Popover({ trigger, children, align = 'right', fullWidth = false 
 
   return (
     <div ref={containerRef} className={fullWidth ? 'relative block w-full min-w-0' : 'relative inline-block'}>
-      <button type="button" onClick={() => setOpen((v) => !v)} className="contents">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="contents"
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        aria-haspopup={panelRole === 'dialog' ? 'dialog' : 'menu'}
+      >
         {trigger(open)}
       </button>
       {open && createPortal(
@@ -85,7 +101,8 @@ export function Popover({ trigger, children, align = 'right', fullWidth = false 
             visibility: pos ? 'visible' : 'hidden',
           }}
           className="min-w-[200px] rounded-md border border-slate-200 bg-white py-1 shadow-lg"
-          role="menu"
+          role={panelRole}
+          aria-label={ariaLabel}
         >
           {children(() => setOpen(false))}
         </div>,

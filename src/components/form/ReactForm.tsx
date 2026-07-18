@@ -1,6 +1,6 @@
-import { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { ChevronDown, HelpCircle, Plus, Trash2, Paperclip, X, Loader2 } from 'lucide-react';
+import { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { ChevronDown, Plus, Trash2, Paperclip, X, Loader2 } from 'lucide-react';
+import { HelpPopover } from '@/components/ui/HelpPopover';
 import { api, ApiError } from '@/lib/api';
 import { regexToTemplate, applyMask, isAllDigits } from '@/lib/mask';
 import { maskDocumento, validateDocumento, type DocKind } from '@/lib/documento';
@@ -656,54 +656,5 @@ function GroupTabsCards({ groups, extra }: { groups: Component[]; extra?: { lead
       </div>
       {tabs[idx]?.content}
     </div>
-  );
-}
-
-/**
- * Ícone de ajuda com aviso no hover/foco. O balão usa `position: fixed`,
- * largura automática (limitada à janela) e é reposicionado para caber no
- * viewport: prefere acima do ícone; se não couber, vai abaixo; clampa na
- * horizontal para não cortar nas bordas.
- */
-function HelpPopover({ html }: { html: string }) {
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const popRef = useRef<HTMLDivElement>(null);
-  const [style, setStyle] = useState<React.CSSProperties>({ visibility: 'hidden' });
-
-  useLayoutEffect(() => {
-    if (!open || !btnRef.current || !popRef.current) return;
-    const margin = 8;
-    const br = btnRef.current.getBoundingClientRect();
-    const pr = popRef.current.getBoundingClientRect();
-    let left = br.left + br.width / 2 - pr.width / 2;
-    left = Math.max(margin, Math.min(left, window.innerWidth - pr.width - margin));
-    const fitsAbove = br.top - pr.height - margin >= 0;
-    const top = fitsAbove ? br.top - pr.height - 6 : br.bottom + 6;
-    setStyle({ position: 'fixed', left, top, visibility: 'visible' });
-  }, [open]);
-
-  return (
-    <span className="relative inline-flex" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      <button
-        ref={btnRef}
-        type="button"
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        className="text-slate-400 hover:text-slate-600"
-        title="Ajuda"
-      >
-        <HelpCircle size={14} />
-      </button>
-      {open && createPortal(
-        <div
-          ref={popRef}
-          style={style}
-          className="pointer-events-none z-[1010] w-max max-w-[min(20rem,90vw)] rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 shadow-lg"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />,
-        document.body,
-      )}
-    </span>
   );
 }

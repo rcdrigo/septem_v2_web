@@ -1,4 +1,4 @@
-import { Checkbox, Field, RadioGroup, Section, Select, TextInput, type SelectOption } from '@/components/ui/Field';
+import { Field, RadioGroup, Section, Select, Switch, TextInput, type SelectOption } from '@/components/ui/Field';
 import { useExtensionState } from '@/lib/useExtensionState';
 import { useAreas, useAreaPositions } from '@/lib/api/catalog';
 import { DataSourceSelect } from '../fields/DataSourceSelect';
@@ -78,17 +78,17 @@ export function DeadlineActorSection({ modeler, element }: Props) {
 
   return (
     <Section title="Responsáveis e prazos">
-      <Checkbox
+      <Switch
         checked={deadline.state.respectWorkHours}
         onChange={(v) => deadline.flush({ respectWorkHours: v })}
         label="Respeitar horas úteis"
       />
-      <Checkbox
+      <Switch
         checked={deadline.state.sendReceiptMail}
         onChange={(v) => deadline.flush({ sendReceiptMail: v })}
         label="Enviar mensagem de recebimento"
       />
-      <Checkbox
+      <Switch
         checked={deadline.state.sendDeadlineMail}
         onChange={(v) => deadline.flush({ sendDeadlineMail: v })}
         label="Enviar mensagem de prazo a expirar"
@@ -152,7 +152,7 @@ export function DeadlineActorSection({ modeler, element }: Props) {
       )}
 
       <div className="grid grid-cols-2 gap-2 border-t border-slate-200 pt-3">
-        <Field label="Prazo (horas)">
+        <Field label="Prazo (horas)" help="Prazo fixo em horas. Aceita intervalos de 0,5 hora. Exemplo: 48.">
           <TextInput
             type="number"
             min={0}
@@ -160,7 +160,6 @@ export function DeadlineActorSection({ modeler, element }: Props) {
             value={deadline.state.expiresIn}
             onChange={(e) => deadline.update({ expiresIn: e.target.value })}
             onBlur={() => deadline.commit('expiresIn')}
-            placeholder="ex: 48"
           />
         </Field>
         <Field label="…OU CAMPO">
@@ -169,7 +168,7 @@ export function DeadlineActorSection({ modeler, element }: Props) {
           <FormFieldSelect
             value={deadline.state.expiresInFieldRef}
             onChange={(v) => deadline.flush(v ? { expiresInFieldRef: v, expiresIn: '' } : { expiresInFieldRef: v })}
-            placeholder="Campo (nº de dias)"
+            placeholder="Campo"
           />
         </Field>
       </div>

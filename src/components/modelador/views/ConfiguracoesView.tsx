@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Checkbox, Field, RadioGroup, Select, Section, TextArea, TextInput } from '@/components/ui/Field';
+import { Field, RadioGroup, Select, Section, Switch, TextArea, TextInput } from '@/components/ui/Field';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import {
   PROCESS_CONFIG_DEFAULTS,
@@ -23,10 +23,10 @@ type Props = {
   modeler: any | null;
 };
 
-const STATUS_OPTIONS: ReadonlyArray<{ value: ProcessStatus; label: string; hint?: string }> = [
-  { value: 'draft', label: 'Rascunho', hint: 'Em construção. Não aparece para usuários finais.' },
-  { value: 'published', label: 'Publicado', hint: 'Disponível para iniciar requisições.' },
-  { value: 'inactive', label: 'Inativo', hint: 'Histórico preservado; novas instâncias bloqueadas.' },
+const STATUS_OPTIONS: ReadonlyArray<{ value: ProcessStatus; label: string; help?: string }> = [
+  { value: 'draft', label: 'Rascunho', help: 'Em construção. Não aparece para usuários finais.' },
+  { value: 'published', label: 'Publicado', help: 'Disponível para iniciar requisições.' },
+  { value: 'inactive', label: 'Inativo', help: 'Histórico preservado; novas instâncias bloqueadas.' },
 ];
 
 // Categorias agora vêm do backend (/api/v1/categories); o XML guarda o slug do
@@ -88,9 +88,6 @@ export function ConfiguracoesView({ modeler }: Props) {
       <div className="flex w-full flex-1 flex-col overflow-y-auto bg-white">
         <header className="border-b border-slate-200 bg-slate-50 px-6 py-3">
           <h2 className="text-sm font-semibold text-slate-900">Configurações do processo</h2>
-          <p className="text-xs text-slate-500">
-            Metadados publicados quando o processo é disponibilizado aos usuários.
-          </p>
         </header>
 
         {/* Abas */}
@@ -109,13 +106,13 @@ export function ConfiguracoesView({ modeler }: Props) {
               <div className="grid grid-cols-1 gap-x-6 gap-y-3 lg:grid-cols-2">
                 {/* Coluna 1 */}
                 <div className="flex flex-col gap-3">
-                  <Field label="Nome" hint="Mesmo nome exibido na barra superior.">
-                    <TextInput value={draftName} onChange={(e) => setDraftName(e.target.value)} onBlur={commitName} placeholder="Nome do processo" />
+                  <Field label="Nome" help="Mesmo nome exibido na barra superior.">
+                    <TextInput value={draftName} onChange={(e) => setDraftName(e.target.value)} onBlur={commitName} />
                   </Field>
                   <Field label="Categoria">
                     <Select value={cfg.categoryId} onChange={(e) => patch({ categoryId: e.target.value })} options={categoryOptions} />
                   </Field>
-                  <Field label="Unidade organizacional responsável" hint="Secretaria/órgão dono do processo.">
+                  <Field label="Unidade organizacional responsável" help="Secretaria ou órgão responsável pelo processo.">
                     <Combobox
                       value={cfg.areaId}
                       options={(orgUnits.data ?? []).map((u) => ({ value: u.key, label: u.name }))}
@@ -124,31 +121,33 @@ export function ConfiguracoesView({ modeler }: Props) {
                       placeholder="Selecione a unidade"
                     />
                   </Field>
-                  <Field label="URL da documentação">
+                  <Field label="URL da documentação" help="Endereço completo da documentação do processo. Exemplo: https://exemplo.gov.br/documentacao.">
                     <TextInput type="url" value={cfg.documentationUrl}
                       onChange={(e) => setCfg((c) => ({ ...c, documentationUrl: e.target.value }))}
-                      onBlur={() => patch({ documentationUrl: cfg.documentationUrl })} placeholder="https://…" />
+                      onBlur={() => patch({ documentationUrl: cfg.documentationUrl })} />
                   </Field>
-                  <Field label="Ícone" hint="Ícone do processo (FontAwesome).">
+                  <Field label="Ícone" help="Ícone FontAwesome usado para representar o processo.">
                     <IconSearchPicker value={cfg.icon} onChange={(cls) => { setCfg((c) => ({ ...c, icon: cls ?? '' })); patch({ icon: cls ?? '' }); }} />
                   </Field>
                 </div>
                 {/* Coluna 2 */}
                 <div className="flex flex-col gap-3">
-                  <Field label="Descrição" hint="Aceita formatação (negrito, listas, links) e quebras de linha — exibido nas listagens de serviço.">
+                  <Field label="Descrição" help="Aceita formatação, listas, links e quebras de linha. É exibida nas listagens de serviço.">
                     <RichTextEditor
                       value={cfg.description ?? ''}
                       onChange={(html) => setCfg((c) => ({ ...c, description: html }))}
                       onBlur={() => patch({ description: cfg.description })}
                     />
                   </Field>
-                  <Field label="Inbox / resumo da requisição" hint="HTML curto mostrado nas listagens. Variáveis com {{campo}}.">
+                  <Field
+                    label="Inbox / resumo da requisição"
+                    help="HTML curto mostrado nas listagens. Aceita variáveis com {{campo}}. Exemplo: &lt;strong&gt;{{titulo}}&lt;/strong&gt; — solicitado por {{requisitante}}."
+                  >
                     <TextArea
                       value={cfg.inbox}
                       onChange={(e) => setCfg((c) => ({ ...c, inbox: e.target.value }))}
                       onBlur={() => patch({ inbox: cfg.inbox })}
                       rows={5}
-                      placeholder="<strong>{{titulo}}</strong> — solicitado por {{requisitante}}"
                     />
                   </Field>
                 </div>
@@ -165,13 +164,14 @@ export function ConfiguracoesView({ modeler }: Props) {
                 </div>
                 {/* Coluna 2 */}
                 <div className="flex flex-col gap-2">
-                  <Field label="Permissões durante a execução">
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Permissões durante a execução</span>
                     <div className="flex flex-col gap-2">
-                      <Checkbox checked={cfg.allowMessages} onChange={(v) => patch({ allowMessages: v })} label="Permitir inserção de mensagens nas execuções" />
-                      <Checkbox checked={cfg.allowCancel} onChange={(v) => patch({ allowCancel: v })} label="Permitir cancelamento do processo" />
-                      <Checkbox checked={cfg.allowAnonymous} onChange={(v) => patch({ allowAnonymous: v })} label="Permitir requisições anônimas (portal)" hint="Requer formulário aceitando dados sem autenticação." />
+                      <Switch checked={cfg.allowMessages} onChange={(v) => patch({ allowMessages: v })} label="Permitir inserção de mensagens nas execuções" />
+                      <Switch checked={cfg.allowCancel} onChange={(v) => patch({ allowCancel: v })} label="Permitir cancelamento do processo" />
+                      <Switch checked={cfg.allowAnonymous} onChange={(v) => patch({ allowAnonymous: v })} label="Permitir requisições anônimas (portal)" help="Requer formulário aceitando dados sem autenticação." />
                     </div>
-                  </Field>
+                  </div>
                 </div>
               </div>
             </Section>
@@ -226,7 +226,7 @@ function AccessControlSection({ value, onChange }: { value: string; onChange: (j
   return (
     <Section
       title="Controle de acesso"
-      description="Defina quem vê/inicia o processo. Sem nenhuma regra = ninguém vê (exceto administradores). Adicione 'Todos os usuários' para liberar a todos, ou regras 'Permitir' para grupos específicos. 'Bloquear' é exceção e vence o 'Permitir'. Administradores sempre acessam."
+      help="Defina quem vê ou inicia o processo. Sem regras, ninguém vê, exceto administradores. Adicione Todos os usuários para liberar a todos ou regras Permitir para grupos específicos. Bloquear é exceção e vence Permitir. Administradores sempre acessam."
     >
       {rules.length === 0 && <p className="text-xs text-amber-600">Nenhuma regra — processo oculto para todos (só administradores). Adicione "Todos os usuários" para liberar.</p>}
       <div className="flex flex-col gap-2">

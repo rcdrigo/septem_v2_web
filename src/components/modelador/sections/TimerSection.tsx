@@ -26,8 +26,8 @@ const KIND_OPTIONS = [
 ] as const;
 
 const MODE_OPTIONS = [
-  { value: 'fixed', label: 'Fixa', hint: 'Valor digitado direto.' },
-  { value: 'dynamic', label: 'Dinâmica', hint: 'Lê de um campo do formulário.' },
+  { value: 'fixed', label: 'Fixa', help: 'Valor digitado diretamente.' },
+  { value: 'dynamic', label: 'Dinâmica', help: 'Lê o valor de um campo do formulário.' },
 ] as const;
 
 /**
@@ -45,7 +45,7 @@ export function TimerSection({ modeler, element }: Props) {
   );
 
   const valueLabel = labelForKind(state.kind);
-  const valuePlaceholder = placeholderForKind(state.kind);
+  const valueHelp = helpForKind(state.kind);
 
   return (
     <Section title="Configuração do temporizador">
@@ -70,21 +70,19 @@ export function TimerSection({ modeler, element }: Props) {
       </Field>
 
       {state.mode === 'fixed' ? (
-        <Field label={valueLabel}>
+        <Field label={valueLabel} help={valueHelp}>
           <TextInput
             value={state.value}
             onChange={(e) => update({ value: e.target.value })}
             onBlur={() => commit('value')}
-            placeholder={valuePlaceholder}
           />
         </Field>
       ) : (
-        <Field label="Campo do formulário" hint="Vira combobox de campos na Fase 4.3.">
+        <Field label="Campo do formulário" help="Identificador do campo que fornece o valor. Exemplo: data_prevista.">
           <TextInput
             value={state.fieldRef}
             onChange={(e) => update({ fieldRef: e.target.value })}
             onBlur={() => commit('fieldRef')}
-            placeholder="ex: data_prevista"
           />
         </Field>
       )}
@@ -105,15 +103,15 @@ function labelForKind(kind: TimerKind): string {
   }
 }
 
-function placeholderForKind(kind: TimerKind): string {
+function helpForKind(kind: TimerKind): string {
   switch (kind) {
     case 'untilDate':
-      return '01/01/2026';
+      return 'Informe a data no formato DD/MM/AAAA. Exemplo: 01/01/2026.';
     case 'untilDay':
-      return '15';
+      return 'Informe um dia do mês entre 1 e 31. Exemplo: 15.';
     case 'forHours':
-      return '48';
+      return 'Informe a quantidade de horas. Exemplo: 48.';
     case 'forDays':
-      return '5';
+      return 'Informe a quantidade de dias. Exemplo: 5.';
   }
 }

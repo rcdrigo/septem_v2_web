@@ -33,7 +33,7 @@ export function RoutinesSection({ modeler, element }: Props) {
   return (
     <Section
       title="Rotinas"
-      description="Fontes de dados executadas em momentos do ciclo da tarefa."
+      help="Fontes de dados executadas em momentos do ciclo da tarefa."
     >
       {/* Um único atalho para criar fonte, acima dos 4 seletores (cada seletor
           esconde o seu — showNew={false} — para não repetir o botão 4×). */}

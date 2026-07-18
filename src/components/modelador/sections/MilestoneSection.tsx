@@ -82,12 +82,11 @@ export function MilestoneSection({ modeler, element }: Props) {
       </Field>
 
       {showCustom && (
-        <Field label="Novo nome">
+        <Field label="Novo nome" help="Nome do novo marco. Exemplo: Recebido pelo protocolo.">
           <TextInput
             value={state.name}
             onChange={(e) => update({ name: e.target.value })}
             onBlur={() => commit('name')}
-            placeholder="ex: Recebido pelo protocolo"
           />
         </Field>
       )}

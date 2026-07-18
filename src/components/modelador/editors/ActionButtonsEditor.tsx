@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { MessageSquareText, Plus, Trash2 } from 'lucide-react';
-import { Checkbox, Field, TextInput } from '@/components/ui/Field';
+import { ChevronDown, MessageSquareText, Plus, Trash2 } from 'lucide-react';
+import { Field, Switch, TextInput } from '@/components/ui/Field';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { Dialog } from '@/components/ui/Dialog';
 import { IconButton } from '@/components/ui/IconButton';
 import { IconSearchPicker } from '@/components/ui/IconSearchPicker';
+import { Popover } from '@/components/ui/Popover';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { slugify } from '@/lib/slugify';
 import { uid } from '@/lib/uid';
@@ -27,29 +28,55 @@ const PALETTE = [
   '#047857', '#b45309', '#c2410c', '#b91c1c', '#6d28d9',
 ];
 
-/** Fileira de swatches + "personalizar" (ColorPicker). */
+/** Botão compacto que abre as cores predefinidas e o seletor personalizado. */
 function PaletteField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const known = PALETTE.includes(value.toLowerCase());
   return (
-    <div className="flex flex-col gap-1.5" data-testid="cor-paleta">
-      <div className="flex flex-wrap items-center gap-1.5">
-        {PALETTE.map((c) => (
-          <button
-            key={c}
-            type="button"
-            onClick={() => onChange(c)}
-            aria-label={`Cor ${c}`}
-            data-testid="cor-swatch"
-            className={`h-6 w-6 rounded-full border transition ${value.toLowerCase() === c ? 'ring-2 ring-slate-900 ring-offset-1' : 'border-slate-300 hover:scale-110'}`}
-            style={{ backgroundColor: c }}
-          />
-        ))}
-        <span className="ml-1 flex items-center gap-1">
-          <ColorPicker value={value} onChange={onChange} ariaLabel="Cor personalizada" />
-          {!known && <span className="text-[11px] text-slate-400">custom</span>}
+    <Popover
+      align="left"
+      panelRole="dialog"
+      ariaLabel="Selecionar cor primária"
+      trigger={(open) => (
+        <span
+          className="inline-flex w-full min-w-0 items-center gap-2 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-left text-xs text-slate-600 hover:bg-slate-50"
+          data-testid="cor-primaria-trigger"
+          data-open={open || undefined}
+        >
+          <span className="h-5 w-5 shrink-0 rounded border border-black/10" style={{ backgroundColor: value }} />
+          <span className="min-w-0 flex-1 truncate font-mono uppercase">{value}</span>
+          <ChevronDown size={13} className="shrink-0 text-slate-400" />
         </span>
-      </div>
-    </div>
+      )}
+    >
+      {(close) => (
+        <div className="w-56 p-2" data-testid="cor-paleta">
+          <div className="grid grid-cols-5 gap-2">
+            {PALETTE.map((color) => {
+              const selected = value.toLowerCase() === color;
+              return (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => { onChange(color); close(); }}
+                  aria-label={`Cor ${color}`}
+                  aria-pressed={selected}
+                  data-testid="cor-swatch"
+                  className={`h-8 w-8 rounded-full border border-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 ${selected ? 'ring-2 ring-slate-900 ring-offset-2' : ''}`}
+                  style={{ backgroundColor: color }}
+                />
+              );
+            })}
+          </div>
+          <div className="mt-2 border-t border-slate-100 pt-2">
+            <span className="mb-1.5 block text-xs font-medium text-slate-600">Cor personalizada</span>
+            <ColorPicker
+              value={value}
+              onChange={(color) => { onChange(color); close(); }}
+              ariaLabel="Cor personalizada"
+            />
+          </div>
+        </div>
+      )}
+    </Popover>
   );
 }
 
@@ -176,43 +203,43 @@ function ActionButtonRow({
       </header>
 
       <div className="flex flex-col gap-3">
-        <Field label="Nome">
+        <Field label="Nome" help="Texto exibido no botão. Exemplo: Aprovar.">
           <TextInput
             value={draftLabel}
             onChange={(e) => setDraftLabel(e.target.value)}
             onBlur={commitLabel}
-            placeholder="ex: Aprovar"
           />
         </Field>
-        <Field label="Id" hint="Auto-gerado a partir do nome; pode ser editado.">
+        <Field label="Id" help="Gerado automaticamente a partir do nome, mas pode ser editado. Exemplo: aprovar.">
           <TextInput
             value={draftId}
             onChange={(e) => setDraftId(e.target.value)}
             onBlur={commitId}
-            placeholder="ex: aprovar"
           />
         </Field>
 
-        <Field label="Cor primária">
-          <PaletteField value={button.primaryColor} onChange={(v) => onChange({ primaryColor: v })} />
-        </Field>
-        <Field label="Cor do texto">
-          <ColorPicker
-            value={button.textColor}
-            onChange={(v) => onChange({ textColor: v })}
-            ariaLabel="Cor do texto"
-          />
-        </Field>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Cor primária">
+            <PaletteField value={button.primaryColor} onChange={(v) => onChange({ primaryColor: v })} />
+          </Field>
+          <Field label="Cor do texto">
+            <ColorPicker
+              value={button.textColor}
+              onChange={(v) => onChange({ textColor: v })}
+              ariaLabel="Cor do texto"
+            />
+          </Field>
+        </div>
 
         {/* Ícone e Orientações lado a lado — as orientações editam num MODAL
             (mesmo padrão dos campos do formulário), sem comer o painel. */}
         <div className="grid grid-cols-2 gap-2">
-          <Field label="Ícone" hint="À esquerda do rótulo.">
+          <Field label="Ícone" help="Exibido à esquerda do rótulo do botão.">
             <div>
               <IconSearchPicker value={button.icon} onChange={(icon) => onChange({ icon })} />
             </div>
           </Field>
-          <Field label="Orientações" hint="Exibidas no hover do botão.">
+          <Field label="Orientações" help="Exibidas quando o usuário passa o cursor sobre o botão.">
             <button
               type="button"
               onClick={() => setHintOpen(true)}
@@ -245,15 +272,17 @@ function ActionButtonRow({
           </Dialog>
         )}
 
-        <Checkbox
+        <Switch
           checked={button.validateForm}
           onChange={(v) => onChange({ validateForm: v })}
-          label="Validar campos do formulário antes de submeter"
+          label="Validar campos"
+          help="Não permite que a tarefa seja concluída sem que todos os campos obrigatórios estejam preenchidos"
         />
-        <Checkbox
+        <Switch
           checked={!!button.requireJustification}
           onChange={(v) => onChange({ requireJustification: v || undefined })}
-          label="Obrigar justificativa ao concluir por este botão"
+          label="Obrigar justificativa"
+          help="O usuário terá de detalhar o porque escolheu esta opção antes de concluir a tarefa"
         />
       </div>
     </div>

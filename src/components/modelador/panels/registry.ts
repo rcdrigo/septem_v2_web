@@ -20,42 +20,42 @@ export type PanelComponent = ComponentType<PanelProps>;
  * É a única função "switch por tipo" do app — toda a lógica de UI específica
  * mora dentro de cada Panel/Section.
  */
-export function resolvePanel(element: any): { Panel: PanelComponent; label: string; type: string } {
+export function resolvePanel(element: any): { Panel: PanelComponent; label: string } {
   const type = element?.businessObject?.$type ?? '';
   const evDef = element?.businessObject?.eventDefinitions?.[0]?.$type ?? '';
 
   switch (type) {
     case 'bpmn:StartEvent':
-      return { Panel: StartEventPanel, label: 'Início', type };
+      return { Panel: StartEventPanel, label: 'Início' };
     case 'bpmn:EndEvent':
-      return { Panel: EndEventPanel, label: 'Fim', type };
+      return { Panel: EndEventPanel, label: 'Fim' };
     case 'bpmn:UserTask':
-      return { Panel: UserTaskPanel, label: 'Tarefa humana', type };
+      return { Panel: UserTaskPanel, label: 'Tarefa humana' };
     case 'bpmn:ServiceTask':
-      return { Panel: ServiceTaskPanel, label: 'Atividade de serviço', type };
+      return { Panel: ServiceTaskPanel, label: 'Atividade de serviço' };
     case 'bpmn:CallActivity':
-      return { Panel: CallActivityPanel, label: 'Subprocesso', type };
+      return { Panel: CallActivityPanel, label: 'Subprocesso' };
     case 'bpmn:InclusiveGateway':
-      return { Panel: InclusiveGatewayPanel, label: 'Desvio condicional (inclusivo)', type };
+      return { Panel: InclusiveGatewayPanel, label: 'Desvio condicional (inclusivo)' };
     case 'bpmn:ExclusiveGateway':
-      return { Panel: ExclusiveGatewayPanel, label: 'Desvio condicional exclusivo', type };
+      return { Panel: ExclusiveGatewayPanel, label: 'Desvio condicional exclusivo' };
     case 'bpmn:ParallelGateway':
-      return { Panel: ParallelGatewayPanel, label: 'Gateway paralelo', type };
+      return { Panel: ParallelGatewayPanel, label: 'Gateway paralelo' };
     case 'bpmn:IntermediateThrowEvent':
       if (evDef === 'bpmn:MessageEventDefinition')
-        return { Panel: EmailEventPanel, label: 'Evento de e-mail', type };
+        return { Panel: EmailEventPanel, label: 'Evento de e-mail' };
       if (evDef === 'bpmn:SignalEventDefinition')
-        return { Panel: MilestoneEventPanel, label: 'Evento de marco', type };
-      return { Panel: GenericPanel, label: 'Evento intermediário', type };
+        return { Panel: MilestoneEventPanel, label: 'Evento de marco' };
+      return { Panel: GenericPanel, label: 'Evento intermediário' };
     case 'bpmn:IntermediateCatchEvent':
       if (evDef === 'bpmn:TimerEventDefinition')
-        return { Panel: TimerEventPanel, label: 'Evento de timer', type };
-      return { Panel: GenericPanel, label: 'Evento intermediário', type };
+        return { Panel: TimerEventPanel, label: 'Evento de timer' };
+      return { Panel: GenericPanel, label: 'Evento intermediário' };
     case 'bpmn:SequenceFlow':
-      return { Panel: GenericPanel, label: 'Conexão', type };
+      return { Panel: GenericPanel, label: 'Conexão' };
     case 'bpmn:Process':
-      return { Panel: GenericPanel, label: 'Processo', type };
+      return { Panel: GenericPanel, label: 'Processo' };
     default:
-      return { Panel: GenericPanel, label: type.replace(/^bpmn:/, '') || 'Elemento', type };
+      return { Panel: GenericPanel, label: type.replace(/^bpmn:/, '') || 'Elemento' };
   }
 }
