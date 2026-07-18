@@ -23,6 +23,15 @@ html, body, #root {
 html,
 body { overflow-x: clip; }
 
+/* Botões de ação usam por padrão a escala compacta do seletor Interno/Externo.
+   A altura é mínima: cards e outros controles ricos continuam crescendo conforme
+   o conteúdo, sem serem comprimidos ou recortados. */
+button {
+  min-height: 1.75rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
 /* Tailwind 4 removeu o cursor:pointer padrão de botões/links — restauramos. */
 button:not(:disabled),
 [role="button"]:not([aria-disabled="true"]),

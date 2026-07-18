@@ -16,7 +16,7 @@ await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT}/login-desktop.png` });
 
 const layout = await page.evaluate(() => {
-  const t = document.body.innerText;
+  const t = document.body.innerText.replace(/\s+/g, ' ').trim();
   return {
     headline: t.includes('Processos claros, conformidade em cada decisão.'),
     eyebrow: t.includes('PROCESSOS & COMPLIANCE'),

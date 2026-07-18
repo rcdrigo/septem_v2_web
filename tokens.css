@@ -25,4 +25,41 @@
   --rule-thin: 1px;
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
+
+  /* Login · hero-panel aprovado */
+  --color-login-page: oklch(96.83% 0.0069 247.9);
+  --color-login-paper: oklch(97.89% 0.0029 264.54);
+  --color-login-hero: oklch(33.6% 0.0524 260.52);
+  --color-login-hero-deep: oklch(26.08% 0.0471 261.24);
+  --color-login-gold: oklch(76.32% 0.1207 78.07);
+  --color-login-frame: oklch(100% 0 0 / 94%);
+  --color-login-on-hero: oklch(100% 0 0);
+  --color-login-brand-muted: oklch(100% 0 0 / 68%);
+  --color-login-action: oklch(100% 0 0 / 96%);
+  --color-login-action-ink: oklch(33.6% 0.0524 260.52);
+  --color-login-action-muted: oklch(55.4% 0.032 263.3);
+  --color-login-band-top-1: oklch(39.91% 0.0597 253.64);
+  --color-login-band-top-2: oklch(47.32% 0.0696 243.56);
+  --color-login-band-top-3: oklch(53.59% 0.0774 237.43);
+  --color-login-band-bottom-1: oklch(37.51% 0.0588 256.38);
+  --color-login-band-bottom-2: oklch(41.71% 0.0631 253.38);
+  --color-login-band-bottom-3: oklch(46.35% 0.067 248.75);
+  --color-login-action-error: oklch(57.7% 0.215 27.33);
+  --color-login-action-success: oklch(52.7% 0.137 150.07);
+  --shadow-login-card: 0 30px 75px oklch(20% 0.04 260 / 32%);
+  --shadow-login-action: 0 12px 26px oklch(20% 0.04 260 / 20%);
+  --shadow-login-action-hover: 0 15px 30px oklch(20% 0.04 260 / 24%);
+  --radius-login-card: 1.875rem;
+  --radius-login-hero: 1.375rem;
+  --radius-login-action: 0.75rem;
+  --text-login-tenant: 0.8125rem;
+  --text-login-tenant-meta: 0.625rem;
+  --text-login-eyebrow: 0.5625rem;
+  --text-login-title-mobile: 1.4375rem;
+  --text-login-title-tablet: 1.875rem;
+  --text-login-title-max: 2.125rem;
+  --text-login-action-mobile: 0.6875rem;
+  --text-login-action-compact: 0.75rem;
+  --text-login-action-title: 0.8125rem;
+  --text-login-action-copy: 0.625rem;
 }

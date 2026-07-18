@@ -47,8 +47,8 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
 
       {/* Navegação principal */}
       <nav className="flex-1 overflow-y-auto px-2 py-3">
-        <button type="button" onClick={() => setNewRequestOpen(true)} className="mb-4 flex min-h-11 w-full items-center gap-2.5 whitespace-nowrap rounded-md bg-slate-900 px-3 text-sm font-semibold text-white hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 active:bg-slate-800">
-          <Plus size={17} className="shrink-0" />
+        <button type="button" onClick={() => setNewRequestOpen(true)} className="mb-4 flex w-full items-center gap-2 whitespace-nowrap rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 active:bg-blue-800">
+          <Plus size={14} className="shrink-0" />
           <span className="truncate">Nova requisição</span>
         </button>
         {layout.main.map((section, i) => {
