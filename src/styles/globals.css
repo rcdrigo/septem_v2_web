@@ -46,9 +46,15 @@ summary {
 .septem-form-grid {
   grid-template-columns: repeat(16, minmax(0, 1fr));
 }
+/* Item de grid tem `min-width: auto` por padrão: conteúdo que não quebra (o nome
+   longo de um documento gerado, uma URL, uma palavra única) estica a célula e joga
+   o formulário para fora da tela. Deixar encolher é o que faz o `truncate` valer. */
+.septem-form-grid > * {
+  min-width: 0;
+}
 @media (max-width: 640px) {
   .septem-form-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .septem-form-grid > * {
     grid-column: 1 / -1 !important;

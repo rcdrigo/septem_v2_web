@@ -21,6 +21,23 @@ export async function uploadAttachment(ctx: UploadContext, fieldKey: string, fil
   return api.postForm<Attachment>('/api/v1/workflow/uploads', form);
 }
 
+/** Modelos que o campo oferece para escolha (só o modo "lista" devolve itens). */
+export type DocumentOptions = { mode: string; templates: { id: string; name: string }[] };
+
+export function fetchDocumentOptions(taskId: string, fieldKey: string): Promise<DocumentOptions> {
+  return api.get<DocumentOptions>(
+    `/api/v1/workflow/tasks/${taskId}/document-options?fieldKey=${encodeURIComponent(fieldKey)}`);
+}
+
+/**
+ * Gera o documento do campo (Fase 6g). O servidor resolve o modelo pela
+ * parametrização, preenche com os dados da solicitação e devolve o anexo pronto —
+ * o cliente não escolhe modelo fora dos permitidos. Lança ApiError (mostre o detail).
+ */
+export function generateDocument(taskId: string, fieldKey: string, templateId?: string): Promise<Attachment> {
+  return api.post<Attachment>(`/api/v1/workflow/tasks/${taskId}/generate-document`, { fieldKey, templateId });
+}
+
 /** Lê o valor do campo (array de anexos), tolerando string legada/JSON. */
 export function parseAttachments(value: unknown): Attachment[] {
   if (Array.isArray(value)) return value as Attachment[];

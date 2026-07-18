@@ -1,11 +1,11 @@
 import { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, HelpCircle, Plus, Trash2, Paperclip, X, Loader2 } from 'lucide-react';
+import { ChevronDown, HelpCircle, Plus, Trash2, Paperclip, X, Loader2, FileText } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { regexToTemplate, applyMask, isAllDigits } from '@/lib/mask';
 import { maskDocumento, validateDocumento, type DocKind } from '@/lib/documento';
 import { inputTypeForDateMode, validateDateClient, type DateMode, type DateLimit } from '@/lib/datafield';
-import { uploadAttachment, parseAttachments, type Attachment, type UploadContext } from '@/lib/upload';
+import { uploadAttachment, parseAttachments, fetchDocumentOptions, generateDocument, type Attachment, type UploadContext } from '@/lib/upload';
 
 /** Mesmo contrato do FormFill (form-js), para ser intercambiável. */
 export type FormFillResult = { data: Record<string, unknown>; errors: Record<string, unknown> };
@@ -415,6 +415,40 @@ function FilePickerControl({ comp, value, disabled, onChange }: { comp: Componen
     .split(',').map((e) => e.trim().replace(/^\./, '').toLowerCase()).filter(Boolean);
   const accept = allowed.map((e) => `.${e}`).join(',') || undefined;
 
+  // ── Geração de documento (Fase 6g) ──────────────────────────────────────
+  // O campo gera documento quando o modelador marcou "Gera documento?"; nesse
+  // caso o upload manual só aparece se também foi liberado (:52/:53).
+  const geraDoc = comp.properties?.septemDocGen === 'yes';
+  const permiteManual = !geraDoc || comp.properties?.septemDocManual === 'yes';
+  const taskId = uploadContext?.taskId;
+  const [gerando, setGerando] = useState(false);
+  const [opcoes, setOpcoes] = useState<{ id: string; name: string }[]>([]);
+  const [modelo, setModelo] = useState('');
+
+  // No modo "lista" o executor escolhe entre os modelos parametrizados.
+  useEffect(() => {
+    if (!geraDoc || !taskId || disabled || !comp.key) return;
+    let vivo = true;
+    fetchDocumentOptions(taskId, comp.key)
+      .then((r) => { if (vivo) setOpcoes(r.mode === 'lista' ? r.templates : []); })
+      .catch(() => { /* sem opções: cai no modo fixo/regra, resolvido no servidor */ });
+    return () => { vivo = false; };
+  }, [geraDoc, taskId, disabled, comp.key]);
+
+  async function gerar() {
+    if (!taskId || !comp.key) return;
+    setGerando(true); setErro(null);
+    try {
+      const novo = await generateDocument(taskId, comp.key, modelo || undefined);
+      onChange([...anexos, novo]);
+    } catch (e) {
+      const body = e instanceof ApiError ? (e.body as { detail?: string } | undefined) : undefined;
+      setErro(body?.detail ?? 'Falha ao gerar o documento.');
+    } finally {
+      setGerando(false);
+    }
+  }
+
   async function enviar(files: FileList | null) {
     if (!files?.length || !uploadContext) return;
     setEnviando(true); setErro(null);
@@ -435,11 +469,15 @@ function FilePickerControl({ comp, value, disabled, onChange }: { comp: Componen
   }
 
   return (
-    <div className="flex flex-col gap-2" data-testid="anexo-campo">
+    // min-w-0 em toda a cadeia: sem isso um nome de arquivo longo (os gerados sempre
+    // são: modelo + timestamp) não deixa a coluna encolher e empurra o formulário
+    // inteiro para fora da tela no mobile — o `truncate` do link só funciona se os
+    // pais puderem encolher.
+    <div className="flex min-w-0 flex-col gap-2" data-testid="anexo-campo">
       {anexos.length > 0 && (
-        <ul className="flex flex-col gap-1">
+        <ul className="flex min-w-0 flex-col gap-1">
           {anexos.map((a, i) => (
-            <li key={i} className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm" data-testid="anexo-item">
+            <li key={i} className="flex min-w-0 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm" data-testid="anexo-item">
               <Paperclip size={14} className="shrink-0 text-slate-400" />
               <a href={a.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-slate-700 hover:underline">{a.name}</a>
               <span className="shrink-0 text-xs text-slate-400">{Math.max(1, Math.round(a.size / 1024))} KB</span>
@@ -452,7 +490,29 @@ function FilePickerControl({ comp, value, disabled, onChange }: { comp: Componen
           ))}
         </ul>
       )}
-      {!disabled && (
+      {!disabled && geraDoc && taskId && (
+        <div className="flex flex-wrap items-center gap-2" data-testid="anexo-gerar-area">
+          {opcoes.length > 0 && (
+            <select
+              value={modelo} onChange={(e) => setModelo(e.target.value)} disabled={gerando}
+              aria-label="Modelo do documento" data-testid="anexo-modelo"
+              className="rounded-md border border-slate-300 px-2 py-1.5 text-sm disabled:opacity-60"
+            >
+              <option value="">Selecione o modelo…</option>
+              {opcoes.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            </select>
+          )}
+          <button
+            type="button" onClick={gerar} disabled={gerando || (opcoes.length > 0 && !modelo)}
+            data-testid="anexo-gerar"
+            className="inline-flex items-center gap-1.5 rounded-md bg-slate-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+          >
+            {gerando ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+            {gerando ? 'Gerando…' : 'Gerar documento'}
+          </button>
+        </div>
+      )}
+      {!disabled && permiteManual && (
         <div>
           <input
             ref={inputRef} type="file" multiple accept={accept} disabled={enviando}
@@ -462,9 +522,9 @@ function FilePickerControl({ comp, value, disabled, onChange }: { comp: Componen
           />
           {allowed.length > 0 && <p className="mt-1 text-[11px] text-slate-400">Aceita: {allowed.join(', ')}.</p>}
           {enviando && <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-500"><Loader2 size={12} className="animate-spin" /> Enviando…</p>}
-          {erro && <p className="mt-1 text-[11px] text-rose-600" data-testid="anexo-erro">{erro}</p>}
         </div>
       )}
+      {!disabled && erro && <p className="text-[11px] text-rose-600" data-testid="anexo-erro">{erro}</p>}
       {disabled && anexos.length === 0 && <span className="text-sm text-slate-400">—</span>}
     </div>
   );
