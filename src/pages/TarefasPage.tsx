@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, CheckCircle2, Inbox, LifeBuoy, ExternalLink, X, LayoutGrid, Table as TableIcon, Clock, User } from 'lucide-react';
+import { CheckCircle2, Inbox, LifeBuoy, ExternalLink, X, LayoutGrid, Table as TableIcon, Clock, User } from 'lucide-react';
 import { useMyTasks, useTask, useCompleteTask, useSaveTask, type MyTask, type TaskButton } from '@/lib/api/execution';
 import { ReactForm, FormSkeleton, type ReactFormHandle } from '@/components/form/ReactForm';
-import { Tooltip } from '@/components/ui/Tooltip';
 import { openTab, navTo } from '@/lib/nav';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
 import { Dialog } from '@/components/ui/Dialog';
+import { ExecutionHeader } from '@/components/execution/ExecutionHeader';
+import { TaskActionFooter, type ExecutionAction } from '@/components/execution/TaskActionFooter';
 
 /**
  * Geral › Tarefas pendentes (B3): inbox do executor — tarefas atribuídas a ele
@@ -187,45 +188,58 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
   if (done) return <CompletionScreen kind="task" next={done.nextTaskForMe} executionId={done.executionId} onClose={onClose} />;
 
   const buttons = task.data?.buttons ?? [];
+  const completionActions: ExecutionAction[] = buttons.length === 0
+    ? [{
+        id: '__complete',
+        label: 'Concluir',
+        loadingLabel: 'Concluindo…',
+        icon: <CheckCircle2 size={15} aria-hidden="true" />,
+        onClick: () => finish(),
+        disabled: complete.isPending || task.isLoading,
+        loading: complete.isPending,
+      }]
+    : buttons.map((button) => ({
+        id: button.id,
+        label: button.label,
+        hint: button.hint,
+        icon: button.icon ? <i className={button.icon} aria-hidden="true" /> : undefined,
+        onClick: () => finish(button),
+        disabled: complete.isPending || task.isLoading,
+        loading: complete.isPending,
+        loadingLabel: 'Concluindo…',
+        style: button.primaryColor ? { backgroundColor: button.primaryColor, color: button.textColor ?? '#fff' } : undefined,
+      }));
+  const utilityActions: ExecutionAction[] = [
+    {
+      id: '__save',
+      label: 'Salvar',
+      loadingLabel: 'Salvando…',
+      onClick: saveDraft,
+      disabled: save.isPending || task.isLoading,
+      loading: save.isPending,
+      variant: 'secondary',
+    },
+    { id: '__cancel', label: 'Cancelar', onClick: onClose, variant: 'secondary' },
+  ];
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-6 py-4">
-        <button type="button" onClick={onClose} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="Voltar para a lista">
-          <ArrowLeft size={18} />
-        </button>
-        <div className="flex flex-col">
-          {task.data?.process && <span className="text-sm font-medium text-slate-500">{task.data.process}</span>}
-          <h1 className="text-lg font-semibold text-slate-900">{task.data?.name ?? 'Tarefa'}</h1>
-        </div>
-      </header>
+      <ExecutionHeader
+        processName={task.data?.process}
+        taskName={task.data?.name}
+        alias={task.data?.alias}
+        sector={task.data?.sector}
+        processNumber={task.data?.processNumber}
+        onBack={onClose}
+        onOpenReport={task.data?.executionId ? () => openTab(`/solicitacao/${task.data!.executionId}`) : undefined}
+      />
 
       {/* Cada grupo renderiza seu próprio card (sem container único). */}
-      <main className="flex-1 overflow-auto p-6">
+      <main className="flex-1 overflow-auto p-4 sm:p-6">
         {task.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={task.data?.formSchema} data={task.data?.data as Record<string, unknown> | undefined} optionsByField={task.data?.fieldOptions} uploadContext={{ taskId }} />}
       </main>
 
-      {/* Botões de conclusão sempre visíveis no rodapé (req. 4) */}
-      <footer className="flex justify-start gap-2 border-t border-slate-200 bg-white px-6 py-3">
-        {buttons.length === 0 ? (
-          <button type="button" onClick={() => finish()} disabled={complete.isPending || task.isLoading} className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">
-            <CheckCircle2 size={15} /> Concluir
-          </button>
-        ) : buttons.map((b) => (
-          <Tooltip key={b.id} text={b.hint}>
-            <button type="button" onClick={() => finish(b)} disabled={complete.isPending || task.isLoading}
-              style={b.primaryColor ? { backgroundColor: b.primaryColor, color: b.textColor ?? '#fff' } : undefined}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-sm font-medium disabled:opacity-60 ${b.primaryColor ? '' : 'bg-slate-900 text-white hover:bg-slate-700'}`}>
-              {b.icon && <i className={b.icon} />}
-              {b.label}
-            </button>
-          </Tooltip>
-        ))}
-        <div className="ml-auto flex gap-2">
-          <button type="button" onClick={saveDraft} disabled={save.isPending || task.isLoading} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">Salvar</button>
-          <button type="button" onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Cancelar</button>
-        </div>
-      </footer>
+      <TaskActionFooter completionActions={completionActions} utilityActions={utilityActions} loading={task.isLoading} />
 
       {justify && (
         <JustifyDialog

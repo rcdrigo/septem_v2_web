@@ -4,8 +4,9 @@ import { HelpPopover } from '@/components/ui/HelpPopover';
 import { api, ApiError } from '@/lib/api';
 import { regexToTemplate, applyMask, isAllDigits } from '@/lib/mask';
 import { maskDocumento, validateDocumento, type DocKind } from '@/lib/documento';
-import { inputTypeForDateMode, validateDateClient, type DateMode, type DateLimit } from '@/lib/datafield';
+import { validateDateClient, type DateMode, type DateLimit } from '@/lib/datafield';
 import { uploadAttachment, parseAttachments, type Attachment, type UploadContext } from '@/lib/upload';
+import { DatePickerField } from './DatePickerField';
 
 /** Mesmo contrato do FormFill (form-js), para ser intercambiável. */
 export type FormFillResult = { data: Record<string, unknown>; errors: Record<string, unknown> };
@@ -338,24 +339,32 @@ function Node({ comp }: { comp: Component }) {
         {popoverHelp && <HelpPopover html={popoverHelp} />}
       </label>
     );
+  } else if (comp.type === 'datetime') {
+    control = (
+      <DatePickerField
+        value={String(v ?? '')}
+        mode={comp.properties?.septemDateMode as DateMode | undefined}
+        limit={comp.properties?.septemDateLimit as DateLimit | undefined}
+        error={!!err}
+        ariaLabel={comp.label}
+        required={comp.validate?.required}
+        onChange={(value, event) => setAndEmit(value, event)}
+        onClick={evt.onClick}
+        onBlur={evt.onBlur}
+        onFocus={evt.onFocus}
+      />
+    );
   } else {
     const input = (
       <input
-        type={docKind || maskTemplate ? 'text' : comp.type === 'number' ? 'number' : comp.type === 'email' ? 'email' : comp.type === 'datetime' ? inputTypeForDateMode(comp.properties?.septemDateMode as DateMode | undefined) : comp.type === 'password' ? 'password' : 'text'}
+        type={docKind || maskTemplate ? 'text' : comp.type === 'number' ? 'number' : comp.type === 'email' ? 'email' : comp.type === 'password' ? 'password' : 'text'}
         inputMode={docKind ? 'numeric' : maskTemplate ? (isAllDigits(maskTemplate) ? 'numeric' : undefined) : undefined}
         maxLength={docKind ? 18 : maskTemplate ? maskTemplate.length : maxLength}
         disabled={disabled}
         className={prefixAdorner || suffixAdorner ? `${base} rounded-none border-0 focus:ring-0` : base}
         value={String(v ?? '')}
         {...evt}
-        onFocus={(e) => {
-          // Campo de data: abre o calendário já ao FOCAR (não só no ícone). showPicker()
-          // exige ativação do usuário e pode lançar — protege sem quebrar o runEvent.
-          if (comp.type === 'datetime') {
-            try { (e.currentTarget as HTMLInputElement).showPicker?.(); } catch { /* sem ativação */ }
-          }
-          evt.onFocus(e);
-        }}
+        onFocus={evt.onFocus}
         onChange={(e) => {
           if (docKind) { setAndEmit(maskDocumento(e.target.value, docKind), e); return; }
           if (maskTemplate) { setAndEmit(applyMask(maskTemplate, e.target.value), e); return; }
@@ -377,7 +386,7 @@ function Node({ comp }: { comp: Component }) {
     <div className="flex flex-col gap-1" style={widthPx && !Number.isNaN(widthPx) ? { maxWidth: widthPx } : undefined}>
       {(comp.type !== 'checkbox' || disabled) && labelEl}
       {control}
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex min-h-[1lh] items-start justify-between gap-2">
         <div className="min-w-0">
           {err && <span className="text-xs text-rose-600">{err}</span>}
           {!err && inlineHelp && <span className="text-xs text-slate-400" dangerouslySetInnerHTML={{ __html: inlineHelp }} />}

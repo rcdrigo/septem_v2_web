@@ -9,7 +9,9 @@ export type TaskButton = { id: string; label: string; validateForm: boolean; req
 export type FieldOptions = Record<string, { value: string; label: string }[]>;
 export type TaskDetail = {
   id: string; name: string | null; status: string; executionId: string;
-  process?: string | null; documentationUrl?: string | null;
+  process?: string | null; processNumber?: number | null;
+  alias?: string | null; sector?: string | null;
+  documentationUrl?: string | null;
   formSchema: unknown; data: unknown; buttons: TaskButton[]; fieldOptions?: FieldOptions;
 };
 export type CompleteResult = { taskStatus: string; executionStatus: string; pendingTasks: number; executionId?: string; nextTaskForMe?: string | null };
@@ -26,6 +28,8 @@ export type StartForm = {
   documentationUrl?: string | null;
   processName?: string | null;
   startTaskName?: string | null;
+  startTaskAlias?: string | null;
+  startTaskSector?: string | null;
 };
 export function useProcessForm(key: string | null) {
   return useQuery({ queryKey: ['workflow', 'process-form', key], queryFn: () => api.get<StartForm>(`/api/v1/workflow/process-definitions/${key}/form`), enabled: !!key });
