@@ -66,7 +66,43 @@ export function ModelosDocumentoPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Mobile: cards empilhados. A tabela larga jogaria os botões de ação para
+              fora da tela (só alcançáveis com scroll horizontal) — no celular as
+              colunas viram linhas e as ações ficam sempre visíveis. */}
+          <ul className="flex flex-col gap-2 sm:hidden">
+            {list.isLoading && <li className="py-8 text-center text-slate-400">Carregando...</li>}
+            {list.data?.map((t) => (
+              <li key={t.id} className="rounded-md border border-slate-200 bg-white p-3" data-testid="doc-card">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-800">{t.name}</p>
+                    {t.description && <p className="truncate text-xs text-slate-500">{t.description}</p>}
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${t.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                    {t.active ? 'Ativo' : 'Inativo'}
+                  </span>
+                </div>
+                <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-slate-500">
+                  <span className="uppercase">{t.outputType}</span> ·{' '}
+                  {t.hasFile ? <span className="truncate">{t.fileName}</span> : <span>sem arquivo</span>}
+                  {t.hasFile && !t.templateValid && <AlertTriangle size={12} className="shrink-0 text-amber-600" />}
+                </p>
+                <div className="mt-2 flex gap-1">
+                  {t.hasFile && (
+                    <button type="button" onClick={() => void preview(t.id)} title="Visualizar"
+                      className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800"><Eye size={15} /></button>
+                  )}
+                  <button type="button" onClick={() => setEditId(t.id)} title="Editar"
+                    className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800"><Pencil size={15} /></button>
+                  <button type="button" onClick={() => askDelete(t)} title="Excluir"
+                    className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"><Trash2 size={15} /></button>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full min-w-[640px] overflow-hidden rounded-md border border-slate-200 bg-white text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
@@ -131,6 +167,7 @@ export function ModelosDocumentoPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

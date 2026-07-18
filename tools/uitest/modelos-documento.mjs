@@ -57,6 +57,33 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
     check(!overflow, `[${vp.n}] sem overflow horizontal`);
 
+    // Protocolo: nenhum CONTROLE cortado (fora da viewport) — na lista e no diálogo.
+    // Ignora o <aside>: no mobile o menu é um drawer off-canvas (fica em left ≈ -248
+    // POR DESIGN, deslizando ao abrir) — contá-lo daria falso-positivo em toda tela.
+    const clippedOf = () => page.evaluate(() => {
+      const vw = document.documentElement.clientWidth;
+      return [...document.querySelectorAll('button, input, select, textarea, a')]
+        .filter((el) => el.offsetParent !== null && !el.closest('aside'))
+        .map((el) => { const r = el.getBoundingClientRect(); return { out: r.right > vw + 1 || r.left < -1, w: r.width }; })
+        .filter((c) => c.out && c.w > 0).length;
+    });
+    check((await clippedOf()) === 0, `[${vp.n}] nenhum controle cortado na lista (clipped: ${await clippedOf()})`);
+
+    // Abre o diálogo de cadastro e mede de novo (é onde o mobile costuma cortar).
+    await page.locator('header button', { hasText: 'Novo modelo' }).click();
+    await page.waitForSelector('[role=dialog]', { timeout: 8000 });
+    await page.waitForTimeout(500);
+    const clippedDlg = await clippedOf();
+    const dlgOverflow = await page.evaluate(() => {
+      const d = document.querySelector('[role=dialog]');
+      return !!d && d.scrollWidth > d.clientWidth + 1;
+    });
+    check(clippedDlg === 0, `[${vp.n}] nenhum controle cortado no diálogo (clipped: ${clippedDlg})`);
+    check(!dlgOverflow, `[${vp.n}] diálogo sem overflow horizontal`);
+    await page.screenshot({ path: `${OUT}/modelos-documento-${vp.n}.png`, fullPage: false });
+    await page.locator('[role=dialog] button', { hasText: 'Cancelar' }).click();
+    await page.waitForTimeout(300);
+
     if (vp.n === 'web') {
       // ── CRIAR pela UI ──
       await page.locator('header button', { hasText: 'Novo modelo' }).click();
