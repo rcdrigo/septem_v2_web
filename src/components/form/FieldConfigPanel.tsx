@@ -92,7 +92,13 @@ export function FieldConfigPanel({ field, editField, masks }: {
 
   // Sincroniza os drafts quando troca o campo selecionado.
   useEffect(() => {
-    setDraftLabel(field?.label ?? '');
+    // O campo de data (form-js datetime) NÃO usa `label`: seu nome visível vem de
+    // `dateLabel`/`timeLabel`. Semeia o draft a partir deles nesse caso.
+    setDraftLabel(
+      field?.type === 'datetime'
+        ? (field?.dateLabel ?? field?.timeLabel ?? field?.label ?? '')
+        : (field?.label ?? ''),
+    );
     setDraftKey(field?.key ?? '');
     setHelpDraft(field?.properties?.septemHelpText ?? '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,6 +133,12 @@ export function FieldConfigPanel({ field, editField, masks }: {
     const prevAuto = slugify(field.label ?? '');
     const keyFollows = isInput && (!field.key || field.key === prevAuto);
     editField(field, ['label'], v);
+    // O canvas do form-js exibe o nome do campo de data por `dateLabel`/`timeLabel`
+    // (não por `label`). Grava os três para o nome mudar no editor E no runtime (ReactForm).
+    if (field.type === 'datetime') {
+      editField(field, ['dateLabel'], v);
+      editField(field, ['timeLabel'], v);
+    }
     if (keyFollows) {
       const nextKey = slugify(v);
       if (nextKey && nextKey !== field.key) {

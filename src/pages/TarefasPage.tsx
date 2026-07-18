@@ -178,7 +178,8 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
   }
 
   async function saveDraft() {
-    const { data } = fillRef.current?.submit() ?? { data: {} };
+    // Salvar rascunho NÃO valida nem pinta obrigatórios — usa getData() (sem submit()).
+    const data = fillRef.current?.getData() ?? {};
     try { await save.mutateAsync({ id: taskId, data }); toast.success('Rascunho salvo.'); }
     catch { toast.error('Não foi possível salvar.'); }
   }

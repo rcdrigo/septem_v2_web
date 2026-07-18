@@ -94,7 +94,10 @@ export function FormularioView({ modeler }: Props) {
       loadingRef.current = true;
       setReady(false);
       const fromXml = modeler ? getEmbeddedFormSchema(modeler) : null;
-      const fromLs = readFormFromLocalStorage();
+      // Fallback pro localStorage SÓ ao editar um processo existente (?key=). Num
+      // processo NOVO (sem key) o localStorage tem o form do processo anterior — usá-lo
+      // faria o novo herdar o formulário antigo. Sem key → começa vazio.
+      const fromLs = params.get('key') ? readFormFromLocalStorage() : null;
       const initial = (fromXml ?? fromLs) as any;
       const clean = stripLayout(initial);
       const layout = initial?.septemGroupLayout;
@@ -108,6 +111,11 @@ export function FormularioView({ modeler }: Props) {
         try { await builderRef.current!.importSchema(enriched); }
         catch (err) { console.warn('Falha ao carregar schema persistido do form:', err); }
         if (!cancelled && fromXml) setFields(extractFields(enriched));
+      } else if (!cancelled) {
+        // Sem schema (processo NOVO): esvazia o builder e o store — a instância do
+        // form-js persiste entre navegações e mostraria o form do processo anterior.
+        try { await builderRef.current!.reset(); } catch { /* editor ainda montando */ }
+        setFields([]);
       }
       if (!cancelled) {
         lastSerialized.current = JSON.stringify(enriched ?? {});

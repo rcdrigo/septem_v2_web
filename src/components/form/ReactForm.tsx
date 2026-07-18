@@ -11,6 +11,9 @@ import { uploadAttachment, parseAttachments, type Attachment, type UploadContext
 export type FormFillResult = { data: Record<string, unknown>; errors: Record<string, unknown> };
 export type ReactFormHandle = {
   submit: () => FormFillResult;
+  /** Lê os valores atuais SEM validar nem pintar erros — para salvar rascunho
+   *  (salvar não deve exigir preenchimento de campos obrigatórios). */
+  getData: () => Record<string, unknown>;
   /** Injeta erros vindos do servidor (422) no formulário, pintando os campos. */
   setServerErrors: (errs: Record<string, string>) => void;
 };
@@ -200,6 +203,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
         setErrors(errs);
         return { data: values, errors: errs };
       },
+      getData: () => values,
       setServerErrors: (errs) => setErrors(errs),
     }), [values, inputs, fieldState]);
 
@@ -344,6 +348,14 @@ function Node({ comp }: { comp: Component }) {
         className={prefixAdorner || suffixAdorner ? `${base} rounded-none border-0 focus:ring-0` : base}
         value={String(v ?? '')}
         {...evt}
+        onFocus={(e) => {
+          // Campo de data: abre o calendário já ao FOCAR (não só no ícone). showPicker()
+          // exige ativação do usuário e pode lançar — protege sem quebrar o runEvent.
+          if (comp.type === 'datetime') {
+            try { (e.currentTarget as HTMLInputElement).showPicker?.(); } catch { /* sem ativação */ }
+          }
+          evt.onFocus(e);
+        }}
         onChange={(e) => {
           if (docKind) { setAndEmit(maskDocumento(e.target.value, docKind), e); return; }
           if (maskTemplate) { setAndEmit(applyMask(maskTemplate, e.target.value), e); return; }
