@@ -8,6 +8,8 @@ import { slugify } from '@/lib/slugify';
 import { DOC_KIND_OPTIONS } from '@/lib/documento';
 import { DATE_MODE_OPTIONS, DATE_LIMIT_OPTIONS } from '@/lib/datafield';
 import { ExtensionPicker } from '@/components/form/ExtensionPicker';
+import { DocumentGenConfig, parseDocGen } from '@/components/form/DocumentGenConfig';
+import { useFormStore } from '@/stores/form';
 import { fetchDataSourceOptions } from '@/lib/api/catalog';
 import { openTab } from '@/lib/nav';
 import { toast } from '@/stores/toast';
@@ -74,6 +76,8 @@ export function FieldConfigPanel({ field, editField, masks }: {
 }) {
   const [tab, setTab] = useState<Tab>('geral');
   const [helpOpen, setHelpOpen] = useState(false);
+  // Campos do formulário — alimentam as regras da parametrização do documento (6f).
+  const formFields = useFormStore((s) => s.fields);
   const [, force] = useState(0);
   // Drafts de Nome/Chave commitados no blur — evita re-render por tecla (que
   // tirava o foco, ex.: título da lista dinâmica).
@@ -257,7 +261,31 @@ export function FieldConfigPanel({ field, editField, masks }: {
             )}
 
             {field.type === 'filepicker' && (
-              <ExtensionPicker value={props.septemAllowedExts} onChange={(csv) => merge('properties', { septemAllowedExts: csv || undefined })} />
+              <>
+                <ExtensionPicker value={props.septemAllowedExts} onChange={(csv) => merge('properties', { septemAllowedExts: csv || undefined })} />
+
+                {/* Fase 6f (:50-:53): o campo de anexo pode ser alimentado por um
+                    documento GERADO a partir de um modelo. Desmarcado por padrão. */}
+                <Check
+                  label="Gera documento?"
+                  checked={props.septemDocGen === 'yes'}
+                  onChange={(b) => merge('properties', { septemDocGen: b ? 'yes' : undefined })}
+                />
+                {props.septemDocGen === 'yes' && (
+                  <>
+                    <Check
+                      label="Permitir anexar documento manualmente?"
+                      checked={props.septemDocManual === 'yes'}
+                      onChange={(b) => merge('properties', { septemDocManual: b ? 'yes' : undefined })}
+                    />
+                    <DocumentGenConfig
+                      value={parseDocGen(props.septemDocGenConfig)}
+                      onChange={(next) => merge('properties', { septemDocGenConfig: JSON.stringify(next) })}
+                      camposDoForm={formFields.map((f) => ({ key: f.id, label: f.label }))}
+                    />
+                  </>
+                )}
+              </>
             )}
 
             {isInput && <Check label="Obrigatório" checked={!!validate.required} onChange={(b) => merge('validate', { required: b })} />}

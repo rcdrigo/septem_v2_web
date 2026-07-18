@@ -81,7 +81,10 @@ export function setProcessConfig(modeler: AnyModeler, patch: Partial<ProcessConf
 /** Lê o schema do formulário (JSON serializado) guardado em `septem:FormSchema`. */
 export function getEmbeddedFormSchema(modeler: AnyModeler): unknown | null {
   const proc = getProcessShape(modeler);
-  if (!proc) return null;
+  // `businessObject` pode faltar enquanto o diagrama ainda não importou (ou se o XML
+  // veio sem DI) — sem esta guarda a página quebrava com
+  // "Cannot read properties of undefined (reading 'extensionElements')".
+  if (!proc?.businessObject) return null;
   const ext = proc.businessObject.extensionElements;
   if (!ext?.values) return null;
   const node = ext.values.find((v: any) => v.$type === 'septem:FormSchema');

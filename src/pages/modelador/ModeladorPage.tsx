@@ -82,6 +82,9 @@ export function ModeladorPage() {
   }, [modeler, key, detail.data]);
 
   async function currentXml(): Promise<string | null> {
+    // O schema do formulário entra no BPMN por polling (600ms). Sem empurrar agora, um
+    // Salvar logo após uma alteração gravaria o processo SEM ela — perda silenciosa.
+    useModeladorStore.getState().flushForm?.();
     if (!modeler) return null;
     const { xml } = await modeler.saveXML({ format: true });
     return xml as string;

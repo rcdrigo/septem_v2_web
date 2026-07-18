@@ -15,6 +15,13 @@ type ModeladorState = {
   setCurrentView: (view: ModeladorView) => void;
   setSelectedElementId: (id: string | null) => void;
   setXml: (xml: string | null) => void;
+  /**
+   * Empurra AGORA o schema do formulário para dentro do BPMN. A view de formulário
+   * propaga por polling (600ms); sem este flush, salvar logo após uma alteração
+   * gravava o processo SEM ela — perda silenciosa do que o usuário acabou de mudar.
+   */
+  flushForm: (() => void) | null;
+  setFlushForm: (fn: (() => void) | null) => void;
 };
 
 function defaultProcessName(): string {
@@ -35,4 +42,6 @@ export const useModeladorStore = create<ModeladorState>((set) => ({
   setCurrentView: (view) => set({ currentView: view }),
   setSelectedElementId: (id) => set({ selectedElementId: id }),
   setXml: (xml) => set({ xml }),
+  flushForm: null,
+  setFlushForm: (fn) => set({ flushForm: fn }),
 }));

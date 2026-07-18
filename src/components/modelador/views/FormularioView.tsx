@@ -13,6 +13,7 @@ import { ImportFormDialog } from '@/components/form/ImportFormDialog';
 import { useProcessDefinition } from '@/lib/api/process-definitions';
 import { extractFields } from '@/lib/form-schema';
 import { useFormStore } from '@/stores/form';
+import { useModeladorStore } from '@/stores/modelador';
 import { useFormMasks } from '@/lib/api/forms';
 import { getEmbeddedFormSchema, setEmbeddedFormSchema } from '@/lib/bpmn-process';
 import { fetchDataSourceOptions } from '@/lib/api/catalog';
@@ -136,6 +137,19 @@ export function FormularioView({ modeler }: Props) {
   // 2) Polling: detecta mudanças no schema do editor e propaga (form-js não emite "changed" confiável).
   useEffect(() => {
     if (!ready) return;
+    // Expõe um flush para o Salvar: propaga na hora, sem esperar o próximo tick.
+    const flush = () => {
+      if (loadingRef.current || !builderRef.current) return;
+      try {
+        const schema = builderRef.current.saveSchema();
+        const serialized = JSON.stringify(schema ?? {});
+        if (serialized === lastSerialized.current) return;
+        lastSerialized.current = serialized;
+        propagate(schema, modeler, setFields, layoutRef.current);
+      } catch { /* editor ainda montando */ }
+    };
+    useModeladorStore.getState().setFlushForm(flush);
+
     const interval = window.setInterval(() => {
       try {
         if (loadingRef.current) return; // (re)carga em andamento — não propagar
