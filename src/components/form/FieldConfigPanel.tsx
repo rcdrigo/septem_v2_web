@@ -268,14 +268,14 @@ export function FieldConfigPanel({ field, editField, masks }: {
 
                 {/* Fase 6f (:50-:53): o campo de anexo pode ser alimentado por um
                     documento GERADO a partir de um modelo. Desmarcado por padrão. */}
-                <Check
+                <Switch
                   label="Gera documento?"
                   checked={props.septemDocGen === 'yes'}
                   onChange={(b) => merge('properties', { septemDocGen: b ? 'yes' : undefined })}
                 />
                 {props.septemDocGen === 'yes' && (
                   <>
-                    <Check
+                    <Switch
                       label="Permitir anexar documento manualmente?"
                       checked={props.septemDocManual === 'yes'}
                       onChange={(b) => merge('properties', { septemDocManual: b ? 'yes' : undefined })}
