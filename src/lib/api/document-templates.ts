@@ -90,6 +90,44 @@ export async function openDocumentTemplateFile(id: string): Promise<void> {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+/** Chave que o usuário preenche no teste (árvore: grupo/lista/imagem). */
+export type TemplateKey = { name: string; kind: 'scalar' | 'group' | 'array' | 'image'; children: TemplateKey[] };
+
+/** Lê as chaves do .docx salvo — vira o esqueleto do JSON do modal de teste. */
+export function useTemplateKeys(id: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ['document-templates', id, 'keys'],
+    queryFn: () => api.get<{ keys: TemplateKey[]; issues: TemplateIssue[]; templateValid: boolean }>(
+      `/api/v1/document-templates/${id}/keys`),
+    enabled: !!id && enabled,
+  });
+}
+
+/**
+ * Monta um JSON de exemplo a partir das chaves: escalares viram string vazia, grupos
+ * viram objeto, listas viram um array com um item modelo. É o que o usuário edita.
+ */
+export function skeletonFromKeys(keys: TemplateKey[]): Record<string, unknown> {
+  const value = (k: TemplateKey): unknown => {
+    if (k.kind === 'group') return Object.fromEntries(k.children.map((c) => [c.name, value(c)]));
+    if (k.kind === 'array') {
+      return k.children.length
+        ? [Object.fromEntries(k.children.map((c) => [c.name, value(c)]))]
+        : [0];
+    }
+    return '';
+  };
+  return Object.fromEntries(keys.map((k) => [k.name, value(k)]));
+}
+
+/** Gera o documento de teste e abre em nova aba (o arquivo vem autenticado). */
+export async function testDocumentTemplate(id: string, data: unknown): Promise<void> {
+  const blob = await api.postBlob(`/api/v1/document-templates/${id}/test`, { data });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener');
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 /** Sobe o .docx do modelo; a resposta traz o resultado da validação de sintaxe. */
 export function useUploadDocumentTemplateFile() {
   const qc = useQueryClient();

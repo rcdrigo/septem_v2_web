@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
-import { AlertTriangle, Eye, FileStack, Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, Eye, FileStack, FlaskConical, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import {
   useDocumentTemplates, useDocumentTemplate, useCreateDocumentTemplate,
   useUpdateDocumentTemplate, useDeleteDocumentTemplate, useUploadDocumentTemplateFile,
-  openDocumentTemplateFile,
+  openDocumentTemplateFile, useTemplateKeys, skeletonFromKeys, testDocumentTemplate,
   type DocumentTemplateListItem,
 } from '@/lib/api/document-templates';
 import { useOrgUnitsFlat } from '@/lib/api/org-units';
@@ -28,6 +28,7 @@ async function preview(id: string) {
 export function ModelosDocumentoPage() {
   const list = useDocumentTemplates();
   const [editId, setEditId] = useState<string | null>(null);
+  const [testId, setTestId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const del = useDeleteDocumentTemplate();
 
@@ -93,6 +94,10 @@ export function ModelosDocumentoPage() {
                     <button type="button" onClick={() => void preview(t.id)} title="Visualizar"
                       className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800"><Eye size={15} /></button>
                   )}
+                  {t.hasFile && (
+                    <button type="button" onClick={() => setTestId(t.id)} title="Testar"
+                      className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800"><FlaskConical size={15} /></button>
+                  )}
                   <button type="button" onClick={() => setEditId(t.id)} title="Editar"
                     className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800"><Pencil size={15} /></button>
                   <button type="button" onClick={() => askDelete(t)} title="Excluir"
@@ -152,6 +157,17 @@ export function ModelosDocumentoPage() {
                             <Eye size={15} />
                           </button>
                         )}
+                        {t.hasFile && (
+                          <button
+                            type="button"
+                            onClick={() => setTestId(t.id)}
+                            title="Testar o modelo"
+                            aria-label={`Testar ${t.name}`}
+                            className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800"
+                          >
+                            <FlaskConical size={15} />
+                          </button>
+                        )}
                         <button type="button" onClick={() => setEditId(t.id)} title="Editar"
                           className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800">
                           <Pencil size={15} />
@@ -171,6 +187,7 @@ export function ModelosDocumentoPage() {
         )}
       </div>
 
+      {testId && <TestDialog id={testId} onClose={() => setTestId(null)} />}
       {creating && <TemplateDialog onClose={() => setCreating(false)} />}
       {editId && <TemplateDialog id={editId} onClose={() => setEditId(null)} />}
     </div>
@@ -186,6 +203,90 @@ const STATUS_OPTIONS = [
   { value: 'ativo', label: 'Ativo' },
   { value: 'inativo', label: 'Inativo' },
 ] as const;
+
+/**
+ * Modal de TESTE (modelos_documentos:13-15): lê as chaves do .docx, monta um JSON de
+ * exemplo para o usuário preencher e gera o documento numa nova aba. O documento sai
+ * com marca d'água e travado para edição (o servidor aplica).
+ */
+function TestDialog({ id, onClose }: { id: string; onClose: () => void }) {
+  const keys = useTemplateKeys(id, true);
+  const [json, setJson] = useState('');
+  const [erro, setErro] = useState<string | null>(null);
+  const [gerando, setGerando] = useState(false);
+  const [semeado, setSemeado] = useState(false);
+
+  // Semeia o JSON assim que as chaves chegam (não sobrescreve o que o usuário editou).
+  if (keys.data && !semeado) {
+    setJson(JSON.stringify(skeletonFromKeys(keys.data.keys), null, 2));
+    setSemeado(true);
+  }
+
+  async function gerar() {
+    let data: unknown;
+    try { data = json.trim() ? JSON.parse(json) : {}; }
+    catch { setErro('O JSON está inválido — revise a formatação.'); return; }
+    setErro(null);
+    setGerando(true);
+    try {
+      await testDocumentTemplate(id, data);
+      toast.success('Documento de teste gerado.');
+    } catch (err) {
+      const d = err instanceof ApiError ? (err.body as { detail?: string } | undefined)?.detail : undefined;
+      setErro(d ?? 'Não foi possível gerar o documento.');
+    } finally { setGerando(false); }
+  }
+
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      width="lg"
+      title="Testar modelo"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">
+            Retornar
+          </button>
+          <button
+            type="button"
+            onClick={gerar}
+            disabled={gerando || keys.isLoading}
+            data-testid="doc-gerar"
+            className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60"
+          >
+            {gerando ? 'Gerando…' : 'Gerar documento'}
+          </button>
+        </>
+      }
+    >
+      {keys.isLoading ? (
+        <p className="py-8 text-center text-sm text-slate-400">Lendo as chaves do modelo…</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-slate-600">
+            Preencha os valores das chaves encontradas no modelo. O documento gerado é de
+            teste: sai com marca d'água e bloqueado para edição.
+          </p>
+          {(keys.data?.keys.length ?? 0) === 0 && (
+            <p className="rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-500">
+              Este modelo não tem chaves — o documento será gerado como está.
+            </p>
+          )}
+          <textarea
+            value={json}
+            onChange={(e) => setJson(e.target.value)}
+            spellCheck={false}
+            rows={14}
+            data-testid="doc-json"
+            className="w-full rounded-md border border-slate-300 bg-white p-2 font-mono text-xs text-slate-800 focus:border-slate-500 focus:outline-none"
+          />
+          {erro && <p className="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700" data-testid="doc-erro">{erro}</p>}
+        </div>
+      )}
+    </Dialog>
+  );
+}
 
 function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
   const detail = useDocumentTemplate(id ?? null);

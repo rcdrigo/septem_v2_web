@@ -165,6 +165,75 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
       await page.locator('[role=dialog] button', { hasText: 'Cancelar' }).click().catch(() => {});
       await page.waitForTimeout(400);
 
+      // ── 6c: botão TESTAR → modal com o JSON das chaves → gera o documento ──
+      // O modelo carregado tem {{nome_cliente}} e {{valor}} (gerado no setup).
+      await page.locator('[data-testid=doc-linha]', { hasText: NOME }).locator('button[title="Testar o modelo"]').click();
+      await page.waitForSelector('[data-testid=doc-json]', { timeout: 15000 });
+      const skeleton = await page.locator('[data-testid=doc-json]').inputValue();
+      let parsedSkeleton = null;
+      try { parsedSkeleton = JSON.parse(skeleton); } catch { /* segue como null */ }
+      check(parsedSkeleton !== null && 'nome_cliente' in parsedSkeleton && 'valor' in parsedSkeleton,
+        `[web] o modal monta o JSON com as chaves do modelo (${Object.keys(parsedSkeleton ?? {}).join(', ')})`);
+
+      // JSON inválido não pode gerar nada — tem que avisar.
+      await page.locator('[data-testid=doc-json]').fill('{ isso nao e json');
+      await page.locator('[data-testid=doc-gerar]').click();
+      await page.waitForTimeout(600);
+      check(await page.locator('[data-testid=doc-erro]').count() === 1, '[web] JSON inválido mostra erro em vez de gerar');
+
+      // Preenche e gera de verdade: a nova aba recebe o arquivo.
+      await page.locator('[data-testid=doc-json]').fill(JSON.stringify({ nome_cliente: 'ACME LTDA', valor: '1.234,56' }, null, 2));
+      const [popup] = await Promise.all([
+        ctx.waitForEvent('page', { timeout: 20000 }).catch(() => null),
+        page.locator('[data-testid=doc-gerar]').click(),
+      ]);
+      check(!!popup, '[web] "Gerar documento" abre o arquivo em nova aba');
+      if (popup) await popup.close();
+      await page.locator('[role=dialog] button', { hasText: 'Retornar' }).click();
+      await page.waitForTimeout(400);
+
+      // EFEITO real: o documento gerado contém os valores E as marcas de teste.
+      const gen = await fetch(`${API}/api/v1/document-templates/${criado.id}/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Tenant': 'prefeitura-x', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ data: { nome_cliente: 'ACME LTDA', valor: '1.234,56' } }),
+      });
+      check(gen.status === 200, `[api] geração do documento de teste responde 200 (${gen.status})`);
+      const genBytes = Buffer.from(await gen.arrayBuffer());
+      // Este modelo está com saída PDF (marcada no cadastro) → sai PDF de verdade.
+      const ehPdf = genBytes.subarray(0, 4).toString('ascii') === '%PDF';
+      check(ehPdf, `[api] modelo com saída PDF gera PDF de verdade (magic="${genBytes.subarray(0, 4).toString('ascii')}")`);
+      writeFileSync(path.join(dir, 'gerado.pdf'), genBytes);
+      const pdfTexto = execFileSync('pdftotext', [path.join(dir, 'gerado.pdf'), '-'], { timeout: 60000 }).toString();
+      check(pdfTexto.includes('ACME LTDA'), '[api] o PDF gerado contém o valor preenchido (ACME LTDA)');
+      check(!pdfTexto.includes('{{'), '[api] o PDF não tem chaves sobrando');
+      check(/DOCUMENTO DE TESTE/i.test(pdfTexto), '[api] o PDF de teste traz o aviso de marca d\'água');
+
+      // E o mesmo modelo com saída DOCX: confere conteúdo, marca e TRAVA de edição.
+      const { body: mDocx } = await api(token, '/api/v1/document-templates/', 'POST',
+        { name: `Docx Saida ${rid}`, outputType: 'docx', active: true });
+      const fdDocx = new FormData();
+      fdDocx.append('file', new Blob([docxBytes]), 'modelo.docx');
+      await fetch(`${API}/api/v1/document-templates/${mDocx.id}/file`, {
+        method: 'POST', headers: { 'X-Tenant': 'prefeitura-x', Authorization: `Bearer ${token}` }, body: fdDocx,
+      });
+      const genD = await fetch(`${API}/api/v1/document-templates/${mDocx.id}/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Tenant': 'prefeitura-x', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ data: { nome_cliente: 'ACME LTDA', valor: '1.234,56' } }),
+      });
+      // Lê as partes do .docx (zip) direto para stdout com `unzip -p`: extrair para
+      // disco dá EACCES, porque as entradas do zip gerado carregam permissão restritiva.
+      const docxPathGerado = path.join(dir, 'gerado.docx');
+      writeFileSync(docxPathGerado, Buffer.from(await genD.arrayBuffer()));
+      const unzipPart = (part) => execFileSync('unzip', ['-p', docxPathGerado, part], { timeout: 60000 }).toString();
+      const xml = unzipPart('word/document.xml');
+      check(xml.includes('ACME LTDA'), '[api] o .docx gerado contém o valor preenchido');
+      check(!xml.includes('{{nome_cliente}}'), '[api] a chave foi substituída (não sobrou {{nome_cliente}})');
+      check(/DOCUMENTO DE TESTE/i.test(xml), '[api] documento de teste sai com o aviso de marca d\'água');
+      const settingsXml = unzipPart('word/settings.xml');
+      check(/documentProtection[^>]*w:edit="readOnly"/.test(settingsXml), '[api] documento de teste sai travado para edição');
+
       // ── AUDITORIA (rules.md): salvar-antes-de-carregar ──
       // Abrir "Editar" com a API lenta NÃO pode mostrar um form vazio salvável — senão
       // o usuário digita, salva, e o PUT vai com descrição/unidade em branco (perda de
