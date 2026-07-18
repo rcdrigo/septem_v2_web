@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ArrowLeft, FileSearch, Tags } from 'lucide-react';
 import { useReportsList, useReport, type GlobalFilterDef } from '@/lib/api/reports';
 import { ReportRunViewer } from '@/components/reports/ReportViewer';
@@ -11,6 +12,9 @@ import {
   textColorFor,
   tintOf,
 } from '@/components/catalog/category-catalog';
+import { FavoriteButton } from '@/components/discovery/FavoriteButton';
+import { useFavorites, useToggleFavorite } from '@/lib/api/discovery';
+import { toast } from '@/stores/toast';
 
 /**
  * Geral › Consultas (item 8): catálogo de relatórios publicados — mesma lógica
@@ -20,12 +24,38 @@ import {
  */
 export function ConsultasPage() {
   const list = useReportsList({ status: 'published', pageSize: 100 });
+  const [params, setParams] = useSearchParams();
   const [open, setOpen] = useState<{ key: string; name: string } | null>(null);
   const [filter, setFilter] = useState<string>('all');
+  const favorites = useFavorites();
+  const toggleFavorite = useToggleFavorite();
+  const favoriteKeys = useMemo(() => new Set((favorites.data?.items ?? []).filter((item) => item.type === 'query').map((item) => item.id)), [favorites.data?.items]);
 
   const groups = useMemo(() => groupByCategory(list.data?.items ?? []), [list.data?.items]);
 
-  if (open) return <ReportViewer reportKey={open.key} name={open.name} onClose={() => setOpen(null)} />;
+  useEffect(() => {
+    const key = params.get('consulta');
+    if (!key || open || !list.data) return;
+    const report = list.data.items.find((item) => item.key === key);
+    if (report) setOpen({ key: report.key, name: report.name });
+  }, [list.data, open, params]);
+
+  function openReport(key: string, name: string) {
+    setParams((current) => { const next = new URLSearchParams(current); next.set('consulta', key); return next; });
+    setOpen({ key, name });
+  }
+
+  function closeReport() {
+    setOpen(null);
+    setParams((current) => { const next = new URLSearchParams(current); next.delete('consulta'); return next; }, { replace: true });
+  }
+
+  async function toggle(key: string) {
+    try { await toggleFavorite.mutateAsync({ type: 'query', key, favorite: !favoriteKeys.has(key) }); }
+    catch (error) { toast.error(error instanceof Error && error.message !== 'HTTP 409' ? error.message : 'Não foi possível atualizar os favoritos. O limite é de 10 itens.'); }
+  }
+
+  if (open) return <ReportViewer reportKey={open.key} name={open.name} onClose={closeReport} />;
 
   const visible = filter === 'all' ? groups : groups.filter((g) => g.key === filter);
   const empty = !list.isLoading && (list.data?.items.length ?? 0) === 0;
@@ -70,24 +100,22 @@ export function ConsultasPage() {
 
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {g.items.map((r) => (
-                      <div key={r.key} className="flex flex-col rounded-md border border-slate-200 bg-white p-4">
-                        <div
-                          className="mb-2 flex h-9 w-9 items-center justify-center rounded-md"
-                          style={{ backgroundColor: tintOf(color), color }}
-                        >
-                          <FileSearch size={18} />
+                      <article key={r.key} className="relative flex min-w-0 flex-col rounded-md border border-slate-200 bg-white p-4">
+                        <div className="mb-2 flex items-start justify-between gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-md" style={{ backgroundColor: tintOf(color), color }}><FileSearch size={18} /></div>
+                          <FavoriteButton favorite={favoriteKeys.has(r.key)} disabled={toggleFavorite.isPending && toggleFavorite.variables?.key === r.key} onToggle={() => toggle(r.key)} />
                         </div>
-                        <p className="font-medium text-slate-800">{r.name}</p>
-                        <p className="text-xs text-slate-500">{r.description || 'Relatório'}</p>
+                        <p title={r.name} className="truncate font-medium text-slate-800">{r.name}</p>
+                        <p title={r.description || undefined} className="line-clamp-2 min-h-8 text-xs leading-4 text-slate-500">{r.description || 'Relatório'}</p>
                         <button
                           type="button"
-                          onClick={() => setOpen({ key: r.key, name: r.name })}
-                          className="mt-3 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-opacity hover:opacity-85"
+                          onClick={() => openReport(r.key, r.name)}
+                          className="mt-3 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium transition-opacity hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 active:opacity-75"
                           style={{ backgroundColor: color, color: textColorFor(color) }}
                         >
                           <FileSearch size={15} /> Abrir
                         </button>
-                      </div>
+                      </article>
                     ))}
                   </div>
                 </section>

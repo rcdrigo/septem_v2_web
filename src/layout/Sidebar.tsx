@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronDown, Plus } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileSearch, Plus, Search, Workflow } from 'lucide-react';
 import { SidebarUser, ImpersonateDialog } from './SidebarUser';
 import { AccessModeToggle } from './AccessModeToggle';
 import { MENU } from './menu/menu-config';
@@ -8,6 +8,9 @@ import type { MenuAction, MenuGroup, MenuLink, MenuNode } from './menu/types';
 import { useSessionStore } from '@/stores/session';
 import { useTaskSummary } from '@/lib/api/execution';
 import { NewRequestDialog } from '@/components/requests/NewRequestDialog';
+import { GlobalSearchDialog } from '@/components/discovery/GlobalSearchDialog';
+import { useFavorites, type DiscoveryItem } from '@/lib/api/discovery';
+import { openTab } from '@/lib/nav';
 
 export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
   const session = useSessionStore();
@@ -16,6 +19,18 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
   const layout = MENU[session.effectiveMode()];
   const [impersonateOpen, setImpersonateOpen] = useState(false);
   const [newRequestOpen, setNewRequestOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  useEffect(() => {
+    function onShortcut(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    }
+    window.addEventListener('keydown', onShortcut);
+    return () => window.removeEventListener('keydown', onShortcut);
+  }, []);
 
   return (
     <aside
@@ -47,10 +62,16 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
 
       {/* Navegação principal */}
       <nav className="flex-1 overflow-y-auto px-2 py-3">
-        <button type="button" onClick={() => setNewRequestOpen(true)} className="mb-4 flex w-full items-center gap-2 whitespace-nowrap rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 active:bg-blue-800">
-          <Plus size={14} className="shrink-0" />
+        <button type="button" onClick={() => setSearchOpen(true)} className="mb-2 flex min-h-10 w-full items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700 active:bg-slate-100">
+          <Search size={16} className="shrink-0" />
+          <span className="min-w-0 flex-1 truncate text-left">Buscar no Septem</span>
+          <kbd className="hidden shrink-0 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.65rem] font-medium text-slate-400 xl:inline">⌘K</kbd>
+        </button>
+        <button type="button" onClick={() => setNewRequestOpen(true)} className="mb-4 flex min-h-10 w-full items-center gap-2 whitespace-nowrap rounded-md bg-cyan-700 px-3 text-sm font-semibold text-white hover:bg-cyan-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700 active:bg-cyan-900">
+          <Plus size={16} className="shrink-0" />
           <span className="truncate">Nova requisição</span>
         </button>
+        <FavoritesGroup />
         {layout.main.map((section, i) => {
           // Item visível = passa na permissão E (link com predicado visible ok |
           // grupo com ao menos um filho permitido). Seção sem itens não renderiza
@@ -103,7 +124,39 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
         <ImpersonateDialog selfId={session.user.id} onClose={() => setImpersonateOpen(false)} />
       )}
       {newRequestOpen && <NewRequestDialog onClose={() => setNewRequestOpen(false)} />}
+      {searchOpen && <GlobalSearchDialog onClose={() => setSearchOpen(false)} />}
     </aside>
+  );
+}
+
+function FavoritesGroup() {
+  const favorites = useFavorites();
+  const [expanded, setExpanded] = useState(false);
+  const items = favorites.data?.items ?? [];
+  if (favorites.isLoading || favorites.isError || items.length === 0) return null;
+  const visible = expanded ? items : items.slice(0, 3);
+  return (
+    <section className="mb-5" aria-labelledby="sidebar-favorites-title">
+      <p id="sidebar-favorites-title" className="px-3 pb-1.5 text-[0.65rem] font-semibold uppercase tracking-wider text-slate-400">Favoritos</p>
+      <ul className="space-y-0.5">
+        {visible.map((item) => <li key={`${item.type}:${item.id}`}><FavoriteLink item={item} /></li>)}
+      </ul>
+      {items.length > 3 && <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1 flex min-h-10 w-full items-center gap-2 rounded-md px-3 text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-cyan-700 active:bg-slate-100">{expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}<span>{expanded ? 'Exibir menos' : `Exibir mais (${items.length - 3})`}</span></button>}
+    </section>
+  );
+}
+
+function FavoriteLink({ item }: { item: DiscoveryItem }) {
+  const Icon = item.type === 'service' ? Workflow : FileSearch;
+  if (item.type === 'service') return (
+    <button type="button" title={item.title} onClick={() => openTab(item.href)} className="flex min-h-10 w-full min-w-0 items-center gap-2.5 rounded-md px-3 text-sm text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-cyan-700 active:bg-slate-200">
+      <Icon size={15} className="shrink-0 text-slate-400" /><span className="truncate">{item.title}</span>
+    </button>
+  );
+  return (
+    <Link to={item.href} title={item.title} className="flex min-h-10 min-w-0 items-center gap-2.5 rounded-md px-3 text-sm text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-cyan-700 active:bg-slate-200">
+      <Icon size={15} className="shrink-0 text-slate-400" /><span className="truncate">{item.title}</span>
+    </Link>
   );
 }
 

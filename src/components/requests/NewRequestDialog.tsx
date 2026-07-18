@@ -5,6 +5,9 @@ import { FALLBACK_COLOR, groupByCategory, tintOf } from '@/components/catalog/ca
 import { useProcessList, type ProcessListItem } from '@/lib/api/process-definitions';
 import { renderIcon } from '@/lib/icon-catalog';
 import { openTab } from '@/lib/nav';
+import { useFavorites, useToggleFavorite } from '@/lib/api/discovery';
+import { FavoriteButton } from '@/components/discovery/FavoriteButton';
+import { toast } from '@/stores/toast';
 import '@/styles/new-request.css';
 
 const ALL_CATEGORIES = 'all';
@@ -13,6 +16,9 @@ export function NewRequestDialog({ onClose }: { onClose: () => void }) {
   const list = useProcessList({ status: 'published', pageSize: 100 });
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState(ALL_CATEGORIES);
+  const favorites = useFavorites();
+  const toggleFavorite = useToggleFavorite();
+  const favoriteKeys = useMemo(() => new Set((favorites.data?.items ?? []).filter((item) => item.type === 'service').map((item) => item.id)), [favorites.data?.items]);
   const items = list.data?.items ?? [];
   const groups = useMemo(() => groupByCategory(items), [items]);
   const normalizedQuery = normalize(query.trim());
@@ -31,6 +37,15 @@ export function NewRequestDialog({ onClose }: { onClose: () => void }) {
   function start(service: ProcessListItem) {
     openTab(`/servico/${service.key}`);
     onClose();
+  }
+
+  async function toggle(service: ProcessListItem) {
+    try {
+      await toggleFavorite.mutateAsync({ type: 'service', key: service.key, favorite: !favoriteKeys.has(service.key) });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : null;
+      toast.error(detail && detail !== 'HTTP 409' ? detail : 'Não foi possível atualizar os favoritos. O limite é de 10 itens.');
+    }
   }
 
   return (
@@ -94,7 +109,7 @@ export function NewRequestDialog({ onClose }: { onClose: () => void }) {
               </div>
             ) : (
               <div className="grid min-w-0 gap-3 lg:grid-cols-2">
-                {filtered.map((service) => <ServiceCard key={service.key} service={service} onStart={() => start(service)} />)}
+                {filtered.map((service) => <ServiceCard key={service.key} service={service} favorite={favoriteKeys.has(service.key)} favoritePending={toggleFavorite.isPending && toggleFavorite.variables?.key === service.key} onFavorite={() => toggle(service)} onStart={() => start(service)} />)}
               </div>
             )}
           </div>
@@ -107,7 +122,7 @@ export function NewRequestDialog({ onClose }: { onClose: () => void }) {
 function CategoryButton({ active, label, count, color, icon, onClick }: { active: boolean; label: string; count: number; color?: string | null; icon?: string | null; onClick: () => void }) {
   const tone = color ?? FALLBACK_COLOR;
   return (
-    <button type="button" aria-pressed={active} onClick={onClick} className={`mb-0.5 flex min-h-11 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-slate-700 active:bg-slate-100 ${active ? 'bg-white font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:bg-white hover:text-slate-900'}`}>
+    <button type="button" aria-pressed={active} onClick={onClick} className={`mb-1 flex min-h-11 w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-slate-700 active:bg-slate-100 ${active ? 'bg-white font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:bg-white hover:text-slate-900'}`}>
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: tintOf(tone), color: tone }}><NamedIcon name={icon} fallback={<Tags size={14} />} /></span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <span className="shrink-0 text-xs tabular-nums text-slate-400">{count}</span>
@@ -115,14 +130,14 @@ function CategoryButton({ active, label, count, color, icon, onClick }: { active
   );
 }
 
-function ServiceCard({ service, onStart }: { service: ProcessListItem; onStart: () => void }) {
+function ServiceCard({ service, favorite, favoritePending, onFavorite, onStart }: { service: ProcessListItem; favorite: boolean; favoritePending: boolean; onFavorite: () => void; onStart: () => void }) {
   const color = service.categoryColor ?? FALLBACK_COLOR;
   const description = descriptionText(service.description);
   return (
-    <button type="button" onClick={onStart} className="new-request-card group relative flex min-h-40 min-w-0 flex-col rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700">
+    <article role="link" tabIndex={0} onClick={onStart} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onStart(); } }} className="new-request-card group relative flex min-h-40 min-w-0 cursor-pointer flex-col rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700">
       <div className="flex min-w-0 items-start justify-between gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: tintOf(color), color }}><NamedIcon name={service.icon} fallback={<Workflow size={17} />} /></span>
-        <span className="inline-flex min-w-0 max-w-[70%] items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} /><span className="truncate">{service.category ?? 'Sem categoria'}</span></span>
+        <div className="flex min-w-0 max-w-[78%] items-start gap-2"><span className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} /><span className="truncate">{service.category ?? 'Sem categoria'}</span></span><FavoriteButton favorite={favorite} disabled={favoritePending} onToggle={onFavorite} /></div>
       </div>
       <strong title={service.name} className="mt-3 truncate text-sm font-bold text-slate-900">{service.name}</strong>
       <p title={description || undefined} className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{description || 'Sem descrição disponível.'}</p>
@@ -130,7 +145,7 @@ function ServiceCard({ service, onStart }: { service: ProcessListItem; onStart: 
         <span className="min-w-0 flex-1 truncate text-xs text-slate-400">{service.area || 'Disponível para solicitação'}</span>
         <span className="new-request-action inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-slate-700">Iniciar <ArrowRight size={14} /></span>
       </div>
-    </button>
+    </article>
   );
 }
 
