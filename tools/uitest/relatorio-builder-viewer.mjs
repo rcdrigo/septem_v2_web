@@ -114,8 +114,14 @@ check(builder.publishedNote, 'builder indica versão e status (publicado→novo 
 // adicionar um bloco KPI e salvar rascunho → vira v2 draft
 await page.locator('button', { hasText: 'KPI / Card' }).first().click();
 await page.locator('button', { hasText: 'Salvar rascunho' }).click();
-await page.waitForTimeout(900);
-check(await page.evaluate(() => document.body.innerText.includes('Rascunho salvo')), 'salvar rascunho OK (toast)');
+// O toast "Rascunho salvo" é transiente e some sozinho — sob carga da suíte cheia o
+// POST+render passa de um tempo fixo (ou o toast já sumiu). Espera o SINAL real assim
+// que ele aparece, não um tempo fixo.
+const salvou = await page
+  .waitForFunction(() => document.body.innerText.includes('Rascunho salvo'), { timeout: 12000 })
+  .then(() => true)
+  .catch(() => false);
+check(salvou, 'salvar rascunho OK (toast)');
 
 // preview com dados reais
 await page.locator('button', { hasText: 'Preview' }).first().click();

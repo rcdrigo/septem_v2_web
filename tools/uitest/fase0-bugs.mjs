@@ -21,10 +21,16 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   page.on('pageerror', (e) => console.log('pageerror:', e.message.slice(0, 150)));
   await login(page);
 
-  // no mobile o sidenav é drawer: abrir pelo hamburger
+  // no mobile o sidenav é drawer: abrir pelo hamburger. Espera o drawer REALMENTE
+  // abrir (aside deslizou pra dentro, borda esquerda em x>=0), não um tempo fixo —
+  // sob carga o clique demora a abrir e o aside fica off-canvas (-translate-x-full),
+  // deixando o "Sair" "fora do viewport" e o clique falha.
   if (vp.n === 'mobile') {
     await page.locator('button[aria-label="Abrir menu"]').click();
-    await page.waitForTimeout(500);
+    await page.waitForFunction(() => {
+      const a = document.querySelector('aside');
+      return !!a && a.getBoundingClientRect().left >= 0;
+    }, { timeout: 8000 }).catch(() => {});
   }
   await page.locator('aside button', { hasText: 'Sair' }).click();
   await page.waitForURL(/\/login/, { timeout: 10000 }).catch(() => {});

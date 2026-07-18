@@ -201,6 +201,20 @@ export class SeptemPaletteProvider {
         'bpmn-icon-gateway-parallel',
         'Convergência de paralelismo',
       ),
+
+      // Piscina/raias: cria um "pool" expandido. As RAIAS (setores) são adicionadas
+      // depois pelo context pad padrão do bpmn-js ao selecionar a piscina
+      // ("adicionar raia acima/abaixo" / "dividir em raias"). O campo Setor da tarefa
+      // (Fase 5b) lê justamente essas raias (bpmn:Lane) do processo.
+      'create.participant-expanded': {
+        group: 'collaboration',
+        className: 'bpmn-icon-participant',
+        title: 'Piscina (raias/setores)',
+        action: {
+          dragstart: (event: Event) => this.create.start(event, this.elementFactory.createParticipantShape()),
+          click: (event: Event) => this.create.start(event, this.elementFactory.createParticipantShape()),
+        },
+      },
     };
   }
 }
