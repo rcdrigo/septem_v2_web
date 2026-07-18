@@ -17,7 +17,6 @@ const CASES = [
   ['/admin/dashboards', 'Dashboards', 'Relatórios e Dashboards'],
   ['/admin/usuarios', 'Usuários', 'Configurações'],
   ['/admin/perfis', 'Perfis de acesso', 'Configurações'],
-  ['/servicos', 'Serviços', null],
   ['/tarefas?status=pendentes', 'Tarefas', null],
   ['/requisicoes?status=em_andamento&page=1', 'Requisições', null],
 ];
@@ -51,7 +50,7 @@ async function actives(route) {
 let failures = 0;
 
 // As rotas antigas devem cair no wildcard, sem redirect ou item de menu.
-for (const route of ['/tarefas-executadas', '/minhas-solicitacoes']) {
+for (const route of ['/tarefas-executadas', '/minhas-solicitacoes', '/servicos']) {
   await page.goto(BASE + route, { waitUntil: 'networkidle' });
   const oldMissing = await page.getByText('Página não encontrada').isVisible();
   if (!oldMissing) failures++;
@@ -59,10 +58,13 @@ for (const route of ['/tarefas-executadas', '/minhas-solicitacoes']) {
 }
 
 // O modo externo preserva os dois índices operacionais.
-await page.goto(BASE + '/servicos', { waitUntil: 'networkidle' });
+await page.goto(BASE + '/tarefas', { waitUntil: 'networkidle' });
 await page.getByRole('button', { name: /Externo/ }).click();
 const externalLabels = await page.locator('aside nav a').allTextContents();
-const externalOk = externalLabels.some((x) => x.includes('Tarefas')) && externalLabels.some((x) => x.includes('Requisições'));
+const externalOk = externalLabels.some((x) => x.includes('Tarefas'))
+  && externalLabels.some((x) => x.includes('Requisições'))
+  && !externalLabels.some((x) => x.includes('Serviços'))
+  && await page.getByRole('button', { name: 'Nova requisição' }).isVisible();
 if (!externalOk) failures++;
 console.log(`${externalOk ? '✓' : '✗ FALHOU'} menu externo → ${JSON.stringify(externalLabels)}`);
 await page.getByRole('button', { name: /Interno/ }).click();

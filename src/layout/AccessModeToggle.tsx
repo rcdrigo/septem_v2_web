@@ -17,8 +17,8 @@ export function AccessModeToggle() {
   function pick(mode: AccessMode) {
     if (mode === accessMode) return;
     setAccessMode(mode);
-    // Layout externo não compartilha as rotas de admin — leva pra Serviços.
-    if (mode === 'externo') navigate('/servicos');
+    // Layout externo não compartilha as rotas de admin — leva para o índice operacional.
+    if (mode === 'externo') navigate('/tarefas');
   }
 
   const options: { mode: AccessMode; label: string; icon: typeof Briefcase }[] = [

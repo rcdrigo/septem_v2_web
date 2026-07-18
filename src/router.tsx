@@ -13,7 +13,6 @@ import { LogsPage } from './pages/admin/LogsPage';
 import { ParametrosPage } from './pages/admin/ParametrosPage';
 import { MeuDadosPage } from './pages/admin/MeuDadosPage';
 import { OrganogramaPage } from './pages/OrganogramaPage';
-import { ServicosPage } from './pages/ServicosPage';
 import { TarefasPage } from './pages/TarefasPage';
 import { InstanciasPage } from './pages/InstanciasPage';
 import { ConsultasPage } from './pages/ConsultasPage';
@@ -58,11 +57,10 @@ export const router = createBrowserRouter(
       path: '/',
       element: <AppShell />,
       children: [
-        { index: true, element: <Navigate to="/servicos" replace /> },
+        { index: true, element: <Navigate to="/tarefas" replace /> },
 
         // --- Geral ---------------------------------------------------------
         stub('dashboard', 'Dashboard', { phase: 'Fase 7' }),
-        { path: 'servicos', element: <ServicosPage /> },
         { path: 'tarefas', element: <TarefasPage /> },
         { path: 'requisicoes', element: <InstanciasPage title="Requisições" lockMine initialStatus="em_andamento" /> },
         // Consultas = catálogo de relatórios publicados (req. 8).

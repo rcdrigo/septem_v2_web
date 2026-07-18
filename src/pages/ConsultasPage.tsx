@@ -14,7 +14,7 @@ import {
 
 /**
  * Geral › Consultas (item 8): catálogo de relatórios publicados — mesma lógica
- * visual de Serviços: agrupados por categoria (lista própria de relatórios),
+ * visual do seletor de requisições: agrupados por categoria (lista própria de relatórios),
  * filtro em pílulas e cores herdadas no ícone e no botão "Abrir". Em vez de
  * iniciar um processo, "abre" o relatório e mostra os dados em página inteira.
  */

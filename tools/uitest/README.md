@@ -30,7 +30,7 @@ Protection e a API passa a responder 500; reiniciar a API cura). Sequência segu
 |---|---|
 | `modal-condicoes.mjs` | Modal de condições do gateway no modelador (layout web+mobile, combobox pesquisável de campos) |
 | `menu-ativo.mjs` | Item ativo do menu em 13 rotas — prefixo, query string (`?scope=report`) e redirects; exige exatamente 1 ativo no grupo certo |
-| `servicos-categorias.mjs` | Serviços agrupados por categoria, filtro em pílulas, cores herdadas, modal CRUD de categorias de processos (cria/edita/exclui/409 em uso) |
+| `servicos-categorias.mjs` | Modal “Nova requisição” (categorias, busca, cards e abertura em nova aba) e modal CRUD de categorias de processos |
 | `consultas-categorias.mjs` | Consultas agrupadas por categoria (lista própria de relatórios), filtro, cores, modal CRUD de categorias de relatórios |
 | `relatorio-fluxo-completo.mjs` | Fluxo real ponta-a-ponta: criar relatório pela UI escolhendo categoria → publicar → conferir card/cor em Consultas → limpar |
 

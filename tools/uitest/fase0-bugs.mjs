@@ -236,7 +236,6 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
 
   await login(page);
   const rotas = [
-    ['/servicos', /Serviços/i],
     ['/tarefas', /Tarefas pendentes/i],
     ['/consultas', /Consultas/i],
     ['/admin/processos', /Processos/i],

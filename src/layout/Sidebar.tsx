@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Plus } from 'lucide-react';
 import { SidebarUser, ImpersonateDialog } from './SidebarUser';
 import { AccessModeToggle } from './AccessModeToggle';
 import { MENU } from './menu/menu-config';
 import type { MenuAction, MenuGroup, MenuLink, MenuNode } from './menu/types';
 import { useSessionStore } from '@/stores/session';
 import { useTaskSummary } from '@/lib/api/execution';
+import { NewRequestDialog } from '@/components/requests/NewRequestDialog';
 
 export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
   const session = useSessionStore();
@@ -14,6 +15,7 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
   const tenantName = tenant?.clienteNome ?? 'Septem V2';
   const layout = MENU[session.effectiveMode()];
   const [impersonateOpen, setImpersonateOpen] = useState(false);
+  const [newRequestOpen, setNewRequestOpen] = useState(false);
 
   return (
     <aside
@@ -45,6 +47,10 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
 
       {/* Navegação principal */}
       <nav className="flex-1 overflow-y-auto px-2 py-3">
+        <button type="button" onClick={() => setNewRequestOpen(true)} className="mb-4 flex min-h-11 w-full items-center gap-2.5 whitespace-nowrap rounded-md bg-slate-900 px-3 text-sm font-semibold text-white hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 active:bg-slate-800">
+          <Plus size={17} className="shrink-0" />
+          <span className="truncate">Nova requisição</span>
+        </button>
         {layout.main.map((section, i) => {
           // Item visível = passa na permissão E (link com predicado visible ok |
           // grupo com ao menos um filho permitido). Seção sem itens não renderiza
@@ -96,6 +102,7 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
       {impersonateOpen && session.user && (
         <ImpersonateDialog selfId={session.user.id} onClose={() => setImpersonateOpen(false)} />
       )}
+      {newRequestOpen && <NewRequestDialog onClose={() => setNewRequestOpen(false)} />}
     </aside>
   );
 }

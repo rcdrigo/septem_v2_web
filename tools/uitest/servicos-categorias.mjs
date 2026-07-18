@@ -19,41 +19,71 @@ await page.fill('input[type=password]', 'admin123');
 await page.click('button[type=submit]');
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
-// ── 1. Serviços: agrupamento, cores e filtro ─────────────────────────────────
-await page.goto(BASE + '/servicos', { waitUntil: 'networkidle' });
+// ── 1. Nova requisição: modal, categorias, busca e abertura ──────────────────
+await page.goto(BASE + '/tarefas', { waitUntil: 'networkidle' });
+await page.getByRole('button', { name: 'Nova requisição' }).click();
+await page.waitForSelector('[role=dialog]');
 await page.waitForTimeout(500);
-await page.screenshot({ path: `${OUT}/servicos-desktop.png` });
+await page.screenshot({ path: `${OUT}/nova-requisicao-desktop.png` });
 
 const state = await page.evaluate(() => {
-  const headers = [...document.querySelectorAll('main section h2, section h2')].map((h) => h.textContent?.trim());
-  const pills = [...document.querySelectorAll('button[aria-pressed]')].map((b) => b.textContent?.trim());
-  const cards = [...document.querySelectorAll('section .grid > div')].map((c) => c.textContent ?? '');
-  const startBtns = [...document.querySelectorAll('section button')].filter((b) => b.textContent?.includes('Iniciar'));
-  const colors = startBtns.map((b) => b.style.backgroundColor);
-  return { headers, pills, cards, colors };
+  const dialog = document.querySelector('[role=dialog]');
+  const categories = [...(dialog?.querySelectorAll('aside button[aria-pressed]') ?? [])].map((b) => b.textContent?.trim());
+  const cards = [...(dialog?.querySelectorAll('button.new-request-card') ?? [])].map((c) => c.textContent ?? '');
+  const pagamentos = [...(dialog?.querySelectorAll('aside button[aria-pressed]') ?? [])].find((b) => b.textContent?.includes('Pagamentos'));
+  const color = pagamentos?.querySelector('span')?.style.color;
+  return { categories, cards, color };
 });
-check(state.headers.includes('Pagamentos') && state.headers.includes('Sem categoria'), `agrupamentos: ${JSON.stringify(state.headers)}`);
-check(state.pills.includes('Todas') && state.pills.includes('Pagamentos'), `pílulas de filtro: ${JSON.stringify(state.pills)}`);
-// #7c3aed = rgb(124, 58, 237)
-check(state.colors.some((c) => c === 'rgb(124, 58, 237)'), `botão Iniciar herda cor da categoria: ${JSON.stringify(state.colors)}`);
-check(!state.cards.some((t) => t.includes('Pagamentos')), 'nome da categoria NÃO aparece dentro do card');
+check(state.categories.some((x) => x?.includes('Todas')) && state.categories.some((x) => x?.includes('Pagamentos')), `categorias no modal: ${JSON.stringify(state.categories)}`);
+check(state.cards.length > 0 && state.cards.every((text) => text.includes('Iniciar')), `cards de serviços com ação Iniciar: ${state.cards.length}`);
+check(state.color === 'rgb(124, 58, 237)', `categoria herda cor configurada: ${JSON.stringify(state.color)}`);
+check(await page.getByRole('dialog').getByText(/criar pipe|com IA/i).count() === 0, 'modal não exibe ações de IA ou criação de pipe');
 
-// filtro: clica em "Pagamentos" → só o grupo dela fica visível
-await page.locator('button[aria-pressed]', { hasText: 'Pagamentos' }).click();
-await page.waitForTimeout(300);
-const filtered = await page.evaluate(() => [...document.querySelectorAll('section h2')].map((h) => h.textContent?.trim()));
-check(filtered.length === 1 && filtered[0] === 'Pagamentos', `filtro ativo mostra só o grupo: ${JSON.stringify(filtered)}`);
-await page.screenshot({ path: `${OUT}/servicos-filtrado.png` });
-// clica de novo → volta pra "Todas"
-await page.locator('button[aria-pressed]', { hasText: 'Pagamentos' }).click();
-await page.waitForTimeout(300);
+// ação do card é revelada por hover e por foco de teclado
+const firstCard = page.locator('[role=dialog] button.new-request-card').first();
+const firstAction = firstCard.locator('.new-request-action');
+check(await firstAction.evaluate((el) => getComputedStyle(el).opacity) === '0', 'ação Iniciar começa recolhida no desktop');
+await firstCard.hover();
+check(await firstAction.evaluate((el) => getComputedStyle(el).opacity) === '1', 'hover revela ação Iniciar');
+await page.mouse.move(0, 0);
+await firstCard.focus();
+check(await firstAction.evaluate((el) => getComputedStyle(el).opacity) === '1', 'foco de teclado revela ação Iniciar');
+
+// categoria: Pagamentos → somente cards dessa categoria
+await page.locator('[role=dialog] aside button[aria-pressed]', { hasText: 'Pagamentos' }).click();
+await page.waitForTimeout(200);
+const categoryFiltered = await page.locator('[role=dialog] button.new-request-card').allTextContents();
+check(categoryFiltered.length > 0 && categoryFiltered.every((text) => text.includes('Pagamentos')), `filtro por categoria: ${JSON.stringify(categoryFiltered)}`);
+
+// busca local automática: usa o nome do primeiro serviço e reduz ao resultado correspondente
+await page.locator('[role=dialog] aside button[aria-pressed]', { hasText: 'Todas' }).click();
+const firstName = await page.locator('[role=dialog] button.new-request-card strong').first().innerText();
+await page.getByLabel('Buscar serviços').fill(firstName);
+await page.waitForTimeout(100);
+const searchFiltered = await page.locator('[role=dialog] button.new-request-card').allTextContents();
+check(searchFiltered.length >= 1 && searchFiltered.every((text) => text.includes(firstName)), `busca automática por "${firstName}": ${searchFiltered.length}`);
+await page.screenshot({ path: `${OUT}/nova-requisicao-filtrada.png` });
+
+// card abre o formulário standalone em nova aba e fecha o modal
+const [servicePage] = await Promise.all([
+  ctx.waitForEvent('page'),
+  page.locator('[role=dialog] button.new-request-card').first().click(),
+]);
+await servicePage.waitForLoadState('domcontentloaded');
+check(new URL(servicePage.url()).pathname.includes('/servico/'), `serviço abriu em nova aba: ${servicePage.url()}`);
+check(await page.locator('[role=dialog]').count() === 0, 'modal fecha após iniciar serviço');
+await servicePage.close();
 
 // mobile
 await page.setViewportSize({ width: 375, height: 812 });
-await page.waitForTimeout(400);
+await page.getByRole('button', { name: 'Abrir menu' }).click();
+await page.getByRole('button', { name: 'Nova requisição' }).click();
+await page.waitForTimeout(300);
 const mobOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
-check(!mobOverflow, 'serviços mobile sem scroll horizontal');
-await page.screenshot({ path: `${OUT}/servicos-mobile.png` });
+check(!mobOverflow, 'modal Nova requisição mobile sem scroll horizontal');
+check(await page.locator('[role=dialog] .new-request-action').first().evaluate((el) => getComputedStyle(el).opacity) === '1', 'ação Iniciar permanece visível sem hover');
+await page.screenshot({ path: `${OUT}/nova-requisicao-mobile.png` });
+await page.getByRole('button', { name: 'Fechar' }).click();
 await page.setViewportSize({ width: 1280, height: 900 });
 
 // ── 2. Menu: Categorias sumiu do grupo Processos ─────────────────────────────

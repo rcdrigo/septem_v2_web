@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 
 /**
- * Visual compartilhado dos catálogos agrupados por categoria (Serviços e
- * Consultas): cores herdadas da categoria, pílula de filtro e agrupamento.
+ * Visual compartilhado dos catálogos agrupados por categoria (Nova requisição
+ * e Consultas): cores herdadas da categoria, pílula de filtro e agrupamento.
  */
 
 export const FALLBACK_COLOR = '#0f172a'; // slate-900 — itens sem categoria/cor

@@ -9,7 +9,6 @@ import {
   FolderTree,
   Inbox,
   LayoutDashboard,
-  LayoutGrid,
   LifeBuoy,
   ListChecks,
   LogOut,
@@ -45,7 +44,6 @@ export const MENU: MenuByMode = {
             icon: LayoutDashboard,
             visible: (s) => s.user?.hasDashboard ?? false,
           },
-          { kind: 'link', label: 'Serviços', to: '/servicos', icon: LayoutGrid },
           { kind: 'link', label: 'Tarefas', to: '/tarefas', icon: Inbox, badge: 'pendingTasks' },
           { kind: 'link', label: 'Requisições', to: '/requisicoes', icon: ListChecks },
           { kind: 'link', label: 'Consultas', to: '/consultas', icon: FileSearch },
@@ -110,7 +108,6 @@ export const MENU: MenuByMode = {
     main: [
       {
         items: [
-          { kind: 'link', label: 'Serviços', to: '/servicos', icon: LayoutGrid },
           { kind: 'link', label: 'Tarefas', to: '/tarefas', icon: Inbox, badge: 'pendingTasks' },
           { kind: 'link', label: 'Requisições', to: '/requisicoes', icon: ListChecks },
           { kind: 'link', label: 'Organograma', to: '/organograma', icon: FolderTree },

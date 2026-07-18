@@ -141,7 +141,7 @@ export function ConfiguracoesView({ modeler }: Props) {
                   </Field>
                   <Field
                     label="Inbox / resumo da requisição"
-                    help="HTML curto mostrado nas listagens. Aceita variáveis com {{campo}}. Exemplo: &lt;strong&gt;{{titulo}}&lt;/strong&gt; — solicitado por {{requisitante}}."
+                    help="HTML curto mostrado nas listagens. Use variáveis qualificadas, como {{formulario.titulo}}, {{requisitante.nome}}, {{requisitante.email}}, {{processo.nome}} e {{processo.numero}}. Exemplo: &lt;strong&gt;{{formulario.titulo}}&lt;/strong&gt; — solicitado por {{requisitante.nome}}."
                   >
                     <TextArea
                       value={cfg.inbox}
