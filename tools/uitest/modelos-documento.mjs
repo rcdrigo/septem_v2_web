@@ -299,6 +299,30 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
       check(/documentProtection[^>]*w:edit="readOnly"/.test(settingsXml), '[api] documento de teste sai travado para edição');
 
       // ── 6e: BUSCAR CAMPOS DISPONÍVEIS (:42-:44) ──
+      // Publica um serviço PRÓPRIO com grupo e LISTA DINÂMICA: assim o teste não depende
+      // de qual serviço está em 1º lugar (varia conforme as outras suítes) e ainda prova
+      // a "chave já agrupada" que a spec pede para listas dinâmicas.
+      const FORM_SVC = {
+        components: [
+          { type: 'group', label: 'Solicitante', components: [{ type: 'textfield', key: 'nome_req', label: 'Nome' }] },
+          { type: 'dynamiclist', key: 'itens', label: 'Itens', components: [{ type: 'number', key: 'valor_item', label: 'Valor' }] },
+        ],
+      };
+      const SVC_NOME = `Servico Campos ${rid}`;
+      const svcXml = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:septem="http://septem.app/schema/1.0/bpmn" id="d" targetNamespace="x">
+  <bpmn:process id="P" name="${SVC_NOME}" isExecutable="true">
+    <bpmn:extensionElements><septem:formSchema>${JSON.stringify(FORM_SVC)}</septem:formSchema></bpmn:extensionElements>
+    <bpmn:startEvent id="S"><bpmn:outgoing>F1</bpmn:outgoing></bpmn:startEvent>
+    <bpmn:userTask id="T" name="Analisar"><bpmn:incoming>F1</bpmn:incoming><bpmn:outgoing>F2</bpmn:outgoing></bpmn:userTask>
+    <bpmn:endEvent id="E"><bpmn:incoming>F2</bpmn:incoming></bpmn:endEvent>
+    <bpmn:sequenceFlow id="F1" sourceRef="S" targetRef="T" />
+    <bpmn:sequenceFlow id="F2" sourceRef="T" targetRef="E" />
+  </bpmn:process>
+</bpmn:definitions>`;
+      const svcSalvo = await api(token, '/api/v1/workflow/process-definitions', 'POST', { bpmnXml: svcXml });
+      await api(token, `/api/v1/workflow/process-definitions/${svcSalvo.body.key}/status`, 'PATCH', { status: 'published' });
+
       await page.locator('[data-testid=doc-buscar-campos]').click();
       await page.waitForSelector('[role=dialog]', { timeout: 8000 });
       await page.locator('[role=dialog] label:has-text("Serviço")').locator('xpath=..').locator('button').first().click();
@@ -306,6 +330,9 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
       const opcoesServico = page.locator('input[placeholder="Pesquisar…"]').locator('xpath=../../ul/li/button');
       const qtdServicos = await opcoesServico.count();
       check(qtdServicos > 0, `[web] o modal lista os serviços disponíveis (${qtdServicos})`);
+      // Filtra pelo nome do serviço recém-publicado (o combobox é pesquisável).
+      await page.fill('input[placeholder="Pesquisar…"]', SVC_NOME);
+      await page.waitForTimeout(400);
       await opcoesServico.first().click();
       await page.waitForTimeout(300);
       const [abaCampos] = await Promise.all([
@@ -318,9 +345,16 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
         await abaCampos.waitForSelector('[data-testid=campos-tabela], text=Campos disponíveis', { timeout: 15000 }).catch(() => {});
         const txtCampos = await abaCampos.evaluate(() => document.body.innerText);
         check(/Chave/i.test(txtCampos) && /Nome/i.test(txtCampos), '[web] a aba mostra nome e chave dos campos');
-        // A chave tem que estar pronta para colar no template.
         const linhas = await abaCampos.locator('[data-testid=campo-linha]').count();
-        check(linhas > 0, `[web] a aba lista os campos do serviço (${linhas})`);
+        check(linhas >= 2, `[web] a aba lista os campos do serviço (${linhas})`);
+        // Agrupamento vira seção e a chave do campo simples fica sem prefixo.
+        // innerText devolve o texto JÁ em maiúsculas (o título da seção tem `uppercase`
+        // no CSS) — comparar sensível a maiúsculas dava falso-negativo.
+        check(/solicitante/i.test(txtCampos), '[web] a aba mostra o AGRUPAMENTO do campo');
+        check(/\bnome_req\b/.test(txtCampos), '[web] chave do campo simples aparece sem prefixo');
+        // O ponto central do :44: campo de LISTA DINÂMICA sai com a chave já agrupada.
+        check(/itens\.valor_item/.test(txtCampos), '[web] campo de lista dinâmica sai com a chave AGRUPADA (itens.valor_item)');
+        check(/lista dinâmica/i.test(txtCampos), '[web] a aba sinaliza que o campo vem de lista dinâmica');
         await abaCampos.screenshot({ path: `${OUT}/campos-servico.png` });
         await abaCampos.close();
       }
@@ -341,6 +375,20 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
         await abaManual.screenshot({ path: `${OUT}/manual-templates.png` });
         await abaManual.close();
       }
+
+      // ── 6e (:42): o botão precisa estar DENTRO do editor do modelo ──
+      await page.locator('[data-testid=doc-linha]', { hasText: NOME }).locator('button[title="Editar"]').click();
+      await page.waitForSelector('[role=dialog]', { timeout: 8000 });
+      await page.waitForSelector('[data-testid=doc-carregando]', { state: 'detached', timeout: 10000 }).catch(() => {});
+      check(await page.locator('[data-testid=dlg-buscar-campos]').count() === 1,
+        '[web] "Buscar campos disponíveis" está dentro do editor do modelo');
+      await page.locator('[data-testid=dlg-buscar-campos]').click();
+      await page.waitForSelector('[data-testid=campos-buscar]', { timeout: 8000 });
+      check(true, '[web] o modal de campos abre a partir do editor');
+      await page.locator('[role=dialog] button', { hasText: 'Fechar' }).first().click();
+      await page.waitForTimeout(300);
+      await page.locator('[role=dialog] button', { hasText: 'Cancelar' }).first().click().catch(() => {});
+      await page.waitForTimeout(300);
 
       // ── 6d: HISTÓRICO de execuções (:30-:37) ──
       // As gerações acima já devem estar registradas: abre o histórico e confere os

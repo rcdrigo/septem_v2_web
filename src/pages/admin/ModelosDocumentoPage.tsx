@@ -467,6 +467,7 @@ function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
   const [status, setStatus] = useState<'ativo' | 'inativo'>('ativo');
   const [outputType, setOutputType] = useState<'docx' | 'pdf'>('docx');
   const [hydrated, setHydrated] = useState(!id);
+  const [camposOpen, setCamposOpen] = useState(false);
 
   if (id && detail.data && !hydrated) {
     const d = detail.data;
@@ -555,6 +556,26 @@ function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
           </Field>
         </div>
 
+        {/* Ajuda para escrever o modelo, AQUI dentro do editor (a spec pede o botão ao
+            criar/editar — é neste momento que o usuário precisa das chaves). */}
+        <div className="flex flex-wrap gap-2 rounded-md bg-slate-50 p-2">
+          <button
+            type="button"
+            onClick={() => setCamposOpen(true)}
+            data-testid="dlg-buscar-campos"
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <Search size={13} /> Buscar campos disponíveis
+          </button>
+          <button
+            type="button"
+            onClick={() => openTab('manual-templates')}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <BookOpen size={13} /> Manual técnico
+          </button>
+        </div>
+
         {/* Arquivo: só existe depois de salvar (precisa do id para a chave no storage). */}
         <Field label="Arquivo do modelo (.docx)" hint={id ? 'Word ou LibreOffice. O arquivo substitui o anterior.' : 'Salve o modelo primeiro para enviar o arquivo.'}>
           <div className="flex flex-wrap items-center gap-2">
@@ -602,6 +623,7 @@ function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
         )}
       </form>
       )}
+      {camposOpen && <CamposDialog onClose={() => setCamposOpen(false)} />}
     </Dialog>
   );
 }
