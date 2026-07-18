@@ -54,10 +54,9 @@ try {
   await page.locator('button', { hasText: 'Pré-visualizar' }).first().click();
   const dateSel = '[role=dialog] .septem-date-picker-input';
   await page.waitForSelector(dateSel, { timeout: 8000 });
-  await page.locator(dateSel).first().focus();
-  await page.waitForTimeout(300);
-  const abriuNoFoco = await page.locator('.flatpickr-calendar.open').count() > 0;
-  check(abriuNoFoco, '[web] o datepicker moderno abre ao FOCAR no campo');
+  await page.locator('[role=dialog] [data-date-picker-trigger]').first().click();
+  const abriu = await page.locator('[data-date-picker-popover]').count() > 0;
+  check(abriu, '[web] o calendário shadcn Base abre pelo botão');
   await page.screenshot({ path: `${OUT}/campo-data-nome.png` });
 } finally { await browser.close(); }
 ok.forEach((m) => console.log('✓ ' + m));

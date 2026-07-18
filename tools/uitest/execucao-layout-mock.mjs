@@ -8,6 +8,16 @@ const ok = [];
 const bad = [];
 const check = (condition, message) => (condition ? ok.push(message) : bad.push(message));
 
+function relativeDate(offset) {
+  const date = new Date();
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() + offset);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return { digits: `${day}${month}${year}`, display: `${day}/${month}/${year}`, iso: `${year}-${month}-${day}` };
+}
+
 const tenant = {
   tenantId: 'mock', clienteNome: 'Ambiente que não deve aparecer', ambienteNome: 'Teste',
   primaryColor: '#0f172a', modulos: [],
@@ -66,31 +76,60 @@ try {
     await page.goto(`${BASE}/servico/mock-process`, { waitUntil: 'networkidle' });
     await page.waitForSelector('h1', { timeout: 5000 });
 
-    check((await page.locator('h1').innerText()).trim() === 'INIC · Preencher solicitação', `[start ${width}] sigla prefixa a tarefa`);
+    check((await page.locator('h1').innerText()).trim() === 'INIC · Preencher solicitação · Protocolo', `[start ${width}] sigla e setor compõem o título`);
     check(await page.getByText('Processo de Compras', { exact: true }).count() === 1, `[start ${width}] processo aparece uma vez como pill`);
-    check(await page.getByText('Setor: Protocolo', { exact: true }).count() === 1, `[start ${width}] setor secundário presente`);
+    check(await page.getByText('Setor: Protocolo', { exact: true }).count() === 0, `[start ${width}] prefixo Setor removido`);
     check(await page.getByText('Ambiente que não deve aparecer', { exact: true }).count() === 0, `[start ${width}] ambiente removido`);
     check(!await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1), `[start ${width}] sem overflow horizontal`);
 
-    const date = page.locator('.septem-date-picker-input').first();
-    await date.focus();
-    check(await page.locator('.flatpickr-calendar.open').count() === 1, `[start ${width}] datepicker moderno abre por foco`);
+    const date = page.locator('[data-date-picker-input]').first();
+    await page.locator('[data-date-picker-trigger]').first().click();
+    check(await page.locator('[data-date-picker-popover]').count() === 1, `[start ${width}] calendário shadcn Base abre pelo botão`);
+    if (width === 375) await page.screenshot({ path: `${OUT}/execucao-datepicker-mobile.png`, fullPage: true });
     await page.keyboard.press('Escape');
 
     if (width === 375) {
-      const pickers = page.locator('.septem-date-picker-input');
+      const pickers = page.locator('[data-date-picker-input]');
       check(await pickers.count() === 3, '[start 375] renderiza os modos data, hora e data/hora');
-      check(await page.locator('.septem-date-picker > input:visible').count() === 3, '[start 375] oculta os inputs ISO técnicos');
-      await pickers.nth(0).fill('20/07/2026');
+      check(await page.locator('[data-date-picker-trigger]').count() === 2, '[start 375] hora não renderiza calendário');
+      check(await page.locator('[data-date-picker-iso]:visible').count() === 0, '[start 375] oculta os inputs ISO técnicos');
+      const tomorrow = relativeDate(1);
+      const yesterday = relativeDate(-1);
+      await pickers.nth(0).fill(tomorrow.digits);
       await pickers.nth(0).blur();
-      await pickers.nth(1).fill('14:35');
+      check(await pickers.nth(0).inputValue() === tomorrow.display, '[start 375] aplica máscara de data durante digitação manual');
+      await pickers.nth(1).fill('1435');
       await pickers.nth(1).blur();
-      await pickers.nth(2).fill('17/07/2026 10:30');
+      check(await pickers.nth(1).inputValue() === '14:35', '[start 375] aplica máscara de hora durante digitação manual');
+      await pickers.nth(2).fill(`${yesterday.digits}1030`);
       await pickers.nth(2).blur();
-      const isoValues = await page.locator('.septem-date-picker > input:not(.septem-date-picker-input)').evaluateAll((inputs) => inputs.map((input) => input.value));
-      check(isoValues[0] === '2026-07-20', `[start 375] data mantém ISO (${isoValues[0]})`);
+      check(await pickers.nth(2).inputValue() === `${yesterday.display} 10:30`, '[start 375] aplica máscara de data/hora durante digitação manual');
+      const isoValues = await page.locator('[data-date-picker-iso]').evaluateAll((inputs) => inputs.map((input) => input.value));
+      check(isoValues[0] === tomorrow.iso, `[start 375] data mantém ISO (${isoValues[0]})`);
       check(isoValues[1] === '14:35', `[start 375] hora mantém ISO (${isoValues[1]})`);
-      check(isoValues[2] === '2026-07-17T10:30', `[start 375] data/hora mantém ISO (${isoValues[2]})`);
+      check(isoValues[2] === `${yesterday.iso}T10:30`, `[start 375] data/hora mantém ISO (${isoValues[2]})`);
+
+      await page.locator('[data-date-picker-trigger]').nth(1).click();
+      await page.locator('[data-date-picker-time]').fill('2359');
+      check(await pickers.nth(2).inputValue() === `${yesterday.display} 23:59`, '[start 375] horário do popover atualiza a data/hora');
+      check(await page.locator('[data-date-picker-iso]').nth(2).inputValue() === `${yesterday.iso}T23:59`, '[start 375] horário do popover preserva ISO');
+      await page.getByRole('button', { name: 'Aplicar' }).click();
+
+      await pickers.nth(0).fill('31022026');
+      await pickers.nth(0).blur();
+      check(await pickers.nth(0).getAttribute('aria-invalid') === 'true', '[start 375] rejeita data inexistente');
+      check(await page.locator('[data-date-picker-iso]').nth(0).inputValue() === '', '[start 375] data inválida não chega ao valor ISO');
+
+      await pickers.nth(0).fill(yesterday.digits);
+      await pickers.nth(0).blur();
+      check(await pickers.nth(0).getAttribute('aria-invalid') === 'true', '[start 375] limite impede data passada');
+      await pickers.nth(2).fill(`${tomorrow.digits}1030`);
+      await pickers.nth(2).blur();
+      check(await pickers.nth(2).getAttribute('aria-invalid') === 'true', '[start 375] limite impede data/hora futura');
+
+      await page.getByRole('button', { name: 'Botões de conclusão' }).click();
+      await page.getByRole('button', { name: 'Iniciar solicitação' }).click();
+      check(await page.locator('span.text-rose-600').count() >= 2, '[start 375] datas inválidas bloqueiam a conclusão e aparecem no formulário');
     }
 
     if (width < 640) {
@@ -116,13 +155,17 @@ try {
     await page.goto(`${BASE}/tarefa/mock-task`, { waitUntil: 'networkidle' });
     await page.waitForSelector('h1', { timeout: 5000 });
 
-    check((await page.locator('h1').innerText()).trim() === 'ANAL · Analisar solicitação', `[task ${view.name}] sigla prefixa a tarefa`);
-    check(await page.getByText('Setor: Financeiro', { exact: true }).count() === 1, `[task ${view.name}] setor presente`);
+    check((await page.locator('h1').innerText()).trim() === 'ANAL · Analisar solicitação · Financeiro', `[task ${view.name}] setor aparece como sufixo`);
+    check(await page.getByText('Setor: Financeiro', { exact: true }).count() === 0, `[task ${view.name}] prefixo Setor removido`);
     check(await page.getByRole('button', { name: 'Ver relatório do processo 321' }).count() === 1, `[task ${view.name}] número clicável presente`);
+    const pillBox = await page.locator('[data-process-number-pill]').boundingBox();
+    check(!!pillBox && pillBox.height <= 24, `[task ${view.name}] pill do processo está compacto`);
 
     if (view.name === 'desktop') {
       check(await page.getByRole('button', { name: 'Aprovar', exact: true }).count() === 1, '[task desktop] conclusões permanecem visíveis');
       check(await page.getByRole('button', { name: 'Salvar', exact: true }).count() === 1, '[task desktop] Salvar permanece visível');
+      const actionBox = await page.getByRole('button', { name: 'Aprovar', exact: true }).boundingBox();
+      check(!!actionBox && actionBox.height <= 36, '[task desktop] conclusão recupera o tamanho compacto original');
     } else {
       check(await page.getByRole('button', { name: 'Aprovar', exact: true }).count() === 0, '[task mobile] conclusões diretas ocultas');
       await page.getByRole('button', { name: 'Botões de conclusão' }).click();

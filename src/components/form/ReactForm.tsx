@@ -75,6 +75,8 @@ type Runtime = {
   dsOptions: OptionsMap;
   readOnly?: boolean;
   fieldState: FieldState;
+  dateErrors: Record<string, string>;
+  setDateError: (k: string, message: string | null) => void;
   runEvent: (comp: Component, type: string, event: unknown) => void;
   uploadContext?: UploadContext;
 };
@@ -106,6 +108,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
       return init;
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [dateErrors, setDateErrors] = useState<Record<string, string>>({});
     // Opções resolvidas no servidor (form já populado) entram como estado inicial.
     const [dsOptions, setDsOptions] = useState<OptionsMap>(() => optionsByField ?? {});
     const [fieldState, setFieldState] = useState<FieldState>({});
@@ -143,6 +146,16 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
       setValues((prev) => ({ ...prev, [key]: value }));
     }
 
+    function setDateError(key: string, message: string | null) {
+      setDateErrors((prev) => {
+        if (!message && !(key in prev)) return prev;
+        const next = { ...prev };
+        if (message) next[key] = message;
+        else delete next[key];
+        return next;
+      });
+    }
+
     // Executa os eventos do campo para um dado tipo (change/click/blur/focus).
     function runEvent(comp: Component, type: string, event: unknown) {
       const evs = parseEvents(comp.properties?.septemEvents).filter((e) => e.type === type && e.action?.trim());
@@ -167,6 +180,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
       const errs: Record<string, string> = {};
       for (const c of inputs) {
         if (c.disabled || fieldState[c.key!]?.hidden) continue; // somente-leitura/escondido: não valida
+        if (dateErrors[c.key!]) { errs[c.key!] = dateErrors[c.key!]; continue; }
         const v = values[c.key!];
         const req = c.validate?.required;
         const empty = v === '' || v === undefined || v === null || (c.type === 'checkbox' && v === false)
@@ -206,11 +220,11 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
       },
       getData: () => values,
       setServerErrors: (errs) => setErrors(errs),
-    }), [values, inputs, fieldState]);
+    }), [values, inputs, fieldState, dateErrors]);
 
     const comps = root.components ?? [];
     const layout = (root as { septemGroupLayout?: string }).septemGroupLayout;
-    const runtime: Runtime = { values, errors, set, dsOptions, readOnly, fieldState, runEvent, uploadContext };
+    const runtime: Runtime = { values, errors, set, dsOptions, readOnly, fieldState, dateErrors, setDateError, runEvent, uploadContext };
 
     // Cada grupo de topo vira um card; os cards se distribuem no grid de 16 col
     // (8+8 = lado a lado). Em "abas", a barra fica num card e o conteúdo noutro.
@@ -239,7 +253,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
 ReactForm.displayName = 'ReactForm';
 
 function Node({ comp }: { comp: Component }) {
-  const { values, errors, set, dsOptions, readOnly, fieldState, runEvent } = useRuntime();
+  const { values, errors, set, dsOptions, readOnly, fieldState, runEvent, setDateError } = useRuntime();
 
   if (comp.type === 'dynamiclist') return <DynamicList comp={comp} />;
 
@@ -352,6 +366,7 @@ function Node({ comp }: { comp: Component }) {
         onClick={evt.onClick}
         onBlur={evt.onBlur}
         onFocus={evt.onFocus}
+        onValidityChange={(message) => setDateError(key, message)}
       />
     );
   } else {

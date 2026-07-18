@@ -25,12 +25,14 @@ type Props = {
   completionActions: ExecutionAction[];
   utilityActions?: ExecutionAction[];
   loading?: boolean;
+  compactDesktop?: boolean;
 };
 
-function ActionButton({ action, fullWidth, onRun }: {
+function ActionButton({ action, fullWidth, onRun, compact }: {
   action: ExecutionAction;
   fullWidth?: boolean;
   onRun?: (action: ExecutionAction) => void;
+  compact?: boolean;
 }) {
   const secondary = action.variant === 'secondary';
   const button = (
@@ -41,8 +43,8 @@ function ActionButton({ action, fullWidth, onRun }: {
       style={action.style}
       aria-busy={action.loading || undefined}
       className={[
-        'inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium outline-none transition-[background-color,color,filter] focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 active:brightness-90 disabled:cursor-not-allowed disabled:opacity-60',
-        fullWidth ? 'w-full' : '',
+        'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium outline-none transition-[background-color,color,filter] focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 active:brightness-90 disabled:cursor-not-allowed disabled:opacity-60',
+        fullWidth ? 'min-h-11 w-full gap-2 px-4 py-2' : compact ? 'gap-1.5 px-3.5 py-1.5' : 'gap-1.5 px-4 py-2',
         action.style
           ? 'hover:brightness-95'
           : secondary
@@ -63,7 +65,7 @@ function ActionButton({ action, fullWidth, onRun }: {
 }
 
 /** Rodapé desktop e bottom sheet mobile compartilhados pelas telas de execução. */
-export function TaskActionFooter({ completionActions, utilityActions = [], loading }: Props) {
+export function TaskActionFooter({ completionActions, utilityActions = [], loading, compactDesktop = false }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -143,10 +145,10 @@ export function TaskActionFooter({ completionActions, utilityActions = [], loadi
     <>
       <footer className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
         <div className="hidden items-center gap-2 sm:flex">
-          {completionActions.map((action) => <ActionButton key={action.id} action={action} />)}
+          {completionActions.map((action) => <ActionButton key={action.id} action={action} compact={compactDesktop} />)}
           {utilityActions.length > 0 && (
             <div className="ml-auto flex items-center gap-2">
-              {utilityActions.map((action) => <ActionButton key={action.id} action={action} />)}
+              {utilityActions.map((action) => <ActionButton key={action.id} action={action} compact={compactDesktop} />)}
             </div>
           )}
         </div>

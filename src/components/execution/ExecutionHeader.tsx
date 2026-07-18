@@ -51,8 +51,8 @@ export function ExecutionHeader({
           <h1 className="mt-1 min-w-0 break-words text-lg font-semibold leading-snug text-slate-900 [overflow-wrap:anywhere]">
             {alias && <span className="text-slate-500">{alias} <span aria-hidden="true">·</span>{' '}</span>}
             {taskName || 'Tarefa'}
+            {sector && <span className="font-normal text-slate-500"> <span aria-hidden="true">·</span>{' '}{sector}</span>}
           </h1>
-          {sector && <p className="mt-0.5 break-words text-sm text-slate-500">Setor: {sector}</p>}
         </div>
 
         {hasProcessNumber && (
@@ -61,9 +61,11 @@ export function ExecutionHeader({
             onClick={onOpenReport}
             title="Ver relatório do processo"
             aria-label={`Ver relatório do processo ${processNumber}`}
-            className="inline-flex min-h-11 shrink-0 items-center rounded-full bg-slate-100 px-3 text-sm font-semibold text-slate-600 outline-none transition-colors hover:bg-slate-200 hover:text-slate-800 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 active:bg-slate-300"
+            className="group -m-1 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full p-1 outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
           >
-            #{processNumber}
+            <span data-process-number-pill="" className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 transition-colors group-hover:bg-slate-200 group-hover:text-slate-800 group-active:bg-slate-300">
+              #{processNumber}
+            </span>
           </button>
         )}
       </div>

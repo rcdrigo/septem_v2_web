@@ -11,6 +11,7 @@
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
+    "@base-ui/react": "^1.6.0",
     "@bpmn-io/form-js": "^1.21.3",
     "@bpmn-io/form-js-viewer": "^1.21.3",
     "@bpmn-io/properties-panel": "^3.41.3",
@@ -19,9 +20,10 @@
     "bpmn-js": "^18.16.1",
     "bpmn-js-properties-panel": "^5.54.0",
     "chart.js": "^4.5.1",
-    "flatpickr": "^4.6.13",
+    "date-fns": "^4.4.0",
     "lucide-react": "^1.14.0",
     "react": "^19.2.6",
+    "react-day-picker": "^9.14.0",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.15.0",
     "zustand": "^5.0.13"

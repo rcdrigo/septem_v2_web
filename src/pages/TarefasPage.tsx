@@ -239,7 +239,7 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
         {task.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={task.data?.formSchema} data={task.data?.data as Record<string, unknown> | undefined} optionsByField={task.data?.fieldOptions} uploadContext={{ taskId }} />}
       </main>
 
-      <TaskActionFooter completionActions={completionActions} utilityActions={utilityActions} loading={task.isLoading} />
+      <TaskActionFooter completionActions={completionActions} utilityActions={utilityActions} loading={task.isLoading} compactDesktop />
 
       {justify && (
         <JustifyDialog
