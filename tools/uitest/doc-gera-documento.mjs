@@ -64,18 +64,21 @@ try {
   await page.waitForTimeout(800);
 
   // :50 — o checkbox existe e vem DESMARCADO por padrão.
-  const geraCb = page.locator('aside label', { hasText: 'Gera documento?' }).locator('input[type=checkbox]');
+  // O painel usa o <Switch> de ui/Field: o input é sr-only atrás do visual do
+  // toggle, então clicar nele é interceptado. Vamos pelo papel semântico e
+  // acionamos pelo <label>, que é o que o usuário de fato clica.
+  const geraCb = page.getByRole('switch', { name: 'Gera documento?' });
   check(await geraCb.count() === 1, '[web] campo de anexo tem o checkbox "Gera documento?"');
   check(!(await geraCb.isChecked()), '[web] "Gera documento?" vem DESMARCADO por padrão');
   // :51 — a seção só aparece depois de marcar.
   check(await page.locator('[data-testid=doc-param]').count() === 0, '[web] a seção de parametrização só aparece ao marcar');
 
-  await geraCb.check();
+  await geraCb.locator("xpath=ancestor::label[1]").click();
   await page.waitForTimeout(500);
   check(await page.locator('[data-testid=doc-param]').count() === 1, '[web] marcar exibe "Parametrização do documento"');
 
   // :52 — anexo manual, desmarcado por padrão.
-  const manualCb = page.locator('aside label', { hasText: 'Permitir anexar documento manualmente?' }).locator('input[type=checkbox]');
+  const manualCb = page.getByRole('switch', { name: 'Permitir anexar documento manualmente?' });
   check(await manualCb.count() === 1, '[web] existe "Permitir anexar documento manualmente?"');
   check(!(await manualCb.isChecked()), '[web] anexo manual vem DESMARCADO por padrão (:53)');
 
@@ -146,7 +149,7 @@ try {
   // Volta para FIXO (é o que vamos persistir e verificar).
   await page.locator('[data-testid=doc-param] input[type=radio]').first().check();
   await page.waitForTimeout(300);
-  await manualCb.check(); // marca o anexo manual para provar que persiste também
+  await manualCb.locator("xpath=ancestor::label[1]").click(); // marca o anexo manual para provar que persiste também
   // SEM espera antes do Salvar: o schema do formulário entra no BPMN por polling
   // (600ms), então salvar "no susto" é justamente o caso que perdia a alteração.
   check(await manualCb.isChecked(), '[web] o checkbox de anexo manual fica marcado ao clicar');

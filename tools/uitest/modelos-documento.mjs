@@ -102,10 +102,20 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
       const histOverflow = await page.evaluate(() => {
         const d = document.querySelector('[role=dialog]');
         if (!d) return { dialog: false, filhos: 0 };
-        return {
-          dialog: d.scrollWidth > d.clientWidth + 1,
-          filhos: [...d.querySelectorAll('*')].filter((e) => e.scrollWidth > e.clientWidth + 1 && e.tagName !== 'PRE').length,
-        };
+        const culpados = [...d.querySelectorAll('*')]
+          .filter((e) => e.scrollWidth > e.clientWidth + 1 && e.tagName !== 'PRE')
+          // Só conta quem REALMENTE esconde conteúdo: num elemento com overflow
+          // visível o excesso apenas transborda (e aqui vem de pseudo-elemento
+          // decorativo — ex.: `before:-inset-2`, que amplia a área de clique do
+          // botão de fechar em 8px por lado). Isso não corta nada nem gera barra.
+          .filter((e) => {
+            const ox = getComputedStyle(e).overflowX;
+            return ox === 'hidden' || ox === 'auto' || ox === 'scroll';
+          })
+          // Reportar QUEM estoura, não só quantos: sem isso a falha vira um número
+          // e custa uma sonda separada só para descobrir o elemento.
+          .map((e) => `${e.tagName}.${(e.className || '').toString().slice(0, 50)} (${e.scrollWidth}>${e.clientWidth})`);
+        return { dialog: d.scrollWidth > d.clientWidth + 1, filhos: culpados.length, culpados };
       });
       check(clippedHist === 0, `[${vp.n}] histórico: nenhum controle cortado (clipped: ${clippedHist})`);
       check(!histOverflow.dialog && histOverflow.filhos === 0,
