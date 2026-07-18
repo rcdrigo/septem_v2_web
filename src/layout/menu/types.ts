@@ -7,6 +7,8 @@ export type MenuLink = {
   label: string;
   to: string;
   icon: LucideIcon;
+  /** Badge de dados carregado pelo item, sem acoplar o menu à implementação da consulta. */
+  badge?: 'pendingTasks';
   /** Permissão necessária; ausente = sempre visível. */
   perm?: string;
   /** Visibilidade condicional extra (ex: Dashboard só se configurado). */

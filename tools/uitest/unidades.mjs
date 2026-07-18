@@ -7,8 +7,11 @@
 import { chromium } from 'playwright-core';
 
 const BASE = 'http://localhost:5173';
-const API = 'http://localhost:5000';
+const API = process.env.API_URL || 'http://localhost:5000';
 const OUT = process.env.OUT_DIR || '.';
+const CHROME = process.env.CHROME_PATH || (process.platform === 'darwin'
+  ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+  : '/usr/bin/google-chrome');
 const ok = [];
 const bad = [];
 const check = (cond, msg) => (cond ? ok.push(msg) : bad.push(msg));
@@ -51,7 +54,7 @@ async function criarUsuario(nome, foto) {
   return { id: r.body.id, nome };
 }
 
-const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
+const browser = await chromium.launch({ executablePath: CHROME, headless: true });
 const criadas = [];
 const posicoes = [];
 
@@ -168,9 +171,64 @@ try {
     check(texto.includes(titular.nome), `[${view.name}] a linha mostra o nome do titular`);
     const foto = await linha.locator('[data-testid=avatar]').first().getAttribute('src');
     check(!!foto && foto.includes('picsum'), `[${view.name}] a linha mostra a FOTO do titular (não o avatar genérico)`);
+    await linha.getByRole('button', { name: `Ações de ${nome}` }).click();
+    const menuAcoes = page.getByRole('menu', { name: `Ações de ${nome}` });
+    check((await menuAcoes.getByRole('menuitem').count()) === 3,
+      `[${view.name}] o menu compacto oferece criar subunidade, editar e excluir`);
+
+    // Cria e exclui uma filha pelo menu para garantir que as ações compactadas
+    // preservam os fluxos administrativos completos.
+    const nomeFilha = `Subunidade temporária ${view.name} ${uniq}`;
+    await menuAcoes.getByRole('menuitem', { name: 'Nova subunidade' }).click();
+    await page.waitForSelector('[data-testid=form-unidade]');
+    await page.fill('[data-testid=form-unidade] input[name=name]', nomeFilha);
+    await page.fill('[data-testid=form-unidade] input[name=sigla]', `SUB${uniq}`);
+    await page.getByRole('button', { name: 'Criar' }).click();
+    await page.waitForSelector(`text=Unidade "${nomeFilha}" criada.`, { timeout: 10000 });
+    const cardFilha = page.locator('[data-testid=unidade-linha]', { hasText: nomeFilha }).first();
+    check((await cardFilha.count()) === 1, `[${view.name}] cria subunidade pelo menu compacto`);
+
+    await cardFilha.getByRole('button', { name: `Ações de ${nomeFilha}` }).click();
+    await page.getByRole('menuitem', { name: 'Excluir' }).click();
+    await page.getByRole('button', { name: 'Excluir', exact: true }).click();
+    await page.waitForSelector(`text=Unidade "${nomeFilha}" excluída.`, { timeout: 10000 });
+    check((await page.locator('[data-testid=unidade-linha]', { hasText: nomeFilha }).count()) === 0,
+      `[${view.name}] exclui subunidade pelo menu compacto`);
+
+    // Hallmark: além do fluxo obrigatório em 1280/375, audita as larguras móveis
+    // intermediárias sem truncar nomes e sem deixar o documento rolar na horizontal.
+    if (view.name === 'mobile') {
+      for (const width of [320, 414, 768]) {
+        await page.setViewportSize({ width, height: width === 320 ? 760 : 896 });
+        const responsivo = await linha.evaluate((card) => {
+          const viewport = card.closest('[data-testid=org-unit-tree-viewport]');
+          const nomes = [...card.querySelectorAll('[data-testid=org-unit-name], [data-testid=org-unit-holder]')];
+          return {
+            documentoComOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+            viewportContido: !!viewport && viewport.getBoundingClientRect().right <= window.innerWidth + 1,
+            nomesIntegrais: nomes.every((el) => {
+              const cs = getComputedStyle(el);
+              return cs.whiteSpace === 'nowrap' && cs.textOverflow !== 'ellipsis' && cs.overflow !== 'hidden';
+            }),
+          };
+        });
+        check(!responsivo.documentoComOverflow && responsivo.viewportContido,
+          `[mobile-${width}] árvore contida sem overflow no documento`);
+        check(responsivo.nomesIntegrais, `[mobile-${width}] nomes completos, sem quebra ou truncamento`);
+      }
+      await page.setViewportSize({ width: view.width, height: view.height });
+    }
     await page.screenshot({ path: `${OUT}/unidades-lista-${view.name}.png`, fullPage: true });
 
     // ── 4) Detalhe em aba própria ──────────────────────────────────────────
+    const [popupDetalhe] = await Promise.all([
+      ctx.waitForEvent('page', { timeout: 8000 }).catch(() => null),
+      linha.locator('button[title="Abrir a unidade em nova aba"]').click(),
+    ]);
+    check(!!popupDetalhe && popupDetalhe.url().includes(`/unidade?id=${criada.id}`),
+      `[${view.name}] clicar no card abre o detalhe em nova aba`);
+    if (popupDetalhe) await popupDetalhe.close();
+
     await page.goto(`${BASE}/unidade?id=${criada.id}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('[data-testid=abas-unidade]');
     const detalhe = await page.locator('body').innerText();
@@ -252,8 +310,9 @@ try {
       async (route) => { await new Promise((r) => setTimeout(r, 900)); await route.continue(); },
       { times: 1 },
     );
-    await page.locator('[data-testid=unidade-linha]', { hasText: sigla })
-      .first().locator('button[title=Editar]').click();
+    const cardParaEditar = page.locator('[data-testid=unidade-linha]', { hasText: sigla }).first();
+    await cardParaEditar.getByRole('button', { name: `Ações de ${nome}` }).click();
+    await page.getByRole('menuitem', { name: 'Editar' }).click();
 
     await page.waitForSelector('[data-testid=unidade-carregando]', { timeout: 3000 });
     const formCedo = await page.locator('[data-testid=form-unidade]').count();

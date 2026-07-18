@@ -3,8 +3,11 @@ import { api } from '@/lib/api';
 
 export type StartedInstance = { executionId: string; status: string; tasks: { id: string; name: string | null }[]; nextTaskForMe?: string | null };
 export type RequestSummary = { label: string; value: string };
-export type MyTask = { id: string; name: string | null; executionId: string; createdAt: string; dueAt: string | null; process?: string | null; processNumber?: number; requester?: string | null; summary?: RequestSummary[] };
-export type ExecutedTask = { id: string; name: string | null; executionId: string; process: string | null; completedAt: string | null; action: string | null; processNumber?: number; requester?: string | null; summary?: RequestSummary[] };
+export type ProcessMetadata = { process?: string | null; processKey?: string | null; processIcon?: string | null; categoryName?: string | null; categoryColor?: string | null; inboxText?: string | null; processNumber?: number; requester?: string | null };
+export type MyTask = ProcessMetadata & { id: string; name: string | null; executionId: string; createdAt: string; dueAt: string | null; completedAt?: string | null; action?: string | null; summary?: RequestSummary[] };
+export type ExecutedTask = MyTask & { completedAt: string | null; action: string | null };
+export type TaskListItem = MyTask | ExecutedTask;
+export type TaskSummary = { pendingCount: number };
 export type TaskButton = { id: string; label: string; validateForm: boolean; requireJustification?: boolean; primaryColor?: string | null; textColor?: string | null; icon?: string | null; hint?: string | null };
 export type FieldOptions = Record<string, { value: string; label: string }[]>;
 export type TaskDetail = {
@@ -16,7 +19,7 @@ export type TaskDetail = {
 };
 export type CompleteResult = { taskStatus: string; executionStatus: string; pendingTasks: number; executionId?: string; nextTaskForMe?: string | null };
 
-const execKeys = { tasks: ['workflow', 'tasks'] as const, task: (id: string) => ['workflow', 'task', id] as const };
+const execKeys = { tasks: ['workflow', 'tasks'] as const, summary: ['workflow', 'tasks', 'summary'] as const, task: (id: string) => ['workflow', 'task', id] as const };
 
 /** Schema form-js do processo (formulário inicial de "Iniciar"). */
 export type StartForm = {
@@ -44,12 +47,24 @@ export function useStartInstance() {
 }
 
 export function useMyTasks() {
-  return useQuery({ queryKey: execKeys.tasks, queryFn: () => api.get<MyTask[]>('/api/v1/workflow/tasks?assignee=me') });
+  return useTasks('pendentes');
 }
 
 /** Tarefas que o usuário concluiu (não estão mais com ele). */
 export function useExecutedTasks() {
-  return useQuery({ queryKey: ['workflow', 'tasks', 'executed'], queryFn: () => api.get<ExecutedTask[]>('/api/v1/workflow/tasks?status=concluida') });
+  return useTasks('concluidas');
+}
+
+export function useTasks(status: 'pendentes' | 'concluidas') {
+  const query = status === 'concluidas' ? 'status=concluida' : 'assignee=me';
+  return useQuery({
+    queryKey: [...execKeys.tasks, status],
+    queryFn: () => api.get<TaskListItem[]>(`/api/v1/workflow/tasks?${query}`),
+  });
+}
+
+export function useTaskSummary() {
+  return useQuery({ queryKey: execKeys.summary, queryFn: () => api.get<TaskSummary>('/api/v1/workflow/tasks/summary') });
 }
 
 export function useTask(id: string | null) {
@@ -74,7 +89,7 @@ export function useSaveTask() {
 }
 
 // ── instâncias (acompanhamento) ───────────────────────────────────────
-export type InstanceListItem = { id: string; process: string | null; status: string; startedAt: string; endedAt: string | null; pendingTasks: number };
+export type InstanceListItem = ProcessMetadata & { id: string; number?: number; status: string; startedAt: string; endedAt: string | null; pendingTasks: number };
 export type InstancesPage = { items: InstanceListItem[]; total: number; page: number; pageSize: number };
 export type FieldChange = { changedAt: string; changedBy: string | null; impersonator: string | null; action: string; group: string | null; field: string; changeType: string; oldValue: string | null; newValue: string | null };
 export type InstanceTask = { id: string; name: string | null; status: string; assignee: string | null; completedBy: string | null; completedByImpersonator?: string | null; createdAt: string; completedAt: string | null; dueAt: string | null; action: string | null; justification?: string | null; fieldHistory?: FieldChange[] };

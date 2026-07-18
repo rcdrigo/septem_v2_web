@@ -13,6 +13,8 @@ type Props = {
   fullWidth?: boolean;
   panelRole?: AriaRole;
   ariaLabel?: string;
+  /** Classes aplicadas ao botão real do gatilho; o padrão `contents` preserva os usos atuais. */
+  triggerClassName?: string;
 };
 
 /**
@@ -30,6 +32,7 @@ export function Popover({
   fullWidth = false,
   panelRole = 'menu',
   ariaLabel,
+  triggerClassName = 'contents',
 }: Props) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
@@ -82,7 +85,7 @@ export function Popover({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="contents"
+        className={triggerClassName}
         aria-label={ariaLabel}
         aria-expanded={open}
         aria-haspopup={panelRole === 'dialog' ? 'dialog' : 'menu'}
@@ -127,7 +130,7 @@ export function MenuItem({ onClick, children, destructive, disabled }: MenuItemP
       disabled={disabled}
       onClick={onClick}
       className={[
-        'flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors',
+        'flex min-h-11 w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-slate-700',
         disabled ? 'cursor-not-allowed text-slate-300' : 'cursor-pointer hover:bg-slate-100',
         destructive ? 'text-rose-700' : 'text-slate-700',
       ].join(' ')}

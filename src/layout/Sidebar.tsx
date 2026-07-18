@@ -6,6 +6,7 @@ import { AccessModeToggle } from './AccessModeToggle';
 import { MENU } from './menu/menu-config';
 import type { MenuAction, MenuGroup, MenuLink, MenuNode } from './menu/types';
 import { useSessionStore } from '@/stores/session';
+import { useTaskSummary } from '@/lib/api/execution';
 
 export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
   const session = useSessionStore();
@@ -149,8 +150,19 @@ function LinkRow({ link }: { link: MenuLink }) {
       }
     >
       <Icon size={18} className="shrink-0" />
-      <span className="truncate">{link.label}</span>
+      <span className="min-w-0 flex-1 truncate">{link.label}</span>
+      {link.badge === 'pendingTasks' && <PendingTasksBadge />}
     </NavLink>
+  );
+}
+
+function PendingTasksBadge() {
+  const summary = useTaskSummary();
+  if (summary.isLoading || summary.isError || !summary.data) return null;
+  return (
+    <span aria-label={`${summary.data.pendingCount} tarefas pendentes`} className="shrink-0 tabular-nums text-xs font-semibold opacity-75">
+      {summary.data.pendingCount}
+    </span>
   );
 }
 
