@@ -298,6 +298,50 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
       const settingsXml = unzipPart('word/settings.xml');
       check(/documentProtection[^>]*w:edit="readOnly"/.test(settingsXml), '[api] documento de teste sai travado para edição');
 
+      // ── 6e: BUSCAR CAMPOS DISPONÍVEIS (:42-:44) ──
+      await page.locator('[data-testid=doc-buscar-campos]').click();
+      await page.waitForSelector('[role=dialog]', { timeout: 8000 });
+      await page.locator('[role=dialog] label:has-text("Serviço")').locator('xpath=..').locator('button').first().click();
+      await page.waitForSelector('input[placeholder="Pesquisar…"]', { timeout: 5000 });
+      const opcoesServico = page.locator('input[placeholder="Pesquisar…"]').locator('xpath=../../ul/li/button');
+      const qtdServicos = await opcoesServico.count();
+      check(qtdServicos > 0, `[web] o modal lista os serviços disponíveis (${qtdServicos})`);
+      await opcoesServico.first().click();
+      await page.waitForTimeout(300);
+      const [abaCampos] = await Promise.all([
+        ctx.waitForEvent('page', { timeout: 15000 }).catch(() => null),
+        page.locator('[data-testid=campos-buscar]').click(),
+      ]);
+      check(!!abaCampos, '[web] "Buscar" abre os campos do serviço em nova aba');
+      if (abaCampos) {
+        await abaCampos.waitForLoadState('networkidle').catch(() => {});
+        await abaCampos.waitForSelector('[data-testid=campos-tabela], text=Campos disponíveis', { timeout: 15000 }).catch(() => {});
+        const txtCampos = await abaCampos.evaluate(() => document.body.innerText);
+        check(/Chave/i.test(txtCampos) && /Nome/i.test(txtCampos), '[web] a aba mostra nome e chave dos campos');
+        // A chave tem que estar pronta para colar no template.
+        const linhas = await abaCampos.locator('[data-testid=campo-linha]').count();
+        check(linhas > 0, `[web] a aba lista os campos do serviço (${linhas})`);
+        await abaCampos.screenshot({ path: `${OUT}/campos-servico.png` });
+        await abaCampos.close();
+      }
+      await page.locator('[role=dialog] button', { hasText: 'Fechar' }).click().catch(() => {});
+      await page.waitForTimeout(300);
+
+      // ── 6e: MANUAL técnico (:45-:46) ──
+      const [abaManual] = await Promise.all([
+        ctx.waitForEvent('page', { timeout: 15000 }).catch(() => null),
+        page.locator('[data-testid=doc-manual]').click(),
+      ]);
+      check(!!abaManual, '[web] o helper abre o manual técnico em nova aba');
+      if (abaManual) {
+        await abaManual.waitForSelector('[data-testid=manual-templates]', { timeout: 15000 }).catch(() => {});
+        const txtManual = await abaManual.evaluate(() => document.body.innerText);
+        check(/qrcode/i.test(txtManual) && /sum\(\)/i.test(txtManual) && /#if/i.test(txtManual),
+          '[web] o manual documenta as chaves do template');
+        await abaManual.screenshot({ path: `${OUT}/manual-templates.png` });
+        await abaManual.close();
+      }
+
       // ── 6d: HISTÓRICO de execuções (:30-:37) ──
       // As gerações acima já devem estar registradas: abre o histórico e confere os
       // campos da spec (data relativa, requisitante, duração, tipo, status, payload).

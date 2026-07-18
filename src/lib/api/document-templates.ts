@@ -90,6 +90,29 @@ export async function openDocumentTemplateFile(id: string): Promise<void> {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+/** Serviço (processo publicado) visível ao usuário — alimenta o "buscar campos". */
+export type DocumentService = { key: string; name: string; area: string | null };
+
+/** Campo do formulário do serviço, com a chave já pontuada em lista dinâmica. */
+export type CatalogField = { group: string | null; label: string | null; key: string; type: string | null; inList: boolean };
+
+export function useDocumentServices(enabled: boolean) {
+  return useQuery({
+    queryKey: ['document-templates', 'services'],
+    queryFn: () => api.get<DocumentService[]>('/api/v1/document-templates/services'),
+    enabled,
+  });
+}
+
+export function useServiceFields(key: string | null) {
+  return useQuery({
+    queryKey: ['document-templates', 'services', key, 'fields'],
+    queryFn: () => api.get<{ service: string; fields: CatalogField[] }>(
+      `/api/v1/document-templates/services/${encodeURIComponent(key!)}/fields`),
+    enabled: !!key,
+  });
+}
+
 /** Uma execução do modelo no histórico (Fase 6d). */
 export type DocumentExecution = {
   id: string;

@@ -22,6 +22,8 @@ import { RelatoriosPage } from './pages/admin/RelatoriosPage';
 import { FontesDadosPage } from './pages/admin/FontesDadosPage';
 import { ModelosEmailPage } from './pages/admin/ModelosEmailPage';
 import { ModelosDocumentoPage } from './pages/admin/ModelosDocumentoPage';
+import { CamposServicoPage } from './pages/CamposServicoPage';
+import { ManualTemplatesPage } from './pages/ManualTemplatesPage';
 import { ServicoFormPage } from './pages/ServicoFormPage';
 import { TarefaPage } from './pages/TarefaPage';
 import { SolicitacaoPage } from './pages/SolicitacaoPage';
@@ -50,6 +52,9 @@ export const router = createBrowserRouter(
     { path: '/solicitacao/:instanceId', element: <SolicitacaoPage /> },
     // Criar/editar fonte de dados em aba própria (sem menus).
     { path: '/fonte-dados/:id', element: <FonteDadosPage /> },
+    // Abrem em aba própria a partir do editor de modelos de documento (Fase 6e).
+    { path: '/campos-servico', element: <CamposServicoPage /> },
+    { path: '/manual-templates', element: <ManualTemplatesPage /> },
     // Modelador em aba própria (sem menu lateral) — aberto via "Novo/Editar".
     { path: '/processos/editar', element: <ModeladorPage /> },
     // Builder de relatórios em aba própria (Admin › Relatórios › Builder).

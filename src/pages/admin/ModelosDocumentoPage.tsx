@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
-import { AlertTriangle, Eye, FileStack, FlaskConical, History, Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, BookOpen, Eye, FileStack, FlaskConical, History, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react';
 import {
   useDocumentTemplates, useDocumentTemplate, useCreateDocumentTemplate,
   useUpdateDocumentTemplate, useDeleteDocumentTemplate, useUploadDocumentTemplateFile,
   openDocumentTemplateFile, useTemplateKeys, skeletonFromKeys, testDocumentTemplate, useDocumentExecutions,
+  useDocumentServices,
   type DocumentTemplateListItem,
 } from '@/lib/api/document-templates';
 import { useOrgUnitsFlat } from '@/lib/api/org-units';
@@ -14,6 +15,7 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { ApiError } from '@/lib/api';
 import { toast } from '@/stores/toast';
 import { formatWithRelative, formatDuration } from '@/lib/relative-time';
+import { openTab } from '@/lib/nav';
 
 /** Abre o .docx do modelo em nova aba, avisando na tela se falhar. */
 async function preview(id: string) {
@@ -31,6 +33,7 @@ export function ModelosDocumentoPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [testId, setTestId] = useState<string | null>(null);
   const [histId, setHistId] = useState<{ id: string; nome: string } | null>(null);
+  const [camposOpen, setCamposOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const del = useDeleteDocumentTemplate();
 
@@ -48,13 +51,32 @@ export function ModelosDocumentoPage() {
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
         <h1 className="text-lg font-semibold text-slate-900">Modelos de documentos</h1>
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className="flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-700"
-        >
-          <Plus size={16} /> Novo modelo
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => openTab('manual-templates')}
+            title="Manual técnico de criação de templates"
+            data-testid="doc-manual"
+            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            <BookOpen size={15} /> <span className="hidden sm:inline">Manual</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setCamposOpen(true)}
+            data-testid="doc-buscar-campos"
+            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            <Search size={15} /> <span className="hidden sm:inline">Buscar campos</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-700"
+          >
+            <Plus size={16} /> <span className="hidden sm:inline">Novo modelo</span><span className="sm:hidden">Novo</span>
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 overflow-auto p-6">
@@ -200,6 +222,7 @@ export function ModelosDocumentoPage() {
         )}
       </div>
 
+      {camposOpen && <CamposDialog onClose={() => setCamposOpen(false)} />}
       {testId && <TestDialog id={testId} onClose={() => setTestId(null)} />}
       {histId && <HistoricoDialog id={histId.id} nome={histId.nome} onClose={() => setHistId(null)} />}
       {creating && <TemplateDialog onClose={() => setCreating(false)} />}
@@ -217,6 +240,63 @@ const STATUS_OPTIONS = [
   { value: 'ativo', label: 'Ativo' },
   { value: 'inativo', label: 'Inativo' },
 ] as const;
+
+/**
+ * "Buscar campos disponíveis" (modelos_documentos:42-44): dropdown pesquisável com os
+ * serviços que o usuário pode ver (o servidor filtra pela unidade; admin vê todos) e,
+ * ao buscar, abre em nova aba a lista de campos com agrupamento, nome e chave.
+ */
+function CamposDialog({ onClose }: { onClose: () => void }) {
+  const servicos = useDocumentServices(true);
+  const [key, setKey] = useState('');
+
+  const options = (servicos.data ?? []).map((s) => ({
+    value: s.key,
+    label: s.area ? `${s.name} — ${s.area}` : s.name,
+  }));
+
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      width="md"
+      title="Buscar campos disponíveis"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Fechar</button>
+          <button
+            type="button"
+            disabled={!key}
+            data-testid="campos-buscar"
+            onClick={() => { openTab(`campos-servico?key=${encodeURIComponent(key)}`); onClose(); }}
+            className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60"
+          >
+            Buscar
+          </button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-2">
+        <p className="text-sm text-slate-600">
+          Escolha o serviço para ver as chaves que podem ser usadas no modelo. Abre em uma nova aba.
+        </p>
+        <Field label="Serviço">
+          <Combobox
+            value={key}
+            options={options}
+            onChange={setKey}
+            placeholder={servicos.isLoading ? 'Carregando…' : 'Selecione o serviço'}
+          />
+        </Field>
+        {!servicos.isLoading && options.length === 0 && (
+          <p className="rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-500">
+            Nenhum serviço publicado disponível para a sua unidade.
+          </p>
+        )}
+      </div>
+    </Dialog>
+  );
+}
 
 /**
  * Histórico de execuções do modelo (modelos_documentos:30-37): quando, quem pediu,
