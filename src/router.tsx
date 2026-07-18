@@ -21,6 +21,7 @@ import { TarefasExecutadasPage } from './pages/TarefasExecutadasPage';
 import { RelatoriosPage } from './pages/admin/RelatoriosPage';
 import { FontesDadosPage } from './pages/admin/FontesDadosPage';
 import { ModelosEmailPage } from './pages/admin/ModelosEmailPage';
+import { ModelosDocumentoPage } from './pages/admin/ModelosDocumentoPage';
 import { ServicoFormPage } from './pages/ServicoFormPage';
 import { TarefaPage } from './pages/TarefaPage';
 import { SolicitacaoPage } from './pages/SolicitacaoPage';
@@ -81,7 +82,7 @@ export const router = createBrowserRouter(
         // Categorias de processos: geridas no modal da tela Admin › Processos.
         { path: 'admin/processos/categorias', element: <Navigate to="/admin/processos" replace /> },
         { path: 'admin/modelos-email', element: <ModelosEmailPage /> },
-        stub('admin/modelos-doc', 'Modelos de documentos', { phase: 'Fase 7' }),
+        { path: 'admin/modelos-doc', element: <ModelosDocumentoPage /> },
         { path: 'admin/fontes-dados', element: <FontesDadosPage /> },
 
         // --- Admin › Relatórios e Dashboards ------------------------------

@@ -1,0 +1,108 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+
+/** Erro de sintaxe encontrado ao validar o .docx no upload (Fase 6b). */
+export type TemplateIssue = { severity: 'error' | 'warning'; message: string; token?: string | null };
+
+export type DocumentTemplateListItem = {
+  id: string;
+  name: string;
+  description: string | null;
+  orgUnitId: string | null;
+  active: boolean;
+  outputType: 'docx' | 'pdf';
+  fileName: string | null;
+  hasFile: boolean;
+  templateValid: boolean;
+  updatedAt: string;
+};
+
+export type DocumentTemplateDetail = DocumentTemplateListItem & {
+  fileSize: number | null;
+  fileUploadedAt: string | null;
+  validation: { issues?: TemplateIssue[] } | null;
+  createdAt: string;
+};
+
+export type DocumentTemplateWrite = {
+  name: string;
+  description?: string;
+  orgUnitId?: string | null;
+  active?: boolean;
+  outputType?: 'docx' | 'pdf';
+};
+
+const keys = {
+  all: ['document-templates'] as const,
+  detail: (id: string) => ['document-templates', id] as const,
+};
+
+export function useDocumentTemplates(q?: string) {
+  return useQuery({
+    queryKey: [...keys.all, q ?? ''],
+    queryFn: () => api.get<DocumentTemplateListItem[]>(`/api/v1/document-templates/${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  });
+}
+
+export function useDocumentTemplate(id: string | null) {
+  return useQuery({
+    queryKey: keys.detail(id ?? ''),
+    queryFn: () => api.get<DocumentTemplateDetail>(`/api/v1/document-templates/${id}`),
+    enabled: !!id,
+  });
+}
+
+export function useCreateDocumentTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: DocumentTemplateWrite) => api.post<{ id: string }>('/api/v1/document-templates/', body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.all }),
+  });
+}
+
+export function useUpdateDocumentTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: DocumentTemplateWrite }) =>
+      api.put<{ id: string }>(`/api/v1/document-templates/${id}`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.all }),
+  });
+}
+
+export function useDeleteDocumentTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del<void>(`/api/v1/document-templates/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.all }),
+  });
+}
+
+/**
+ * Abre o .docx do modelo numa nova aba (somente leitura). A rota exige Bearer token,
+ * então buscamos o blob autenticado e abrimos por object URL — abrir a URL crua numa
+ * aba nova não levaria o token e daria 401.
+ */
+export async function openDocumentTemplateFile(id: string): Promise<void> {
+  const blob = await api.getBlob(`/api/v1/document-templates/${id}/file`);
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener');
+  // Revoga depois de a aba pegar o conteúdo (revogar na hora cancelaria o download).
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** Sobe o .docx do modelo; a resposta traz o resultado da validação de sintaxe. */
+export function useUploadDocumentTemplateFile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, file }: { id: string; file: File }) => {
+      const form = new FormData();
+      form.append('file', file);
+      return api.postForm<{ fileName: string; fileSize: number; templateValid: boolean }>(
+        `/api/v1/document-templates/${id}/file`, form);
+    },
+    onSuccess: (_r, v) => {
+      void qc.invalidateQueries({ queryKey: keys.all });
+      void qc.invalidateQueries({ queryKey: keys.detail(v.id) });
+    },
+  });
+}

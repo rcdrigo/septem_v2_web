@@ -1,0 +1,127 @@
+// Fase 6a — Modelos de documento: cadastro (nome, descrição, unidade, status, tipo de
+// saída), upload do .docx (só aceita .docx) e preview somente-leitura.
+// Prova o EFEITO: cria pela UI → confere na API; sobe um .docx REAL → confere que o
+// arquivo volta pelo endpoint com o mesmo conteúdo; tenta um .txt → rejeitado.
+import { chromium } from 'playwright-core';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+const BASE = 'http://localhost:5173';
+const API = 'http://localhost:5000';
+const OUT = process.env.OUT_DIR || '.';
+const ok = [], bad = [];
+const check = (c, m) => (c ? ok.push(m) : bad.push(m));
+const api = async (t, p, m = 'GET', b) => {
+  const r = await fetch(API + p, { method: m, headers: { 'Content-Type': 'application/json', 'X-Tenant': 'prefeitura-x', ...(t ? { Authorization: `Bearer ${t}` } : {}) }, body: b ? JSON.stringify(b) : undefined });
+  return { status: r.status, body: await r.json().catch(() => null) };
+};
+const { body: auth } = await api(null, '/api/v1/auth/login', 'POST', { identifier: 'admin@prefeitura-x.local', password: 'admin123' });
+const token = auth.accessToken;
+
+// Gera um .docx de verdade (LibreOffice) com uma chave {{ }} — é o insumo do módulo.
+const dir = mkdtempSync(path.join(tmpdir(), 'septem-doc-'));
+const txt = path.join(dir, 'modelo.txt');
+writeFileSync(txt, 'Contrato de {{nome_cliente}}\nValor: {{valor}}\n');
+execFileSync('soffice', ['--headless', '--convert-to', 'docx', '--outdir', dir, txt], { stdio: 'ignore', timeout: 120000 });
+const docxPath = path.join(dir, 'modelo.docx');
+const docxBytes = readFileSync(docxPath);
+check(docxBytes.length > 0, `[setup] .docx de teste gerado (${docxBytes.length} bytes)`);
+// Um .txt para provar que a validação de extensão barra.
+const txtPath = path.join(dir, 'naoaceito.txt');
+writeFileSync(txtPath, 'nao deveria passar');
+
+const rid = Math.floor(Math.random() * 1e9);
+const NOME = `Contrato Teste ${rid}`;
+
+const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
+for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h } });
+  const page = await ctx.newPage();
+  page.on('pageerror', (e) => console.log('pageerror:', e.message.slice(0, 160)));
+  try {
+    await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
+    await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
+    await page.fill('input[type=password]', 'admin123');
+    await page.click('button[type=submit]');
+    await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
+    await page.goto(BASE + '/admin/modelos-doc', { waitUntil: 'networkidle' });
+    await page.waitForSelector('h1:has-text("Modelos de documentos")', { timeout: 15000 });
+
+    // A página real substituiu o stub ("Fase 7" era o placeholder).
+    const semStub = !(await page.evaluate(() => document.body.innerText.includes('Fase 7')));
+    check(semStub, `[${vp.n}] página real (não é mais o stub "Fase 7")`);
+
+    // Sem overflow horizontal (a tabela rola dentro do próprio container).
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+    check(!overflow, `[${vp.n}] sem overflow horizontal`);
+
+    if (vp.n === 'web') {
+      // ── CRIAR pela UI ──
+      await page.locator('header button', { hasText: 'Novo modelo' }).click();
+      await page.waitForSelector('[role=dialog]', { timeout: 8000 });
+      await page.locator('[role=dialog] label:has-text("Nome")').locator('xpath=..').locator('input').first().fill(NOME);
+      await page.locator('[role=dialog] label:has-text("Descrição")').locator('xpath=..').locator('textarea').first().fill('modelo de teste e2e');
+      // Tipo de saída: PDF — marca o input do radio direto (o label é sibling, não wrapper).
+      await page.locator('[role=dialog] input[type=radio][value="pdf"]').check();
+      await page.locator('[role=dialog] button', { hasText: 'Salvar' }).click();
+      // Espera o diálogo fechar (sinal real de que salvou), não um tempo fixo.
+      await page.waitForSelector('[role=dialog]', { state: 'detached', timeout: 10000 }).catch(() => {});
+
+      // EFEITO no servidor: o modelo existe com os campos salvos.
+      const lista = await api(token, '/api/v1/document-templates/');
+      const criado = (lista.body ?? []).find((t) => t.name === NOME);
+      check(!!criado, `[web] modelo criado aparece na API ("${NOME}")`);
+      check(criado?.outputType === 'pdf', `[web] tipo de saída salvo (${criado?.outputType})`);
+      check(criado?.active === true, '[web] status ativo salvo');
+
+      // ── UPLOAD do .docx pela UI ──
+      // Recarrega: garante a lista já com o modelo novo (independe do timing do refetch).
+      await page.reload({ waitUntil: 'networkidle' });
+      const linha = page.locator('[data-testid=doc-linha]', { hasText: NOME });
+      await linha.waitFor({ timeout: 15000 });
+      await linha.locator('button[title="Editar"]').click();
+      await page.waitForSelector('[role=dialog]', { timeout: 8000 });
+      await page.waitForTimeout(800);
+      await page.locator('[data-testid=doc-file-input]').setInputFiles(docxPath);
+      await page.waitForFunction(() => document.body.innerText.includes('enviado') || document.body.innerText.includes('modelo.docx'), { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(800);
+
+      const det = await api(token, `/api/v1/document-templates/${criado.id}`);
+      check(det.body?.hasFile === true, '[web] upload gravou o arquivo no modelo (hasFile)');
+      check(det.body?.fileName === 'modelo.docx', `[web] nome do arquivo salvo (${det.body?.fileName})`);
+
+      // EFEITO real: o arquivo VOLTA pelo endpoint, com os mesmos bytes (round-trip).
+      const r = await fetch(`${API}/api/v1/document-templates/${criado.id}/file`, {
+        headers: { 'X-Tenant': 'prefeitura-x', Authorization: `Bearer ${token}` },
+      });
+      const back = Buffer.from(await r.arrayBuffer());
+      check(r.status === 200, `[web] preview/download do .docx responde 200 (${r.status})`);
+      check(back.length === docxBytes.length && back.equals(docxBytes), `[web] round-trip do arquivo: bytes idênticos (${back.length})`);
+      check(r.headers.get('content-type')?.includes('wordprocessingml'), '[web] content-type é .docx');
+
+      // ── Só .docx: um .txt é rejeitado pelo servidor ──
+      const form = new FormData();
+      form.append('file', new Blob([readFileSync(txtPath)], { type: 'text/plain' }), 'naoaceito.txt');
+      const up = await fetch(`${API}/api/v1/document-templates/${criado.id}/file`, {
+        method: 'POST', headers: { 'X-Tenant': 'prefeitura-x', Authorization: `Bearer ${token}` }, body: form,
+      });
+      const upBody = await up.json().catch(() => null);
+      check(up.status === 422 && upBody?.error === 'not_docx', `[api] arquivo que não é .docx é recusado (${up.status}/${upBody?.error})`);
+
+      // O arquivo bom continua lá (a recusa não apagou nada).
+      const det2 = await api(token, `/api/v1/document-templates/${criado.id}`);
+      check(det2.body?.fileName === 'modelo.docx', '[api] a recusa não apagou o arquivo válido');
+
+      await page.screenshot({ path: `${OUT}/modelos-documento.png`, fullPage: true });
+      await page.locator('[role=dialog] button', { hasText: 'Cancelar' }).click().catch(() => {});
+    }
+  } finally { await ctx.close(); }
+}
+await browser.close();
+
+ok.forEach((m) => console.log('✓ ' + m));
+bad.forEach((m) => console.log('✗ ' + m));
+console.log(bad.length === 0 ? `\nPASSOU (${ok.length} checks)` : `\nFALHOU (${bad.length} de ${ok.length + bad.length})`);
+process.exit(bad.length === 0 ? 0 : 1);
