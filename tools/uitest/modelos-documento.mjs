@@ -163,6 +163,51 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
 
       await page.screenshot({ path: `${OUT}/modelos-documento.png`, fullPage: true });
       await page.locator('[role=dialog] button', { hasText: 'Cancelar' }).click().catch(() => {});
+      await page.waitForTimeout(400);
+
+      // ── AUDITORIA (rules.md): salvar-antes-de-carregar ──
+      // Abrir "Editar" com a API lenta NÃO pode mostrar um form vazio salvável — senão
+      // o usuário digita, salva, e o PUT vai com descrição/unidade em branco (perda de
+      // dados, a mesma classe de bug da Fase 3).
+      // Cache FRIO: recarrega antes (o React Query já tinha o detalhe do open anterior;
+      // com cache quente não há requisição para atrasar e o form abre preenchido).
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.route((u) => new RegExp(`/api/v1/document-templates/${criado.id}$`).test(u.pathname),
+        async (route) => { await new Promise((r) => setTimeout(r, 1500)); await route.continue(); }, { times: 1 });
+      await page.locator('[data-testid=doc-linha]', { hasText: NOME }).locator('button[title="Editar"]').click();
+      await page.waitForSelector('[role=dialog]', { timeout: 8000 });
+      await page.waitForTimeout(400); // ainda dentro do atraso: o dado NÃO chegou
+      const carregandoVisivel = await page.locator('[data-testid=doc-carregando]').count();
+      // O que prova a guarda é o form NÃO existir enquanto carrega: sem ele o usuário
+      // não tem como digitar e disparar um PUT com os outros campos em branco.
+      // (Checar só "Salvar desabilitado" passaria em falso — ele já fica disabled por
+      // `!name` mesmo com o form vazio renderizado.)
+      const camposRenderizados = await page.locator('[role=dialog] input, [role=dialog] textarea').count();
+      check(carregandoVisivel === 1, '[web] editar com API lenta mostra "carregando" em vez de form vazio');
+      check(camposRenderizados === 0, `[web] nenhum campo editável renderizado antes do dado chegar (${camposRenderizados})`);
+
+      // Depois de carregar, os dados do modelo estão lá (não foram perdidos).
+      await page.waitForSelector('[data-testid=doc-carregando]', { state: 'detached', timeout: 10000 });
+      const descCarregada = await page.locator('[role=dialog] textarea').first().inputValue();
+      check(descCarregada === 'modelo de teste e2e', `[web] descrição carregada no form ("${descCarregada}")`);
+      // Salva sem tocar em nada → nada pode ser apagado.
+      await page.locator('[role=dialog] button', { hasText: 'Salvar' }).click();
+      await page.waitForSelector('[role=dialog]', { state: 'detached', timeout: 10000 }).catch(() => {});
+      const depois = await api(token, `/api/v1/document-templates/${criado.id}`);
+      check(depois.body?.description === 'modelo de teste e2e' && depois.body?.outputType === 'pdf',
+        `[web] salvar sem editar NÃO apaga campos (desc="${depois.body?.description}", saída=${depois.body?.outputType})`);
+
+      // ── AUDITORIA: costura — .docx corrompido não pode virar 500 ──
+      const fake = new FormData();
+      fake.append('file', new Blob([Buffer.from('isto nao e um docx de verdade')]), 'corrompido.docx');
+      const rFake = await fetch(`${API}/api/v1/document-templates/${criado.id}/file`, {
+        method: 'POST', headers: { 'X-Tenant': 'prefeitura-x', Authorization: `Bearer ${token}` }, body: fake,
+      });
+      const fakeBody = await rFake.json().catch(() => null);
+      check(rFake.status === 200 && fakeBody?.templateValid === false,
+        `[api] .docx corrompido responde com erro tratado, não 500 (${rFake.status})`);
+      check((fakeBody?.issues ?? []).some((i) => /não foi possível ler|docx/i.test(i.message)),
+        '[api] o erro do arquivo ilegível é explicado ao usuário');
     }
   } finally { await ctx.close(); }
 }

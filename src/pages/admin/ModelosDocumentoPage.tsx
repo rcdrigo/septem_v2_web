@@ -213,6 +213,10 @@ function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
 
   const unitOptions = (units.data ?? []).map((u) => ({ value: u.id, label: u.sigla ? `${u.sigla} — ${u.name}` : u.name }));
   const issues = detail.data?.validation?.issues ?? [];
+  // Editando, o form só existe DEPOIS do dado chegar. Sem esta guarda o usuário podia
+  // digitar o nome e salvar antes da carga, e o PUT ia com descrição/unidade vazias —
+  // apagando o que ele nem viu (mesma classe de bug da Fase 3).
+  const carregando = !!id && !hydrated;
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -254,13 +258,16 @@ function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
       footer={
         <>
           <button onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Cancelar</button>
-          <button form="dt-form" type="submit" disabled={!name}
+          <button form="dt-form" type="submit" disabled={!name || carregando}
             className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">
             Salvar
           </button>
         </>
       }
     >
+      {carregando ? (
+        <p className="py-10 text-center text-sm text-slate-400" data-testid="doc-carregando">Carregando o modelo…</p>
+      ) : (
       <form id="dt-form" className="flex flex-col gap-3" onSubmit={save}>
         <Field label="Nome"><TextInput required autoFocus value={name} onChange={(e) => setName(e.target.value)} /></Field>
         <Field label="Descrição"><TextArea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
@@ -328,6 +335,7 @@ function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
           </div>
         )}
       </form>
+      )}
     </Dialog>
   );
 }
