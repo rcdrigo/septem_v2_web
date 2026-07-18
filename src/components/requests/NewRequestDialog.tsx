@@ -137,12 +137,13 @@ function ServiceCard({ service, favorite, favoritePending, onFavorite, onStart }
     <article role="link" tabIndex={0} onClick={onStart} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onStart(); } }} className="new-request-card group relative flex min-h-40 min-w-0 cursor-pointer flex-col rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700">
       <div className="flex min-w-0 items-start justify-between gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: tintOf(color), color }}><NamedIcon name={service.icon} fallback={<Workflow size={17} />} /></span>
-        <div className="flex min-w-0 max-w-[78%] items-start gap-2"><span className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} /><span className="truncate">{service.category ?? 'Sem categoria'}</span></span><FavoriteButton favorite={favorite} disabled={favoritePending} onToggle={onFavorite} /></div>
+        <FavoriteButton favorite={favorite} disabled={favoritePending} onToggle={onFavorite} />
       </div>
       <strong title={service.name} className="mt-3 truncate text-sm font-bold text-slate-900">{service.name}</strong>
       <p title={description || undefined} className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{description || 'Sem descrição disponível.'}</p>
-      <div className="mt-auto flex min-w-0 items-center gap-3 pt-3">
-        <span className="min-w-0 flex-1 truncate text-xs text-slate-400">{service.area || 'Disponível para solicitação'}</span>
+      {service.area && <p title={service.area} className="mt-2 truncate text-xs text-slate-400">{service.area}</p>}
+      <div className="mt-auto flex min-w-0 items-end justify-between gap-3 pt-3">
+        <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} /><span className="truncate">{service.category ?? 'Sem categoria'}</span></span>
         <span className="new-request-action inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-slate-700">Iniciar <ArrowRight size={14} /></span>
       </div>
     </article>

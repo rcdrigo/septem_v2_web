@@ -32,14 +32,11 @@ export function SolicitacaoPage() {
     <div className="flex h-screen flex-col bg-slate-100">
       <header className="border-b border-slate-200 bg-white px-6 py-4">
         <div className="min-w-0">
-          {/* Pill com o NOME do processo; o status vai só no alert da Visão geral. */}
-          {d?.process && (
-            <span className="mb-1 inline-block rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700">{d.process}</span>
-          )}
           <h1 className="text-xl font-semibold text-slate-900">
             Detalhamento do processo{d?.number != null ? ` nº ${d.number}` : ''}
           </h1>
-          {d?.category && <p className="truncate text-sm text-slate-500">{d.category}</p>}
+          {d?.process && <p className="mt-1 break-words text-sm text-slate-500 [overflow-wrap:anywhere]">{d.process}</p>}
+          {d?.category && <p className="mt-1 truncate text-xs text-slate-400">Categoria: {d.category}</p>}
         </div>
       </header>
       <main className="flex-1 overflow-auto p-6">

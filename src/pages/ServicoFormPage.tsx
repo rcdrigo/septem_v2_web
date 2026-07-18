@@ -25,7 +25,9 @@ export function ServicoFormPage() {
   const start = useStartInstance();
   const fillRef = useRef<ReactFormHandle>(null);
   const [done, setDone] = useState<{ nextTaskForMe?: string | null; executionId?: string } | null>(null);
-  useDocumentTitle(detail.data?.name ?? 'Serviço');
+  const processName = form.data?.processName ?? detail.data?.name ?? 'Serviço';
+  const taskName = form.data?.startTaskName || processName;
+  useDocumentTitle(taskName);
 
   if (!token) return <Navigate to="/login" replace />;
 
@@ -38,10 +40,8 @@ export function ServicoFormPage() {
     } catch { toast.error('Não foi possível iniciar o processo.'); }
   }
 
-  const processName = form.data?.processName ?? detail.data?.name ?? 'Serviço';
-  // Cabeçalho no MESMO padrão das demais tarefas: processo em cima (linha
-  // pequena) e o nome da TAREFA de início em destaque.
-  const taskName = form.data?.startTaskName || processName;
+  // Cabeçalho no MESMO padrão das demais tarefas: tarefa em destaque e processo
+  // como contexto secundário.
   const buttons = form.data?.buttons ?? [];
   const completionActions: ExecutionAction[] = buttons.length === 0
     ? [{

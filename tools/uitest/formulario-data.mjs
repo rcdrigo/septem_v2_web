@@ -68,7 +68,7 @@ try {
 
     const campo = page.locator('.septem-date-picker-input').first();
     const placeholder = await campo.getAttribute('placeholder');
-    check(placeholder === null || placeholder === '', `[${view.name}] datepicker sem placeholder instrutivo`);
+    check(placeholder === 'DD/MM/YYYY', `[${view.name}] datepicker usa o formato brasileiro explícito`);
 
     const concluir = async () => {
       if (view.name === 'mobile') await page.getByRole('button', { name: 'Botões de conclusão' }).click();

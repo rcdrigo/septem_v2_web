@@ -142,15 +142,18 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
   const [display, setDisplay] = useState(() => displayFromIso(value, mode));
   const [localError, setLocalError] = useState<Inspection['reason']>();
   const [open, setOpen] = useState(false);
-  const [timeDraft, setTimeDraft] = useState(currentTime);
+  const initialTime = currentTime().split(':');
+  const [hourDraft, setHourDraft] = useState(initialTime[0]);
+  const [minuteDraft, setMinuteDraft] = useState(initialTime[1]);
   const lastEmitted = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const validityCallback = useRef(onValidityChange);
   validityCallback.current = onValidityChange;
+  const changeCallback = useRef(onChange);
+  changeCallback.current = onChange;
   const previousMode = useRef(mode);
   const errorId = useId();
-  const hasCalendar = mode !== 'time';
 
   useEffect(() => {
     const changedMode = previousMode.current !== mode;
@@ -160,9 +163,20 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
       return;
     }
     lastEmitted.current = null;
-    setDisplay(displayFromIso(value, mode));
+    const nextDisplay = displayFromIso(value, mode);
+    setDisplay(nextDisplay);
     setLocalError(undefined);
-    if (changedMode) setOpen(false);
+    const time = mode === 'time' ? nextDisplay : / (\d{2}):(\d{2})$/.exec(nextDisplay)?.slice(1);
+    const fallback = currentTime().split(':');
+    setHourDraft(time?.[0] ?? fallback[0]);
+    setMinuteDraft(time?.[1] ?? fallback[1]);
+    if (changedMode) {
+      setOpen(false);
+      if (value && !nextDisplay) {
+        lastEmitted.current = '';
+        changeCallback.current('', new Event('change', { bubbles: true }));
+      }
+    }
     validityCallback.current?.(null);
   }, [value, mode]);
 
@@ -195,7 +209,8 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
   function handleManualChange(event: React.ChangeEvent<HTMLInputElement>) {
     const masked = maskDigits(event.target.value, mode);
     acceptDisplay(masked, event.nativeEvent);
-    if (mode === 'datetime' && masked.length === lengths.datetime) setTimeDraft(masked.slice(-5));
+    const time = mode === 'time' ? /^(\d{2}):(\d{2})$/.exec(masked) : / (\d{2}):(\d{2})$/.exec(masked);
+    if (time) { setHourDraft(time[1]); setMinuteDraft(time[2]); }
   }
 
   function handleBlur(event: React.FocusEvent<HTMLInputElement | HTMLButtonElement>) {
@@ -205,11 +220,10 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
     }
     const nextTarget = event.relatedTarget;
     if (
-      hasCalendar &&
-      (!nextTarget || (
+      !nextTarget || (
         !containerRef.current?.contains(nextTarget) &&
         !popupRef.current?.contains(nextTarget)
-      ))
+      )
     ) setOpen(false);
     onBlur?.(event);
   }
@@ -232,21 +246,29 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
       setOpen(false);
       return;
     }
-    const safeTime = inspect(timeDraft, 'time').valid ? timeDraft : currentTime();
-    setTimeDraft(safeTime);
+    const draft = `${hourDraft}:${minuteDraft}`;
+    const safeTime = inspect(draft, 'time').valid ? draft : currentTime();
+    const [safeHour, safeMinute] = safeTime.split(':');
+    setHourDraft(safeHour);
+    setMinuteDraft(safeMinute);
     acceptDisplay(`${displayDate(date)} ${safeTime}`);
   }
 
-  function changeTime(event: React.ChangeEvent<HTMLInputElement>) {
-    const masked = maskDigits(event.target.value, 'time');
-    setTimeDraft(masked);
-    if (selectedDate) acceptDisplay(`${displayDate(selectedDate)} ${masked}`, event.nativeEvent);
+  function selectTime(nextHour: string, nextMinute: string) {
+    setHourDraft(nextHour);
+    setMinuteDraft(nextMinute);
+    const time = `${nextHour}:${nextMinute}`;
+    if (mode === 'time') acceptDisplay(time);
+    else if (selectedDate) acceptDisplay(`${displayDate(selectedDate)} ${time}`);
   }
 
   function handleOpenChange(next: boolean) {
-    if (next && mode === 'datetime') {
-      const time = / (\d{2}:\d{2})$/.exec(display)?.[1];
-      setTimeDraft(time ?? currentTime());
+    if (next && mode !== 'date') {
+      const time = mode === 'time' ? display : / (\d{2}:\d{2})$/.exec(display)?.[1];
+      const safe = inspect(time || '', 'time').valid ? (time ?? currentTime()) : currentTime();
+      const [hour, minute] = safe.split(':');
+      setHourDraft(hour);
+      setMinuteDraft(minute);
     }
     setOpen(next);
   }
@@ -254,6 +276,7 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
   const invalidReason = localError ? reasonText[localError] : undefined;
   const invalid = !!error || !!localError;
   const inputLabel = ariaLabel || (mode === 'time' ? 'Hora' : mode === 'date' ? 'Data' : 'Data e hora');
+  const placeholder = mode === 'time' ? 'HH:mm' : mode === 'date' ? 'DD/MM/YYYY' : 'DD/MM/YYYY HH:mm';
   const inputMinWidth = mode === 'datetime' ? 'min-w-[17ch]' : mode === 'date' ? 'min-w-[11ch]' : 'min-w-[6ch]';
   const inputClass = [
     `septem-date-picker-input h-10 w-0 flex-1 ${inputMinWidth} bg-white px-3 text-sm text-slate-800 outline-none`,
@@ -275,25 +298,26 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
           aria-required={required || undefined}
           aria-invalid={invalid || undefined}
           aria-describedby={invalidReason ? errorId : undefined}
+          placeholder={placeholder}
           title={invalidReason}
           data-date-picker-input=""
           onChange={handleManualChange}
           onFocus={(event) => {
             onFocus?.(event);
-            if (hasCalendar) handleOpenChange(true);
+            handleOpenChange(true);
           }}
           onBlur={handleBlur}
           onClick={(event) => {
             onClick?.(event);
-            if (hasCalendar && !open) handleOpenChange(true);
+            if (!open) handleOpenChange(true);
           }}
           onKeyDown={(event) => {
-            if (hasCalendar && open && event.key === 'Escape') {
+            if (open && event.key === 'Escape') {
               event.preventDefault();
               setOpen(false);
               return;
             }
-            if (hasCalendar && event.altKey && event.key === 'ArrowDown') {
+            if (event.altKey && event.key === 'ArrowDown') {
               event.preventDefault();
               setOpen(true);
             }
@@ -311,48 +335,44 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
           </button>
         )}
 
-        {hasCalendar ? (
-          <Popover.Root open={open} onOpenChange={handleOpenChange}>
+        <Popover.Root open={open} onOpenChange={handleOpenChange}>
             <Popover.Trigger
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center text-slate-500 outline-none hover:bg-slate-100 hover:text-slate-800 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 active:bg-slate-200"
-              aria-label={mode === 'date' ? 'Abrir calendário' : 'Abrir calendário e horário'}
+              aria-label={mode === 'date' ? 'Abrir calendário' : mode === 'time' ? 'Abrir seletor de horário' : 'Abrir calendário e horário'}
               data-date-picker-trigger=""
               onFocus={onFocus}
               onBlur={handleBlur}
               onClick={onClick}
             >
-              <CalendarDays size={17} aria-hidden="true" />
+              {mode === 'time' ? <Clock3 size={17} aria-hidden="true" /> : <CalendarDays size={17} aria-hidden="true" />}
             </Popover.Trigger>
             <Popover.Portal>
-              <Popover.Positioner sideOffset={6} collisionPadding={8} className="z-[1000] outline-none">
+              <Popover.Positioner anchor={containerRef} align="start" sideOffset={6} collisionPadding={8} className="z-[1000] outline-none">
                 <Popover.Popup
                   ref={popupRef}
                   initialFocus={false}
                   finalFocus={false}
-                  className="max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-900 shadow-xl outline-none data-[ending-style]:opacity-0 data-[starting-style]:opacity-0"
+                  className="max-h-[24.5rem] max-w-[calc(100vw-1rem)] overflow-x-hidden overflow-y-auto rounded-lg border border-slate-200 bg-white text-slate-900 shadow-xl outline-none data-[ending-style]:opacity-0 data-[starting-style]:opacity-0"
                   data-date-picker-popover=""
                 >
-                  <Calendar mode="single" selected={selectedDate} onSelect={selectDate} disabled={disabledDays} />
-                  {mode === 'datetime' && (
-                    <div className="flex items-end gap-2 border-t border-slate-200 bg-slate-50 p-3">
-                      <label className="min-w-0 flex-1 text-xs font-medium text-slate-600">
-                        Horário
-                        <div className="mt-1 flex h-10 items-center rounded-md border border-slate-300 bg-white focus-within:border-slate-500 focus-within:ring-2 focus-within:ring-slate-300">
-                          <Clock3 className="ml-3 shrink-0 text-slate-400" size={16} aria-hidden="true" />
-                          <input
-                            value={timeDraft}
-                            onChange={changeTime}
-                            inputMode="numeric"
-                            maxLength={5}
-                            className="min-w-0 flex-1 bg-transparent px-2 text-sm text-slate-800 outline-none"
-                            aria-label="Horário"
-                            data-date-picker-time=""
-                          />
-                        </div>
-                      </label>
+                  <div className={mode === 'datetime' ? 'flex flex-col sm:flex-row' : ''}>
+                    {mode !== 'time' && <Calendar mode="single" selected={selectedDate} onSelect={selectDate} disabled={disabledDays}
+                      className="p-2 sm:p-3" classNames={{ month: 'space-y-1 sm:space-y-3', weeks: 'space-y-0 sm:space-y-1' }} />}
+                    {mode !== 'date' && (
+                      <TimeColumns
+                        hour={hourDraft}
+                        minute={minuteDraft}
+                        onHour={(hour) => selectTime(hour, minuteDraft)}
+                        onMinute={(minute) => selectTime(hourDraft, minute)}
+                        className={mode === 'datetime' ? 'border-t border-slate-200 sm:border-l sm:border-t-0' : ''}
+                      />
+                    )}
+                  </div>
+                  {mode !== 'date' && (
+                    <div className="flex justify-end border-t border-slate-200 bg-slate-50 p-2.5">
                       <Popover.Close
                         disabled={!inspect(display, mode, limit).valid}
-                        className="inline-flex h-10 items-center justify-center gap-1.5 rounded-md bg-slate-900 px-3 text-sm font-medium text-white outline-none hover:bg-slate-700 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 active:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-slate-900 px-3 text-sm font-medium text-white outline-none hover:bg-slate-700 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 active:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <Check size={15} aria-hidden="true" /> Aplicar
                       </Popover.Close>
@@ -362,11 +382,42 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
               </Popover.Positioner>
             </Popover.Portal>
           </Popover.Root>
-        ) : (
-          <Clock3 className="mr-3 shrink-0 text-slate-400" size={17} aria-hidden="true" />
-        )}
       </div>
       {invalidReason && <span id={errorId} className="sr-only">{invalidReason}</span>}
+    </div>
+  );
+}
+
+const HOURS = Array.from({ length: 24 }, (_, index) => two(index));
+const MINUTES = Array.from({ length: 60 }, (_, index) => two(index));
+
+function TimeColumns({ hour, minute, onHour, onMinute, className = '' }: {
+  hour: string;
+  minute: string;
+  onHour: (value: string) => void;
+  onMinute: (value: string) => void;
+  className?: string;
+}) {
+  return (
+    <div className={`grid min-w-56 grid-cols-2 gap-2 p-3 ${className}`} data-date-picker-time="">
+      <TimeList label="Hora" values={HOURS} selected={hour} onSelect={onHour} />
+      <TimeList label="Minuto" values={MINUTES} selected={minute} onSelect={onMinute} />
+    </div>
+  );
+}
+
+function TimeList({ label, values, selected, onSelect }: { label: string; values: string[]; selected: string; onSelect: (value: string) => void }) {
+  return (
+    <div className="min-w-0">
+      <p className="mb-1.5 px-1 text-xs font-semibold text-slate-500">{label}</p>
+      <div role="listbox" aria-label={label} className="max-h-28 space-y-0.5 overflow-y-auto overscroll-contain pr-1 sm:max-h-52">
+        {values.map((value) => (
+          <button key={value} type="button" role="option" aria-selected={selected === value} onClick={() => onSelect(value)}
+            className={`flex h-9 w-full items-center justify-center rounded-md text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-slate-500 ${selected === value ? 'bg-slate-900 font-semibold text-white' : 'text-slate-700 hover:bg-slate-100'}`}>
+            {value}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

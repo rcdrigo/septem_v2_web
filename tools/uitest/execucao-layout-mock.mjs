@@ -23,11 +23,14 @@ const tenant = {
   primaryColor: '#0f172a', modulos: [],
 };
 const schema = {
-  components: [
-    { type: 'datetime', subtype: 'datetime', key: 'prazo', label: 'Prazo', properties: { septemDateMode: 'date', septemDateLimit: 'noPast', septemWidth: '150' } },
-    { type: 'datetime', subtype: 'time', key: 'horario', label: 'Horário', properties: {} },
-    { type: 'datetime', subtype: 'datetime', key: 'agenda', label: 'Agendamento', properties: { septemDateLimit: 'noFuture' } },
-  ],
+  septemGroupLayout: 'tabs',
+  components: [{
+    type: 'group', key: 'dados_com_chave_legada', label: 'Dados', components: [
+      { type: 'datetime', subtype: 'datetime', key: 'prazo', label: 'Prazo', properties: { septemDateMode: 'date', septemDateLimit: 'noPast', septemWidth: '150' } },
+      { type: 'datetime', subtype: 'time', key: 'horario', label: 'Horário', properties: {} },
+      { type: 'datetime', subtype: 'datetime', key: 'agenda', label: 'Agendamento', properties: { septemDateLimit: 'noFuture' } },
+    ],
+  }],
 };
 
 async function mockedContext(browser, viewport) {
@@ -77,7 +80,8 @@ try {
     await page.waitForSelector('h1', { timeout: 5000 });
 
     check((await page.locator('h1').innerText()).trim() === 'INIC · Preencher solicitação · Protocolo', `[start ${width}] sigla e setor compõem o título`);
-    check(await page.getByText('Processo de Compras', { exact: true }).count() === 1, `[start ${width}] processo aparece uma vez como pill`);
+    check(await page.getByRole('tab', { name: /^Dados/ }).count() === 1, `[start ${width}] agrupamento com key continua sendo exibido como aba`);
+    check(await page.locator('header p', { hasText: /^Processo de Compras$/ }).count() === 1, `[start ${width}] processo aparece como texto secundário`);
     check(await page.getByText('Setor: Protocolo', { exact: true }).count() === 0, `[start ${width}] prefixo Setor removido`);
     check(await page.getByText('Ambiente que não deve aparecer', { exact: true }).count() === 0, `[start ${width}] ambiente removido`);
     check(!await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1), `[start ${width}] sem overflow horizontal`);
@@ -87,21 +91,24 @@ try {
     check(await page.locator('[data-date-picker-popover]').count() === 1, `[start ${width}] calendário shadcn Base abre ao focar o campo`);
     check(await date.evaluate((input) => document.activeElement === input), `[start ${width}] foco permanece no input para digitação manual`);
     const dateBox = await date.locator('xpath=..').boundingBox();
-    check(!!dateBox && dateBox.width >= Math.min(260, width - 48), `[start ${width}] campo de data respeita uma largura legível`);
+    check(!!dateBox && dateBox.width >= Math.min(260, width - 72), `[start ${width}] campo de data respeita uma largura legível`);
     if (width === 375) await page.screenshot({ path: `${OUT}/execucao-datepicker-mobile.png`, fullPage: true });
     await page.keyboard.press('Escape');
 
     if (width === 375) {
       const pickers = page.locator('[data-date-picker-input]');
       check(await pickers.count() === 3, '[start 375] renderiza os modos data, hora e data/hora');
-      check(await page.locator('[data-date-picker-trigger]').count() === 2, '[start 375] hora não renderiza calendário');
+      check(await page.locator('[data-date-picker-trigger]').count() === 3, '[start 375] os três modos possuem seletor visual');
       const modes = await page.locator('[data-date-picker-mode]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-date-picker-mode')));
       check(modes.join(',') === 'date,time,datetime', `[start 375] aplica os subtipos no runtime (${modes.join(',')})`);
       await pickers.nth(1).focus();
       await page.waitForTimeout(250);
-      check(await page.locator('[data-date-picker-trigger][aria-expanded="true"]').count() === 0, '[start 375] somente hora não abre calendário');
+      check(await page.locator('[data-date-picker-popover] [data-date-picker-time]').count() === 1, '[start 375] somente hora abre listas de horas e minutos');
+      check(await page.locator('[data-date-picker-popover] [role="grid"]').count() === 0, '[start 375] somente hora não exibe calendário');
+      await page.keyboard.press('Escape');
       await pickers.nth(2).focus();
       check(await page.locator('[data-date-picker-popover] [data-date-picker-time]').count() === 1, '[start 375] data e hora abre calendário com horário');
+      await page.screenshot({ path: `${OUT}/execucao-datetime-mobile.png`, fullPage: true });
       await page.keyboard.press('Escape');
       check(await page.locator('[data-date-picker-iso]:visible').count() === 0, '[start 375] oculta os inputs ISO técnicos');
       const tomorrow = relativeDate(1);
@@ -122,7 +129,8 @@ try {
       check(isoValues[2] === `${yesterday.iso}T10:30`, `[start 375] data/hora mantém ISO (${isoValues[2]})`);
 
       await pickers.nth(2).focus();
-      await page.locator('[data-date-picker-time]').fill('2359');
+      await page.getByRole('listbox', { name: 'Hora' }).getByRole('option', { name: '23', exact: true }).click();
+      await page.getByRole('listbox', { name: 'Minuto' }).getByRole('option', { name: '59', exact: true }).click();
       check(await pickers.nth(2).inputValue() === `${yesterday.display} 23:59`, '[start 375] horário do popover atualiza a data/hora');
       check(await page.locator('[data-date-picker-iso]').nth(2).inputValue() === `${yesterday.iso}T23:59`, '[start 375] horário do popover preserva ISO');
       await page.getByRole('button', { name: 'Aplicar' }).click();

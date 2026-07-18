@@ -43,16 +43,12 @@ export function ExecutionHeader({
 
       <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          {processName && (
-            <span className="inline-flex max-w-full rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-              <span className="break-words">{processName}</span>
-            </span>
-          )}
-          <h1 className="mt-1 min-w-0 break-words text-lg font-semibold leading-snug text-slate-900 [overflow-wrap:anywhere]">
+          <h1 className="min-w-0 break-words text-lg font-semibold leading-snug text-slate-900 [overflow-wrap:anywhere]">
             {alias && <span className="text-slate-500">{alias} <span aria-hidden="true">·</span>{' '}</span>}
             {taskName || 'Tarefa'}
             {sector && <span className="font-normal text-slate-500"> <span aria-hidden="true">·</span>{' '}{sector}</span>}
           </h1>
+          {processName && <p className="mt-1 break-words text-sm text-slate-500 [overflow-wrap:anywhere]">{processName}</p>}
         </div>
 
         {hasProcessNumber && (

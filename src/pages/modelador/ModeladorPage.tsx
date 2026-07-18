@@ -58,6 +58,7 @@ export function ModeladorPage() {
   const patchMut = usePatchProcessStatus();
   const loadedKeyRef = useRef<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'save' | 'publish' | 'version' | null>(null);
   const suppressDirty = useRef(false);
 
   // Marca "alterações pendentes" a cada edição do fluxo (ignorando o import programático).
@@ -115,9 +116,11 @@ export function ModeladorPage() {
 
   // Salvar: atualiza a versão corrente no lugar (ou cria a v1 se for novo).
   async function onSave() {
-    const xml = await currentXml();
-    if (xml == null) return;
+    if (pendingAction) return;
+    setPendingAction('save');
     try {
+      const xml = await currentXml();
+      if (xml == null) return;
       const r = key
         ? await updateMut.mutateAsync({ key, bpmnXml: xml })
         : await saveMut.mutateAsync({ bpmnXml: xml });
@@ -126,24 +129,30 @@ export function ModeladorPage() {
       toast.success(label + warnSuffix(r));
       afterPersist(r);
     } catch (err) { handleError(err); }
+    finally { setPendingAction(null); }
   }
 
   // Versionar: cria uma NOVA versão explicitamente.
   async function onVersion() {
-    const xml = await currentXml();
-    if (xml == null) return;
+    if (pendingAction) return;
+    setPendingAction('version');
     try {
+      const xml = await currentXml();
+      if (xml == null) return;
       const r = await saveMut.mutateAsync({ bpmnXml: xml, key: key ?? undefined });
       toast.success(`Versão v${r.version} criada.` + warnSuffix(r));
       afterPersist(r);
     } catch (err) { handleError(err); }
+    finally { setPendingAction(null); }
   }
 
   // Publicar: salva o estado atual e marca como publicado.
   async function onPublish() {
-    const xml = await currentXml();
-    if (xml == null) return;
+    if (pendingAction) return;
+    setPendingAction('publish');
     try {
+      const xml = await currentXml();
+      if (xml == null) return;
       const r = key
         ? await updateMut.mutateAsync({ key, bpmnXml: xml })
         : await saveMut.mutateAsync({ bpmnXml: xml });
@@ -151,6 +160,7 @@ export function ModeladorPage() {
       toast.success(`Publicado v${r.version}.`);
       afterPersist(r);
     } catch (err) { handleError(err); }
+    finally { setPendingAction(null); }
   }
 
   const persistence = {
@@ -158,7 +168,7 @@ export function ModeladorPage() {
     onPublish,
     onVersion,
     dirty,
-    saving: saveMut.isPending || updateMut.isPending || patchMut.isPending,
+    pendingAction,
   };
 
   const recursos: RecursosHandlers = {

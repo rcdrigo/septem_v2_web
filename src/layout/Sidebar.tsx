@@ -62,15 +62,17 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
 
       {/* Navegação principal */}
       <nav className="flex-1 overflow-y-auto px-2 py-3">
-        <button type="button" onClick={() => setSearchOpen(true)} className="mb-2 flex min-h-10 w-full items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700 active:bg-slate-100">
-          <Search size={16} className="shrink-0" />
-          <span className="min-w-0 flex-1 truncate text-left">Buscar no Septem</span>
-          <kbd className="hidden shrink-0 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.65rem] font-medium text-slate-400 xl:inline">⌘K</kbd>
-        </button>
-        <button type="button" onClick={() => setNewRequestOpen(true)} className="mb-4 flex min-h-10 w-full items-center gap-2 whitespace-nowrap rounded-md bg-cyan-700 px-3 text-sm font-semibold text-white hover:bg-cyan-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700 active:bg-cyan-900">
-          <Plus size={16} className="shrink-0" />
-          <span className="truncate">Nova requisição</span>
-        </button>
+        <div className="mb-4 flex flex-col gap-3">
+          <button type="button" onClick={() => setSearchOpen(true)} className="flex min-h-9 w-full items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700 active:bg-slate-100">
+            <Search size={16} className="shrink-0" />
+            <span className="min-w-0 flex-1 truncate text-left">Buscar no Septem</span>
+            <kbd className="hidden shrink-0 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.65rem] font-medium text-slate-400 xl:inline">⌘K</kbd>
+          </button>
+          <button type="button" onClick={() => setNewRequestOpen(true)} className="flex min-h-9 w-full items-center gap-2 whitespace-nowrap rounded-md bg-cyan-700 px-3 text-sm font-semibold text-white hover:bg-cyan-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700 active:bg-cyan-900">
+            <Plus size={16} className="shrink-0" />
+            <span className="truncate">Nova requisição</span>
+          </button>
+        </div>
         <FavoritesGroup />
         {layout.main.map((section, i) => {
           // Item visível = passa na permissão E (link com predicado visible ok |

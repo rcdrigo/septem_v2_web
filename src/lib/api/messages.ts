@@ -11,7 +11,7 @@ export type ProcessMessage = {
   replyToId: string | null;
   author: { id: string; name: string; photoUrl: string | null };
   mentions: MessageMention[];
-  origin: { type: 'task' | 'report'; taskName: string | null; processName: string; processNumber: number };
+  origin: { type: 'task' | 'report'; taskCode: string | null; taskName: string | null; processName: string; processNumber: number };
 };
 export type MessageThread = { message: ProcessMessage; replies: ProcessMessage[] };
 export type MessagesPage = {

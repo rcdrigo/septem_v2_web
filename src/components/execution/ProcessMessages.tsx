@@ -10,6 +10,7 @@ import {
   type ProcessMessage,
 } from '@/lib/api/messages';
 import { toast } from '@/stores/toast';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 type Props = {
   executionId: string;
@@ -83,11 +84,12 @@ export function ProcessMessages({ executionId, originType, taskId, messageAccess
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm" aria-labelledby={`messages-${executionId}`}>
-      <div className="flex items-center gap-2">
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby={`messages-${executionId}`}>
+      <header className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
         <MessageSquare size={17} className="text-slate-500" />
         <h2 id={`messages-${executionId}`} className="text-sm font-semibold text-slate-900">Mensagens</h2>
-      </div>
+      </header>
+      <div className="p-4">
 
       {messages.isLoading ? (
         <div className="mt-4 space-y-3" aria-label="Carregando mensagens">
@@ -160,6 +162,7 @@ export function ProcessMessages({ executionId, originType, taskId, messageAccess
       ) : (
         <p className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-500">A inserção de novas mensagens está desativada para este processo.</p>
       )}
+      </div>
     </section>
   );
 }
@@ -174,7 +177,7 @@ function MessageItem({ message, onReply, compact = false }: { message: ProcessMe
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <strong className="text-sm text-slate-900">{message.author.name}</strong>
-          <time dateTime={message.createdAt} title={exact} className="cursor-help text-xs text-slate-400">{friendly}</time>
+          <Tooltip text={exact}><time dateTime={message.createdAt} tabIndex={0} className="cursor-help rounded-sm text-xs text-slate-400 outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2">{friendly}</time></Tooltip>
           {message.hiddenFromRequester && <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700"><EyeOff size={10} /> interna</span>}
         </div>
         <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700"><MentionText message={message} /></p>
@@ -201,8 +204,7 @@ function MessageAvatar({ photoUrl, name, size = 'md' }: { photoUrl: string | nul
 }
 
 function originLabel(message: ProcessMessage) {
-  const process = `${message.origin.processName} nº ${message.origin.processNumber}`;
-  return message.origin.type === 'task' ? `${message.origin.taskName ?? 'Tarefa'} · ${process}` : `Relatório · ${process}`;
+  return message.origin.type === 'task' ? message.origin.taskName ?? 'Tarefa' : 'Relatório';
 }
 
 function escapeRegex(value: string) { return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }

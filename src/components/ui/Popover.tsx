@@ -120,14 +120,16 @@ type MenuItemProps = {
   children: ReactNode;
   destructive?: boolean;
   disabled?: boolean;
+  ariaBusy?: boolean;
 };
 
-export function MenuItem({ onClick, children, destructive, disabled }: MenuItemProps) {
+export function MenuItem({ onClick, children, destructive, disabled, ariaBusy }: MenuItemProps) {
   return (
     <button
       type="button"
       role="menuitem"
       disabled={disabled}
+      aria-busy={ariaBusy || undefined}
       onClick={onClick}
       className={[
         'flex min-h-11 w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-slate-700',

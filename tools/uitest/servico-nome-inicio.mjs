@@ -62,10 +62,10 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
     await page.waitForSelector('h1', { timeout: 15000 });
     await page.waitForTimeout(600);
     const h1 = (await page.locator('h1').first().innerText()).trim();
-    check(h1 === `INIC · ${TAREFA}`, `[${vp.n}] H1 mostra sigla + nome da TAREFA de início ("${h1}")`);
+    check(h1 === `INIC · ${TAREFA} · Protocolo`, `[${vp.n}] H1 mostra sigla + nome da TAREFA de início + setor ("${h1}")`);
     check(h1 !== PROC, `[${vp.n}] H1 NÃO mostra o nome do processo`);
-    check(await page.getByText(`Setor: Protocolo`, { exact: true }).count() === 1, `[${vp.n}] mostra setor da tarefa de início`);
-    check(await page.getByText(PROC, { exact: true }).count() === 1, `[${vp.n}] mostra processo como pill`);
+    check(await page.locator('header p', { hasText: new RegExp(`^${PROC}$`) }).count() === 1, `[${vp.n}] mostra processo como texto secundário`);
+    check((await page.title()).startsWith(`${TAREFA} ·`), `[${vp.n}] título da aba usa a tarefa inicial`);
     if (vp.n === 'web') await page.screenshot({ path: `${OUT}/servico-nome-inicio.png` });
   } finally { await page.context().close(); }
 }
@@ -82,8 +82,8 @@ for (const vp of [{ n: 'web-task', w: 1280, h: 900 }, { n: 'mobile-task', w: 375
     await page.goto(`${BASE}/tarefa/${taskId}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('h1', { timeout: 15000 });
 
-    check((await page.locator('h1').innerText()).trim() === `ANAL · ${TAREFA}`, `[${vp.n}] tarefa mostra sigla + nome`);
-    check(await page.getByText('Setor: Análise', { exact: true }).count() === 1, `[${vp.n}] tarefa mostra setor`);
+    check((await page.locator('h1').innerText()).trim() === `ANAL · ${TAREFA} · Análise`, `[${vp.n}] tarefa mostra sigla + nome + setor`);
+    check(await page.locator('header p', { hasText: new RegExp(`^${PROC}$`) }).count() === 1, `[${vp.n}] tarefa mostra processo como texto secundário`);
     const numberButton = page.getByRole('button', { name: new RegExp(`processo ${taskDetail.body.processNumber}$`, 'i') });
     check(await numberButton.count() === 1, `[${vp.n}] tarefa mostra número clicável`);
 

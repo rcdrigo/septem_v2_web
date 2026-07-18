@@ -181,7 +181,7 @@ export function FormularioView({ modeler }: Props) {
               <Columns3 size={13} /> Abas
             </button>
           </div>
-          <IconButton onClick={() => setPreview(builderRef.current?.saveSchema() ?? { type: 'default', components: [], schemaVersion: 17 })}><Eye size={14} /> Pré-visualizar</IconButton>
+          <IconButton onClick={() => setPreview({ ...((builderRef.current?.saveSchema() ?? { type: 'default', components: [], schemaVersion: 17 }) as object), septemGroupLayout: groupLayout })}><Eye size={14} /> Pré-visualizar</IconButton>
           <IconButton onClick={() => setMasksOpen(true)}><Regex size={14} /> Máscaras</IconButton>
           {hasInstances ? (
             <Tooltip text="Este processo já tem instâncias iniciadas. Importar sobrescreveria o formulário e quebraria os dados já preenchidos.">
@@ -249,4 +249,3 @@ function propagate(schema: unknown, modeler: any | null, setFields: (fs: ReturnT
   persistFormToLocalStorage(stored);
   if (modeler) setEmbeddedFormSchema(modeler, stored);
 }
-
