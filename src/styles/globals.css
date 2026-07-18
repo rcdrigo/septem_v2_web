@@ -20,6 +20,9 @@ html, body, #root {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
+html,
+body { overflow-x: clip; }
+
 /* Tailwind 4 removeu o cursor:pointer padrão de botões/links — restauramos. */
 button:not(:disabled),
 [role="button"]:not([aria-disabled="true"]),

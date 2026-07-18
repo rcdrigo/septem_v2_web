@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type AriaRole, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 type Props = {
@@ -11,6 +11,10 @@ type Props = {
   /** Ocupa toda a largura do pai (block). Sem isto o container é inline-block
       e cresce pelo conteúdo — o `truncate` do trigger nunca atua. */
   fullWidth?: boolean;
+  panelRole?: AriaRole;
+  ariaLabel?: string;
+  /** Classes aplicadas ao botão real do gatilho; o padrão `contents` preserva os usos atuais. */
+  triggerClassName?: string;
 };
 
 /**
@@ -21,7 +25,15 @@ type Props = {
  * o frame do modelador de formulário) não corta o popover. Se não couber abaixo,
  * abre para cima. Recalcula em scroll/resize.
  */
-export function Popover({ trigger, children, align = 'right', fullWidth = false }: Props) {
+export function Popover({
+  trigger,
+  children,
+  align = 'right',
+  fullWidth = false,
+  panelRole = 'menu',
+  ariaLabel,
+  triggerClassName = 'contents',
+}: Props) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -70,7 +82,14 @@ export function Popover({ trigger, children, align = 'right', fullWidth = false 
 
   return (
     <div ref={containerRef} className={fullWidth ? 'relative block w-full min-w-0' : 'relative inline-block'}>
-      <button type="button" onClick={() => setOpen((v) => !v)} className="contents">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={triggerClassName}
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        aria-haspopup={panelRole === 'dialog' ? 'dialog' : 'menu'}
+      >
         {trigger(open)}
       </button>
       {open && createPortal(
@@ -85,7 +104,8 @@ export function Popover({ trigger, children, align = 'right', fullWidth = false 
             visibility: pos ? 'visible' : 'hidden',
           }}
           className="min-w-[200px] rounded-md border border-slate-200 bg-white py-1 shadow-lg"
-          role="menu"
+          role={panelRole}
+          aria-label={ariaLabel}
         >
           {children(() => setOpen(false))}
         </div>,
@@ -100,17 +120,19 @@ type MenuItemProps = {
   children: ReactNode;
   destructive?: boolean;
   disabled?: boolean;
+  ariaBusy?: boolean;
 };
 
-export function MenuItem({ onClick, children, destructive, disabled }: MenuItemProps) {
+export function MenuItem({ onClick, children, destructive, disabled, ariaBusy }: MenuItemProps) {
   return (
     <button
       type="button"
       role="menuitem"
       disabled={disabled}
+      aria-busy={ariaBusy || undefined}
       onClick={onClick}
       className={[
-        'flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors',
+        'flex min-h-11 w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-slate-700',
         disabled ? 'cursor-not-allowed text-slate-300' : 'cursor-pointer hover:bg-slate-100',
         destructive ? 'text-rose-700' : 'text-slate-700',
       ].join(' ')}

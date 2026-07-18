@@ -1,3 +1,4 @@
+/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V4 */
 import {
   type ReactNode,
   type InputHTMLAttributes,
@@ -5,6 +6,12 @@ import {
   type SelectHTMLAttributes,
   forwardRef,
 } from 'react';
+import { HelpPopover } from './HelpPopover';
+
+/* Hallmark · component: form controls · genre: modern-minimal · theme: existing slate
+ * states: default · hover · focus · active · disabled (synchronous controls)
+ * contrast: existing application palette
+ */
 
 const INPUT_BASE =
   'rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-500 focus:outline-none';
@@ -14,14 +21,18 @@ const INPUT_BASE =
 type FieldProps = {
   label: string;
   hint?: string;
+  help?: string;
   htmlFor?: string;
   children: ReactNode;
 };
 
-export function Field({ label, hint, htmlFor, children }: FieldProps) {
+export function Field({ label, hint, help, htmlFor, children }: FieldProps) {
   return (
     <label className="flex flex-col gap-1.5" htmlFor={htmlFor}>
-      <span className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</span>
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
+        {label}
+        {help && <HelpPopover html={help} ariaLabel={`Ajuda: ${label}`} />}
+      </span>
       {children}
       {hint && <span className="text-xs text-slate-400">{hint}</span>}
     </label>
@@ -108,12 +119,47 @@ export function Checkbox({ checked, onChange, label, hint, disabled }: CheckboxP
   );
 }
 
+// ─── Switch ─────────────────────────────────────────────────────────────────
+
+type SwitchProps = {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+  help?: string;
+  disabled?: boolean;
+};
+
+export function Switch({ checked, onChange, label, help, disabled }: SwitchProps) {
+  return (
+    <label className={['group flex min-h-9 items-center gap-2.5', disabled ? 'opacity-50' : ''].join(' ')}>
+      <span className="relative inline-flex h-5 w-9 shrink-0">
+        <input
+          type="checkbox"
+          role="switch"
+          aria-checked={checked}
+          checked={checked}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.checked)}
+          className="peer sr-only"
+        />
+        <span className="absolute inset-0 rounded-full border border-slate-300 bg-slate-200 transition-colors duration-150 group-hover:bg-slate-300 group-active:bg-slate-400 peer-checked:border-slate-900 peer-checked:bg-slate-900 peer-focus-visible:ring-2 peer-focus-visible:ring-slate-500 peer-focus-visible:ring-offset-2 peer-disabled:cursor-not-allowed" />
+        <span className="pointer-events-none absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-150 peer-checked:translate-x-4" />
+      </span>
+      <span className="inline-flex min-w-0 items-center gap-1.5 text-sm text-slate-800">
+        <span>{label}</span>
+        {help && <HelpPopover html={help} ariaLabel={`Ajuda: ${label}`} />}
+      </span>
+    </label>
+  );
+}
+
 // ─── RadioGroup ──────────────────────────────────────────────────────────────
 
 export type RadioOption<T extends string = string> = {
   value: T;
   label: string;
   hint?: string;
+  help?: string;
 };
 
 type RadioGroupProps<T extends string> = {
@@ -144,7 +190,10 @@ export function RadioGroup<T extends string>({
             className="mt-0.5 h-4 w-4 cursor-pointer border-slate-400 text-slate-900 focus:ring-slate-500"
           />
           <span className="flex flex-col">
-            <span className="text-sm text-slate-800">{opt.label}</span>
+            <span className="inline-flex items-center gap-1.5 text-sm text-slate-800">
+              {opt.label}
+              {opt.help && <HelpPopover html={opt.help} ariaLabel={`Ajuda: ${opt.label}`} />}
+            </span>
             {opt.hint && <span className="text-xs text-slate-400">{opt.hint}</span>}
           </span>
         </label>
@@ -158,14 +207,18 @@ export function RadioGroup<T extends string>({
 type SectionProps = {
   title: string;
   description?: string;
+  help?: string;
   children: ReactNode;
 };
 
-export function Section({ title, description, children }: SectionProps) {
+export function Section({ title, description, help, children }: SectionProps) {
   return (
     <section className="border-b border-slate-200 px-4 py-4">
       <header className="mb-3">
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+          {title}
+          {help && <HelpPopover html={help} ariaLabel={`Ajuda: ${title}`} />}
+        </h3>
         {description && <p className="text-xs text-slate-500">{description}</p>}
       </header>
       <div className="flex flex-col gap-3">{children}</div>

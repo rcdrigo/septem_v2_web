@@ -5,11 +5,12 @@ import { useProcessDefinition } from '@/lib/api/process-definitions';
 import { useProcessForm, useStartInstance, type TaskButton } from '@/lib/api/execution';
 import { ReactForm, FormSkeleton, type ReactFormHandle } from '@/components/form/ReactForm';
 import { CompletionScreen, DocBanner } from '@/pages/TarefasPage';
-import { Tooltip } from '@/components/ui/Tooltip';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { Toaster } from '@/components/ui/Toaster';
 import { useSessionStore } from '@/stores/session';
 import { toast } from '@/stores/toast';
+import { ExecutionHeader } from '@/components/execution/ExecutionHeader';
+import { TaskActionFooter, type ExecutionAction } from '@/components/execution/TaskActionFooter';
 
 /**
  * Aba standalone (sem menus) para preencher e iniciar um serviço (req. 7). O
@@ -19,13 +20,14 @@ import { toast } from '@/stores/toast';
 export function ServicoFormPage() {
   const { processKey } = useParams();
   const token = useSessionStore((s) => s.accessToken);
-  const tenant = useSessionStore((s) => s.tenant);
   const detail = useProcessDefinition(processKey ?? null);
   const form = useProcessForm(processKey ?? null);
   const start = useStartInstance();
   const fillRef = useRef<ReactFormHandle>(null);
   const [done, setDone] = useState<{ nextTaskForMe?: string | null; executionId?: string } | null>(null);
-  useDocumentTitle(detail.data?.name ?? 'Serviço');
+  const processName = form.data?.processName ?? detail.data?.name ?? 'Serviço';
+  const taskName = form.data?.startTaskName || processName;
+  useDocumentTitle(taskName);
 
   if (!token) return <Navigate to="/login" replace />;
 
@@ -38,21 +40,39 @@ export function ServicoFormPage() {
     } catch { toast.error('Não foi possível iniciar o processo.'); }
   }
 
-  const processName = form.data?.processName ?? detail.data?.name ?? 'Serviço';
-  // Cabeçalho no MESMO padrão das demais tarefas: processo em cima (linha
-  // pequena) e o nome da TAREFA de início em destaque.
-  const taskName = form.data?.startTaskName || processName;
+  // Cabeçalho no MESMO padrão das demais tarefas: tarefa em destaque e processo
+  // como contexto secundário.
   const buttons = form.data?.buttons ?? [];
+  const completionActions: ExecutionAction[] = buttons.length === 0
+    ? [{
+        id: '__start',
+        label: 'Iniciar',
+        loadingLabel: 'Iniciando…',
+        icon: <Play size={15} aria-hidden="true" />,
+        onClick: () => submit(),
+        disabled: start.isPending || form.isLoading,
+        loading: start.isPending,
+      }]
+    : buttons.map((button) => ({
+        id: button.id,
+        label: button.label,
+        hint: button.hint,
+        icon: button.icon ? <i className={button.icon} aria-hidden="true" /> : undefined,
+        onClick: () => submit(button),
+        disabled: start.isPending || form.isLoading,
+        loading: start.isPending,
+        loadingLabel: 'Iniciando…',
+        style: button.primaryColor ? { backgroundColor: button.primaryColor, color: button.textColor ?? '#fff' } : undefined,
+      }));
 
   return (
-    <div className="flex h-screen flex-col bg-slate-100">
-      <header className="border-b border-slate-200 bg-white px-6 py-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{tenant?.clienteNome ?? 'Septem'}</p>
-        <div className="flex flex-col">
-          {form.data?.startTaskName && <span className="text-sm font-medium text-slate-500">{processName}</span>}
-          <h1 className="text-lg font-semibold text-slate-900">{taskName}</h1>
-        </div>
-      </header>
+    <div className="flex h-[100dvh] flex-col bg-slate-100">
+      <ExecutionHeader
+        processName={processName}
+        taskName={taskName}
+        alias={form.data?.startTaskAlias}
+        sector={form.data?.startTaskSector}
+      />
 
       {done ? (
         <main className="flex-1 overflow-auto">
@@ -61,27 +81,11 @@ export function ServicoFormPage() {
       ) : (
         <>
           {/* Cada grupo renderiza seu próprio card (sem container único). */}
-          <main className="flex-1 overflow-auto p-6">
+          <main className="flex-1 overflow-auto p-4 sm:p-6">
             {form.data?.documentationUrl && <DocBanner url={form.data.documentationUrl} />}
             {form.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={form.data?.formSchema} data={form.data?.data ?? undefined} optionsByField={form.data?.fieldOptions} uploadContext={{ processKey: processKey ?? undefined }} />}
           </main>
-          {/* Botões de início — usa os configurados no evento de início; senão, "Iniciar". */}
-          <footer className="flex justify-start gap-2 border-t border-slate-200 bg-white px-6 py-3">
-            {buttons.length === 0 ? (
-              <button type="button" onClick={() => submit()} disabled={start.isPending || form.isLoading} className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">
-                <Play size={15} /> Iniciar
-              </button>
-            ) : buttons.map((b) => (
-              <Tooltip key={b.id} text={b.hint}>
-                <button type="button" onClick={() => submit(b)} disabled={start.isPending || form.isLoading}
-                  style={b.primaryColor ? { backgroundColor: b.primaryColor, color: b.textColor ?? '#fff' } : undefined}
-                  className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium disabled:opacity-60 ${b.primaryColor ? '' : 'bg-slate-900 text-white hover:bg-slate-700'}`}>
-                  {b.icon && <i className={b.icon} />}
-                  {b.label}
-                </button>
-              </Tooltip>
-            ))}
-          </footer>
+          <TaskActionFooter completionActions={completionActions} loading={form.isLoading} />
         </>
       )}
       <Toaster />

@@ -61,7 +61,7 @@ for (const c of CASOS) {
   check(inst.status === 200 || inst.status === 201, `iniciou uma solicitação de "${c.nome}" (HTTP ${inst.status})`);
 }
 
-/** "17/07/2026 11:00" (pt-BR, como o DuePill escreve) → Date. */
+/** "17/07/2026 11:00" (pt-BR, exibido no popover do prazo) → Date. */
 function parsePill(txt) {
   const m = txt.match(/(\d{2})\/(\d{2})\/(\d{4}),?\s+(\d{2}):(\d{2})/);
   if (!m) return null;
@@ -87,18 +87,17 @@ for (const view of [
   await page.waitForTimeout(1200);
   await page.screenshot({ path: `${OUT}/prazo-horas-uteis-${view.name}.png`, fullPage: true });
 
-  // A inbox é uma lista de cards: pegamos o bloco de cada tarefa e o "Prazo: ..." dele.
-  const texto = (await page.locator('main').innerText()).replace(/\n+/g, ' | ');
-  const prazoDe = (nome) => {
-    const i = texto.indexOf(nome);
-    if (i < 0) return '';
-    const bloco = texto.slice(i, i + 220);
-    const m = bloco.match(/Prazo:\s*([^|]+)/);
-    return m ? m[1].trim() : '';
+  // O rótulo é relativo; a data exata permanece disponível no popover acessível.
+  const prazoDe = async (nome) => {
+    const card = page.locator('article').filter({ hasText: nome }).first();
+    const pill = card.locator('button').filter({ hasText: /Prazo:|Em atraso:/ }).first();
+    await pill.hover();
+    const texto = await card.getByRole('tooltip').innerText();
+    return texto.match(/Conclusão estimada:\s*([^\n]+)/)?.[1]?.trim() ?? '';
   };
 
-  const txtUteis = prazoDe('Prazo Horas Uteis');
-  const txtCorrido = prazoDe('Prazo Corrido');
+  const txtUteis = await prazoDe('Prazo Horas Uteis');
+  const txtCorrido = await prazoDe('Prazo Corrido');
   const dUteis = parsePill(txtUteis);
   const dCorrido = parsePill(txtCorrido);
 

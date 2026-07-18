@@ -1,0 +1,16 @@
+[
+  {
+    "date": "2026-07-18",
+    "macrostructure": "Split Studio",
+    "theme": "Cobalt/Septem",
+    "enrichment": "tier-A CSS bands",
+    "brief": "Aplicação fiel do hero-panel aprovado à tela real de login"
+  },
+  {
+    "date": "2026-07-18",
+    "macrostructure": "Index-First",
+    "theme": "existing Slate",
+    "enrichment": "none",
+    "brief": "Unificação de tarefas e índice de requisições"
+  }
+]

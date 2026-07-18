@@ -1,0 +1,10 @@
+{
+  "date": "2026-07-18",
+  "framework": "React 19 + Vite 6",
+  "styles": "Tailwind CSS 4",
+  "fontStack": "system UI",
+  "palette": "existing Slate utility palette",
+  "motion": "motion-cut; no animation library",
+  "spacing": "Tailwind 4-point utility scale",
+  "preserve": ["React", "Tailwind", "system UI", "Slate palette", "existing sidenav shell"]
+}

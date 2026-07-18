@@ -1,14 +1,16 @@
 // Bugs: (3) "o NOME do campo de data não muda" — form-js exibe o datetime por
 // dateLabel/timeLabel, não por label; o painel só gravava label. Fix: para datetime,
-// grava label+dateLabel+timeLabel. (4) "o datepicker deve abrir ao FOCAR, não só no
-// ícone" — Fix: onFocus chama showPicker(). Modelador é desktop → 1280.
+// grava label+dateLabel+timeLabel. (4) O preview usa o datepicker compartilhado e
+// abre seu calendário ao focar. Modelador é desktop → 1280.
 import { chromium } from 'playwright-core';
 const BASE = 'http://localhost:5173';
 const OUT = process.env.OUT_DIR || '.';
 const ok = [], bad = [];
 const check = (c, m) => (c ? ok.push(m) : bad.push(m));
 
-const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
+const chrome = process.env.CHROME_BIN
+  || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : '/usr/bin/google-chrome');
+const browser = await chromium.launch({ executablePath: chrome, headless: true });
 const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
 try {
   await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
@@ -50,19 +52,15 @@ try {
   }, NOVO);
   check(schemaOk, `[web] o datetime passa a exibir o novo nome (dateLabel aplicado)`);
 
-  // Pré-visualização → ReactForm com input de data (default = datetime-local) (bug 4).
+  // Pré-visualização → ReactForm com datepicker moderno (default = data e hora).
   await page.locator('button', { hasText: 'Pré-visualizar' }).first().click();
-  const dateSel = '[role=dialog] input[type="datetime-local"], [role=dialog] input[type="date"], [role=dialog] input[type="time"]';
+  const dateSel = '[role=dialog] .septem-date-picker-input';
   await page.waitForSelector(dateSel, { timeout: 8000 });
-  // Espia showPicker: sobrescreve pra registrar a chamada (nativo não abre em headless).
-  await page.evaluate(() => {
-    window.__pk = false;
-    HTMLInputElement.prototype.showPicker = function () { window.__pk = true; };
-  });
-  await page.locator(dateSel).first().focus();
-  await page.waitForTimeout(300);
-  const abriuNoFoco = await page.evaluate(() => window.__pk === true);
-  check(abriuNoFoco, '[web] o datepicker abre ao FOCAR no campo (showPicker chamado no onFocus)');
+  check(await page.locator('[role=dialog] [data-date-picker-mode="datetime"]').count() === 1, '[web] campo novo mantém o subtipo data e hora');
+  await page.locator(dateSel).focus();
+  const abriu = await page.locator('[data-date-picker-popover]').count() > 0;
+  check(abriu, '[web] o calendário shadcn Base abre ao focar o campo');
+  check(await page.locator('[data-date-picker-time]').count() === 1, '[web] o subtipo data e hora exibe o seletor de horário');
   await page.screenshot({ path: `${OUT}/campo-data-nome.png` });
 } finally { await browser.close(); }
 ok.forEach((m) => console.log('✓ ' + m));

@@ -15,6 +15,7 @@ import {
   Save,
   Send,
   GitBranch,
+  LoaderCircle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useModeladorStore, type ModeladorView } from '@/stores/modelador';
@@ -38,10 +39,10 @@ export type RecursosHandlers = {
 
 /** Persistência no backend (IF2): salvar no lugar, versionar e publicar. */
 export type PersistenceHandlers = {
-  onSave: () => void;
-  onVersion: () => void;
-  onPublish: () => void;
-  saving: boolean;
+  onSave: () => Promise<void>;
+  onVersion: () => Promise<void>;
+  onPublish: () => Promise<void>;
+  pendingAction: 'save' | 'publish' | 'version' | null;
   /** Há alterações no fluxo ainda não salvas no servidor. */
   dirty: boolean;
 };
@@ -198,13 +199,15 @@ export function ModeladorNavbar({ recursos, modeler, persistence }: Props) {
                 <>
                   <div className="my-1 h-px bg-slate-200" />
                   <MenuItem
-                    onClick={() => {
+                    disabled={persistence.pendingAction != null}
+                    ariaBusy={persistence.pendingAction === 'version'}
+                    onClick={async () => {
+                      await persistence.onVersion();
                       close();
-                      persistence.onVersion();
                     }}
                   >
-                    <GitBranch size={14} />
-                    Versionar processo
+                    {persistence.pendingAction === 'version' ? <LoaderCircle size={14} className="animate-spin" /> : <GitBranch size={14} />}
+                    {persistence.pendingAction === 'version' ? 'Versionando…' : 'Versionar processo'}
                   </MenuItem>
                 </>
               )}
@@ -224,23 +227,25 @@ export function ModeladorNavbar({ recursos, modeler, persistence }: Props) {
             <button
               type="button"
               onClick={persistence.onSave}
-              disabled={persistence.saving}
+              disabled={persistence.pendingAction != null}
+              aria-busy={persistence.pendingAction === 'save'}
               className={[
                 'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50',
                 persistence.dirty ? 'bg-amber-100 text-amber-800 hover:bg-amber-200' : 'text-slate-700 hover:bg-slate-100',
               ].join(' ')}
             >
-              <Save size={16} />
-              Salvar
+              {persistence.pendingAction === 'save' ? <LoaderCircle size={16} className="animate-spin" /> : <Save size={16} />}
+              {persistence.pendingAction === 'save' ? 'Salvando…' : 'Salvar'}
             </button>
             <button
               type="button"
               onClick={persistence.onPublish}
-              disabled={persistence.saving}
+              disabled={persistence.pendingAction != null}
+              aria-busy={persistence.pendingAction === 'publish'}
               className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
             >
-              <Send size={16} />
-              Publicar
+              {persistence.pendingAction === 'publish' ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={16} />}
+              {persistence.pendingAction === 'publish' ? 'Publicando…' : 'Publicar'}
             </button>
           </>
         )}

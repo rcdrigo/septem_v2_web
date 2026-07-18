@@ -35,8 +35,9 @@ export function GeneralInfoSection({ modeler, element }: Props) {
   // criar uma raia nova no canvas e este componente não re-renderiza sozinho.
   const [lanesTick, setLanesTick] = useState(0);
 
-  // Setor (raia) só para tarefas humanas; o dropdown lista as raias do processo.
-  const isTask = element?.businessObject?.$type === 'bpmn:UserTask';
+  // Setor (raia) para tarefas humanas e atividade de início.
+  const elementType = element?.businessObject?.$type;
+  const isTask = elementType === 'bpmn:UserTask' || elementType === 'bpmn:StartEvent';
   const lanes = useMemo(
     () => (isTask ? getProcessLanes(modeler) : []),
     [isTask, modeler, element, lanesTick],
@@ -67,24 +68,22 @@ export function GeneralInfoSection({ modeler, element }: Props) {
   return (
     <Section title="Informações gerais">
       {/* Ordem pedida (Fase 5b): Sigla → Nome → Setor. */}
-      <Field label="Sigla" hint="Identificador curto usado em integrações e relatórios">
+      <Field label="Sigla" help="Identificador curto usado em integrações e relatórios. Exemplo: aprovacao_gerente.">
         <TextInput
           value={alias}
           onChange={(e) => setAliasLocal(e.target.value)}
           onBlur={commitAlias}
-          placeholder="ex: aprovacao_gerente"
         />
       </Field>
-      <Field label="Nome">
+      <Field label="Nome" help="Nome exibido para identificar o elemento no processo.">
         <TextInput
           value={name}
           onChange={(e) => setNameLocal(e.target.value)}
           onBlur={commitName}
-          placeholder="Nome do elemento"
         />
       </Field>
       {isTask && (
-        <Field label="Setor" hint="Raia do processo responsável por esta tarefa.">
+        <Field label="Setor" help="Raia do processo responsável por esta tarefa.">
           <div className="flex items-center gap-1.5">
             <div className="min-w-0 flex-1">
               <Combobox
@@ -107,12 +106,11 @@ export function GeneralInfoSection({ modeler, element }: Props) {
           </div>
         </Field>
       )}
-      <Field label="Descrição">
+      <Field label="Descrição" help="Descrição opcional do elemento.">
         <TextArea
           value={description}
           onChange={(e) => setDescriptionLocal(e.target.value)}
           onBlur={commitDescription}
-          placeholder="Descrição opcional"
         />
       </Field>
     </Section>

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Download, FileSpreadsheet, Upload, AlertTriangle } from 'lucide-react';
+import { Download, FileSpreadsheet, Upload, AlertTriangle, LoaderCircle } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { api, ApiError } from '@/lib/api';
 import { toast } from '@/stores/toast';
@@ -14,9 +14,12 @@ type ImportError = { row: number; message: string };
 export function ImportFormDialog({ onClose, onApply }: { onClose: () => void; onApply: (schema: unknown) => void }) {
   const [erros, setErros] = useState<ImportError[] | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [baixando, setBaixando] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function baixarModelo() {
+    if (baixando) return;
+    setBaixando(true);
     try {
       const blob = await api.getBlob('/api/v1/workflow/form-import/template');
       const url = URL.createObjectURL(blob);
@@ -24,6 +27,7 @@ export function ImportFormDialog({ onClose, onApply }: { onClose: () => void; on
       a.href = url; a.download = 'modelo-formulario.xlsx'; a.click();
       URL.revokeObjectURL(url);
     } catch { toast.error('Não foi possível baixar o modelo.'); }
+    finally { setBaixando(false); }
   }
 
   async function importar(file: File) {
@@ -58,9 +62,9 @@ export function ImportFormDialog({ onClose, onApply }: { onClose: () => void; on
         </p>
 
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={baixarModelo}
-            className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-            <Download size={15} /> Baixar modelo (.xlsx)
+          <button type="button" onClick={baixarModelo} disabled={baixando} aria-busy={baixando}
+            className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60">
+            {baixando ? <LoaderCircle size={15} className="animate-spin" /> : <Download size={15} />} {baixando ? 'Baixando…' : 'Baixar modelo (.xlsx)'}
           </button>
           <a href="https://septem.app/docs/importar-formulario" target="_blank" rel="noreferrer"
             className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900">

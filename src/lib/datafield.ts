@@ -7,6 +7,15 @@
 export type DateMode = 'datetime' | 'date' | 'time';
 export type DateLimit = '' | 'noPast' | 'noFuture';
 
+/**
+ * Normaliza o subtipo vindo do form-js e mantém schemas legados seguros.
+ * O editor usa `subtype`; versões anteriores do cockpit gravavam apenas
+ * `properties.septemDateMode`.
+ */
+export function normalizeDateMode(mode: unknown): DateMode {
+  return mode === 'date' || mode === 'time' || mode === 'datetime' ? mode : 'datetime';
+}
+
 export const DATE_MODE_OPTIONS = [
   { value: 'datetime', label: 'Data e hora' },
   { value: 'date', label: 'Somente data' },
@@ -19,7 +28,7 @@ export const DATE_LIMIT_OPTIONS = [
   { value: 'noFuture', label: 'Não permitir data no futuro' },
 ];
 
-/** Tipo do input nativo — cada um abre o seletor certo ao clicar. */
+/** Tipo equivalente do campo, mantido para consumidores legados. */
 export function inputTypeForDateMode(mode: DateMode | undefined): string {
   return mode === 'date' ? 'date' : mode === 'time' ? 'time' : 'datetime-local';
 }
@@ -31,10 +40,30 @@ export function inputTypeForDateMode(mode: DateMode | undefined): string {
  */
 export function validateDateClient(value: string, mode: DateMode | undefined, limit: DateLimit | undefined, now: Date = new Date()): string | null {
   if (!value) return null;
-  if (mode === 'time') return null; // passado/futuro não faz sentido só com hora
+  if (mode === 'time') {
+    const match = /^(\d{2}):(\d{2})$/.exec(value);
+    if (!match || Number(match[1]) > 23 || Number(match[2]) > 59) return 'Hora inválida.';
+    return null; // passado/futuro não faz sentido só com hora
+  }
 
-  const parsed = mode === 'date' ? new Date(`${value}T00:00:00`) : new Date(value);
-  if (Number.isNaN(parsed.getTime())) return 'Data inválida.';
+  const match = mode === 'date'
+    ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+    : /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return 'Data inválida.';
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = mode === 'date' ? 0 : Number(match[4]);
+  const minute = mode === 'date' ? 0 : Number(match[5]);
+  const parsed = new Date(0);
+  parsed.setHours(0, 0, 0, 0);
+  parsed.setFullYear(year, month - 1, day);
+  parsed.setHours(hour, minute, 0, 0);
+  if (
+    year < 1000 || month < 1 || month > 12 || day < 1 ||
+    hour > 23 || minute > 59 || parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 || parsed.getDate() !== day
+  ) return 'Data inválida.';
   if (!limit) return null;
 
   if (mode === 'date') {

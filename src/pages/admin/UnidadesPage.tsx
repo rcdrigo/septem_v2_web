@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Building2, ChevronDown, ChevronRight, ExternalLink, Pencil, Plus, Trash2, User as UserIcon } from 'lucide-react';
+import { Building2, Plus } from 'lucide-react';
 import {
   useOrgUnitsTree,
   useOrgUnitsFlat,
@@ -7,7 +7,6 @@ import {
   useUpdateOrgUnit,
   useDeleteOrgUnit,
   useOrgUnit,
-  type OrgUnitFlat,
   type OrgUnitNode,
   type OrgUnitWrite,
 } from '@/lib/api/org-units';
@@ -19,6 +18,7 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
 import { slugify } from '@/lib/slugify';
+import { OrgUnitTree } from '@/components/org-units/OrgUnitTree';
 
 /**
  * Admin › Configurações › Unidades — IF1.c. Árvore de unidades organizacionais
@@ -59,14 +59,17 @@ export function UnidadesPage() {
         <h1 className="text-lg font-semibold text-slate-900">Unidades organizacionais</h1>
         <button
           type="button"
+          aria-label="Nova unidade raiz"
           onClick={() => setCreateCtx({ parentId: null })}
-          className="flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700"
+          className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
         >
-          <Plus size={16} /> Nova unidade raiz
+          <Plus size={16} />
+          <span className="sm:hidden">Nova raiz</span>
+          <span className="hidden sm:inline">Nova unidade raiz</span>
         </button>
       </header>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="min-w-0 flex-1 overflow-y-auto p-6">
         {tree.isLoading && <p className="text-sm text-slate-400">Carregando...</p>}
         {!tree.isLoading && (tree.data?.length ?? 0) === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -78,119 +81,23 @@ export function UnidadesPage() {
           </div>
         )}
         {tree.data && tree.data.length > 0 && (
-          <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
-            {tree.data.map((node) => (
-              <TreeNode
-                key={node.id}
-                node={node}
-                depth={0}
-                byId={byId}
-                onAddChild={(n) => setCreateCtx({ parentId: n.id, parentName: n.name })}
-                onEdit={setEditUnit}
-                onDelete={askDelete}
-              />
-            ))}
-          </div>
+          <OrgUnitTree
+            nodes={tree.data}
+            unitsById={byId}
+            variant="manage"
+            cardTestId="unidade-linha"
+            ariaLabel="Árvore de unidades organizacionais"
+            onOpen={(node) => openTab(`unidade?id=${node.id}`)}
+            onAddChild={(node) => setCreateCtx({ parentId: node.id, parentName: node.name })}
+            onEdit={setEditUnit}
+            onDelete={askDelete}
+          />
         )}
       </div>
 
       {createCtx && <CreateUnitDialog ctx={createCtx} onClose={() => setCreateCtx(null)} />}
       {editUnit && <EditUnitDialog unit={editUnit} onClose={() => setEditUnit(null)} />}
     </div>
-  );
-}
-
-/**
- * Linha da árvore (Fase 3): foto do titular no círculo, SIGLA em destaque, nome
- * como texto secundário e o nome do titular. Clicar abre o detalhe em aba própria.
- */
-function TreeNode({
-  node, depth, byId, onAddChild, onEdit, onDelete,
-}: {
-  node: OrgUnitNode;
-  depth: number;
-  byId: Map<string, OrgUnitFlat>;
-  onAddChild: (n: OrgUnitNode) => void;
-  onEdit: (n: OrgUnitNode) => void;
-  onDelete: (n: OrgUnitNode) => void;
-}) {
-  const [open, setOpen] = useState(true);
-  const hasChildren = node.children.length > 0;
-  const info = byId.get(node.id);
-  const titular = info?.titular ?? null;
-
-  return (
-    <>
-      <div
-        className="group flex items-center gap-2 border-b border-slate-100 px-2 py-2 hover:bg-slate-50"
-        style={{ paddingLeft: `${depth * 20 + 8}px` }}
-        data-testid="unidade-linha"
-      >
-        <button
-          type="button"
-          onClick={() => hasChildren && setOpen((o) => !o)}
-          aria-label={open ? 'Recolher' : 'Expandir'}
-          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-400 ${hasChildren ? 'hover:bg-slate-200' : 'invisible'}`}
-        >
-          {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-        </button>
-
-        <Avatar url={titular?.photoUrl ?? null} nome={titular?.name ?? node.name} />
-
-        <button
-          type="button"
-          onClick={() => openTab(`unidade?id=${node.id}`)}
-          className="min-w-0 flex-1 text-left"
-          title="Abrir a unidade em nova aba"
-        >
-          <span className="flex flex-wrap items-center gap-1.5">
-            <span className={`text-sm font-semibold ${node.active ? 'text-slate-900' : 'text-slate-400 line-through'}`}>
-              {info?.sigla || node.name}
-            </span>
-            {info?.sigla && <span className="truncate text-xs text-slate-500">{node.name}</span>}
-            {!node.active && <span className="rounded-full bg-slate-200 px-1.5 text-[10px] text-slate-500">inativa</span>}
-          </span>
-          <span className="block truncate text-xs text-slate-400">
-            {titular ? titular.name : 'Sem titular'}
-          </span>
-        </button>
-
-        <div className="ml-auto flex shrink-0 gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
-          <button type="button" onClick={() => openTab(`unidade?id=${node.id}`)} className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800" title="Abrir unidade" aria-label={`Abrir ${node.name}`}>
-            <ExternalLink size={14} />
-          </button>
-          <button type="button" onClick={() => onAddChild(node)} className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800" title="Nova subunidade">
-            <Plus size={14} />
-          </button>
-          <button type="button" onClick={() => onEdit(node)} className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800" title="Editar">
-            <Pencil size={14} />
-          </button>
-          <button type="button" onClick={() => onDelete(node)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="Excluir">
-            <Trash2 size={14} />
-          </button>
-        </div>
-      </div>
-      {open && node.children.map((child) => (
-        <TreeNode key={child.id} node={child} depth={depth + 1} byId={byId} onAddChild={onAddChild} onEdit={onEdit} onDelete={onDelete} />
-      ))}
-    </>
-  );
-}
-
-/** Círculo com a foto do titular; sem foto, cai no avatar genérico. */
-export function Avatar({ url, nome, size = 32 }: { url: string | null; nome: string; size?: number }) {
-  const style = { width: size, height: size };
-  if (url) {
-    return <img src={url} alt={nome} style={style} className="shrink-0 rounded-full object-cover" data-testid="avatar" />;
-  }
-  return (
-    <span
-      style={style}
-      data-testid="avatar"
-      className="flex shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400"
-    >
-      <UserIcon size={Math.round(size * 0.5)} />
-    </span>
   );
 }
 

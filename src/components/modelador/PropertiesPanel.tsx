@@ -35,11 +35,11 @@ export function PropertiesPanel({ modeler }: Props) {
     return <PanelChrome message="Selecione um elemento no canvas para configurar." />;
   }
 
-  const { Panel, label, type } = resolvePanel(element);
+  const { Panel, label } = resolvePanel(element);
 
   return (
     <aside className="flex w-[380px] shrink-0 flex-col overflow-y-auto border-l border-slate-200 bg-slate-50">
-      <PanelHeader type={type} label={label} />
+      <PanelHeader label={label} />
       <Panel modeler={modeler} element={element} />
     </aside>
   );
@@ -53,10 +53,9 @@ function PanelChrome({ message }: { message: string }) {
   );
 }
 
-function PanelHeader({ type, label }: { type: string; label: string }) {
+function PanelHeader({ label }: { label: string }) {
   return (
     <header className="border-b border-slate-200 bg-white px-4 py-3">
-      <p className="text-xs uppercase tracking-wide text-slate-400">{type}</p>
       <h2 className="text-sm font-semibold text-slate-900">{label}</h2>
     </header>
   );

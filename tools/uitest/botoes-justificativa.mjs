@@ -105,13 +105,16 @@ try {
     await page.waitForTimeout(800);
     const sec = page.locator('text=Botões de ação').first();
     if (await sec.count()) { await sec.click().catch(() => {}); await page.waitForTimeout(500); }
-    check(await page.locator('[data-testid=cor-swatch]').count() >= 10, '[modelador] paleta tem 10 cores sóbrias');
-    check(await page.getByText('Obrigar justificativa ao concluir por este botão').count() > 0, '[modelador] existe o checkbox "Obrigar justificativa"');
+    check(await page.locator('[data-testid=cor-swatch]').count() === 0, '[modelador] paleta fica oculta antes de abrir');
+    await page.locator('[data-testid=cor-primaria-trigger]').click();
+    check(await page.locator('[data-testid=cor-swatch]').count() === 10, '[modelador] floating container tem 10 cores sóbrias');
+    check(await page.locator('input[type=color][aria-label="Cor personalizada"]').count() === 1, '[modelador] floating container oferece color picker');
+    check(await page.getByRole('switch', { name: 'Obrigar justificativa' }).count() === 1, '[modelador] existe o switch "Obrigar justificativa"');
 
-    // Configura na tela: marca justificativa + escolhe a cor vermelha (#b91c1c).
-    await page.getByText('Obrigar justificativa ao concluir por este botão').click();
-    await page.waitForTimeout(300);
+    // Configura na tela: escolhe a cor vermelha (#b91c1c) e marca justificativa.
     await page.locator('[data-testid=cor-swatch]').nth(8).click();
+    await page.waitForTimeout(300);
+    await page.getByRole('switch', { name: 'Obrigar justificativa' }).click();
     await page.waitForTimeout(300);
     await page.locator('header button', { hasText: 'Salvar' }).first().click();
     await page.waitForTimeout(3000);

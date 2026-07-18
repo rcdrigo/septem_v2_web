@@ -13,6 +13,8 @@ import { useFormStore } from '@/stores/form';
 import { fetchDataSourceOptions } from '@/lib/api/catalog';
 import { openTab } from '@/lib/nav';
 import { toast } from '@/stores/toast';
+import { Switch } from '@/components/ui/Field';
+import { HelpPopover } from '@/components/ui/HelpPopover';
 
 type Opt = { value: string; label: string };
 type MaskOpt = Opt & { regex: string; template?: string | null; shouldValidate: boolean };
@@ -207,7 +209,7 @@ export function FieldConfigPanel({ field, editField, masks }: {
                   <IconSearchPicker value={props.septemGroupIcon} onChange={(cls) => merge('properties', { septemGroupIcon: cls || undefined })} />
                 </div>
                 {field.type === 'group' && (
-                  <Check label="Exibir contador de pendências" checked={props.septemShowPending !== 'no'}
+                  <Switch label="Exibir contador de pendências" checked={props.septemShowPending !== 'no'}
                     onChange={(b) => merge('properties', { septemShowPending: b ? undefined : 'no' })} />
                 )}
               </>
@@ -288,9 +290,9 @@ export function FieldConfigPanel({ field, editField, masks }: {
               </>
             )}
 
-            {isInput && <Check label="Obrigatório" checked={!!validate.required} onChange={(b) => merge('validate', { required: b })} />}
-            {(isInput || isContainer) && <Check label="Visível no relatório" checked={props.septemVisReport !== 'no'} onChange={(b) => merge('properties', { septemVisReport: b ? undefined : 'no' })} />}
-            {(isInput || isContainer) && <Check label="Visível ao requisitante" checked={props.septemVisRequester !== 'no'} onChange={(b) => merge('properties', { septemVisRequester: b ? undefined : 'no' })} />}
+            {isInput && <Switch label="Obrigatório" checked={!!validate.required} onChange={(b) => merge('validate', { required: b })} help="Exige o preenchimento antes de concluir a tarefa." />}
+            {(isInput || isContainer) && <Switch label="Visível no relatório" checked={props.septemVisReport !== 'no'} onChange={(b) => merge('properties', { septemVisReport: b ? undefined : 'no' })} help="Controla a exibição deste conteúdo no relatório do processo." />}
+            {(isInput || isContainer) && <Switch label="Visível ao requisitante" checked={props.septemVisRequester !== 'no'} onChange={(b) => merge('properties', { septemVisRequester: b ? undefined : 'no' })} help="Controla a exibição deste conteúdo para quem iniciou a requisição." />}
 
             {(field.type === 'spacer' || field.type === 'separator') && (
               <p className="text-sm text-slate-400">Este elemento não tem configurações em Geral.</p>
@@ -306,9 +308,18 @@ export function FieldConfigPanel({ field, editField, masks }: {
                 onChange={(v) => merge('properties', { septemDocKind: v || undefined })} />
             )}
             {field.type === 'datetime' && (
-              <Select label="Tipo" value={props.septemDateMode ?? 'datetime'} options={DATE_MODE_OPTIONS}
+              <Select label="Tipo" value={props.septemDateMode ?? field.subtype ?? 'datetime'} options={DATE_MODE_OPTIONS}
                 hint="Escolhe o seletor: data e hora, só data ou só hora."
-                onChange={(v) => merge('properties', { septemDateMode: v === 'datetime' ? undefined : v })} />
+                onChange={(v) => {
+                  // `subtype` controla o próprio form-js; a propriedade Septem é
+                  // preservada para schemas e consumidores já publicados.
+                  editField(field, ['subtype'], v);
+                  editField(field, ['properties'], {
+                    ...(field.properties || {}),
+                    septemDateMode: v === 'datetime' ? undefined : v,
+                  });
+                  force((n) => n + 1);
+                }} />
             )}
             {MASKABLE.has(field.type) && field.type !== 'datetime' && !props.septemDocKind && (
               <Select label="Máscara" value={props.septemMaskId ?? ''} options={[{ value: '', label: '— nenhuma —' }, ...masks]}
@@ -382,21 +393,18 @@ function labelOfType(t: string) { return TYPE_LABELS[t] ?? t; }
 // ── controles ────────────────────────────────────────────────────────────────
 const fieldCls = 'w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none read-only:bg-slate-50 read-only:text-slate-500';
 
-function Lbl({ children }: { children: React.ReactNode }) {
-  return <label className="mb-1 block text-xs font-medium text-slate-600">{children}</label>;
+function Lbl({ children, help }: { children: React.ReactNode; help?: string }) {
+  return <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">{children}{help && <HelpPopover html={help} ariaLabel={`Ajuda: ${String(children)}`} />}</label>;
 }
 function Text({ label, value, onChange, onBlur, readOnly, hint }: { label: string; value: string; onChange?: (v: string) => void; onBlur?: () => void; readOnly?: boolean; hint?: string }) {
-  return <div><Lbl>{label}</Lbl><input className={fieldCls} value={value} readOnly={readOnly} onChange={(e) => onChange?.(e.target.value)} onBlur={onBlur} />{hint && <span className="mt-0.5 block text-[11px] text-slate-400">{hint}</span>}</div>;
+  return <div><Lbl help={hint}>{label}</Lbl><input className={fieldCls} value={value} readOnly={readOnly} onChange={(e) => onChange?.(e.target.value)} onBlur={onBlur} /></div>;
 }
 function TextArea({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return <div><Lbl>{label}</Lbl><textarea rows={2} className={fieldCls} value={value} onChange={(e) => onChange(e.target.value)} /></div>;
 }
 function NumberInput({ label, value, onChange, hint }: { label: string; value: unknown; onChange: (n: number | undefined) => void; hint?: string }) {
-  return <div><Lbl>{label}</Lbl><input type="number" className={fieldCls} value={value === undefined || value === null ? '' : String(value)} onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))} />{hint && <span className="mt-0.5 block text-[11px] text-slate-400">{hint}</span>}</div>;
+  return <div><Lbl help={hint}>{label}</Lbl><input type="number" className={fieldCls} value={value === undefined || value === null ? '' : String(value)} onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))} /></div>;
 }
 function Select({ label, value, options, onChange, hint }: { label: string; value: string; options: Opt[]; onChange: (v: string) => void; hint?: string }) {
-  return <div><Lbl>{label}</Lbl><select className={fieldCls} value={value} onChange={(e) => onChange(e.target.value)}>{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>{hint && <span className="mt-0.5 block text-[11px] text-slate-400">{hint}</span>}</div>;
-}
-function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (b: boolean) => void }) {
-  return <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} /> {label}</label>;
+  return <div><Lbl help={hint}>{label}</Lbl><select className={fieldCls} value={value} onChange={(e) => onChange(e.target.value)}>{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>;
 }

@@ -63,17 +63,22 @@ try {
     const inst = await api(token, '/api/v1/workflow/instances', 'POST', { key, data: {} });
     const taskId = inst.body.tasks[0].id;
     await page.goto(`${BASE}/tarefa/${taskId}`, { waitUntil: 'networkidle' });
-    await page.waitForSelector('input', { timeout: 15000 });
+    await page.waitForSelector('.septem-date-picker-input', { timeout: 15000 });
     await page.waitForTimeout(500);
 
-    const campo = page.locator('input').first();
-    // "Só data" → input nativo type=date (abre o datepicker ao clicar).
-    const tipo = await campo.getAttribute('type');
-    check(tipo === 'date', `[${view.name}] campo "só data" usa datepicker (input type=${tipo})`);
+    const campo = page.locator('.septem-date-picker-input').first();
+    const placeholder = await campo.getAttribute('placeholder');
+    check(placeholder === 'DD/MM/YYYY', `[${view.name}] datepicker usa o formato brasileiro explícito`);
+
+    const concluir = async () => {
+      if (view.name === 'mobile') await page.getByRole('button', { name: 'Botões de conclusão' }).click();
+      await page.getByRole('button', { name: 'Concluir', exact: true }).click();
+    };
 
     // Data no futuro → erro em vermelho + bloqueia concluir.
-    await campo.fill('2099-01-01');
-    await page.getByRole('button', { name: 'Concluir' }).click();
+    await campo.fill('01/01/2099');
+    await campo.blur();
+    await concluir();
     await page.waitForTimeout(500);
     const erro = await page.locator('text=/não pode ser no futuro/i').count();
     check(erro > 0, `[${view.name}] data no futuro mostra erro "não pode ser no futuro"`);
@@ -82,8 +87,9 @@ try {
     await page.screenshot({ path: `${OUT}/data-futuro-${view.name}.png`, fullPage: true });
 
     // Data no passado → conclui.
-    await campo.fill('2000-01-01');
-    await page.getByRole('button', { name: 'Concluir' }).click();
+    await campo.fill('01/01/2000');
+    await campo.blur();
+    await concluir();
     await page.waitForTimeout(1500);
     const concluiu = await page.locator('text=/conclu/i').count();
     check(concluiu > 0, `[${view.name}] data no passado conclui a tarefa`);

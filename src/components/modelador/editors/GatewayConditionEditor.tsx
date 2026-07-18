@@ -19,6 +19,7 @@ import { getAllProcessButtons } from '@/lib/bpmn-action-buttons';
 import { useFormStore } from '@/stores/form';
 import { useEnsureFormFields } from '@/lib/use-ensure-form-fields';
 import { FormFieldSelect } from '@/components/modelador/fields/FormFieldSelect';
+import { HelpPopover } from '@/components/ui/HelpPopover';
 
 type Props = {
   modeler: any;
@@ -26,16 +27,16 @@ type Props = {
   connection: any;
 };
 
-const MODE_OPTIONS: ReadonlyArray<{ value: GatewayConditionMode; label: string; hint?: string }> = [
+const MODE_OPTIONS: ReadonlyArray<{ value: GatewayConditionMode; label: string; help?: string }> = [
   {
     value: 'rules',
     label: 'Por botão de ação clicado e/ou valores do formulário',
-    hint: 'Combine o botão clicado na última tarefa com comparações de campos do formulário.',
+    help: 'Combine o botão clicado na última tarefa com comparações de campos do formulário.',
   },
   {
     value: 'else',
     label: 'Quando nenhuma das demais regras for atendida',
-    hint: 'Caminho padrão. Apenas uma conexão pode ser marcada como "else" por gateway.',
+    help: 'Caminho padrão. Apenas uma conexão pode ser marcada como "else" por gateway.',
   },
 ];
 
@@ -140,8 +141,9 @@ function ButtonConditionSection({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
         Último botão de ação clicado
+        <HelpPopover html="Seleciona o botão clicado na última tarefa para decidir se esta conexão deve ser seguida." ariaLabel="Ajuda: último botão de ação clicado" />
       </span>
       {groups.length === 0 ? (
         <p className="text-xs text-slate-500">
@@ -208,17 +210,16 @@ function FormRulesEditor({
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Valores do formulário</span>
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
+        Valores do formulário
+        <HelpPopover
+          html="Compare campos do formulário com valores esperados. Combine as regras com E/OU e use parênteses para definir a precedência. Sem parênteses, E tem precedência sobre OU. Exemplo de valor: 1000."
+          ariaLabel="Ajuda: valores do formulário"
+        />
+      </span>
       {rules.length === 0 && (
         <p className="text-xs text-slate-500">Nenhuma regra. Adicione comparações com campos do formulário.</p>
       )}
-      {rules.length >= 2 && (
-        <p className="text-xs text-slate-500">
-          Combine as regras com <b>E</b>/<b>OU</b> por linha e agrupe com parênteses <code>(</code> <code>)</code>.
-          Sem parênteses, o <b>E</b> tem precedência sobre o <b>OU</b>.
-        </p>
-      )}
-
       {/* Linha da regra: no desktop (md+) tudo numa linha; em telas estreitas o grid
           reorganiza em 3 linhas — [conector ( … ) excluir] / [campo] / [operador valor] —
           senão os últimos controles estouram o modal e ficam cortados/inacessíveis.
@@ -272,10 +273,10 @@ function FormRulesEditor({
             options={OPERATOR_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
           />
           <TextInput
+            aria-label="Valor de comparação"
             className={`${first ? 'col-span-2' : 'col-span-3'} col-start-3 row-start-3 w-full min-w-0 md:col-span-1 md:col-auto md:row-auto`}
             value={rule.value}
             onChange={(e) => update(idx, { value: e.target.value })}
-            placeholder="ex: 1000"
           />
           {/* Fecha grupo ")" */}
           <Select
@@ -313,10 +314,10 @@ function FieldRefSelect({ value, onChange }: { value: string; onChange: (v: stri
   if (fields.length === 0) {
     return (
       <TextInput
+        aria-label="Identificador do campo"
         className="w-full min-w-0"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="id do campo"
       />
     );
   }

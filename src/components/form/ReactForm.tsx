@@ -1,11 +1,16 @@
-import { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { ChevronDown, HelpCircle, Plus, Trash2, Paperclip, X, Loader2, FileText } from 'lucide-react';
+// Merge: base é a reformulação do date picker (DatePickerField/normalizeDateMode) e do
+// HelpPopover; somamos o que a Fase 6 usa — o ícone e as chamadas de geração de
+// documento. useLayoutEffect/createPortal/HelpCircle/inputTypeForDateMode saíram
+// porque o corpo mesclado não os usa mais.
+import { createContext, forwardRef, Fragment, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { ChevronDown, Plus, Trash2, Paperclip, X, Loader2, FileText } from 'lucide-react';
+import { HelpPopover } from '@/components/ui/HelpPopover';
 import { api, ApiError } from '@/lib/api';
 import { regexToTemplate, applyMask, isAllDigits } from '@/lib/mask';
 import { maskDocumento, validateDocumento, type DocKind } from '@/lib/documento';
-import { inputTypeForDateMode, validateDateClient, type DateMode, type DateLimit } from '@/lib/datafield';
+import { normalizeDateMode, validateDateClient, type DateMode, type DateLimit } from '@/lib/datafield';
 import { uploadAttachment, parseAttachments, fetchDocumentOptions, generateDocument, type Attachment, type UploadContext } from '@/lib/upload';
+import { DatePickerField } from './DatePickerField';
 
 /** Mesmo contrato do FormFill (form-js), para ser intercambiável. */
 export type FormFillResult = { data: Record<string, unknown>; errors: Record<string, unknown> };
@@ -21,6 +26,7 @@ export type ReactFormHandle = {
 type Component = {
   id?: string;
   type?: string;
+  subtype?: string;
   key?: string;
   label?: string;
   description?: string;
@@ -44,6 +50,10 @@ function colSpan(c: Component): number {
   const n = c.layout?.columns;
   if (!n || n < 1) return GRID_COLS;
   return Math.min(GRID_COLS, n);
+}
+
+function dateModeOf(component: Component): DateMode {
+  return normalizeDateMode(component.properties?.septemDateMode ?? component.subtype);
 }
 
 type OptionsMap = Record<string, { value: string; label: string }[]>;
@@ -74,6 +84,8 @@ type Runtime = {
   dsOptions: OptionsMap;
   readOnly?: boolean;
   fieldState: FieldState;
+  dateErrors: Record<string, string>;
+  setDateError: (k: string, message: string | null) => void;
   runEvent: (comp: Component, type: string, event: unknown) => void;
   uploadContext?: UploadContext;
 };
@@ -105,6 +117,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
       return init;
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [dateErrors, setDateErrors] = useState<Record<string, string>>({});
     // Opções resolvidas no servidor (form já populado) entram como estado inicial.
     const [dsOptions, setDsOptions] = useState<OptionsMap>(() => optionsByField ?? {});
     const [fieldState, setFieldState] = useState<FieldState>({});
@@ -142,6 +155,16 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
       setValues((prev) => ({ ...prev, [key]: value }));
     }
 
+    function setDateError(key: string, message: string | null) {
+      setDateErrors((prev) => {
+        if (!message && !(key in prev)) return prev;
+        const next = { ...prev };
+        if (message) next[key] = message;
+        else delete next[key];
+        return next;
+      });
+    }
+
     // Executa os eventos do campo para um dado tipo (change/click/blur/focus).
     function runEvent(comp: Component, type: string, event: unknown) {
       const evs = parseEvents(comp.properties?.septemEvents).filter((e) => e.type === type && e.action?.trim());
@@ -166,6 +189,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
       const errs: Record<string, string> = {};
       for (const c of inputs) {
         if (c.disabled || fieldState[c.key!]?.hidden) continue; // somente-leitura/escondido: não valida
+        if (dateErrors[c.key!]) { errs[c.key!] = dateErrors[c.key!]; continue; }
         const v = values[c.key!];
         const req = c.validate?.required;
         const empty = v === '' || v === undefined || v === null || (c.type === 'checkbox' && v === false)
@@ -190,7 +214,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
           if (c.validate?.max !== undefined && n > c.validate.max) errs[c.key!] = `Valor máximo ${c.validate.max}.`;
         }
         if (c.type === 'datetime' && typeof v === 'string' && v) {
-          const msg = validateDateClient(v, c.properties?.septemDateMode as DateMode | undefined, c.properties?.septemDateLimit as DateLimit | undefined);
+          const msg = validateDateClient(v, dateModeOf(c), c.properties?.septemDateLimit as DateLimit | undefined);
           if (msg) errs[c.key!] = msg;
         }
       }
@@ -205,18 +229,18 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
       },
       getData: () => values,
       setServerErrors: (errs) => setErrors(errs),
-    }), [values, inputs, fieldState]);
+    }), [values, inputs, fieldState, dateErrors]);
 
     const comps = root.components ?? [];
     const layout = (root as { septemGroupLayout?: string }).septemGroupLayout;
-    const runtime: Runtime = { values, errors, set, dsOptions, readOnly, fieldState, runEvent, uploadContext };
+    const runtime: Runtime = { values, errors, set, dsOptions, readOnly, fieldState, dateErrors, setDateError, runEvent, uploadContext };
 
     // Cada grupo de topo vira um card; os cards se distribuem no grid de 16 col
     // (8+8 = lado a lado). Em "abas", a barra fica num card e o conteúdo noutro.
-    const isGroup = (c: Component) => !!(c.components && !c.key);
-    // Abas quando o form pede tabs OU quando há abas extras (ex.: relatório com
-    // "Visão geral"/"Tramitação"): tudo numa única barra de abas.
-    const useTabs = layout === 'tabs' || !!extraTabs;
+    const isGroup = (c: Component) => c.type === 'group' || !!(c.components && !c.key);
+    // A configuração do formulário é autoritativa: extras entram na barra quando
+    // o layout é "tabs" e viram cards antes/depois do formulário em "stacked".
+    const useTabs = layout === 'tabs';
     let body: React.ReactNode;
     if (useTabs) {
       const groups = comps.filter(isGroup);
@@ -228,7 +252,13 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
         </div>
       );
     } else {
-      body = <LayoutGrid components={comps} render={(c) => (isGroup(c) ? <GroupCard group={c} /> : <Node comp={c} />)} />;
+      body = (
+        <div className="flex flex-col gap-4">
+          {(extraTabs?.leading ?? []).map((extra) => <Fragment key={`x:${extra.id}`}>{extra.render()}</Fragment>)}
+          <LayoutGrid components={comps} render={(c) => (isGroup(c) ? <GroupCard group={c} /> : <Node comp={c} />)} />
+          {(extraTabs?.trailing ?? []).map((extra) => <Fragment key={`x:${extra.id}`}>{extra.render()}</Fragment>)}
+        </div>
+      );
     }
 
     if (dsLoading) return <FormSkeleton />;
@@ -238,7 +268,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
 ReactForm.displayName = 'ReactForm';
 
 function Node({ comp }: { comp: Component }) {
-  const { values, errors, set, dsOptions, readOnly, fieldState, runEvent } = useRuntime();
+  const { values, errors, set, dsOptions, readOnly, fieldState, runEvent, setDateError } = useRuntime();
 
   if (comp.type === 'dynamiclist') return <DynamicList comp={comp} />;
 
@@ -276,6 +306,7 @@ function Node({ comp }: { comp: Component }) {
   const prefixAdorner = comp.prefixAdorner ?? comp.appearance?.prefixAdorner;
   const suffixAdorner = comp.suffixAdorner ?? comp.appearance?.suffixAdorner;
   const disabled = readOnly === true || comp.disabled === true || fieldState[key]?.disabled === true;
+  const dateMode = comp.type === 'datetime' ? dateModeOf(comp) : undefined;
 
   // Counter de min/max (campos de texto).
   const { minLength, maxLength } = comp.validate ?? {};
@@ -338,24 +369,33 @@ function Node({ comp }: { comp: Component }) {
         {popoverHelp && <HelpPopover html={popoverHelp} />}
       </label>
     );
+  } else if (comp.type === 'datetime') {
+    control = (
+      <DatePickerField
+        value={String(v ?? '')}
+        mode={dateMode}
+        limit={comp.properties?.septemDateLimit as DateLimit | undefined}
+        error={!!err}
+        ariaLabel={comp.label}
+        required={comp.validate?.required}
+        onChange={(value, event) => setAndEmit(value, event)}
+        onClick={evt.onClick}
+        onBlur={evt.onBlur}
+        onFocus={evt.onFocus}
+        onValidityChange={(message) => setDateError(key, message)}
+      />
+    );
   } else {
     const input = (
       <input
-        type={docKind || maskTemplate ? 'text' : comp.type === 'number' ? 'number' : comp.type === 'email' ? 'email' : comp.type === 'datetime' ? inputTypeForDateMode(comp.properties?.septemDateMode as DateMode | undefined) : comp.type === 'password' ? 'password' : 'text'}
+        type={docKind || maskTemplate ? 'text' : comp.type === 'number' ? 'number' : comp.type === 'email' ? 'email' : comp.type === 'password' ? 'password' : 'text'}
         inputMode={docKind ? 'numeric' : maskTemplate ? (isAllDigits(maskTemplate) ? 'numeric' : undefined) : undefined}
         maxLength={docKind ? 18 : maskTemplate ? maskTemplate.length : maxLength}
         disabled={disabled}
         className={prefixAdorner || suffixAdorner ? `${base} rounded-none border-0 focus:ring-0` : base}
         value={String(v ?? '')}
         {...evt}
-        onFocus={(e) => {
-          // Campo de data: abre o calendário já ao FOCAR (não só no ícone). showPicker()
-          // exige ativação do usuário e pode lançar — protege sem quebrar o runEvent.
-          if (comp.type === 'datetime') {
-            try { (e.currentTarget as HTMLInputElement).showPicker?.(); } catch { /* sem ativação */ }
-          }
-          evt.onFocus(e);
-        }}
+        onFocus={evt.onFocus}
         onChange={(e) => {
           if (docKind) { setAndEmit(maskDocumento(e.target.value, docKind), e); return; }
           if (maskTemplate) { setAndEmit(applyMask(maskTemplate, e.target.value), e); return; }
@@ -373,11 +413,13 @@ function Node({ comp }: { comp: Component }) {
   }
 
   const widthPx = comp.properties?.septemWidth ? Number(comp.properties.septemWidth) : undefined;
+  const minimumDateWidth = dateMode === 'datetime' ? 340 : dateMode === 'date' ? 280 : dateMode === 'time' ? 180 : 0;
+  const effectiveWidth = widthPx && !Number.isNaN(widthPx) ? Math.max(widthPx, minimumDateWidth) : undefined;
   return (
-    <div className="flex flex-col gap-1" style={widthPx && !Number.isNaN(widthPx) ? { maxWidth: widthPx } : undefined}>
+    <div className="flex min-w-0 flex-col gap-1" style={effectiveWidth ? { maxWidth: effectiveWidth } : undefined}>
       {(comp.type !== 'checkbox' || disabled) && labelEl}
       {control}
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex min-h-[1lh] items-start justify-between gap-2">
         <div className="min-w-0">
           {err && <span className="text-xs text-rose-600">{err}</span>}
           {!err && inlineHelp && <span className="text-xs text-slate-400" dangerouslySetInnerHTML={{ __html: inlineHelp }} />}
@@ -652,14 +694,14 @@ function countPendingRequired(group: Component, values: Record<string, unknown>)
 }
 
 /** Grupo de topo como card próprio: ícone à esquerda + pill de pendências à direita. */
-function GroupCard({ group }: { group: Component }) {
+function GroupCard({ group, showHeader = true }: { group: Component; showHeader?: boolean }) {
   const { values } = useRuntime();
   const icon = group.properties?.septemGroupIcon;
   const showPending = group.properties?.septemShowPending !== 'no';
   const pending = showPending ? countPendingRequired(group, values) : 0;
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <header className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
+      {showHeader && <header className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
         <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
           {icon && <i className={`${icon} text-slate-500`} />}
           {group.label || 'Grupo'}
@@ -670,7 +712,7 @@ function GroupCard({ group }: { group: Component }) {
             {pending} pendente{pending > 1 ? 's' : ''}
           </span>
         )}
-      </header>
+      </header>}
       <div className="p-4">
         <LayoutGrid components={group.components ?? []} render={(c) => <Node comp={c} />} />
       </div>
@@ -692,18 +734,32 @@ function GroupTabsCards({ groups, extra }: { groups: Component[]; extra?: { lead
       label: grp.label || `Grupo ${i + 1}`,
       icon: grp.properties?.septemGroupIcon ? <i className={grp.properties.septemGroupIcon} /> : undefined,
       pending: grp.properties?.septemShowPending !== 'no' ? countPendingRequired(grp, values) : 0,
-      content: <GroupCard group={grp} />,
+      content: <GroupCard group={grp} showHeader={false} />,
     })),
     ...trail.map((t) => ({ key: `x:${t.id}`, label: t.label, icon: t.icon, pending: 0, content: t.render() })),
   ];
   const [active, setActive] = useState(0);
   const idx = Math.min(active, Math.max(0, tabs.length - 1));
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  function moveFocus(next: number) {
+    const normalized = (next + tabs.length) % tabs.length;
+    setActive(normalized);
+    tabRefs.current[normalized]?.focus();
+  }
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
-        <div className="flex flex-wrap gap-1">
+        <div role="tablist" aria-label="Seções do formulário" className="flex flex-wrap gap-1">
           {tabs.map((tab, i) => (
-            <button key={tab.key} type="button" onClick={() => setActive(i)}
+            <button key={tab.key} ref={(element) => { tabRefs.current[i] = element; }} type="button" role="tab"
+              id={`septem-tab-${tab.key}`} aria-selected={i === idx} aria-controls={`septem-panel-${tab.key}`} tabIndex={i === idx ? 0 : -1}
+              onClick={() => setActive(i)}
+              onKeyDown={(event) => {
+                if (event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); moveFocus(i + 1); }
+                if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') { event.preventDefault(); moveFocus(i - 1); }
+                if (event.key === 'Home') { event.preventDefault(); moveFocus(0); }
+                if (event.key === 'End') { event.preventDefault(); moveFocus(tabs.length - 1); }
+              }}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium uppercase tracking-wide ${i === idx ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
               {tab.icon}
               {tab.label}
@@ -714,56 +770,11 @@ function GroupTabsCards({ groups, extra }: { groups: Component[]; extra?: { lead
           ))}
         </div>
       </div>
-      {tabs[idx]?.content}
-    </div>
-  );
-}
-
-/**
- * Ícone de ajuda com aviso no hover/foco. O balão usa `position: fixed`,
- * largura automática (limitada à janela) e é reposicionado para caber no
- * viewport: prefere acima do ícone; se não couber, vai abaixo; clampa na
- * horizontal para não cortar nas bordas.
- */
-function HelpPopover({ html }: { html: string }) {
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const popRef = useRef<HTMLDivElement>(null);
-  const [style, setStyle] = useState<React.CSSProperties>({ visibility: 'hidden' });
-
-  useLayoutEffect(() => {
-    if (!open || !btnRef.current || !popRef.current) return;
-    const margin = 8;
-    const br = btnRef.current.getBoundingClientRect();
-    const pr = popRef.current.getBoundingClientRect();
-    let left = br.left + br.width / 2 - pr.width / 2;
-    left = Math.max(margin, Math.min(left, window.innerWidth - pr.width - margin));
-    const fitsAbove = br.top - pr.height - margin >= 0;
-    const top = fitsAbove ? br.top - pr.height - 6 : br.bottom + 6;
-    setStyle({ position: 'fixed', left, top, visibility: 'visible' });
-  }, [open]);
-
-  return (
-    <span className="relative inline-flex" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      <button
-        ref={btnRef}
-        type="button"
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        className="text-slate-400 hover:text-slate-600"
-        title="Ajuda"
-      >
-        <HelpCircle size={14} />
-      </button>
-      {open && createPortal(
-        <div
-          ref={popRef}
-          style={style}
-          className="pointer-events-none z-[1010] w-max max-w-[min(20rem,90vw)] rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 shadow-lg"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />,
-        document.body,
+      {tabs[idx] && (
+        <div role="tabpanel" id={`septem-panel-${tabs[idx].key}`} aria-labelledby={`septem-tab-${tabs[idx].key}`} tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2">
+          {tabs[idx].content}
+        </div>
       )}
-    </span>
+    </div>
   );
 }

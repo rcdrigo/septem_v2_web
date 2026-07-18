@@ -17,7 +17,7 @@ export function FormFieldsSection({ modeler, element }: Props) {
   return (
     <Section
       title="Configuração do formulário"
-      description="Visibilidade dos campos do formulário nesta tarefa."
+      help="Define a visibilidade dos campos do formulário nesta tarefa."
     >
       <FieldVisibilityEditor modeler={modeler} element={element} />
     </Section>

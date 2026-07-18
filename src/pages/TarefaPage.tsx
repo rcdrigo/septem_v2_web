@@ -13,7 +13,7 @@ export function TarefaPage() {
   const { taskId } = useParams<{ taskId: string }>();
   if (!taskId) return null;
   return (
-    <div className="h-screen bg-slate-100">
+    <div className="h-[100dvh] bg-slate-100">
       <TaskView taskId={taskId} onClose={() => window.close()} />
       <Toaster />
     </div>

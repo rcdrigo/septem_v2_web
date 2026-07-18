@@ -1,11 +1,15 @@
-import { useRef, useState } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Clock, History, LayoutDashboard, ListTree, Pencil, Play, Printer, Save, Search, Trash2, User, Workflow, X, XCircle } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { AlertCircle, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Clock, History, LayoutDashboard, ListTree, Pencil, Play, Printer, RotateCw, Save, Search, Trash2, User, Workflow, X, XCircle } from 'lucide-react';
 import { useInstances, useInstance, useCancelInstance, useDeleteInstance, useUpdateInstance, type InstanceListItem, type InstanceTask, type FieldChange } from '@/lib/api/execution';
 import { openTab } from '@/lib/nav';
 import { Dialog } from '@/components/ui/Dialog';
 import { ReactForm, type ReactFormHandle } from '@/components/form/ReactForm';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
+import { renderIcon } from '@/lib/icon-catalog';
+import { useViewMode, ViewToggle } from './TarefasPage';
+import { ProcessMessages, processMessagesExtra } from '@/components/execution/ProcessMessages';
 
 const STATUS = { em_andamento: { label: 'Em andamento', cls: 'bg-sky-100 text-sky-700' }, concluido: { label: 'Concluído', cls: 'bg-emerald-100 text-emerald-700' }, cancelado: { label: 'Cancelado', cls: 'bg-rose-100 text-rose-700' } } as Record<string, { label: string; cls: string }>;
 const TASK_STATUS = { pendente: 'bg-amber-100 text-amber-700', concluida: 'bg-emerald-100 text-emerald-700' } as Record<string, string>;
@@ -24,66 +28,54 @@ type InstanciasPageProps = {
  *  - "Tarefas executadas": todas as instâncias, com filtros livres.
  *  - "Minhas tarefas": travada nas instâncias que EU iniciei e em andamento.
  */
-export function InstanciasPage({ title = 'Tarefas executadas', lockMine = false, initialStatus = '' }: InstanciasPageProps = {}) {
-  const [q, setQ] = useState('');
-  const [status, setStatus] = useState(initialStatus);
-  const [mine, setMine] = useState(lockMine);
-  const [page, setPage] = useState(1);
+export function InstanciasPage({ title = 'Requisições', initialStatus = 'em_andamento' }: InstanciasPageProps = {}) {
+  const [params, setParams] = useSearchParams();
+  const status = params.get('status') || initialStatus;
+  const q = params.get('q') || '';
+  const page = Math.max(1, Number(params.get('page')) || 1);
+  const [view, setView] = useViewMode('septem.requests.view');
   const pageSize = 20;
-  // Relatório da instância abre em nova aba (sem menus), não mais em modal.
   const openReport = (id: string) => openTab(`/solicitacao/${id}`);
-
-  const list = useInstances({ q: q || undefined, status: status || undefined, mine, page, pageSize });
+  const list = useInstances({ q: q || undefined, status: status === 'todos' ? undefined : status, mine: true, page, pageSize });
   const total = list.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
+  useEffect(() => {
+    if (!params.has('status') || !params.has('page')) setParams((current) => {
+      if (!current.has('status')) current.set('status', initialStatus);
+      if (!current.has('page')) current.set('page', '1');
+      return current;
+    }, { replace: true });
+  }, [initialStatus, params, setParams]);
+
+  function update(next: Record<string, string | null>) {
+    setParams((current) => { for (const [key, value] of Object.entries(next)) { if (!value) current.delete(key); else current.set(key, value); } return current; });
+  }
+
   return (
-    <div className="flex h-full flex-col">
-      <header className="border-b border-slate-200 bg-white px-6 py-4"><h1 className="text-lg font-semibold text-slate-900">{title}</h1></header>
-      <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-white px-6 py-3">
-        <div className="relative flex-1 min-w-48">
-          <Search size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="search" placeholder="Buscar por processo..." value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-3 text-sm focus:border-slate-500 focus:outline-none" />
-        </div>
-        <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm">
-          <option value="">Todos os status</option>
-          <option value="em_andamento">Em andamento</option>
-          <option value="concluido">Concluídos</option>
-          <option value="cancelado">Cancelados</option>
-        </select>
-        {!lockMine && <label className="flex items-center gap-1.5 text-sm text-slate-600"><input type="checkbox" checked={mine} onChange={(e) => { setMine(e.target.checked); setPage(1); }} /> Apenas as que iniciei</label>}
+    <div className="task-index-root flex h-full min-w-0 flex-col">
+      <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 sm:px-6"><div className="min-w-0"><h1 className="text-lg font-semibold text-slate-900">{title}</h1><p className="mt-0.5 truncate text-sm text-slate-500">Processos iniciados por você.</p></div><ViewToggle view={view} setView={setView} /></header>
+      <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+        <div className="flex flex-wrap gap-2" aria-label="Status das requisições">{([['em_andamento', 'Em andamento'], ['concluido', 'Concluídos'], ['cancelado', 'Cancelados'], ['todos', 'Todos']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={status === value} onClick={() => update({ status: value, page: '1' })} className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 ${status === value ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}>{label}</button>)}</div>
+        <label className="relative mt-3 block max-w-xl"><span className="sr-only">Buscar requisições</span><Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="search" placeholder="Buscar por processo..." value={q} onChange={(event) => update({ q: event.target.value || null, page: '1' })} className="h-11 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm outline-2 outline-transparent hover:bg-slate-50 focus-visible:outline-slate-700" /></label>
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
-        {!list.isLoading && total === 0 ? (
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
+        {list.isLoading ? <RequestSkeletons /> : list.isError ? <RequestError onRetry={() => list.refetch()} /> : total === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400"><Workflow size={26} /></div>
-            <p className="text-sm font-medium text-slate-700">Nenhuma instância</p>
-            <p className="mt-1 text-sm text-slate-500">Processos iniciados aparecem aqui para acompanhamento.</p>
+            <p className="text-sm font-medium text-slate-700">Nenhuma requisição encontrada</p>
+            <p className="mt-1 max-w-sm text-sm text-slate-500">Ajuste os filtros ou inicie um serviço para acompanhar a solicitação aqui.</p>
           </div>
         ) : (
           <>
-            <table className="w-full overflow-hidden rounded-md border border-slate-200 bg-white text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-2 text-left">Processo</th><th className="px-4 py-2 text-left">Status</th><th className="px-4 py-2 text-left">Pendentes</th><th className="px-4 py-2 text-left">Início</th><th className="px-4 py-2 w-20" /></tr></thead>
-              <tbody>
-                {list.isLoading && <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Carregando...</td></tr>}
-                {list.data?.items.map((i: InstanceListItem) => (
-                  <tr key={i.id} className="border-t border-slate-100 hover:bg-slate-50">
-                    <td className="px-4 py-2 font-medium text-slate-800">{i.process ?? '—'}</td>
-                    <td className="px-4 py-2"><StatusBadge status={i.status} /></td>
-                    <td className="px-4 py-2 text-slate-600">{i.pendingTasks}</td>
-                    <td className="px-4 py-2 text-slate-500">{fmt(i.startedAt)}</td>
-                    <td className="px-4 py-2 text-right"><button type="button" onClick={() => openReport(i.id)} className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">Ver</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {view === 'cards' ? <RequestCards items={list.data?.items ?? []} onOpen={openReport} /> : <><div className="md:hidden"><RequestCards items={list.data?.items ?? []} onOpen={openReport} /></div><div className="hidden md:block"><RequestTable items={list.data?.items ?? []} onOpen={openReport} /></div></>}
             <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-              <span>{total} instância{total === 1 ? '' : 's'}</span>
+              <span>{total} requisição{total === 1 ? '' : 'ões'}</span>
               <div className="flex items-center gap-2">
-                <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="rounded border border-slate-300 p-1 disabled:opacity-40"><ChevronLeft size={14} /></button>
+                <button type="button" aria-label="Página anterior" disabled={page <= 1} onClick={() => update({ page: String(page - 1) })} className="flex h-11 w-11 items-center justify-center rounded border border-slate-300 disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={14} /></button>
                 <span>{page} / {totalPages}</span>
-                <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="rounded border border-slate-300 p-1 disabled:opacity-40"><ChevronRight size={14} /></button>
+                <button type="button" aria-label="Próxima página" disabled={page >= totalPages} onClick={() => update({ page: String(page + 1) })} className="flex h-11 w-11 items-center justify-center rounded border border-slate-300 disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight size={14} /></button>
               </div>
             </div>
           </>
@@ -93,9 +85,15 @@ export function InstanciasPage({ title = 'Tarefas executadas', lockMine = false,
   );
 }
 
+function RequestProcess({ item }: { item: InstanceListItem }) { const icon = item.processIcon ? renderIcon(item.processIcon, 13) : null; return <span title={item.categoryName || item.process || undefined} className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700"><span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" style={item.categoryColor ? { backgroundColor: item.categoryColor } : undefined} />{icon}<span className="truncate">{item.process || 'Processo'}</span></span>; }
+function RequestCards({ items, onOpen }: { items: InstanceListItem[]; onOpen: (id: string) => void }) { return <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">{items.map((item) => <article key={item.id} role="link" tabIndex={0} onClick={() => onOpen(item.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen(item.id); } }} className="group min-w-0 cursor-pointer rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><RequestProcess item={item} /><p title={item.categoryName || undefined} className="mt-1 truncate text-xs text-slate-500">{item.categoryName || 'Sem categoria'}</p></div><span className="shrink-0 text-xs font-semibold tabular-nums text-slate-500">{item.number != null ? `#${item.number}` : 'Sem número'}</span></div><p title={item.inboxText || undefined} className="mt-3 line-clamp-2 min-h-10 text-sm leading-5 text-slate-500">{item.inboxText || 'Sem resumo disponível.'}</p><div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 text-xs"><div><span className="block text-slate-400">Status</span><StatusBadge status={item.status} /></div><div><span className="block text-slate-400">Pendências</span><strong className="text-slate-700">{item.pendingTasks}</strong></div><div><span className="block text-slate-400">Início</span><span className="text-slate-600">{fmt(item.startedAt)}</span></div><div><span className="block text-slate-400">Fim</span><span className="text-slate-600">{item.endedAt ? fmt(item.endedAt) : '—'}</span></div></div><span className="task-access mt-3 flex items-center justify-end gap-1 text-xs font-semibold text-slate-700 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">Acessar <ArrowRight size={14} /></span></article>)}</div>; }
+function RequestTable({ items, onOpen }: { items: InstanceListItem[]; onOpen: (id: string) => void }) { return <div className="rounded-lg border border-slate-200 bg-white"><table className="w-full table-fixed text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="w-[28%] px-4 py-3 text-left">Processo</th><th className="w-[25%] px-4 py-3 text-left">Resumo</th><th className="w-[14%] px-4 py-3 text-left">Status</th><th className="w-[10%] px-4 py-3 text-left">Pendentes</th><th className="w-[15%] px-4 py-3 text-left">Início / fim</th><th className="w-[8%] px-4 py-3" /></tr></thead><tbody>{items.map((item) => <tr key={item.id} tabIndex={0} onClick={() => onOpen(item.id)} onKeyDown={(event) => { if (event.key === 'Enter') onOpen(item.id); }} className="group cursor-pointer border-t border-slate-100 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-slate-700"><td className="px-4 py-3"><RequestProcess item={item} /><p title={item.categoryName || undefined} className="mt-1 truncate text-xs text-slate-500">{item.categoryName || 'Sem categoria'} · {item.number != null ? `#${item.number}` : 'Sem número'}</p></td><td title={item.inboxText || undefined} className="truncate px-4 py-3 text-slate-500">{item.inboxText || '—'}</td><td className="px-4 py-3"><StatusBadge status={item.status} /></td><td className="px-4 py-3 font-semibold text-slate-700">{item.pendingTasks}</td><td className="px-4 py-3 text-xs text-slate-500">{fmt(item.startedAt)}<br />{item.endedAt ? fmt(item.endedAt) : '—'}</td><td className="px-4 py-3"><span className="task-access inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold opacity-0 group-hover:opacity-100 group-focus:opacity-100">Acessar <ArrowRight size={14} /></span></td></tr>)}</tbody></table></div>; }
+function RequestSkeletons() { return <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Carregando requisições">{[0, 1, 2].map((item) => <div key={item} className="h-52 animate-pulse rounded-lg border border-slate-200 bg-white p-4"><div className="h-6 w-32 rounded-full bg-slate-100" /><div className="mt-4 h-10 rounded bg-slate-100" /></div>)}</div>; }
+function RequestError({ onRetry }: { onRetry: () => void }) { return <div role="alert" className="mx-auto flex max-w-md flex-col items-center py-16 text-center"><AlertCircle className="text-rose-600" /><p className="mt-3 font-semibold text-slate-900">Não foi possível carregar as requisições</p><button type="button" onClick={onRetry} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white"><RotateCw size={15} />Tentar novamente</button></div>; }
+
 /** Conteúdo do relatório de uma instância: abas Visão geral + Formulário (só-leitura) + Tramitação. */
-export function InstanceReport({ id }: { id: string }) {
-  const inst = useInstance(id);
+export function InstanceReport({ id, messageAccess }: { id: string; messageAccess?: string | null }) {
+  const inst = useInstance(id, messageAccess);
   const update = useUpdateInstance();
   const cancel = useCancelInstance();
   const del = useDeleteInstance();
@@ -111,6 +109,8 @@ export function InstanceReport({ id }: { id: string }) {
   const data = (d.data ?? {}) as Record<string, unknown>;
   const canEditForm = !!d.canEdit && !!d.formSchema; // edição inline só quando há schema
   const hasActions = !!d.canCancel || !!d.canDelete;
+  const showMessages = (d.messages?.count ?? 0) > 0 || d.messages?.canPost === true;
+  const messageExtra = showMessages ? processMessagesExtra({ executionId: id, originType: 'report', messageAccess }) : null;
 
   async function doSave() {
     const res = formRef.current?.submit();
@@ -183,7 +183,10 @@ export function InstanceReport({ id }: { id: string }) {
           readOnly={!editing}
           extraTabs={{
             leading: [{ id: 'overview', label: 'Visão geral', icon: <LayoutDashboard size={15} />, render: () => <OverviewTab d={d} /> }],
-            trailing: [{ id: 'history', label: 'Tramitação', icon: <ListTree size={15} />, render: () => <TramitacaoTab d={d} /> }],
+            trailing: [
+              { id: 'history', label: 'Tramitação', icon: <ListTree size={15} />, render: () => <TramitacaoTab d={d} /> },
+              ...(messageExtra ? [messageExtra] : []),
+            ],
           }}
         />
       ) : (
@@ -191,6 +194,7 @@ export function InstanceReport({ id }: { id: string }) {
           <OverviewTab d={d} />
           <KeyValueData data={data} />
           <TramitacaoTab d={d} />
+          {showMessages && <ProcessMessages executionId={id} originType="report" messageAccess={messageAccess} />}
         </div>
       )}
     </div>

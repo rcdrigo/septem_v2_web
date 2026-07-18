@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { useSessionStore } from '@/stores/session';
 import { ApiError } from '@/lib/api';
@@ -7,6 +7,7 @@ import { toast } from '@/stores/toast';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { PasswordChecklist, isPasswordValid } from '@/components/PasswordChecklist';
 import { forgotPassword, resetPassword } from '@/lib/api/account';
+import '@/styles/login.css';
 
 /**
  * Página /login fora do AppShell — layout em duas colunas (proposta do dono,
@@ -20,11 +21,15 @@ type Step = 'credenciais' | '2fa' | 'esqueci' | 'redefinir';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedReturn = searchParams.get('returnUrl');
+  const returnUrl = requestedReturn?.startsWith('/') && !requestedReturn.startsWith('//') ? requestedReturn : '/';
   const tenant = useSessionStore((s) => s.tenant);
   const login = useSessionStore((s) => s.login);
   const completeTwoFactor = useSessionStore((s) => s.completeTwoFactor);
   const status = useSessionStore((s) => s.status);
   const bootstrap = useSessionStore((s) => s.bootstrap);
+  const tenantName = tenant?.clienteNome?.trim() || 'Prefeitura Municipal';
   useDocumentTitle('Entrar');
 
   // Branding do tenant no /login acessado direto: o bootstrap só rodava no
@@ -50,8 +55,8 @@ export function LoginPage() {
   const [novaSenha, setNovaSenha] = useState('');
 
   useEffect(() => {
-    if (status === 'authenticated') navigate('/', { replace: true });
-  }, [status, navigate]);
+    if (status === 'authenticated') navigate(returnUrl, { replace: true });
+  }, [status, navigate, returnUrl]);
 
   function limparFluxo() {
     setCode('');
@@ -113,7 +118,7 @@ export function LoginPage() {
         setStep('2fa');
         return;
       }
-      navigate('/', { replace: true });
+      navigate(returnUrl, { replace: true });
     } catch (err) {
       tratarErro(err, 'Não foi possível entrar. Tente novamente.');
     } finally {
@@ -127,7 +132,7 @@ export function LoginPage() {
     setAviso(null);
     try {
       await completeTwoFactor(identifier, code, trustDevice, keepConnected);
-      navigate('/', { replace: true });
+      navigate(returnUrl, { replace: true });
     } catch (err) {
       tratarErro(err, 'Não foi possível validar o código.');
     } finally {
@@ -174,61 +179,50 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4 sm:p-6">
-      <div className="grid w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white lg:grid-cols-2">
+    <div className="login-page">
+      <div className="login-card">
         {/* ── Painel institucional (esquerda) ─────────────────────────────── */}
-        <div
-          className="relative flex flex-col justify-between overflow-hidden bg-slate-900 bg-cover bg-center p-8 sm:p-10"
-          style={tenant?.heroImageUrl ? { backgroundImage: `url(${tenant.heroImageUrl})` } : undefined}
-          data-testid="login-hero"
-        >
-          {/* Com imagem de destaque, escurece o fundo para o texto seguir legível. */}
-          {tenant?.heroImageUrl && <div aria-hidden className="absolute inset-0 bg-slate-900/75" />}
-          {/* círculos decorativos */}
-          <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-sky-800/40" />
-          <div aria-hidden className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-sky-600/40" />
-          <div aria-hidden className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full border-[22px] border-slate-800/80" />
+        <aside className="login-hero-panel" data-testid="login-hero">
+          <div className="login-corner-bands login-corner-bands--top-right" aria-hidden="true">
+            <i /><i /><i />
+          </div>
+          <div className="login-corner-bands login-corner-bands--bottom-left" aria-hidden="true">
+            <i /><i /><i />
+          </div>
 
-          <div className="relative">
-            <div className="flex items-center gap-2.5">
-              {tenant?.logoUrl && <img src={tenant.logoUrl} alt="" className="h-8 w-auto" />}
-              <div>
-                {/* Copy fixa do painel institucional (mock do dono) — o branding
-                    por tenant segue no restante do app (sidenav, títulos etc.). */}
-                <p className="text-base font-semibold text-white">Prefeitura Municipal</p>
-                <p className="text-sm text-slate-400">Gestão integrada</p>
-              </div>
+          <div className="login-tenant-brand">
+            <div>
+              <strong>{tenantName}</strong>
+              <span>Gestão integrada</span>
             </div>
           </div>
 
-          <div className="relative my-10 lg:my-16">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-amber-400">
-              Processos &amp; Compliance
-            </p>
-            <h2 className="max-w-md text-3xl font-bold leading-tight text-white sm:text-4xl">
-              Processos claros, conformidade em cada decisão.
+          <div className="login-hero-copy">
+            <span className="login-hero-eyebrow">PROCESSOS &amp; COMPLIANCE</span>
+            <h2>
+              Processos claros,<br />
+              conformidade em<br className="login-hero-title-break" /> cada decisão.
             </h2>
-            {tenant?.systemDescription && (
-              <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-300" data-testid="login-descricao">
-                {tenant.systemDescription}
-              </p>
-            )}
           </div>
 
-          <div className="relative grid gap-3 sm:grid-cols-2">
-            <div className="rounded-xl bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-900">Precisa de ajuda?</p>
-              <p className="mt-1 text-xs text-slate-500">Domine a plataforma com nosso guia.</p>
-            </div>
-            <div className="rounded-xl bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-900">Consultar processo</p>
-              <p className="mt-1 text-xs text-slate-500">Valide seu protocolo ou os documentos emitidos ao final dos processos.</p>
-            </div>
+          <div className="login-hero-actions">
+            <button type="button" className="login-hero-action">
+              <strong>Precisa de ajuda?</strong>
+              <span>Domine a plataforma com nosso guia.</span>
+            </button>
+            <button type="button" className="login-hero-action login-hero-action--wide">
+              <strong>Consultar processo</strong>
+              <span>Valide seu protocolo ou os documentos emitidos ao final dos processos.</span>
+            </button>
           </div>
-        </div>
+        </aside>
 
         {/* ── Formulário (direita) ─────────────────────────────────────────── */}
-        <div className="flex flex-col justify-center p-8 sm:p-10 lg:p-14" data-step={step}>
+        <main className="login-form-panel" data-step={step}>
+          <div className="login-mobile-brand">
+            <strong>{tenantName}</strong>
+          </div>
+
           {step === 'credenciais' && (
             <>
               <h1 className="text-3xl font-bold text-slate-900">Bem-vindo de volta</h1>
@@ -407,7 +401,7 @@ export function LoginPage() {
           <p className="mt-10 text-center text-xs text-slate-400">
             Tecnologia <span className="font-semibold text-slate-500">Septem</span>
           </p>
-        </div>
+        </main>
       </div>
     </div>
   );

@@ -20,15 +20,23 @@ await page.screenshot({ path: `${OUT}/servico-header.png` });
 const h = await page.evaluate(() => ({
   h1: document.querySelector('h1')?.textContent?.trim(),
   processLine: [...document.querySelectorAll('header span')].map((s) => s.textContent?.trim()),
+  paragraphCount: document.querySelectorAll('header > p').length,
 }));
 check(h.h1 === 'Preencher solicitação de pagamento', `h1 = nome da tarefa de início ("${h.h1}")`);
 check(h.processLine.includes('Teste Condicoes UI'), `linha do processo presente (${JSON.stringify(h.processLine)})`);
+check(h.paragraphCount === 0, 'header sem parágrafo de ambiente/cliente');
 
 // mobile
 await page.setViewportSize({ width: 375, height: 812 });
 await page.waitForTimeout(500);
 const mobOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
 check(!mobOverflow, 'tela de início mobile sem scroll horizontal');
+check(await page.getByRole('button', { name: 'Botões de conclusão' }).count() === 1, 'mobile exibe somente o acionador dos botões de conclusão');
+await page.getByRole('button', { name: 'Botões de conclusão' }).click();
+check(await page.getByRole('dialog', { name: 'Botões de conclusão' }).count() === 1, 'acionador abre a lista mobile em dialog');
+check(await page.getByRole('button', { name: 'Salvar', exact: true }).count() === 0, 'tarefa de início não adiciona Salvar no mobile');
+check(await page.getByRole('button', { name: 'Cancelar', exact: true }).count() === 0, 'tarefa de início não adiciona Cancelar no mobile');
+await page.getByRole('button', { name: 'Voltar ao formulário' }).click();
 await page.screenshot({ path: `${OUT}/servico-header-mobile.png` });
 
 console.log(failures === 0 ? 'PASSOU' : `FALHOU: ${failures} caso(s)`);

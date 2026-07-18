@@ -1,0 +1,51 @@
+/* Hallmark · component: request launcher modal · genre: modern-minimal · theme: existing Slate
+ * states: default · hover · focus · active · disabled · loading · error · success
+ * contrast: pass (40–41)
+ */
+/* Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V5 */
+@import "../../tokens.css";
+
+.new-request-card {
+  transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+}
+
+.new-request-card:active {
+  transform: translateY(1px);
+}
+
+.new-request-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.new-request-action {
+  opacity: 1;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .new-request-card:hover {
+    border-color: var(--color-rule-strong);
+    background-color: var(--color-paper-subtle);
+  }
+
+  .new-request-action {
+    opacity: 0;
+  }
+
+  .new-request-card:hover .new-request-action,
+  .new-request-card:focus-visible .new-request-action {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .new-request-card,
+  .new-request-action {
+    transition-duration: 1ms;
+  }
+
+  .new-request-card:active {
+    transform: none;
+  }
+}
