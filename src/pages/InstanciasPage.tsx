@@ -9,6 +9,7 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { renderIcon } from '@/lib/icon-catalog';
 import { useViewMode, ViewToggle } from './TarefasPage';
+import { ProcessMessages, processMessagesExtra } from '@/components/execution/ProcessMessages';
 
 const STATUS = { em_andamento: { label: 'Em andamento', cls: 'bg-sky-100 text-sky-700' }, concluido: { label: 'Concluído', cls: 'bg-emerald-100 text-emerald-700' }, cancelado: { label: 'Cancelado', cls: 'bg-rose-100 text-rose-700' } } as Record<string, { label: string; cls: string }>;
 const TASK_STATUS = { pendente: 'bg-amber-100 text-amber-700', concluida: 'bg-emerald-100 text-emerald-700' } as Record<string, string>;
@@ -91,8 +92,8 @@ function RequestSkeletons() { return <div className="grid gap-3 sm:grid-cols-2 x
 function RequestError({ onRetry }: { onRetry: () => void }) { return <div role="alert" className="mx-auto flex max-w-md flex-col items-center py-16 text-center"><AlertCircle className="text-rose-600" /><p className="mt-3 font-semibold text-slate-900">Não foi possível carregar as requisições</p><button type="button" onClick={onRetry} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white"><RotateCw size={15} />Tentar novamente</button></div>; }
 
 /** Conteúdo do relatório de uma instância: abas Visão geral + Formulário (só-leitura) + Tramitação. */
-export function InstanceReport({ id }: { id: string }) {
-  const inst = useInstance(id);
+export function InstanceReport({ id, messageAccess }: { id: string; messageAccess?: string | null }) {
+  const inst = useInstance(id, messageAccess);
   const update = useUpdateInstance();
   const cancel = useCancelInstance();
   const del = useDeleteInstance();
@@ -108,6 +109,8 @@ export function InstanceReport({ id }: { id: string }) {
   const data = (d.data ?? {}) as Record<string, unknown>;
   const canEditForm = !!d.canEdit && !!d.formSchema; // edição inline só quando há schema
   const hasActions = !!d.canCancel || !!d.canDelete;
+  const showMessages = (d.messages?.count ?? 0) > 0 || d.messages?.canPost === true;
+  const messageExtra = showMessages ? processMessagesExtra({ executionId: id, originType: 'report', messageAccess }) : null;
 
   async function doSave() {
     const res = formRef.current?.submit();
@@ -180,7 +183,10 @@ export function InstanceReport({ id }: { id: string }) {
           readOnly={!editing}
           extraTabs={{
             leading: [{ id: 'overview', label: 'Visão geral', icon: <LayoutDashboard size={15} />, render: () => <OverviewTab d={d} /> }],
-            trailing: [{ id: 'history', label: 'Tramitação', icon: <ListTree size={15} />, render: () => <TramitacaoTab d={d} /> }],
+            trailing: [
+              { id: 'history', label: 'Tramitação', icon: <ListTree size={15} />, render: () => <TramitacaoTab d={d} /> },
+              ...(messageExtra ? [messageExtra] : []),
+            ],
           }}
         />
       ) : (
@@ -188,6 +194,7 @@ export function InstanceReport({ id }: { id: string }) {
           <OverviewTab d={d} />
           <KeyValueData data={data} />
           <TramitacaoTab d={d} />
+          {showMessages && <ProcessMessages executionId={id} originType="report" messageAccess={messageAccess} />}
         </div>
       )}
     </div>

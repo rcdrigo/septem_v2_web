@@ -1,4 +1,4 @@
-import { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { createContext, forwardRef, Fragment, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Plus, Trash2, Paperclip, X, Loader2 } from 'lucide-react';
 import { HelpPopover } from '@/components/ui/HelpPopover';
 import { api, ApiError } from '@/lib/api';
@@ -234,9 +234,9 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
     // Cada grupo de topo vira um card; os cards se distribuem no grid de 16 col
     // (8+8 = lado a lado). Em "abas", a barra fica num card e o conteúdo noutro.
     const isGroup = (c: Component) => !!(c.components && !c.key);
-    // Abas quando o form pede tabs OU quando há abas extras (ex.: relatório com
-    // "Visão geral"/"Tramitação"): tudo numa única barra de abas.
-    const useTabs = layout === 'tabs' || !!extraTabs;
+    // A configuração do formulário é autoritativa: extras entram na barra quando
+    // o layout é "tabs" e viram cards antes/depois do formulário em "stacked".
+    const useTabs = layout === 'tabs';
     let body: React.ReactNode;
     if (useTabs) {
       const groups = comps.filter(isGroup);
@@ -248,7 +248,13 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
         </div>
       );
     } else {
-      body = <LayoutGrid components={comps} render={(c) => (isGroup(c) ? <GroupCard group={c} /> : <Node comp={c} />)} />;
+      body = (
+        <div className="flex flex-col gap-4">
+          {(extraTabs?.leading ?? []).map((extra) => <Fragment key={`x:${extra.id}`}>{extra.render()}</Fragment>)}
+          <LayoutGrid components={comps} render={(c) => (isGroup(c) ? <GroupCard group={c} /> : <Node comp={c} />)} />
+          {(extraTabs?.trailing ?? []).map((extra) => <Fragment key={`x:${extra.id}`}>{extra.render()}</Fragment>)}
+        </div>
+      );
     }
 
     if (dsLoading) return <FormSkeleton />;

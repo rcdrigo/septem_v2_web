@@ -10,6 +10,7 @@ import { ApiError } from '@/lib/api';
 import { Dialog } from '@/components/ui/Dialog';
 import { ExecutionHeader } from '@/components/execution/ExecutionHeader';
 import { TaskActionFooter, type ExecutionAction } from '@/components/execution/TaskActionFooter';
+import { processMessagesExtra } from '@/components/execution/ProcessMessages';
 import { renderIcon } from '@/lib/icon-catalog';
 import '@/styles/task-index.css';
 
@@ -283,6 +284,10 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
     },
     { id: '__cancel', label: 'Cancelar', onClick: onClose, variant: 'secondary' },
   ];
+  const showMessages = (task.data?.messages?.count ?? 0) > 0 || task.data?.messages?.canPost === true;
+  const messageExtra = showMessages && task.data?.executionId
+    ? processMessagesExtra({ executionId: task.data.executionId, originType: 'task', taskId })
+    : null;
 
   return (
     <div className="flex h-full flex-col">
@@ -298,7 +303,7 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
 
       {/* Cada grupo renderiza seu próprio card (sem container único). */}
       <main className="flex-1 overflow-auto p-4 sm:p-6">
-        {task.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={task.data?.formSchema} data={task.data?.data as Record<string, unknown> | undefined} optionsByField={task.data?.fieldOptions} uploadContext={{ taskId }} />}
+        {task.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={task.data?.formSchema} data={task.data?.data as Record<string, unknown> | undefined} optionsByField={task.data?.fieldOptions} uploadContext={{ taskId }} extraTabs={messageExtra ? { trailing: [messageExtra] } : undefined} />}
       </main>
 
       <TaskActionFooter completionActions={completionActions} utilityActions={utilityActions} loading={task.isLoading} compactDesktop />

@@ -16,6 +16,7 @@ export type TaskDetail = {
   alias?: string | null; sector?: string | null;
   documentationUrl?: string | null;
   formSchema: unknown; data: unknown; buttons: TaskButton[]; fieldOptions?: FieldOptions;
+  messages?: { count: number; canPost: boolean };
 };
 export type CompleteResult = { taskStatus: string; executionStatus: string; pendingTasks: number; executionId?: string; nextTaskForMe?: string | null };
 
@@ -102,7 +103,7 @@ export type InstancesPage = { items: InstanceListItem[]; total: number; page: nu
 export type FieldChange = { changedAt: string; changedBy: string | null; impersonator: string | null; action: string; group: string | null; field: string; changeType: string; oldValue: string | null; newValue: string | null };
 export type InstanceTask = { id: string; name: string | null; status: string; assignee: string | null; completedBy: string | null; completedByImpersonator?: string | null; createdAt: string; completedAt: string | null; dueAt: string | null; action: string | null; justification?: string | null; fieldHistory?: FieldChange[] };
 export type ActiveTask = { name: string | null; assignee: string | null; startedAt?: string | null; dueAt: string | null };
-export type InstanceDetail = { id: string; number?: number; process: string | null; category?: string | null; flowKey?: string | null; requester?: string | null; status: string; startedAt: string; endedAt: string | null; data: unknown; formSchema?: unknown; inboxHtml?: string | null; activeTask?: ActiveTask | null; tasks: InstanceTask[]; canEdit?: boolean; canCancel?: boolean; canDelete?: boolean };
+export type InstanceDetail = { id: string; number?: number; process: string | null; category?: string | null; flowKey?: string | null; requester?: string | null; status: string; startedAt: string; endedAt: string | null; data: unknown; formSchema?: unknown; inboxHtml?: string | null; activeTask?: ActiveTask | null; tasks: InstanceTask[]; canEdit?: boolean; canCancel?: boolean; canDelete?: boolean; messages?: { count: number; canPost: boolean } };
 export type InstancesParams = { q?: string; status?: string; mine?: boolean; page?: number; pageSize?: number };
 
 export function useInstances(params: InstancesParams) {
@@ -115,8 +116,9 @@ export function useInstances(params: InstancesParams) {
   return useQuery({ queryKey: ['workflow', 'instances', params], queryFn: () => api.get<InstancesPage>(`/api/v1/workflow/instances?${qs.toString()}`), placeholderData: (p) => p });
 }
 
-export function useInstance(id: string | null) {
-  return useQuery({ queryKey: ['workflow', 'instance', id], queryFn: () => api.get<InstanceDetail>(`/api/v1/workflow/instances/${id}`), enabled: !!id });
+export function useInstance(id: string | null, messageAccess?: string | null) {
+  const qs = messageAccess ? `?messageAccess=${encodeURIComponent(messageAccess)}` : '';
+  return useQuery({ queryKey: ['workflow', 'instance', id, messageAccess ?? 'normal'], queryFn: () => api.get<InstanceDetail>(`/api/v1/workflow/instances/${id}${qs}`), enabled: !!id });
 }
 
 /** Edita (overlay) os dados do formulário de uma instância (admin ou capability 'edit'). */

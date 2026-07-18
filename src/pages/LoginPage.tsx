@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { useSessionStore } from '@/stores/session';
 import { ApiError } from '@/lib/api';
@@ -21,6 +21,9 @@ type Step = 'credenciais' | '2fa' | 'esqueci' | 'redefinir';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedReturn = searchParams.get('returnUrl');
+  const returnUrl = requestedReturn?.startsWith('/') && !requestedReturn.startsWith('//') ? requestedReturn : '/';
   const tenant = useSessionStore((s) => s.tenant);
   const login = useSessionStore((s) => s.login);
   const completeTwoFactor = useSessionStore((s) => s.completeTwoFactor);
@@ -52,8 +55,8 @@ export function LoginPage() {
   const [novaSenha, setNovaSenha] = useState('');
 
   useEffect(() => {
-    if (status === 'authenticated') navigate('/', { replace: true });
-  }, [status, navigate]);
+    if (status === 'authenticated') navigate(returnUrl, { replace: true });
+  }, [status, navigate, returnUrl]);
 
   function limparFluxo() {
     setCode('');
@@ -115,7 +118,7 @@ export function LoginPage() {
         setStep('2fa');
         return;
       }
-      navigate('/', { replace: true });
+      navigate(returnUrl, { replace: true });
     } catch (err) {
       tratarErro(err, 'Não foi possível entrar. Tente novamente.');
     } finally {
@@ -129,7 +132,7 @@ export function LoginPage() {
     setAviso(null);
     try {
       await completeTwoFactor(identifier, code, trustDevice, keepConnected);
-      navigate('/', { replace: true });
+      navigate(returnUrl, { replace: true });
     } catch (err) {
       tratarErro(err, 'Não foi possível validar o código.');
     } finally {
