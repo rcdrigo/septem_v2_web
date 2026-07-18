@@ -20,6 +20,7 @@ export type TaskDetail = {
 export type CompleteResult = { taskStatus: string; executionStatus: string; pendingTasks: number; executionId?: string; nextTaskForMe?: string | null };
 
 const execKeys = { tasks: ['workflow', 'tasks'] as const, summary: ['workflow', 'tasks', 'summary'] as const, task: (id: string) => ['workflow', 'task', id] as const };
+const TASKS_REFETCH_INTERVAL_MS = 60_000;
 
 /** Schema form-js do processo (formulário inicial de "Iniciar"). */
 export type StartForm = {
@@ -60,11 +61,18 @@ export function useTasks(status: 'pendentes' | 'concluidas') {
   return useQuery({
     queryKey: [...execKeys.tasks, status],
     queryFn: () => api.get<TaskListItem[]>(`/api/v1/workflow/tasks?${query}`),
+    refetchInterval: TASKS_REFETCH_INTERVAL_MS,
+    refetchIntervalInBackground: true,
   });
 }
 
 export function useTaskSummary() {
-  return useQuery({ queryKey: execKeys.summary, queryFn: () => api.get<TaskSummary>('/api/v1/workflow/tasks/summary') });
+  return useQuery({
+    queryKey: execKeys.summary,
+    queryFn: () => api.get<TaskSummary>('/api/v1/workflow/tasks/summary'),
+    refetchInterval: TASKS_REFETCH_INTERVAL_MS,
+    refetchIntervalInBackground: true,
+  });
 }
 
 export function useTask(id: string | null) {

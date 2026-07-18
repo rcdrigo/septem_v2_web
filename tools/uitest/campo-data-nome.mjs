@@ -8,7 +8,9 @@ const OUT = process.env.OUT_DIR || '.';
 const ok = [], bad = [];
 const check = (c, m) => (c ? ok.push(m) : bad.push(m));
 
-const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
+const chrome = process.env.CHROME_BIN
+  || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : '/usr/bin/google-chrome');
+const browser = await chromium.launch({ executablePath: chrome, headless: true });
 const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
 try {
   await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
@@ -54,9 +56,11 @@ try {
   await page.locator('button', { hasText: 'Pré-visualizar' }).first().click();
   const dateSel = '[role=dialog] .septem-date-picker-input';
   await page.waitForSelector(dateSel, { timeout: 8000 });
-  await page.locator('[role=dialog] [data-date-picker-trigger]').first().click();
+  check(await page.locator('[role=dialog] [data-date-picker-mode="datetime"]').count() === 1, '[web] campo novo mantém o subtipo data e hora');
+  await page.locator(dateSel).focus();
   const abriu = await page.locator('[data-date-picker-popover]').count() > 0;
-  check(abriu, '[web] o calendário shadcn Base abre pelo botão');
+  check(abriu, '[web] o calendário shadcn Base abre ao focar o campo');
+  check(await page.locator('[data-date-picker-time]').count() === 1, '[web] o subtipo data e hora exibe o seletor de horário');
   await page.screenshot({ path: `${OUT}/campo-data-nome.png` });
 } finally { await browser.close(); }
 ok.forEach((m) => console.log('✓ ' + m));

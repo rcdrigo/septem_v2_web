@@ -278,9 +278,18 @@ export function FieldConfigPanel({ field, editField, masks }: {
                 onChange={(v) => merge('properties', { septemDocKind: v || undefined })} />
             )}
             {field.type === 'datetime' && (
-              <Select label="Tipo" value={props.septemDateMode ?? 'datetime'} options={DATE_MODE_OPTIONS}
+              <Select label="Tipo" value={props.septemDateMode ?? field.subtype ?? 'datetime'} options={DATE_MODE_OPTIONS}
                 hint="Escolhe o seletor: data e hora, só data ou só hora."
-                onChange={(v) => merge('properties', { septemDateMode: v === 'datetime' ? undefined : v })} />
+                onChange={(v) => {
+                  // `subtype` controla o próprio form-js; a propriedade Septem é
+                  // preservada para schemas e consumidores já publicados.
+                  editField(field, ['subtype'], v);
+                  editField(field, ['properties'], {
+                    ...(field.properties || {}),
+                    septemDateMode: v === 'datetime' ? undefined : v,
+                  });
+                  force((n) => n + 1);
+                }} />
             )}
             {MASKABLE.has(field.type) && field.type !== 'datetime' && !props.septemDocKind && (
               <Select label="Máscara" value={props.septemMaskId ?? ''} options={[{ value: '', label: '— nenhuma —' }, ...masks]}

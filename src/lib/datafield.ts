@@ -7,6 +7,15 @@
 export type DateMode = 'datetime' | 'date' | 'time';
 export type DateLimit = '' | 'noPast' | 'noFuture';
 
+/**
+ * Normaliza o subtipo vindo do form-js e mantém schemas legados seguros.
+ * O editor usa `subtype`; versões anteriores do cockpit gravavam apenas
+ * `properties.septemDateMode`.
+ */
+export function normalizeDateMode(mode: unknown): DateMode {
+  return mode === 'date' || mode === 'time' || mode === 'datetime' ? mode : 'datetime';
+}
+
 export const DATE_MODE_OPTIONS = [
   { value: 'datetime', label: 'Data e hora' },
   { value: 'date', label: 'Somente data' },

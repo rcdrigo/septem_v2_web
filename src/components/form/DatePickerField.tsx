@@ -144,6 +144,8 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
   const [open, setOpen] = useState(false);
   const [timeDraft, setTimeDraft] = useState(currentTime);
   const lastEmitted = useRef<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
   const validityCallback = useRef(onValidityChange);
   validityCallback.current = onValidityChange;
   const previousMode = useRef(mode);
@@ -160,6 +162,7 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
     lastEmitted.current = null;
     setDisplay(displayFromIso(value, mode));
     setLocalError(undefined);
+    if (changedMode) setOpen(false);
     validityCallback.current?.(null);
   }, [value, mode]);
 
@@ -200,6 +203,14 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
       const result = inspect(display, mode, limit);
       if (!result.valid) setLocalError(result.reason);
     }
+    const nextTarget = event.relatedTarget;
+    if (
+      hasCalendar &&
+      (!nextTarget || (
+        !containerRef.current?.contains(nextTarget) &&
+        !popupRef.current?.contains(nextTarget)
+      ))
+    ) setOpen(false);
     onBlur?.(event);
   }
 
@@ -243,13 +254,14 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
   const invalidReason = localError ? reasonText[localError] : undefined;
   const invalid = !!error || !!localError;
   const inputLabel = ariaLabel || (mode === 'time' ? 'Hora' : mode === 'date' ? 'Data' : 'Data e hora');
+  const inputMinWidth = mode === 'datetime' ? 'min-w-[17ch]' : mode === 'date' ? 'min-w-[11ch]' : 'min-w-[6ch]';
   const inputClass = [
-    'septem-date-picker-input h-10 min-w-0 flex-1 bg-white px-3 text-sm text-slate-800 outline-none',
+    `septem-date-picker-input h-10 w-0 flex-1 ${inputMinWidth} bg-white px-3 text-sm text-slate-800 outline-none`,
     invalid ? 'text-rose-700' : '',
   ].join(' ');
 
   return (
-    <div className="septem-date-picker relative">
+    <div ref={containerRef} className="septem-date-picker relative w-full min-w-0" data-date-picker-mode={mode}>
       <input type="hidden" value={value} readOnly data-date-picker-iso="" />
       <div className={`flex w-full items-center overflow-hidden rounded-md border bg-white transition-colors ${invalid ? 'border-rose-400 focus-within:ring-2 focus-within:ring-rose-300' : 'border-slate-300 hover:border-slate-400 focus-within:border-slate-500 focus-within:ring-2 focus-within:ring-slate-300'}`}>
         <input
@@ -266,10 +278,21 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
           title={invalidReason}
           data-date-picker-input=""
           onChange={handleManualChange}
-          onFocus={onFocus}
+          onFocus={(event) => {
+            onFocus?.(event);
+            if (hasCalendar) handleOpenChange(true);
+          }}
           onBlur={handleBlur}
-          onClick={onClick}
+          onClick={(event) => {
+            onClick?.(event);
+            if (hasCalendar && !open) handleOpenChange(true);
+          }}
           onKeyDown={(event) => {
+            if (hasCalendar && open && event.key === 'Escape') {
+              event.preventDefault();
+              setOpen(false);
+              return;
+            }
             if (hasCalendar && event.altKey && event.key === 'ArrowDown') {
               event.preventDefault();
               setOpen(true);
@@ -303,6 +326,9 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
             <Popover.Portal>
               <Popover.Positioner sideOffset={6} collisionPadding={8} className="z-[1000] outline-none">
                 <Popover.Popup
+                  ref={popupRef}
+                  initialFocus={false}
+                  finalFocus={false}
                   className="max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-900 shadow-xl outline-none data-[ending-style]:opacity-0 data-[starting-style]:opacity-0"
                   data-date-picker-popover=""
                 >

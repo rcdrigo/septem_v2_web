@@ -80,7 +80,7 @@ export function TarefasPage() {
 }
 
 function FilterPill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button type="button" aria-pressed={active} onClick={onClick} className={`min-h-11 max-w-full truncate whitespace-nowrap rounded-full border px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 ${active ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}>{children}</button>;
+  return <button type="button" aria-pressed={active} onClick={onClick} className={`max-w-full truncate whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 ${active ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}>{children}</button>;
 }
 
 function EmptyTasks({ status, filtered }: { status: TaskStatusFilter; filtered: boolean }) {
@@ -148,7 +148,37 @@ export function DuePill({ dueAt, createdAt, completedAt, completed = false }: { 
   const now = useNow();
   const state = deadlineState(dueAt, completedAt, completed, now);
   const id = useMemo(() => `deadline-${Math.random().toString(36).slice(2)}`, []);
-  return <span className="group/deadline relative inline-flex" onClick={(event) => event.stopPropagation()}><button type="button" aria-describedby={id} className={`inline-flex min-h-7 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 ${state.cls}`}><Clock size={12} />{state.label}</button><span id={id} role="tooltip" className="pointer-events-none invisible absolute bottom-full left-0 z-30 mb-2 w-64 rounded-md bg-slate-900 p-3 text-left text-xs font-normal leading-5 text-white opacity-0 shadow-xl transition-opacity delay-700 duration-150 group-hover/deadline:visible group-hover/deadline:opacity-100 group-focus-within/deadline:visible group-focus-within/deadline:opacity-100 group-focus-within/deadline:delay-0"><strong className="block font-semibold">Datas da tarefa</strong><span className="block">Recebimento: {formatDate(createdAt)}</span><span className="block">Conclusão estimada: {formatDate(dueAt)}</span>{completedAt && <span className="block">Conclusão efetiva: {formatDate(completedAt)}</span>}</span></span>;
+  const milestones = [
+    { label: 'Recebimento', value: createdAt, kind: 'start' },
+    { label: 'Conclusão estimada', value: dueAt, kind: 'due' },
+    ...(completedAt ? [{ label: 'Conclusão efetiva', value: completedAt, kind: 'done' }] : []),
+  ];
+  return (
+    <span className="group/deadline relative inline-flex" onClick={(event) => event.stopPropagation()}>
+      <button type="button" aria-describedby={id} className={`inline-flex min-h-7 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 ${state.cls}`}><Clock size={12} />{state.label}</button>
+      <span id={id} role="tooltip" className="pointer-events-none invisible absolute bottom-full left-0 z-30 mb-3 w-72 max-w-[calc(100vw-2rem)] rounded-lg bg-slate-950 p-4 text-left font-normal text-white opacity-0 shadow-xl ring-1 ring-white/10 transition-opacity delay-[800ms] duration-150 group-hover/deadline:visible group-hover/deadline:opacity-100 group-focus-within/deadline:visible group-focus-within/deadline:opacity-100 group-focus-within/deadline:delay-0">
+        <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Prazo da tarefa</span>
+        <span className="sr-only">{milestones.map((milestone) => `${milestone.label}: ${formatDate(milestone.value)}`).join('. ')}</span>
+        <span aria-hidden="true" className="mt-3 block">
+          {milestones.map((milestone, index) => (
+            <span key={milestone.label} className={`grid grid-cols-[1.25rem_minmax(0,1fr)] gap-x-3 ${index < milestones.length - 1 ? 'pb-4' : ''}`}>
+              <span className="relative flex justify-center pt-1">
+                {index < milestones.length - 1 && <span className="absolute bottom-[-1rem] top-4 w-px bg-slate-700" />}
+                {milestone.kind === 'done'
+                  ? <CheckCircle2 size={16} className="relative z-10 text-emerald-400" />
+                  : <span className={`relative z-10 mt-0.5 block h-2.5 w-2.5 rounded-full ${milestone.kind === 'due' ? 'border-2 border-slate-300 bg-slate-950' : 'bg-slate-400'}`} />}
+              </span>
+              <span className="min-w-0">
+                <strong className="block text-sm font-semibold leading-5 text-white">{formatDate(milestone.value)}</strong>
+                <span className="mt-0.5 block text-[11px] leading-4 text-slate-400">{milestone.label}</span>
+              </span>
+            </span>
+          ))}
+        </span>
+        <span aria-hidden="true" className="absolute -bottom-1.5 left-5 h-3 w-3 rotate-45 bg-slate-950 ring-1 ring-white/10" />
+      </span>
+    </span>
+  );
 }
 
 function formatDate(value?: string | null) { return value ? new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Não informada'; }
@@ -165,9 +195,9 @@ export function useViewMode(storageKey = 'septem.tasks.view'): ['cards' | 'table
 
 export function ViewToggle({ view, setView }: { view: 'cards' | 'table'; setView: (v: 'cards' | 'table') => void }) {
   return (
-    <div className="flex overflow-hidden rounded-md border border-slate-300">
-      <button type="button" aria-pressed={view === 'cards'} onClick={() => setView('cards')} title="Cards" className={`flex h-11 w-11 items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-slate-500 ${view === 'cards' ? 'bg-slate-900 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}><LayoutGrid size={16} /></button>
-      <button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')} title="Tabela" className={`flex h-11 w-11 items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-slate-500 ${view === 'table' ? 'bg-slate-900 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}><TableIcon size={16} /></button>
+    <div className="flex rounded-md bg-slate-100 p-0.5">
+      <button type="button" aria-pressed={view === 'cards'} onClick={() => setView('cards')} title="Cards" className={`flex h-7 w-8 items-center justify-center rounded focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-slate-500 ${view === 'cards' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><LayoutGrid size={14} /></button>
+      <button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')} title="Tabela" className={`flex h-7 w-8 items-center justify-center rounded focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-slate-500 ${view === 'table' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><TableIcon size={14} /></button>
     </div>
   );
 }

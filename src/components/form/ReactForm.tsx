@@ -4,7 +4,7 @@ import { HelpPopover } from '@/components/ui/HelpPopover';
 import { api, ApiError } from '@/lib/api';
 import { regexToTemplate, applyMask, isAllDigits } from '@/lib/mask';
 import { maskDocumento, validateDocumento, type DocKind } from '@/lib/documento';
-import { validateDateClient, type DateMode, type DateLimit } from '@/lib/datafield';
+import { normalizeDateMode, validateDateClient, type DateMode, type DateLimit } from '@/lib/datafield';
 import { uploadAttachment, parseAttachments, type Attachment, type UploadContext } from '@/lib/upload';
 import { DatePickerField } from './DatePickerField';
 
@@ -22,6 +22,7 @@ export type ReactFormHandle = {
 type Component = {
   id?: string;
   type?: string;
+  subtype?: string;
   key?: string;
   label?: string;
   description?: string;
@@ -45,6 +46,10 @@ function colSpan(c: Component): number {
   const n = c.layout?.columns;
   if (!n || n < 1) return GRID_COLS;
   return Math.min(GRID_COLS, n);
+}
+
+function dateModeOf(component: Component): DateMode {
+  return normalizeDateMode(component.properties?.septemDateMode ?? component.subtype);
 }
 
 type OptionsMap = Record<string, { value: string; label: string }[]>;
@@ -205,7 +210,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
           if (c.validate?.max !== undefined && n > c.validate.max) errs[c.key!] = `Valor máximo ${c.validate.max}.`;
         }
         if (c.type === 'datetime' && typeof v === 'string' && v) {
-          const msg = validateDateClient(v, c.properties?.septemDateMode as DateMode | undefined, c.properties?.septemDateLimit as DateLimit | undefined);
+          const msg = validateDateClient(v, dateModeOf(c), c.properties?.septemDateLimit as DateLimit | undefined);
           if (msg) errs[c.key!] = msg;
         }
       }
@@ -291,6 +296,7 @@ function Node({ comp }: { comp: Component }) {
   const prefixAdorner = comp.prefixAdorner ?? comp.appearance?.prefixAdorner;
   const suffixAdorner = comp.suffixAdorner ?? comp.appearance?.suffixAdorner;
   const disabled = readOnly === true || comp.disabled === true || fieldState[key]?.disabled === true;
+  const dateMode = comp.type === 'datetime' ? dateModeOf(comp) : undefined;
 
   // Counter de min/max (campos de texto).
   const { minLength, maxLength } = comp.validate ?? {};
@@ -357,7 +363,7 @@ function Node({ comp }: { comp: Component }) {
     control = (
       <DatePickerField
         value={String(v ?? '')}
-        mode={comp.properties?.septemDateMode as DateMode | undefined}
+        mode={dateMode}
         limit={comp.properties?.septemDateLimit as DateLimit | undefined}
         error={!!err}
         ariaLabel={comp.label}
@@ -397,8 +403,10 @@ function Node({ comp }: { comp: Component }) {
   }
 
   const widthPx = comp.properties?.septemWidth ? Number(comp.properties.septemWidth) : undefined;
+  const minimumDateWidth = dateMode === 'datetime' ? 340 : dateMode === 'date' ? 280 : dateMode === 'time' ? 180 : 0;
+  const effectiveWidth = widthPx && !Number.isNaN(widthPx) ? Math.max(widthPx, minimumDateWidth) : undefined;
   return (
-    <div className="flex flex-col gap-1" style={widthPx && !Number.isNaN(widthPx) ? { maxWidth: widthPx } : undefined}>
+    <div className="flex min-w-0 flex-col gap-1" style={effectiveWidth ? { maxWidth: effectiveWidth } : undefined}>
       {(comp.type !== 'checkbox' || disabled) && labelEl}
       {control}
       <div className="flex min-h-[1lh] items-start justify-between gap-2">

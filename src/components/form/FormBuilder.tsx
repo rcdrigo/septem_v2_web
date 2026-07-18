@@ -10,6 +10,12 @@ function applyNewFieldDefaults(editor: any, field: any) {
   if (!field?.key) return; // apresentação/container não têm chave
   try { editor.get('modeling').editFormField(field, ['validate'], { ...(field.validate || {}), required: true }); }
   catch { /* ignora se o tipo não aceitar validate */ }
+  // O form-js cria datetime como "somente data". A paleta Septem oferece
+  // "Data / Hora" e o runtime historicamente usa ambos como padrão.
+  if (field.type === 'datetime') {
+    try { editor.get('modeling').editFormField(field, ['subtype'], 'datetime'); }
+    catch { /* mantém o padrão da engine se a versão não aceitar subtype */ }
+  }
 }
 
 /** Adiciona um campo do tipo dado no índice (de topo) correspondente à posição Y solta. */
