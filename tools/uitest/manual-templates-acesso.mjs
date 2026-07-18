@@ -57,6 +57,42 @@ try {
   const semPermissao = await abrirManual(email, senha);
   check(/Acesso restrito/i.test(semPermissao), '[web] quem NÃO tem permissão vê "Acesso restrito"');
   check(!/qrcode|#hide-if/i.test(semPermissao), '[web] e o conteúdo do manual não vaza para ele');
+
+  // ── As páginas novas do 6e abrem em ABA PRÓPRIA: precisam servir no celular também.
+  // (Sem isto elas ficavam testadas só em 1280 — a mesma lacuna que o histórico teve.)
+  const svc = (await api(token, '/api/v1/document-templates/services')).body?.[0]?.key;
+  for (const [nome, url] of [
+    ['manual', '/manual-templates'],
+    ['campos', svc ? `/campos-servico?key=${encodeURIComponent(svc)}` : null],
+  ]) {
+    if (!url) continue;
+    const ctx = await browser.newContext({ viewport: { width: 375, height: 812 } });
+    const page = await ctx.newPage();
+    await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
+    await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
+    await page.fill('input[type=password]', 'admin123');
+    await page.click('button[type=submit]');
+    await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 }).catch(() => {});
+    await page.goto(BASE + url, { waitUntil: 'networkidle' });
+    await page.waitForFunction(() => !document.body.innerText.includes('Carregando'), { timeout: 15000 }).catch(() => {});
+    const medidas = await page.evaluate(() => {
+      const vw = document.documentElement.clientWidth;
+      const cortados = [...document.querySelectorAll('button, input, a, code')]
+        .filter((el) => el.offsetParent !== null)
+        .filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && (r.right > vw + 1 || r.left < -1); }).length;
+      // CONTEÚDO escondido: um contêiner cujo conteúdo é mais largo que ele. Medir só
+      // controles passava em falso — a coluna "Tipo" da tabela ficava cortada e ninguém
+      // via, porque <td> não é botão nem link.
+      const contDemais = [...document.querySelectorAll('div, table, section, ul')]
+        .filter((el) => el.offsetParent !== null && el.scrollWidth > el.clientWidth + 1).length;
+      return { overflow: document.documentElement.scrollWidth > vw + 1, cortados, contDemais };
+    });
+    check(!medidas.overflow, `[mobile] ${nome}: sem overflow horizontal`);
+    check(medidas.cortados === 0, `[mobile] ${nome}: nenhum controle cortado (${medidas.cortados})`);
+    check(medidas.contDemais === 0, `[mobile] ${nome}: nenhum conteúdo escondido por overflow (${medidas.contDemais})`);
+    await page.screenshot({ path: `${OUT}/6e-${nome}-mobile.png` });
+    await ctx.close();
+  }
 } finally { await browser.close(); }
 
 ok.forEach((m) => console.log('✓ ' + m));

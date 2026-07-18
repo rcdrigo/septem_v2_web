@@ -115,6 +115,15 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
       await page.waitForTimeout(300);
     }
 
+    // O modal "buscar campos" também precisa caber no celular (dropdown + botões).
+    await page.locator('[data-testid=doc-buscar-campos]').click();
+    await page.waitForSelector('[data-testid=campos-buscar]', { timeout: 8000 });
+    await page.waitForTimeout(400);
+    const clippedCampos = await clippedOf();
+    check(clippedCampos === 0, `[${vp.n}] modal "buscar campos": nenhum controle cortado (${clippedCampos})`);
+    await page.locator('[role=dialog] button', { hasText: 'Fechar' }).first().click();
+    await page.waitForTimeout(300);
+
     if (vp.n === 'web') {
       // ── CRIAR pela UI ──
       await page.locator('header button', { hasText: 'Novo modelo' }).click();

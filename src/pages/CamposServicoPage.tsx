@@ -51,7 +51,24 @@ export function CamposServicoPage() {
             <h2 className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
               {grupo}
             </h2>
-            <div className="overflow-x-auto">
+            {/* Mobile: cada campo vira um cartão empilhado. Na tabela (min-w 420) a
+                coluna "Tipo" ficava cortada em 375px, alcançável só com scroll lateral. */}
+            <ul className="divide-y divide-slate-100 sm:hidden">
+              {itens.map((f) => (
+                <li key={f.key} className="px-4 py-3" data-testid="campo-linha">
+                  <p className="text-sm text-slate-800">{f.label ?? '—'}</p>
+                  <p className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <code className="break-all rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-800">{f.key}</code>
+                    {f.inList && (
+                      <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] text-sky-700">lista dinâmica</span>
+                    )}
+                    <span className="text-xs text-slate-500">{f.type ?? '—'}</span>
+                  </p>
+                </li>
+              ))}
+            </ul>
+
+            <div className="hidden overflow-x-auto sm:block">
               <table className="w-full min-w-[420px] text-sm" data-testid="campos-tabela">
                 <thead className="text-xs uppercase tracking-wide text-slate-400">
                   <tr>
