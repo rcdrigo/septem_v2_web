@@ -1,0 +1,45 @@
+/* Hallmark · macrostructure: Index-First · genre: modern-minimal · tone: utilitarian · anchor hue: slate · nav: existing N3 side rail · footer: existing · contrast: pass (40–41) · mobile: source-pass (34, 49–57) */
+/* Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V5 */
+@import "../../tokens.css";
+
+.task-index-root {
+  min-width: 0;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+.task-index-root button:active,
+.task-index-root [role="link"]:active {
+  transform: translateY(1px);
+}
+
+.task-index-root button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .task-index-root [role="link"] {
+    transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .task-index-root .task-access {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-index-root *,
+  .task-index-root *::before,
+  .task-index-root *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+
+  .task-index-root button:active,
+  .task-index-root [role="link"]:active {
+    transform: none;
+  }
+}

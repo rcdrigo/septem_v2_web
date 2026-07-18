@@ -52,7 +52,7 @@ export function useMyTasks() {
 
 /** Tarefas que o usuário concluiu (não estão mais com ele). */
 export function useExecutedTasks() {
-  return useTasks('concluidas');
+  return useQuery({ queryKey: [...execKeys.tasks, 'concluidas'], queryFn: () => api.get<ExecutedTask[]>('/api/v1/workflow/tasks?status=concluida') });
 }
 
 export function useTasks(status: 'pendentes' | 'concluidas') {

@@ -18,6 +18,8 @@ const CASES = [
   ['/admin/usuarios', 'Usuários', 'Configurações'],
   ['/admin/perfis', 'Perfis de acesso', 'Configurações'],
   ['/servicos', 'Serviços', null],
+  ['/tarefas?status=pendentes', 'Tarefas', null],
+  ['/requisicoes?status=em_andamento&page=1', 'Requisições', null],
 ];
 
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
@@ -38,7 +40,7 @@ async function actives(route) {
     return links
       .filter((a) => [...a.classList].some((c) => c === 'bg-slate-100' || c === 'bg-slate-900'))
       .map((a) => ({
-        label: a.textContent?.trim(),
+        label: a.querySelector(':scope > span.flex-1')?.textContent?.trim() ?? a.textContent?.trim(),
         // grupo = <li> pai com <button><span>rótulo</span></button>
         group: a.closest('ul')?.closest('li')?.querySelector('button span')?.textContent?.trim() ?? null,
         ariaCurrent: a.getAttribute('aria-current'),
@@ -47,6 +49,24 @@ async function actives(route) {
 }
 
 let failures = 0;
+
+// As rotas antigas devem cair no wildcard, sem redirect ou item de menu.
+for (const route of ['/tarefas-executadas', '/minhas-solicitacoes']) {
+  await page.goto(BASE + route, { waitUntil: 'networkidle' });
+  const oldMissing = await page.getByText('Página não encontrada').isVisible();
+  if (!oldMissing) failures++;
+  console.log(`${oldMissing ? '✓' : '✗ FALHOU'} ${route} removida`);
+}
+
+// O modo externo preserva os dois índices operacionais.
+await page.goto(BASE + '/servicos', { waitUntil: 'networkidle' });
+await page.getByRole('button', { name: /Externo/ }).click();
+const externalLabels = await page.locator('aside nav a').allTextContents();
+const externalOk = externalLabels.some((x) => x.includes('Tarefas')) && externalLabels.some((x) => x.includes('Requisições'));
+if (!externalOk) failures++;
+console.log(`${externalOk ? '✓' : '✗ FALHOU'} menu externo → ${JSON.stringify(externalLabels)}`);
+await page.getByRole('button', { name: /Interno/ }).click();
+
 for (const [route, label, group] of CASES) {
   const found = await actives(route);
   const ok = found.length === 1 && found[0].label === label && found[0].group === group;
