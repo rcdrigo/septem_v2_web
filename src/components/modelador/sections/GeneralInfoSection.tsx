@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { Field, Section, TextArea, TextInput } from '@/components/ui/Field';
 import { Combobox } from '@/components/ui/Combobox';
 import {
@@ -30,10 +31,16 @@ export function GeneralInfoSection({ modeler, element }: Props) {
   const [description, setDescriptionLocal] = useState('');
   const [alias, setAliasLocal] = useState('');
   const [setor, setSetorLocal] = useState('');
+  // "Tick" para forçar a releitura das raias sem recarregar a página — o usuário pode
+  // criar uma raia nova no canvas e este componente não re-renderiza sozinho.
+  const [lanesTick, setLanesTick] = useState(0);
 
   // Setor (raia) só para tarefas humanas; o dropdown lista as raias do processo.
   const isTask = element?.businessObject?.$type === 'bpmn:UserTask';
-  const lanes = isTask ? getProcessLanes(modeler) : [];
+  const lanes = useMemo(
+    () => (isTask ? getProcessLanes(modeler) : []),
+    [isTask, modeler, element, lanesTick],
+  );
 
   // Sincroniza estado local quando o elemento selecionado muda
   useEffect(() => {
@@ -78,13 +85,26 @@ export function GeneralInfoSection({ modeler, element }: Props) {
       </Field>
       {isTask && (
         <Field label="Setor" hint="Raia do processo responsável por esta tarefa.">
-          <Combobox
-            value={setor}
-            options={lanes.map((l) => ({ value: l, label: l }))}
-            onChange={commitSetor}
-            placeholder={lanes.length ? 'Selecione o setor…' : 'Nenhuma raia no processo ainda'}
-            clearLabel="— sem setor —"
-          />
+          <div className="flex items-center gap-1.5">
+            <div className="min-w-0 flex-1">
+              <Combobox
+                value={setor}
+                options={lanes.map((l) => ({ value: l, label: l }))}
+                onChange={commitSetor}
+                placeholder={lanes.length ? 'Selecione o setor…' : 'Nenhuma raia no processo ainda'}
+                clearLabel="— sem setor —"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setLanesTick((t) => t + 1)}
+              title="Atualizar a lista de raias do processo"
+              aria-label="Atualizar raias"
+              className="shrink-0 rounded-md border border-slate-300 p-1.5 text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+            >
+              <RefreshCw size={14} />
+            </button>
+          </div>
         </Field>
       )}
       <Field label="Descrição">

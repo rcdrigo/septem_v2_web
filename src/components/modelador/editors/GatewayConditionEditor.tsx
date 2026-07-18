@@ -230,8 +230,8 @@ function FormRulesEditor({
           key={idx}
           className={
             first
-              ? 'grid grid-cols-[3.25rem_minmax(0,1fr)_3.25rem_2rem] items-center gap-2 rounded-md border border-slate-200 bg-white p-2 md:grid-cols-[3.25rem_minmax(0,1.6fr)_8.5rem_minmax(0,1.4fr)_3.25rem_2rem]'
-              : 'grid grid-cols-[4.5rem_3.25rem_minmax(0,1fr)_3.25rem_2rem] items-center gap-2 rounded-md border border-slate-200 bg-white p-2 md:grid-cols-[4.5rem_3.25rem_minmax(0,1.6fr)_8.5rem_minmax(0,1.4fr)_3.25rem_2rem]'
+              ? 'grid grid-cols-[4rem_minmax(0,1fr)_4rem_2rem] items-center gap-2 rounded-md border border-slate-200 bg-white p-2 md:grid-cols-[4rem_minmax(0,1.6fr)_8.5rem_minmax(0,1.4fr)_4rem_2rem]'
+              : 'grid grid-cols-[4.5rem_4rem_minmax(0,1fr)_4rem_2rem] items-center gap-2 rounded-md border border-slate-200 bg-white p-2 md:grid-cols-[4.5rem_4rem_minmax(0,1.6fr)_8.5rem_minmax(0,1.4fr)_4rem_2rem]'
           }
         >
           {/* Conector com a regra anterior — a 1ª regra não tem a coluna */}
@@ -250,7 +250,7 @@ function FormRulesEditor({
           {/* Abre grupo "(" */}
           <Select
             aria-label="Abrir grupo"
-            className={`${first ? 'col-start-1' : 'col-start-2'} row-start-1 w-full min-w-0 px-2 md:col-auto md:row-auto`}
+            className={`${first ? 'col-start-1' : 'col-start-2'} row-start-1 w-full min-w-0 !pl-2 !pr-6 text-center md:col-auto md:row-auto`}
             value={rule.open ? '(' : ''}
             onChange={(e) => update(idx, { open: e.target.value === '(' })}
             options={[
@@ -280,7 +280,7 @@ function FormRulesEditor({
           {/* Fecha grupo ")" */}
           <Select
             aria-label="Fechar grupo"
-            className={`${first ? 'col-start-3' : 'col-start-4'} row-start-1 w-full min-w-0 px-2 md:col-auto md:row-auto`}
+            className={`${first ? 'col-start-3' : 'col-start-4'} row-start-1 w-full min-w-0 !pl-2 !pr-6 text-center md:col-auto md:row-auto`}
             value={rule.close ? ')' : ''}
             onChange={(e) => update(idx, { close: e.target.value === ')' })}
             options={[

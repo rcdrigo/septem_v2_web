@@ -66,7 +66,21 @@ page.on('pageerror', (e) => console.log('pageerror:', e.message.slice(0, 300)));
 try {
   await openModal(page);
   await page.screenshot({ path: `${OUT}/modal-desktop${SUFFIX}.png` });
-  await diagnose(page, 'desktop-1280');
+  const dInfo = await diagnose(page, 'desktop-1280');
+
+  // Fase 5e — os selects de parênteses "(" e ")" precisam ser largos o bastante para
+  // não cortar o caractere atrás da seta do <select> (antes: 3.25rem + px-2 vs pr-8 →
+  // cortava). Agora as colunas são 4rem. Mede a largura real e o conteúdo mostrado.
+  const abre = dInfo.selects.find((s) => s.aria === 'Abrir grupo');
+  const fecha = dInfo.selects.find((s) => s.aria === 'Fechar grupo');
+  console.log('[5e] parênteses:', JSON.stringify({ abre, fecha }));
+  check(!!abre && abre.w >= 56, `[desktop-1280] select "abrir grupo" largo o bastante (${abre?.w}px ≥ 56)`);
+  check(!!fecha && fecha.w >= 56, `[desktop-1280] select "fechar grupo" largo o bastante (${fecha?.w}px ≥ 56)`);
+  // Seleciona "(" e confirma que o caractere aparece de fato (não fica escondido).
+  await page.locator('[role=dialog] select[aria-label="Abrir grupo"]').first().selectOption('(');
+  await page.waitForTimeout(150);
+  const abreShown = await page.locator('[role=dialog] select[aria-label="Abrir grupo"]').first().evaluate((s) => s.selectedOptions[0]?.label ?? '');
+  check(abreShown === '(', `[desktop-1280] o parêntese "(" é exibido no select (mostrado="${abreShown}")`);
 
   // Combobox de campo: abre o da 1ª regra, pesquisa e seleciona
   const combo = page.locator('[role=dialog] button', { hasText: 'Selecione o campo' }).first();

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 type Props = {
   /** O gatilho do popover (botão). É clonado para receber onClick. */
@@ -14,16 +15,47 @@ type Props = {
 
 /**
  * Popover de cliques (não hover). Fecha ao clicar fora ou apertar Esc.
- * Layout posicionado abaixo do trigger.
+ *
+ * O painel é renderizado em PORTAL (document.body) com posição `fixed`, calculada
+ * sob o trigger — assim `overflow:hidden`/`z-index` de um contêiner ancestral (ex.:
+ * o frame do modelador de formulário) não corta o popover. Se não couber abaixo,
+ * abre para cima. Recalcula em scroll/resize.
  */
 export function Popover({ trigger, children, align = 'right', fullWidth = false }: Props) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Posiciona o painel (fixed) a partir do rect do trigger e do tamanho medido do painel.
+  useLayoutEffect(() => {
+    if (!open) return;
+    function place() {
+      const r = containerRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const pw = panelRef.current?.offsetWidth ?? 200;
+      const ph = panelRef.current?.offsetHeight ?? 0;
+      let left = align === 'right' ? r.right - pw : r.left;
+      left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
+      const cabeAbaixo = r.bottom + 4 + ph <= window.innerHeight - 8;
+      const top = cabeAbaixo ? r.bottom + 4 : Math.max(8, r.top - 4 - ph);
+      setPos({ left, top });
+    }
+    place();
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  }, [open, align]);
 
   useEffect(() => {
     if (!open) return;
     function onClickOutside(e: MouseEvent) {
-      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (containerRef.current?.contains(t) || panelRef.current?.contains(t)) return;
+      setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false);
@@ -41,16 +73,23 @@ export function Popover({ trigger, children, align = 'right', fullWidth = false 
       <button type="button" onClick={() => setOpen((v) => !v)} className="contents">
         {trigger(open)}
       </button>
-      {open && (
+      {open && createPortal(
         <div
-          className={[
-            'absolute top-full z-40 mt-1 min-w-[200px] rounded-md border border-slate-200 bg-white py-1 shadow-lg',
-            align === 'right' ? 'right-0' : 'left-0',
-          ].join(' ')}
+          ref={panelRef}
+          style={{
+            position: 'fixed',
+            left: pos?.left ?? 0,
+            top: pos?.top ?? 0,
+            zIndex: 1010,
+            // Mede o painel invisível na 1ª passada, então o layoutEffect calcula `pos`.
+            visibility: pos ? 'visible' : 'hidden',
+          }}
+          className="min-w-[200px] rounded-md border border-slate-200 bg-white py-1 shadow-lg"
           role="menu"
         >
           {children(() => setOpen(false))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

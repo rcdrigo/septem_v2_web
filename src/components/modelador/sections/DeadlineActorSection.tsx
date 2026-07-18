@@ -163,8 +163,14 @@ export function DeadlineActorSection({ modeler, element }: Props) {
             placeholder="ex: 48"
           />
         </Field>
-        <Field label="…ou campo do formulário">
-          <FormFieldSelect value={deadline.state.expiresInFieldRef} onChange={(v) => deadline.flush({ expiresInFieldRef: v })} placeholder="Campo (nº de dias)" />
+        <Field label="…OU CAMPO">
+          {/* Prazo por campo do formulário: mutuamente exclusivo com o prazo em horas.
+              Ao escolher um campo, zera as horas fixas (não faz sentido ter os dois). */}
+          <FormFieldSelect
+            value={deadline.state.expiresInFieldRef}
+            onChange={(v) => deadline.flush(v ? { expiresInFieldRef: v, expiresIn: '' } : { expiresInFieldRef: v })}
+            placeholder="Campo (nº de dias)"
+          />
         </Field>
       </div>
     </Section>

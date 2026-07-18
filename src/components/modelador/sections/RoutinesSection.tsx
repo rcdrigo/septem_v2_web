@@ -1,5 +1,7 @@
+import { Plus } from 'lucide-react';
 import { Field, Section } from '@/components/ui/Field';
 import { useExtensionState } from '@/lib/useExtensionState';
+import { openTab } from '@/lib/nav';
 import { DataSourceSelect } from '../fields/DataSourceSelect';
 import type { Routines } from '@/lib/bpmn-helpers';
 
@@ -33,12 +35,22 @@ export function RoutinesSection({ modeler, element }: Props) {
       title="Rotinas"
       description="Fontes de dados executadas em momentos do ciclo da tarefa."
     >
+      {/* Um único atalho para criar fonte, acima dos 4 seletores (cada seletor
+          esconde o seu — showNew={false} — para não repetir o botão 4×). */}
+      <button
+        type="button"
+        onClick={() => openTab('/fonte-dados/nova?scope=form')}
+        className="inline-flex w-fit items-center gap-1 rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+      >
+        <Plus size={13} /> Nova fonte de dados
+      </button>
       {FIELDS.map(({ key, label }) => (
         <Field key={key} label={label}>
           <DataSourceSelect
             value={state[key]}
             onChange={(v) => flush({ [key]: v } as Partial<Routines>)}
             placeholder="Nenhuma"
+            showNew={false}
           />
         </Field>
       ))}
