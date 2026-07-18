@@ -128,6 +128,26 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
       check(back.length === docxBytes.length && back.equals(docxBytes), `[web] round-trip do arquivo: bytes idênticos (${back.length})`);
       check(r.headers.get('content-type')?.includes('wordprocessingml'), '[web] content-type é .docx');
 
+      // ── 6b: template COM ERRO de sintaxe → a tela mostra os problemas ──
+      // Gera um .docx com {{#if}} sem {{/if}} e filtro inexistente.
+      const ruimTxt = path.join(dir, 'ruim.txt');
+      writeFileSync(ruimTxt, '{{#if ativo}}Sim\n{{itens|soma()}}\n');
+      execFileSync('soffice', ['--headless', '--convert-to', 'docx', '--outdir', dir, ruimTxt], { stdio: 'ignore', timeout: 120000 });
+      await page.locator('[data-testid=doc-file-input]').setInputFiles(path.join(dir, 'ruim.docx'));
+      await page.waitForSelector('[data-testid=doc-issues]', { timeout: 15000 }).catch(() => {});
+      const issuesTxt = await page.locator('[data-testid=doc-issues]').innerText().catch(() => '');
+      check(/\/if/.test(issuesTxt), `[web] a tela lista o erro do {{#if}} sem {{/if}}`);
+      check(/Filtro desconhecido/i.test(issuesTxt), '[web] a tela lista o filtro desconhecido');
+      // E o modelo fica marcado como inválido na API (efeito, não só texto na tela).
+      const detRuim = await api(token, `/api/v1/document-templates/${criado.id}`);
+      check(detRuim.body?.templateValid === false, '[api] modelo com erro de sintaxe fica templateValid=false');
+
+      // Reenvia o .docx BOM → os erros somem e volta a ser válido (o fluxo de correção).
+      await page.locator('[data-testid=doc-file-input]').setInputFiles(docxPath);
+      await page.waitForTimeout(2500);
+      const detBom = await api(token, `/api/v1/document-templates/${criado.id}`);
+      check(detBom.body?.templateValid === true, '[api] reenviar o template corrigido volta a validar');
+
       // ── Só .docx: um .txt é rejeitado pelo servidor ──
       const form = new FormData();
       form.append('file', new Blob([readFileSync(txtPath)], { type: 'text/plain' }), 'naoaceito.txt');
