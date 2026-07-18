@@ -84,6 +84,37 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
     await page.locator('[role=dialog] button', { hasText: 'Cancelar' }).click();
     await page.waitForTimeout(300);
 
+    // O modal de HISTÓRICO também precisa caber nas duas telas (o payload é um <pre>
+    // longo, candidato natural a estourar a largura no celular).
+    // O layout troca por breakpoint: linha da tabela no web, card no mobile — e o outro
+    // continua no DOM porém oculto (sm:hidden), então escolher pelo viewport evita
+    // clicar num botão invisível.
+    const comHistorico = page.locator(vp.n === 'mobile' ? '[data-testid=doc-card]' : '[data-testid=doc-linha]')
+      .filter({ hasText: 'Contrato Teste' }).first();
+    if (await comHistorico.count()) {
+      await comHistorico.locator('button[title="Histórico de execuções"], button[title="Histórico"]').first().click();
+      await page.waitForSelector('[role=dialog]', { timeout: 8000 });
+      await page.waitForTimeout(800);
+      // Abre o payload (o conteúdo mais largo do modal) antes de medir.
+      const verPayload = page.locator('[role=dialog] button', { hasText: 'Ver payload' }).first();
+      if (await verPayload.count()) { await verPayload.click(); await page.waitForTimeout(300); }
+      const clippedHist = await clippedOf();
+      const histOverflow = await page.evaluate(() => {
+        const d = document.querySelector('[role=dialog]');
+        if (!d) return { dialog: false, filhos: 0 };
+        return {
+          dialog: d.scrollWidth > d.clientWidth + 1,
+          filhos: [...d.querySelectorAll('*')].filter((e) => e.scrollWidth > e.clientWidth + 1 && e.tagName !== 'PRE').length,
+        };
+      });
+      check(clippedHist === 0, `[${vp.n}] histórico: nenhum controle cortado (clipped: ${clippedHist})`);
+      check(!histOverflow.dialog && histOverflow.filhos === 0,
+        `[${vp.n}] histórico sem overflow horizontal (${JSON.stringify(histOverflow)})`);
+      await page.screenshot({ path: `${OUT}/modelos-documento-hist-${vp.n}.png`, fullPage: false });
+      await page.locator('[role=dialog] button', { hasText: 'Fechar' }).click();
+      await page.waitForTimeout(300);
+    }
+
     if (vp.n === 'web') {
       // ── CRIAR pela UI ──
       await page.locator('header button', { hasText: 'Novo modelo' }).click();
