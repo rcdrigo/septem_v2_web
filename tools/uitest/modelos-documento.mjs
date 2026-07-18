@@ -165,6 +165,39 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
       await page.locator('[role=dialog] button', { hasText: 'Cancelar' }).click().catch(() => {});
       await page.waitForTimeout(400);
 
+      // ── AUDITORIA (:7, :8): unidade organizacional e status INATIVO persistem ──
+      // Os campos existiam na tela mas nenhum teste provava que salvam (o cadastro
+      // acima usou "sem unidade" e status ativo) — clássico check que passa em falso.
+      const unidades = (await api(token, '/api/v1/org-units/tree')).body ?? [];
+      if (unidades.length > 0) {
+        const alvo = unidades[0];
+        await page.locator('[data-testid=doc-linha]', { hasText: NOME }).locator('button[title="Editar"]').click();
+        await page.waitForSelector('[role=dialog]', { timeout: 8000 });
+        await page.waitForSelector('[data-testid=doc-carregando]', { state: 'detached', timeout: 10000 }).catch(() => {});
+        // Unidade: combobox pesquisável.
+        await page.locator('[role=dialog] label:has-text("Unidade")').locator('xpath=..').locator('button').first().click();
+        await page.waitForSelector('input[placeholder="Pesquisar…"]', { timeout: 5000 });
+        // Escopa às opções do painel ABERTO (o combobox abre em portal): um
+        // `ul li button` global pegaria uma lista atrás do overlay do diálogo.
+        await page.locator('input[placeholder="Pesquisar…"]').locator('xpath=../../ul/li/button')
+          .nth(1).click(); // 1ª unidade real (após "— sem unidade —")
+        await page.waitForTimeout(300);
+        // Status: inativo.
+        await page.locator('[role=dialog] input[type=radio][value="inativo"]').check();
+        await page.locator('[role=dialog] button', { hasText: 'Salvar' }).click();
+        await page.waitForSelector('[role=dialog]', { state: 'detached', timeout: 10000 }).catch(() => {});
+
+        const dep = await api(token, `/api/v1/document-templates/${criado.id}`);
+        check(!!dep.body?.orgUnitId, `[web] unidade organizacional persiste (${dep.body?.orgUnitId ?? 'null'})`);
+        check(dep.body?.active === false, `[web] status INATIVO persiste (active=${dep.body?.active})`);
+        void alvo;
+
+        // Volta para ativo (os passos seguintes esperam o modelo utilizável).
+        await api(token, `/api/v1/document-templates/${criado.id}`, 'PUT',
+          { name: NOME, description: 'modelo de teste e2e', orgUnitId: dep.body?.orgUnitId, active: true, outputType: 'pdf' });
+        await page.reload({ waitUntil: 'networkidle' });
+      }
+
       // ── 6c: botão TESTAR → modal com o JSON das chaves → gera o documento ──
       // O modelo carregado tem {{nome_cliente}} e {{valor}} (gerado no setup).
       await page.locator('[data-testid=doc-linha]', { hasText: NOME }).locator('button[title="Testar o modelo"]').click();
