@@ -168,6 +168,20 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
       check(back.length === docxBytes.length && back.equals(docxBytes), `[web] round-trip do arquivo: bytes idênticos (${back.length})`);
       check(r.headers.get('content-type')?.includes('wordprocessingml'), '[web] content-type é .docx');
 
+      // :11 — o PREVIEW tem que ser visualizável, não um download: o servidor devolve
+      // o modelo convertido em PDF, que o navegador abre na aba (nenhum navegador
+      // renderiza .docx). Sem filename no Content-Disposition = inline.
+      const pv = await fetch(`${API}/api/v1/document-templates/${criado.id}/preview`, {
+        headers: { 'X-Tenant': 'prefeitura-x', Authorization: `Bearer ${token}` },
+      });
+      check(pv.status === 200, `[web] preview responde 200 (${pv.status})`);
+      check(pv.headers.get('content-type')?.includes('pdf'),
+        `[web] preview é PDF, exibível na aba (${pv.headers.get('content-type')})`);
+      const pvBytes = Buffer.from(await pv.arrayBuffer());
+      check(pvBytes.subarray(0, 4).toString() === '%PDF', '[web] o preview é um PDF válido');
+      check(!/filename/i.test(pv.headers.get('content-disposition') ?? ''),
+        '[web] preview abre inline em vez de baixar (:11)');
+
       // ── 6b: template COM ERRO de sintaxe → a tela mostra os problemas ──
       // Gera um .docx com {{#if}} sem {{/if}} e filtro inexistente.
       const ruimTxt = path.join(dir, 'ruim.txt');

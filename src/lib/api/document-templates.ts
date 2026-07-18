@@ -90,6 +90,17 @@ export async function openDocumentTemplateFile(id: string): Promise<void> {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+/**
+ * Preview do modelo em SOMENTE LEITURA (:11). Navegador nenhum renderiza .docx, então
+ * o servidor devolve o mesmo modelo convertido em PDF — abre na aba em vez de baixar.
+ */
+export async function openDocumentTemplatePreview(id: string): Promise<void> {
+  const blob = await api.getBlob(`/api/v1/document-templates/${id}/preview`);
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener');
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 /** Serviço (processo publicado) visível ao usuário — alimenta o "buscar campos". */
 export type DocumentService = { key: string; name: string; area: string | null };
 

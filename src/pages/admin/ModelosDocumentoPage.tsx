@@ -3,7 +3,7 @@ import { AlertTriangle, BookOpen, Eye, FileStack, FlaskConical, History, Pencil,
 import {
   useDocumentTemplates, useDocumentTemplate, useCreateDocumentTemplate,
   useUpdateDocumentTemplate, useDeleteDocumentTemplate, useUploadDocumentTemplateFile,
-  openDocumentTemplateFile, useTemplateKeys, skeletonFromKeys, testDocumentTemplate, useDocumentExecutions,
+  openDocumentTemplateFile, openDocumentTemplatePreview, useTemplateKeys, skeletonFromKeys, testDocumentTemplate, useDocumentExecutions,
   useDocumentServices,
   type DocumentTemplateListItem,
 } from '@/lib/api/document-templates';
@@ -17,10 +17,18 @@ import { toast } from '@/stores/toast';
 import { formatWithRelative, formatDuration } from '@/lib/relative-time';
 import { openTab } from '@/lib/nav';
 
-/** Abre o .docx do modelo em nova aba, avisando na tela se falhar. */
+/**
+ * Preview do modelo em nova aba, somente leitura (:11). Vai pelo PDF, que o navegador
+ * exibe; se o servidor não tiver conversor, cai no .docx original (que baixa) em vez
+ * de deixar o usuário sem nada.
+ */
 async function preview(id: string) {
-  try { await openDocumentTemplateFile(id); }
-  catch { toast.error('Não foi possível abrir o arquivo do modelo.'); }
+  try {
+    await openDocumentTemplatePreview(id);
+  } catch {
+    try { await openDocumentTemplateFile(id); }
+    catch { toast.error('Não foi possível abrir o arquivo do modelo.'); }
+  }
 }
 
 /**
