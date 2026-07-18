@@ -92,13 +92,56 @@ try {
   const fixoTxt = await page.locator('[data-testid=doc-param-fixo]').innerText();
   check(fixoTxt.includes(`Modelo Anexo ${rid}`), `[web] modelo fixo selecionado aparece ("${fixoTxt}")`);
 
-  // :57/:58 — regra de negócio: adiciona uma regra apontando para um modelo.
+  // :56 — LISTA: modal multi-seleção define quais modelos ficam disponíveis.
+  await page.locator('[data-testid=doc-param] input[type=radio]').nth(1).check();
+  await page.waitForTimeout(300);
+  await page.locator('[data-testid=doc-param] button', { hasText: 'Escolher modelos' }).click();
+  await page.waitForSelector('[data-testid=modelo-picker-lista]', { timeout: 8000 });
+  const caixas = page.locator('[data-testid=modelo-picker-lista] input[type=checkbox]');
+  const nCaixas = await caixas.count();
+  check(nCaixas > 0, `[web] o modal de lista mostra os modelos ativos (${nCaixas})`);
+  await caixas.nth(0).check();
+  if (nCaixas > 1) await caixas.nth(1).check();
+  await page.locator('[data-testid=modelo-picker-ok]').click();
+  await page.waitForTimeout(400);
+  const escolhidos = await page.locator('[data-testid=doc-param-lista] li').count();
+  check(escolhidos === Math.min(2, nCaixas), `[web] os modelos escolhidos aparecem na lista (${escolhidos})`);
+
+  // :57/:58 — regra de negócio PREENCHIDA: campo/operador/valor → modelo.
   await page.locator('[data-testid=doc-param] input[type=radio]').nth(2).check();
   await page.waitForTimeout(300);
   await page.locator('[data-testid=doc-param-add-regra]').click();
   await page.waitForTimeout(300);
-  check(await page.locator('[data-testid=doc-param-regras] select[aria-label="Campo da regra"]').count() === 1,
+  const linhaRegra = page.locator('[data-testid=doc-param-regras] > div').first();
+  check(await linhaRegra.locator('select[aria-label="Campo da regra"]').count() === 1,
     '[web] regra de negócio: linha com campo/operador/valor → modelo');
+  // Preenche a regra de verdade (campo do formulário + operador + valor + modelo).
+  const opcoesCampo = await linhaRegra.locator('select[aria-label="Campo da regra"] option').count();
+  if (opcoesCampo > 1) await linhaRegra.locator('select[aria-label="Campo da regra"]').selectOption({ index: 1 });
+  await linhaRegra.locator('select[aria-label="Operador da regra"]').selectOption('eq');
+  await linhaRegra.locator('input[aria-label="Valor da regra"]').fill('urgente');
+  await linhaRegra.locator('button', { hasText: 'nenhum' }).click();
+  await page.waitForSelector('[data-testid=modelo-picker-ok]', { timeout: 8000 });
+  await page.locator('[role=dialog] button', { hasText: 'Selecione o modelo' }).first().click();
+  await page.waitForSelector('input[placeholder="Pesquisar…"]', { timeout: 5000 });
+  await page.fill('input[placeholder="Pesquisar…"]', `Modelo Anexo ${rid}`);
+  await page.waitForTimeout(400);
+  await page.locator('input[placeholder="Pesquisar…"]').locator('xpath=../../ul/li/button').first().click();
+  await page.locator('[data-testid=modelo-picker-ok]').click();
+  await page.waitForTimeout(400);
+  check((await linhaRegra.innerText()).includes(`Modelo Anexo ${rid}`),
+    '[web] a regra aponta para o modelo escolhido');
+
+  // Salva no modo REGRA para provar que a regra PREENCHIDA persiste (:58).
+  await page.locator('header button', { hasText: 'Salvar' }).first().click();
+  await page.waitForTimeout(3000);
+  const detRegra = await api(token, `/api/v1/workflow/process-definitions/${key}`);
+  const cfgRegra = (detRegra.body?.bpmnXml ?? '').match(/septemDocGenConfig[^&]*?(\{.*?\})\\?"/);
+  const xmlRegra = detRegra.body?.bpmnXml ?? '';
+  check(xmlRegra.includes('"mode\\":\\"regra') || xmlRegra.includes('&quot;mode&quot;:&quot;regra'),
+    '[web] o modo REGRA persiste no processo salvo');
+  check(xmlRegra.includes('urgente'), '[web] a condição preenchida (valor "urgente") persiste');
+  void cfgRegra;
 
   // Volta para FIXO (é o que vamos persistir e verificar).
   await page.locator('[data-testid=doc-param] input[type=radio]').first().check();
