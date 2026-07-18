@@ -90,6 +90,28 @@ export async function openDocumentTemplateFile(id: string): Promise<void> {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+/** Uma execução do modelo no histórico (Fase 6d). */
+export type DocumentExecution = {
+  id: string;
+  startedAt: string;
+  durationMs: number;
+  kind: 'teste' | 'producao';
+  status: 'sucesso' | 'falha';
+  error: string | null;
+  outputType: 'docx' | 'pdf';
+  payload: string | null;
+  requestedBy: string | null;
+};
+
+/** Histórico de execuções do modelo — exige a permissão documents:history. */
+export function useDocumentExecutions(id: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ['document-templates', id, 'executions'],
+    queryFn: () => api.get<DocumentExecution[]>(`/api/v1/document-templates/${id}/executions`),
+    enabled: !!id && enabled,
+  });
+}
+
 /** Chave que o usuário preenche no teste (árvore: grupo/lista/imagem). */
 export type TemplateKey = { name: string; kind: 'scalar' | 'group' | 'array' | 'image'; children: TemplateKey[] };
 

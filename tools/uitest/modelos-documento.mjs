@@ -267,6 +267,56 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
       const settingsXml = unzipPart('word/settings.xml');
       check(/documentProtection[^>]*w:edit="readOnly"/.test(settingsXml), '[api] documento de teste sai travado para edição');
 
+      // ── 6d: HISTÓRICO de execuções (:30-:37) ──
+      // As gerações acima já devem estar registradas: abre o histórico e confere os
+      // campos da spec (data relativa, requisitante, duração, tipo, status, payload).
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.locator('[data-testid=doc-linha]', { hasText: NOME })
+        .locator('button[title="Histórico de execuções"]').click();
+      await page.waitForSelector('[data-testid=doc-historico]', { timeout: 15000 });
+      const hist = await page.locator('[data-testid=doc-historico]').innerText();
+      check(/há .* (segundo|minuto|hora)/i.test(hist) || /agora/i.test(hist),
+        `[web] histórico mostra o tempo relativo (${(hist.match(/\((há|em|agora)[^)]*\)?/) ?? ['—'])[0]})`);
+      check(/Administrador/.test(hist), '[web] histórico mostra o requisitante');
+      check(/Teste/.test(hist), '[web] histórico mostra o tipo (Teste)');
+      check(/Sucesso/i.test(hist), '[web] histórico mostra o status');
+      check(/\d+\s?(ms|s)\b/.test(hist), '[web] histórico mostra a duração');
+      // Payload do que foi enviado.
+      await page.locator('[data-testid=doc-historico] button', { hasText: 'Ver payload' }).first().click();
+      await page.waitForTimeout(300);
+      const comPayload = await page.locator('[data-testid=doc-historico]').innerText();
+      check(/ACME LTDA/.test(comPayload), '[web] histórico mostra o payload enviado');
+      await page.screenshot({ path: `${OUT}/modelos-documento-historico.png` });
+      await page.locator('[role=dialog] button', { hasText: 'Fechar' }).click();
+      await page.waitForTimeout(300);
+
+      // Uma geração que FALHA precisa aparecer com o erro visível (:36).
+      const fdRuim = new FormData();
+      fdRuim.append('file', new Blob([Buffer.from('nao sou docx')]), 'quebrado.docx');
+      const mRuim = (await api(token, '/api/v1/document-templates/', 'POST',
+        { name: `Falha Hist ${rid}`, outputType: 'docx', active: true })).body;
+      await fetch(`${API}/api/v1/document-templates/${mRuim.id}/file`, {
+        method: 'POST', headers: { 'X-Tenant': 'prefeitura-x', Authorization: `Bearer ${token}` }, body: fdRuim,
+      });
+      const rFalha = await fetch(`${API}/api/v1/document-templates/${mRuim.id}/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Tenant': 'prefeitura-x', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ data: {} }),
+      });
+      check(rFalha.status === 400, `[api] geração com .docx corrompido não dá 500 (${rFalha.status})`);
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.locator('[data-testid=doc-linha]', { hasText: `Falha Hist ${rid}` })
+        .locator('button[title="Histórico de execuções"]').click();
+      await page.waitForSelector('[data-testid=doc-historico]', { timeout: 15000 });
+      check(/Falhou/i.test(await page.locator('[data-testid=doc-historico]').innerText()),
+        '[web] a geração que falhou aparece como "Falhou" no histórico');
+      await page.locator('[data-testid=doc-ver-erro]').first().click();
+      await page.waitForTimeout(300);
+      const erroTxt = await page.locator('[data-testid=doc-erro-detalhe]').innerText();
+      check(erroTxt.length > 10, `[web] "Ver erro" mostra o motivo da falha ("${erroTxt.slice(0, 40)}…")`);
+      await page.locator('[role=dialog] button', { hasText: 'Fechar' }).click();
+      await page.waitForTimeout(300);
+
       // ── AUDITORIA (rules.md): salvar-antes-de-carregar ──
       // Abrir "Editar" com a API lenta NÃO pode mostrar um form vazio salvável — senão
       // o usuário digita, salva, e o PUT vai com descrição/unidade em branco (perda de

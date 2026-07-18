@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
-import { AlertTriangle, Eye, FileStack, FlaskConical, Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, Eye, FileStack, FlaskConical, History, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import {
   useDocumentTemplates, useDocumentTemplate, useCreateDocumentTemplate,
   useUpdateDocumentTemplate, useDeleteDocumentTemplate, useUploadDocumentTemplateFile,
-  openDocumentTemplateFile, useTemplateKeys, skeletonFromKeys, testDocumentTemplate,
+  openDocumentTemplateFile, useTemplateKeys, skeletonFromKeys, testDocumentTemplate, useDocumentExecutions,
   type DocumentTemplateListItem,
 } from '@/lib/api/document-templates';
 import { useOrgUnitsFlat } from '@/lib/api/org-units';
@@ -13,6 +13,7 @@ import { Field, TextInput, TextArea, RadioGroup } from '@/components/ui/Field';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { ApiError } from '@/lib/api';
 import { toast } from '@/stores/toast';
+import { formatWithRelative, formatDuration } from '@/lib/relative-time';
 
 /** Abre o .docx do modelo em nova aba, avisando na tela se falhar. */
 async function preview(id: string) {
@@ -29,6 +30,7 @@ export function ModelosDocumentoPage() {
   const list = useDocumentTemplates();
   const [editId, setEditId] = useState<string | null>(null);
   const [testId, setTestId] = useState<string | null>(null);
+  const [histId, setHistId] = useState<{ id: string; nome: string } | null>(null);
   const [creating, setCreating] = useState(false);
   const del = useDeleteDocumentTemplate();
 
@@ -98,6 +100,8 @@ export function ModelosDocumentoPage() {
                     <button type="button" onClick={() => setTestId(t.id)} title="Testar"
                       className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800"><FlaskConical size={15} /></button>
                   )}
+                  <button type="button" onClick={() => setHistId({ id: t.id, nome: t.name })} title="Histórico"
+                    className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800"><History size={15} /></button>
                   <button type="button" onClick={() => setEditId(t.id)} title="Editar"
                     className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800"><Pencil size={15} /></button>
                   <button type="button" onClick={() => askDelete(t)} title="Excluir"
@@ -168,6 +172,15 @@ export function ModelosDocumentoPage() {
                             <FlaskConical size={15} />
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => setHistId({ id: t.id, nome: t.name })}
+                          title="Histórico de execuções"
+                          aria-label={`Histórico de ${t.name}`}
+                          className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800"
+                        >
+                          <History size={15} />
+                        </button>
                         <button type="button" onClick={() => setEditId(t.id)} title="Editar"
                           className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800">
                           <Pencil size={15} />
@@ -188,6 +201,7 @@ export function ModelosDocumentoPage() {
       </div>
 
       {testId && <TestDialog id={testId} onClose={() => setTestId(null)} />}
+      {histId && <HistoricoDialog id={histId.id} nome={histId.nome} onClose={() => setHistId(null)} />}
       {creating && <TemplateDialog onClose={() => setCreating(false)} />}
       {editId && <TemplateDialog id={editId} onClose={() => setEditId(null)} />}
     </div>
@@ -203,6 +217,77 @@ const STATUS_OPTIONS = [
   { value: 'ativo', label: 'Ativo' },
   { value: 'inativo', label: 'Inativo' },
 ] as const;
+
+/**
+ * Histórico de execuções do modelo (modelos_documentos:30-37): quando, quem pediu,
+ * quanto demorou, tipo (teste/produção), status — com o erro quando falhou — e o
+ * payload enviado. Só abre para quem tem a permissão documents:history.
+ */
+function HistoricoDialog({ id, nome, onClose }: { id: string; nome: string; onClose: () => void }) {
+  const execs = useDocumentExecutions(id, true);
+  const [aberto, setAberto] = useState<string | null>(null);
+
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      width="lg"
+      title={`Histórico — ${nome}`}
+      footer={<button type="button" onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Fechar</button>}
+    >
+      {execs.isLoading ? (
+        <p className="py-8 text-center text-sm text-slate-400">Carregando o histórico…</p>
+      ) : execs.isError ? (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Você não tem permissão para ver o histórico deste modelo.
+        </p>
+      ) : (execs.data?.length ?? 0) === 0 ? (
+        <p className="py-8 text-center text-sm text-slate-500">Nenhuma geração registrada ainda.</p>
+      ) : (
+        <ul className="flex flex-col gap-2" data-testid="doc-historico">
+          {execs.data!.map((e) => (
+            <li key={e.id} className="rounded-md border border-slate-200 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${e.status === 'sucesso' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                  {e.status === 'sucesso' ? 'Sucesso' : 'Falhou'}
+                </span>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                  {e.kind === 'teste' ? 'Teste' : 'Produção'}
+                </span>
+                <span className="text-xs uppercase text-slate-500">{e.outputType}</span>
+                <span className="ml-auto text-xs text-slate-500">{formatDuration(e.durationMs)}</span>
+              </div>
+              <p className="mt-1 text-sm text-slate-700">{formatWithRelative(e.startedAt)}</p>
+              <p className="text-xs text-slate-500">Requisitante: {e.requestedBy ?? '— integração —'}</p>
+
+              <div className="mt-2 flex flex-wrap gap-3">
+                {e.status === 'falha' && e.error && (
+                  <button type="button" onClick={() => setAberto(aberto === `err-${e.id}` ? null : `err-${e.id}`)}
+                    className="text-xs font-medium text-rose-700 hover:underline" data-testid="doc-ver-erro">
+                    {aberto === `err-${e.id}` ? 'Ocultar erro' : 'Ver erro'}
+                  </button>
+                )}
+                {e.payload && (
+                  <button type="button" onClick={() => setAberto(aberto === `pay-${e.id}` ? null : `pay-${e.id}`)}
+                    className="text-xs font-medium text-slate-600 hover:underline">
+                    {aberto === `pay-${e.id}` ? 'Ocultar payload' : 'Ver payload'}
+                  </button>
+                )}
+              </div>
+
+              {aberto === `err-${e.id}` && (
+                <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-rose-50 p-2 text-xs text-rose-900" data-testid="doc-erro-detalhe">{e.error}</pre>
+              )}
+              {aberto === `pay-${e.id}` && (
+                <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-slate-50 p-2 font-mono text-xs text-slate-700">{e.payload}</pre>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Dialog>
+  );
+}
 
 /**
  * Modal de TESTE (modelos_documentos:13-15): lê as chaves do .docx, monta um JSON de
