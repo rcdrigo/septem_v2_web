@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Mail, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Mail, Pencil, Plus, Send, Trash2, X } from 'lucide-react';
 import {
   useEmailTemplatesList, useEmailTemplate, useCreateEmailTemplate, useUpdateEmailTemplate, useDeleteEmailTemplate,
+  useTestEmailTemplate,
   type EmailTemplateListItem, type Recipient, type RecipientType,
 } from '@/lib/api/email-templates';
+import { ApiError } from '@/lib/api';
 import { useAreas, useAreaPositions } from '@/lib/api/catalog';
 import { useUsersList } from '@/lib/api/users';
 import { Dialog } from '@/components/ui/Dialog';
@@ -80,6 +82,7 @@ function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
   const detail = useEmailTemplate(id ?? null);
   const create = useCreateEmailTemplate();
   const update = useUpdateEmailTemplate();
+  const test = useTestEmailTemplate();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -111,9 +114,22 @@ function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
     } catch { toast.error('Não foi possível salvar o modelo.'); }
   }
 
+  async function doTest() {
+    try {
+      const r = await test.mutateAsync({ subject, bodyHtml });
+      toast.success(`Teste enviado para ${r.sentTo}.`);
+    } catch (err) {
+      const d = err instanceof ApiError ? (err.body as { detail?: string } | undefined)?.detail : undefined;
+      toast.error(d ?? 'Não foi possível enviar o teste.');
+    }
+  }
+
   return (
     <Dialog open onClose={onClose} width="lg" title={id ? 'Editar modelo de e-mail' : 'Novo modelo de e-mail'} footer={
       <>
+        <button type="button" onClick={doTest} disabled={test.isPending} className="mr-auto inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60" title="Envia um e-mail de teste para você com o conteúdo atual">
+          <Send size={14} /> {test.isPending ? 'Enviando…' : 'Testar'}
+        </button>
         <button onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Cancelar</button>
         <button form="et-form" type="submit" disabled={!name} className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">Salvar</button>
       </>

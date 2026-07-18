@@ -52,3 +52,11 @@ export function useDeleteEmailTemplate() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: (id: string) => api.del<void>(`/api/v1/email-templates/${id}`), onSuccess: () => qc.invalidateQueries({ queryKey: keys.all }) });
 }
+
+/** Envia um teste com o assunto+corpo atuais (mesmo não salvos) para o e-mail do próprio usuário. */
+export function useTestEmailTemplate() {
+  return useMutation({
+    mutationFn: (body: { subject: string; bodyHtml: string }) =>
+      api.post<{ ok: boolean; sentTo: string }>('/api/v1/email-templates/test', body),
+  });
+}

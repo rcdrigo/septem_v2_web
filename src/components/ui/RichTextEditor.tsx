@@ -16,13 +16,40 @@ export function RichTextEditor({
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
-  // Seta o HTML inicial só na montagem (evita pular o cursor a cada digitação).
+  // Sincroniza o HTML externo → editor. Roda quando `value` muda (ex.: ao EDITAR, o
+  // corpo chega async DEPOIS do mount — antes o effect só rodava na montagem e o
+  // conteúdo nunca era injetado). Nunca sobrescreve enquanto o usuário digita (editor
+  // focado), senão o cursor pula; só atualiza quando o conteúdo de fato difere.
   useEffect(() => {
-    if (ref.current) ref.current.innerHTML = value ?? '';
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const el = ref.current;
+    if (!el) return;
+    if (document.activeElement !== el && el.innerHTML !== (value ?? '')) {
+      el.innerHTML = value ?? '';
+    }
+  }, [value]);
 
-  const emit = () => onChange(ref.current?.innerHTML ?? '');
+  // Ao focar um editor VAZIO, o Blink aplica o estilo de digitação "pendente" (ex.: um
+  // negrito ligado em OUTRA instância do editor) ao 1º caractere — é o "começa em
+  // negrito" do modelo novo. A limpeza precisa rodar DEPOIS do foco assentar (deferida):
+  // no instante do onFocus a seleção ainda não está no editor e queryCommandState/
+  // execCommand viram no-op. Já assentado, desligamos bold/itálico/sublinhado pendentes.
+  const resetTypingStyle = () => {
+    const el = ref.current;
+    if (!el || el.textContent || document.activeElement !== el) return; // só editor vazio e focado
+    for (const c of ['bold', 'italic', 'underline']) {
+      try { if (document.queryCommandState(c)) document.execCommand(c, false); } catch { /* noop */ }
+    }
+    try { document.execCommand('removeFormat'); } catch { /* noop */ }
+  };
+
+  // Bloco/br "vazio" não deve virar conteúdo do modelo — normaliza para string vazia.
+  const clean = (raw: string | undefined) => {
+    const s = (raw ?? '').trim().toLowerCase();
+    return s === '' || s === '<br>' || s === '<div><br></div>' || s === '<div></div>' || s === '<p><br></p>'
+      ? '' : (raw ?? '');
+  };
+
+  const emit = () => onChange(clean(ref.current?.innerHTML));
   // Foca ANTES do comando — senão sem caret o execCommand (listas) não aplica.
   const exec = (cmd: string, arg?: string) => { ref.current?.focus(); document.execCommand(cmd, false, arg); emit(); };
   const addLink = () => { const url = window.prompt('URL do link:'); if (url) exec('createLink', url); };
@@ -44,8 +71,9 @@ export function RichTextEditor({
         ref={ref}
         contentEditable
         suppressContentEditableWarning
+        onFocus={() => window.setTimeout(resetTypingStyle, 0)}
         onInput={emit}
-        onBlur={() => onBlur?.(ref.current?.innerHTML ?? '')}
+        onBlur={() => onBlur?.(clean(ref.current?.innerHTML))}
         className="min-h-[120px] max-w-none p-2 text-sm focus:outline-none [&_a]:text-sky-600 [&_a]:underline [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5"
       />
     </div>
