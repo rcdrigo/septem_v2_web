@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { reserveDocumentWindow } from '@/lib/async-document-window';
 
 /** Erro de sintaxe encontrado ao validar o .docx no upload (Fase 6b). */
 export type TemplateIssue = { severity: 'error' | 'warning'; message: string; token?: string | null };
@@ -83,11 +84,14 @@ export function useDeleteDocumentTemplate() {
  * aba nova não levaria o token e daria 401.
  */
 export async function openDocumentTemplateFile(id: string): Promise<void> {
-  const blob = await api.getBlob(`/api/v1/document-templates/${id}/file`);
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank', 'noopener');
-  // Revoga depois de a aba pegar o conteúdo (revogar na hora cancelaria o download).
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  const documentWindow = reserveDocumentWindow();
+  try {
+    const blob = await api.getBlob(`/api/v1/document-templates/${id}/file`);
+    documentWindow.show(blob);
+  } catch (error) {
+    documentWindow.close();
+    throw error;
+  }
 }
 
 /**
@@ -95,10 +99,20 @@ export async function openDocumentTemplateFile(id: string): Promise<void> {
  * o servidor devolve o mesmo modelo convertido em PDF — abre na aba em vez de baixar.
  */
 export async function openDocumentTemplatePreview(id: string): Promise<void> {
-  const blob = await api.getBlob(`/api/v1/document-templates/${id}/preview`);
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank', 'noopener');
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  const documentWindow = reserveDocumentWindow();
+  try {
+    let blob: Blob;
+    try {
+      blob = await api.getBlob(`/api/v1/document-templates/${id}/preview`);
+    } catch {
+      // Sem conversor/preview, baixa o .docx usando a MESMA aba já reservada.
+      blob = await api.getBlob(`/api/v1/document-templates/${id}/file`);
+    }
+    documentWindow.show(blob);
+  } catch (error) {
+    documentWindow.close();
+    throw error;
+  }
 }
 
 /** Serviço (processo publicado) visível ao usuário — alimenta o "buscar campos". */
@@ -178,10 +192,14 @@ export function skeletonFromKeys(keys: TemplateKey[]): Record<string, unknown> {
 
 /** Gera o documento de teste e abre em nova aba (o arquivo vem autenticado). */
 export async function testDocumentTemplate(id: string, data: unknown): Promise<void> {
-  const blob = await api.postBlob(`/api/v1/document-templates/${id}/test`, { data });
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank', 'noopener');
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  const documentWindow = reserveDocumentWindow('Gerando documento…');
+  try {
+    const blob = await api.postBlob(`/api/v1/document-templates/${id}/test`, { data });
+    documentWindow.show(blob);
+  } catch (error) {
+    documentWindow.close();
+    throw error;
+  }
 }
 
 /** Sobe o .docx do modelo; a resposta traz o resultado da validação de sintaxe. */

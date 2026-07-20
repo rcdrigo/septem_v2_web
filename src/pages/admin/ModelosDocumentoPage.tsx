@@ -3,7 +3,7 @@ import { AlertTriangle, BookOpen, Eye, FileStack, FlaskConical, History, Pencil,
 import {
   useDocumentTemplates, useDocumentTemplate, useCreateDocumentTemplate,
   useUpdateDocumentTemplate, useDeleteDocumentTemplate, useUploadDocumentTemplateFile,
-  openDocumentTemplateFile, openDocumentTemplatePreview, useTemplateKeys, skeletonFromKeys, testDocumentTemplate, useDocumentExecutions,
+  openDocumentTemplatePreview, useTemplateKeys, skeletonFromKeys, testDocumentTemplate, useDocumentExecutions,
   useDocumentServices,
   type DocumentTemplateListItem,
 } from '@/lib/api/document-templates';
@@ -25,9 +25,11 @@ import { openTab } from '@/lib/nav';
 async function preview(id: string) {
   try {
     await openDocumentTemplatePreview(id);
-  } catch {
-    try { await openDocumentTemplateFile(id); }
-    catch { toast.error('Não foi possível abrir o arquivo do modelo.'); }
+  } catch (error) {
+    const detail = error instanceof ApiError
+      ? (error.body as { detail?: string } | undefined)?.detail
+      : error instanceof Error ? error.message : undefined;
+    toast.error(detail ?? 'Não foi possível abrir o arquivo do modelo.');
   }
 }
 
@@ -403,9 +405,11 @@ function TestDialog({ id, onClose }: { id: string; onClose: () => void }) {
     setGerando(true);
     try {
       await testDocumentTemplate(id, data);
-      toast.success('Documento de teste gerado.');
+      toast.success('Documento de teste gerado e aberto.');
     } catch (err) {
-      const d = err instanceof ApiError ? (err.body as { detail?: string } | undefined)?.detail : undefined;
+      const d = err instanceof ApiError
+        ? (err.body as { detail?: string } | undefined)?.detail
+        : err instanceof Error ? err.message : undefined;
       setErro(d ?? 'Não foi possível gerar o documento.');
     } finally { setGerando(false); }
   }
