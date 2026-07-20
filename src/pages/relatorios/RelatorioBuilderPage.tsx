@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, BarChart3, Eye, Plus, RefreshCcw, Save, Send, Trash2 } from 'lucide-react';
+import { ArrowLeft, BarChart3, Eye, Pencil, Plus, RefreshCcw, Save, Send, Trash2 } from 'lucide-react';
 import { useSessionStore } from '@/stores/session';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { Field, Checkbox, Select, TextInput } from '@/components/ui/Field';
@@ -14,29 +14,12 @@ import { useDataSourcesList } from '@/lib/api/data-sources';
 import {
   useReport, useUpdateReport, usePublishReport, useSyncReportSchema, useReportSourceMetadata,
   useReportAccessRules, useSaveReportAccessRules,
-  type BlockDef, type BlockFilterDef, type GlobalFilterDef, type ReportDefinition,
-  type ReportAccessRule, type TableColumnDef,
+  type BlockDef, type GlobalFilterDef, type ReportDefinition, type ReportAccessRule,
 } from '@/lib/api/reports';
+import { ComponentEditorModal, blockTypeLabel, blockTypeIcon } from '@/components/reports/ComponentEditorModal';
 import { useAccessProfiles } from '@/lib/api/access-profiles';
 import { useOrgUnitsFlat } from '@/lib/api/org-units';
 import { useUsersList } from '@/lib/api/users';
-
-const AGG_OPTIONS = [
-  { value: 'count', label: 'Contagem' },
-  { value: 'sum', label: 'Soma' },
-  { value: 'avg', label: 'Média' },
-  { value: 'min', label: 'Mínimo' },
-  { value: 'max', label: 'Máximo' },
-  { value: 'percent', label: 'Percentual (%)' },
-];
-
-const BLOCK_TYPES = [
-  { value: 'table', label: 'Tabela' },
-  { value: 'kpi', label: 'KPI / Card' },
-  { value: 'pie', label: 'Pizza' },
-  { value: 'bars', label: 'Barras' },
-  { value: 'stackedBars', label: 'Barras compostas' },
-];
 
 /**
  * Builder do relatório (aba própria — /relatorios/editar?key=): staging de
@@ -216,7 +199,8 @@ export function RelatorioBuilderPage() {
             </section>
 
             {tab === 'blocos' && (
-              <BlocksEditor def={def} setDef={setDef} columnOptions={columnOptions} />
+              <BlocksEditor def={def} setDef={setDef} columnOptions={columnOptions}
+                reportKey={key} hasSource={columns.length > 0} />
             )}
             {tab === 'filtros' && (
               <FiltersAndDetailEditor def={def} setDef={setDef} columnOptions={columnOptions} />
@@ -236,32 +220,24 @@ export function RelatorioBuilderPage() {
   );
 }
 
-const OP_OPTIONS = [
-  { value: 'eq', label: 'igual a' }, { value: 'neq', label: 'diferente de' },
-  { value: 'gt', label: 'maior que' }, { value: 'lt', label: 'menor que' },
-  { value: 'gte', label: 'maior ou igual' }, { value: 'lte', label: 'menor ou igual' },
-  { value: 'contains', label: 'contém' },
-];
-
-const FORMAT_OPTIONS = [
-  { value: '', label: 'Automático' }, { value: 'number', label: 'Número' },
-  { value: 'currency', label: 'Moeda (R$)' }, { value: 'date', label: 'Data' }, { value: 'text', label: 'Texto' },
-];
-
-function BlocksEditor({ def, setDef, columnOptions }: {
+function BlocksEditor({ def, setDef, columnOptions, reportKey, hasSource }: {
   def: ReportDefinition; setDef: (d: ReportDefinition) => void;
   columnOptions: { value: string; label: string }[];
+  reportKey: string; hasSource: boolean;
 }) {
   const blocks = def.blocks ?? [];
+  const [editing, setEditing] = useState<{ block: BlockDef; index: number | null } | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
-  function patch(i: number, p: Partial<BlockDef>) {
-    setDef({ ...def, blocks: blocks.map((b, j) => (j === i ? { ...b, ...p } : b)) });
+
+  function openNew() {
+    setEditing({ block: { id: `b${Date.now().toString(36)}`, type: 'table', w: 12, h: 1 }, index: null });
   }
-  function add(type: BlockDef['type']) {
-    const id = `b${Date.now().toString(36)}`;
-    setDef({ ...def, blocks: [...blocks, { id, type, title: BLOCK_TYPES.find((t) => t.value === type)?.label }] });
+  function saveBlock(block: BlockDef) {
+    if (editing?.index == null) setDef({ ...def, blocks: [...blocks, block] });
+    else setDef({ ...def, blocks: blocks.map((b, j) => (j === editing.index ? block : b)) });
+    setEditing(null);
   }
-  // Reordenação por arrastar-e-soltar (a ordem define o layout do canvas).
+  // Arrastar reposiciona o card no grid (a ordem define o fluxo do layout).
   function dropOn(target: number) {
     if (dragIndex === null || dragIndex === target) return;
     const next = [...blocks];
@@ -274,206 +250,79 @@ function BlocksEditor({ def, setDef, columnOptions }: {
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h2 className="text-sm font-semibold text-slate-800">Blocos do relatório</h2>
-        <span className="text-xs text-slate-400">arraste pelo ícone ⋮⋮ para reordenar</span>
-        <div className="ml-auto flex flex-wrap gap-1.5">
-          {BLOCK_TYPES.map((t) => (
-            <button key={t.value} type="button" onClick={() => add(t.value as BlockDef['type'])}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
-              <Plus size={12} /> {t.label}
-            </button>
-          ))}
-        </div>
+        <h2 className="text-sm font-semibold text-slate-800">Componentes do relatório</h2>
+        {blocks.length > 0 && <span className="text-xs text-slate-400">arraste um card para reposicionar; duplo-clique (ou ✎) para configurar</span>}
+        <button type="button" onClick={openNew}
+          className="ml-auto inline-flex items-center gap-1 rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
+          <Plus size={12} /> Adicionar componente
+        </button>
       </div>
-      {blocks.length === 0 && (
+
+      {blocks.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-6 py-16 text-center">
           <BarChart3 size={48} strokeWidth={1.5} className="text-slate-300" aria-hidden />
           <p className="max-w-sm text-sm leading-relaxed text-slate-500">
-            <button type="button" onClick={() => add('table')}
+            <button type="button" onClick={openNew}
               className="rounded font-medium text-sky-600 underline underline-offset-2 hover:text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500">
               Adicione um componente
             </button>{' '}
             para visualizar seus dados em tabelas, indicadores (KPI) e gráficos de pizza, barras e barras compostas.
           </p>
         </div>
+      ) : (
+        <div className="grid grid-cols-12 gap-3" style={{ gridAutoRows: '82px' }}>
+          {blocks.map((b, i) => (
+            <BlockCard key={b.id} block={b} dragging={dragIndex === i}
+              onEdit={() => setEditing({ block: b, index: i })}
+              onRemove={() => setDef({ ...def, blocks: blocks.filter((_, j) => j !== i) })}
+              onDragStart={() => setDragIndex(i)} onDragEnd={() => setDragIndex(null)} onDrop={() => dropOn(i)} />
+          ))}
+        </div>
       )}
-      <div className="flex flex-col gap-3">
-        {blocks.map((b, i) => (
-          <div key={b.id}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={() => dropOn(i)}
-            className={`rounded-md border p-3 ${dragIndex === i ? 'border-sky-400 opacity-60' : 'border-slate-200'}`}
-          >
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span
-                draggable
-                onDragStart={() => setDragIndex(i)}
-                onDragEnd={() => setDragIndex(null)}
-                title="Arraste para reordenar"
-                className="cursor-grab select-none rounded px-1 text-slate-400 hover:bg-slate-100 active:cursor-grabbing"
-              >⋮⋮</span>
-              <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{BLOCK_TYPES.find((t) => t.value === b.type)?.label}</span>
-              <input value={b.title ?? ''} onChange={(e) => patch(i, { title: e.target.value })} placeholder="Título do bloco"
-                className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1 text-sm" />
-              <button type="button" onClick={() => setDef({ ...def, blocks: blocks.filter((_, j) => j !== i) })}
-                aria-label="Remover bloco" className="rounded p-1.5 text-rose-600 hover:bg-rose-50"><Trash2 size={14} /></button>
-            </div>
 
-            {b.type === 'table' ? (
-              <div className="flex flex-col gap-2">
-                <TableColumnsEditor block={b} onChange={(columns) => patch(i, { columns })} columnOptions={columnOptions} />
-                <SortEditor block={b} onChange={(sort) => patch(i, { sort })} columnOptions={columnOptions} allowValue={false} />
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                {b.type !== 'kpi' && (
-                  <Field label="Agrupar por">
-                    <Select value={b.groupBy ?? ''} onChange={(e) => patch(i, { groupBy: e.target.value })}
-                      options={[{ value: '', label: '—' }, ...columnOptions]} />
-                  </Field>
-                )}
-                {b.type === 'stackedBars' && (
-                  <Field label="Empilhar por (série)">
-                    <Select value={b.stackBy ?? ''} onChange={(e) => patch(i, { stackBy: e.target.value })}
-                      options={[{ value: '', label: '—' }, ...columnOptions]} />
-                  </Field>
-                )}
-                <Field label="Agregação">
-                  <Select value={b.agg ?? 'count'} onChange={(e) => patch(i, { agg: e.target.value })} options={AGG_OPTIONS} />
-                </Field>
-                <Field label="Campo de valor">
-                  <Select value={b.valueField ?? ''} onChange={(e) => patch(i, { valueField: e.target.value })}
-                    options={[{ value: '', label: '—' }, ...columnOptions]} />
-                </Field>
-                <Field label="Formatação">
-                  <Select value={b.format ?? ''} onChange={(e) => patch(i, { format: e.target.value || undefined })} options={FORMAT_OPTIONS} />
-                </Field>
-                <Field label="Limite">
-                  <TextInput type="number" value={b.limit ?? ''} onChange={(e) => patch(i, { limit: e.target.value ? Number(e.target.value) : undefined })} placeholder="Todos" />
-                </Field>
-                <div className="sm:col-span-1 lg:col-span-2">
-                  <SortEditor block={b} onChange={(sort) => patch(i, { sort })} columnOptions={columnOptions} allowValue />
-                </div>
-                <div className="sm:col-span-2 lg:col-span-4">
-                  <Field label="Fórmula avançada (opcional)" hint="Expressão por linha, ex.: [valor] * 1.1 — validada, sem SQL.">
-                    <TextInput value={b.formula ?? ''} onChange={(e) => patch(i, { formula: e.target.value || undefined })} placeholder="[campo_a] + [campo_b]" />
-                  </Field>
-                </div>
-              </div>
-            )}
-
-            <BlockFiltersEditor block={b} onChange={(filters) => patch(i, { filters })} columnOptions={columnOptions} />
-          </div>
-        ))}
-      </div>
+      {editing && (
+        <ComponentEditorModal open onClose={() => setEditing(null)}
+          initial={editing.block} isEdit={editing.index != null} columnOptions={columnOptions}
+          reportKey={reportKey} globalFilters={def.filters ?? []} hasSource={hasSource}
+          onSave={saveBlock} />
+      )}
     </section>
   );
 }
 
-/** Ordenação do bloco: campo (ou valor agregado, nos gráficos) + direção. */
-function SortEditor({ block, onChange, columnOptions, allowValue }: {
-  block: BlockDef; onChange: (s: BlockDef['sort']) => void;
-  columnOptions: { value: string; label: string }[]; allowValue: boolean;
+/** Card do componente no grid de 12 colunas: ocupa w colunas × h linhas. */
+function BlockCard({ block, dragging, onEdit, onRemove, onDragStart, onDragEnd, onDrop }: {
+  block: BlockDef; dragging: boolean;
+  onEdit: () => void; onRemove: () => void;
+  onDragStart: () => void; onDragEnd: () => void; onDrop: () => void;
 }) {
-  const opts = [
-    { value: '', label: 'Sem ordenação' },
-    ...(allowValue ? [{ value: '_value', label: 'Valor agregado' }] : []),
-    ...columnOptions,
-  ];
+  const w = Math.min(12, Math.max(1, block.w ?? 6));
+  const h = Math.max(1, block.h ?? 1);
+  const Icon = blockTypeIcon(block.type);
   return (
-    <div className="flex items-end gap-2">
-      <div className="min-w-0 flex-1">
-        <Field label="Ordenação">
-          <Select value={block.sort?.field ?? ''} options={opts}
-            onChange={(e) => onChange(e.target.value ? { field: e.target.value, desc: block.sort?.desc ?? true } : undefined)} />
-        </Field>
+    <div
+      draggable
+      onDragStart={onDragStart} onDragEnd={onDragEnd}
+      onDragOver={(e) => e.preventDefault()} onDrop={onDrop}
+      onDoubleClick={onEdit}
+      title="Arraste para reposicionar · duplo-clique para configurar"
+      style={{ gridColumn: `span ${w} / span ${w}`, gridRow: `span ${h} / span ${h}` }}
+      className={`group relative flex cursor-grab select-none flex-col rounded-md border p-3 active:cursor-grabbing ${
+        dragging ? 'border-sky-400 opacity-60' : 'border-slate-200 bg-white hover:border-slate-300'
+      }`}
+    >
+      <div className="flex items-center gap-1.5">
+        <span className="text-slate-300">⋮⋮</span>
+        <Icon size={14} className="shrink-0 text-slate-500" />
+        <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-700">{block.title || blockTypeLabel(block.type)}</span>
+        <span className="flex shrink-0 gap-0.5 opacity-0 group-hover:opacity-100">
+          <button type="button" onClick={onEdit} aria-label="Editar componente"
+            className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Pencil size={13} /></button>
+          <button type="button" onClick={onRemove} aria-label="Remover bloco"
+            className="rounded p-1 text-rose-500 hover:bg-rose-50"><Trash2 size={13} /></button>
+        </span>
       </div>
-      {block.sort && (
-        <button type="button" onClick={() => onChange({ field: block.sort!.field, desc: !block.sort!.desc })}
-          className="rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
-          title="Inverter direção">
-          {block.sort.desc ? '↓ desc' : '↑ asc'}
-        </button>
-      )}
-    </div>
-  );
-}
-
-/** Filtros PRÓPRIOS do bloco (além dos globais): campo + operador + valor. */
-function BlockFiltersEditor({ block, onChange, columnOptions }: {
-  block: BlockDef; onChange: (f: BlockFilterDef[]) => void;
-  columnOptions: { value: string; label: string }[];
-}) {
-  const filters = block.filters ?? [];
-  return (
-    <div className="mt-2 border-t border-slate-100 pt-2">
-      <div className="mb-1 flex items-center gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Filtros do bloco</span>
-        <button type="button"
-          onClick={() => onChange([...filters, { field: columnOptions[0]?.value ?? '', op: 'eq', value: '' }])}
-          className="inline-flex items-center gap-1 rounded border border-slate-300 px-1.5 py-0.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50">
-          <Plus size={10} /> filtro
-        </button>
-      </div>
-      {filters.length === 0 && <p className="text-xs text-slate-400">Sem filtros próprios — o bloco usa só os filtros globais.</p>}
-      <div className="flex flex-col gap-1.5">
-        {filters.map((f, i) => (
-          <div key={i} className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_2rem] items-center gap-1.5">
-            <Select value={f.field} aria-label="Campo do filtro"
-              onChange={(e) => onChange(filters.map((x, j) => (j === i ? { ...x, field: e.target.value } : x)))}
-              options={columnOptions} className="min-w-0" />
-            <Select value={f.op} aria-label="Operador do filtro"
-              onChange={(e) => onChange(filters.map((x, j) => (j === i ? { ...x, op: e.target.value } : x)))}
-              options={OP_OPTIONS} className="min-w-0" />
-            <TextInput value={f.value ?? ''} placeholder="valor"
-              onChange={(e) => onChange(filters.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))}
-              className="min-w-0" />
-            <button type="button" onClick={() => onChange(filters.filter((_, j) => j !== i))}
-              aria-label="Remover filtro do bloco" className="justify-self-end rounded p-1 text-rose-600 hover:bg-rose-50">
-              <Trash2 size={13} />
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TableColumnsEditor({ block, onChange, columnOptions }: {
-  block: BlockDef; onChange: (c: TableColumnDef[]) => void;
-  columnOptions: { value: string; label: string }[];
-}) {
-  const cols = block.columns ?? [];
-  const available = columnOptions.filter((o) => !cols.some((c) => c.key === o.value));
-  return (
-    <div className="flex flex-col gap-2">
-      <p className="text-xs text-slate-500">Colunas ocultas continuam no detalhe da linha (botão ℹ por linha).</p>
-      <div className="flex flex-wrap gap-2">
-        {cols.map((c, i) => (
-          <span key={c.key} className="inline-flex flex-wrap items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs">
-            {columnOptions.find((o) => o.value === c.key)?.label ?? c.key}
-            <label className="inline-flex items-center gap-1 text-slate-500">
-              <input type="checkbox" checked={c.visible !== false}
-                onChange={(e) => onChange(cols.map((x, j) => (j === i ? { ...x, visible: e.target.checked } : x)))} />
-              visível
-            </label>
-            <select value={c.format ?? ''} aria-label={`Formato de ${c.key}`}
-              onChange={(e) => onChange(cols.map((x, j) => (j === i ? { ...x, format: e.target.value || undefined } : x)))}
-              className="rounded border border-slate-200 px-1 py-0.5 text-[11px] text-slate-600">
-              {FORMAT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-            <button type="button" onClick={() => onChange(cols.filter((_, j) => j !== i))} aria-label={`Remover ${c.key}`}
-              className="text-rose-500 hover:text-rose-700">×</button>
-          </span>
-        ))}
-      </div>
-      {available.length > 0 && (
-        <select value="" onChange={(e) => e.target.value && onChange([...cols, { key: e.target.value }])}
-          className="w-fit rounded-md border border-slate-300 px-2 py-1 text-xs">
-          <option value="">+ adicionar coluna…</option>
-          {available.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-      )}
+      <span className="mt-auto text-[10px] uppercase tracking-wide text-slate-400">{blockTypeLabel(block.type)} · {w}×{h}</span>
     </div>
   );
 }

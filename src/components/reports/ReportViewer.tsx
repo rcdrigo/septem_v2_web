@@ -140,7 +140,7 @@ export function ReportRunViewer({ reportKey, filtersDef, preview }: { reportKey:
 
       {/* Blocos */}
       {data && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 print:grid-cols-1">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 print:grid-cols-1">
           {data.blocks.map((b) => (
             <BlockView key={b.id} block={b} reportKey={reportKey} filters={applied}
               onDrill={openDrill} onDetail={(block, row) => setDetailRow({ block, row })} />
@@ -198,8 +198,12 @@ function BlockView({ block, reportKey, filters, onDrill, onDetail }: {
   onDetail: (b: RunBlockTable, row: (string | null)[]) => void;
 }) {
   const isTable = block.type === 'table';
+  // Grid de 12 colunas: cada bloco ocupa a largura configurada (w); no mobile
+  // (grid-cols-1) o span colapsa para a coluna única. Sem w, tabela = largura total.
+  const w = Math.min(12, Math.max(1, block.w ?? (isTable ? 12 : 6)));
   return (
-    <section className={`flex flex-col rounded-md border border-slate-200 bg-white p-4 ${isTable ? 'lg:col-span-2' : ''}`}>
+    <section style={{ gridColumn: `span ${w} / span ${w}` }}
+      className="flex flex-col rounded-md border border-slate-200 bg-white p-4">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-semibold text-slate-800">{block.title ?? (isTable ? 'Tabela' : '')}</h3>
         {isTable && (
@@ -221,6 +225,25 @@ function BlockView({ block, reportKey, filters, onDrill, onDetail }: {
       )}
       {block.type === 'table' && <TableBlock block={block} onDetail={(row) => onDetail(block, row)} />}
     </section>
+  );
+}
+
+/**
+ * Renderiza UM bloco já executado, somente leitura (sem exportar/drill/detalhe).
+ * Usado pelo preview ao vivo do modal de configuração do componente.
+ */
+export function PreviewBlockView({ block }: { block: RunBlock }) {
+  const isTable = block.type === 'table';
+  return (
+    <div className="flex flex-col">
+      {block.title && <h3 className="mb-2 text-sm font-semibold text-slate-800">{block.title}</h3>}
+      {block.type === 'kpi' && (
+        <p className="py-6 text-center text-4xl font-semibold text-slate-900">{fmt(block.value, block.format)}</p>
+      )}
+      {(block.type === 'pie' || block.type === 'bars') && <GroupedChart block={block} onDrill={() => {}} />}
+      {block.type === 'stackedBars' && <StackedChart block={block} onDrill={() => {}} />}
+      {isTable && <TableBlock block={block as RunBlockTable} onDetail={() => {}} />}
+    </div>
   );
 }
 

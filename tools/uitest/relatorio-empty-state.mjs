@@ -1,6 +1,6 @@
 // Correção: ao criar um relatório novo (sem blocos), o container central da aba
 // "Blocos" deve mostrar um empty state — ícone + texto com CTA "Adicione um
-// componente" — e clicar no CTA adiciona o primeiro bloco (tabela).
+// componente" — e clicar no CTA abre o MODAL de configuração do componente.
 // Modelador de relatório é desktop → web 1280.
 import { chromium } from 'playwright-core';
 
@@ -34,29 +34,27 @@ try {
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
   await page.goto(`${BASE}/relatorios/editar?key=${key}`, { waitUntil: 'networkidle' });
-  await page.waitForSelector('text=Blocos do relatório', { timeout: 15000 });
+  await page.waitForSelector('text=Componentes do relatório', { timeout: 15000 });
   await page.waitForTimeout(500);
 
   // O empty state substitui o texto miúdo antigo: ícone + CTA.
   const cta = page.getByRole('button', { name: 'Adicione um componente' });
   check(await cta.count() === 1, '[web] empty state exibe o CTA "Adicione um componente"');
-  const svgAntes = await page.locator('section:has-text("Blocos do relatório") .border-dashed svg').count();
+  const svgAntes = await page.locator('section:has-text("Componentes do relatório") .border-dashed svg').count();
   check(svgAntes >= 1, '[web] empty state tem o ícone ilustrativo');
   await page.screenshot({ path: `${OUT}/relatorio-empty-state.png`, fullPage: false });
 
-  // Clicar no CTA adiciona o primeiro bloco (tabela) e o empty state some.
+  // Clicar no CTA abre o MODAL de configuração do componente.
   await cta.click();
-  await page.waitForTimeout(400);
-  check(await page.getByRole('button', { name: 'Adicione um componente' }).count() === 0,
-    '[web] após clicar, o empty state some');
-  const temTabela = await page.locator('section:has-text("Blocos do relatório")').getByText('Tabela', { exact: true }).count();
-  check(temTabela >= 1, '[web] o CTA adicionou um bloco de Tabela');
-
-  // Remover o bloco traz o empty state de volta.
-  await page.locator('button[aria-label="Remover bloco"]').first().click();
+  await page.waitForSelector('[role=dialog]', { timeout: 8000 });
+  check(await page.locator('[role=dialog]').getByText('Adicionar componente').count() >= 1,
+    '[web] o CTA abre o modal "Adicionar componente"');
+  // Cancelar fecha o modal e mantém o empty state (nada foi adicionado).
+  await page.locator('[role=dialog]').getByRole('button', { name: 'Cancelar' }).click();
   await page.waitForTimeout(300);
+  check(await page.locator('[role=dialog]').count() === 0, '[web] cancelar fecha o modal');
   check(await page.getByRole('button', { name: 'Adicione um componente' }).count() === 1,
-    '[web] remover o último bloco reexibe o empty state');
+    '[web] cancelar mantém o empty state (nada adicionado)');
 } finally { await browser.close(); }
 
 ok.forEach((m) => console.log('✓ ' + m));

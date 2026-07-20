@@ -51,6 +51,8 @@ export type TableColumnDef = { key: string; label?: string; visible?: boolean; f
 export type BlockFilterDef = { field: string; op: string; value?: string };
 export type BlockDef = {
   id: string; type: 'table' | 'kpi' | 'pie' | 'bars' | 'stackedBars'; title?: string;
+  /** Layout no grid de 12 colunas: largura em colunas (1–12) e altura em linhas. */
+  w?: number; h?: number;
   columns?: TableColumnDef[];
   groupBy?: string; stackBy?: string; valueField?: string; agg?: string; formula?: string; format?: string;
   filters?: BlockFilterDef[]; sort?: { field: string; desc: boolean }; limit?: number;
@@ -64,13 +66,13 @@ export type ReportDefinition = {
 };
 
 export type RunBlockTable = {
-  id: string; type: 'table'; title?: string;
+  id: string; type: 'table'; title?: string; w?: number; h?: number;
   columns: { key: string; label: string; visible: boolean; format?: string; colType: string }[];
   rows: (string | null)[][]; hasHiddenColumns: boolean; total: number;
 };
-export type RunBlockKpi = { id: string; type: 'kpi'; title?: string; format?: string; value: number };
-export type RunBlockGrouped = { id: string; type: 'pie' | 'bars'; title?: string; format?: string; items: { label: string; value: number }[] };
-export type RunBlockStacked = { id: string; type: 'stackedBars'; title?: string; format?: string; labels: string[]; series: { name: string; values: number[] }[] };
+export type RunBlockKpi = { id: string; type: 'kpi'; title?: string; w?: number; h?: number; format?: string; value: number };
+export type RunBlockGrouped = { id: string; type: 'pie' | 'bars'; title?: string; w?: number; h?: number; format?: string; items: { label: string; value: number }[] };
+export type RunBlockStacked = { id: string; type: 'stackedBars'; title?: string; w?: number; h?: number; format?: string; labels: string[]; series: { name: string; values: number[] }[] };
 export type RunBlock = RunBlockTable | RunBlockKpi | RunBlockGrouped | RunBlockStacked;
 
 export type ReportRunResult = {
@@ -134,6 +136,11 @@ export function refreshReport(key: string, filters: Record<string, string>, prev
 
 export function fetchDrilldown(key: string, blockId: string, body: { filters?: Record<string, string>; group?: string; stack?: string }) {
   return api.post<DrilldownResult>(`${BASE}/${key}/blocks/${blockId}/drilldown`, body);
+}
+
+/** Preview ao vivo de UM bloco avulso (ainda não salvo) — modal de configuração. */
+export function previewBlock(key: string, block: BlockDef, filters: Record<string, string> = {}) {
+  return api.post<{ block: RunBlock | null; error?: string }>(`${BASE}/${key}/preview-block`, { block, filters });
 }
 
 export function useReportSourceMetadata(key: string | null) {
