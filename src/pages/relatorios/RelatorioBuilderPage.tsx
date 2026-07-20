@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Eye, Plus, RefreshCcw, Save, Send, Trash2 } from 'lucide-react';
+import { ArrowLeft, BarChart3, Eye, Plus, RefreshCcw, Save, Send, Trash2 } from 'lucide-react';
 import { useSessionStore } from '@/stores/session';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { Field, Checkbox, Select, TextInput } from '@/components/ui/Field';
@@ -285,7 +285,18 @@ function BlocksEditor({ def, setDef, columnOptions }: {
           ))}
         </div>
       </div>
-      {blocks.length === 0 && <p className="text-sm text-slate-400">Adicione blocos: tabela, KPI, pizza, barras…</p>}
+      {blocks.length === 0 && (
+        <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-6 py-16 text-center">
+          <BarChart3 size={48} strokeWidth={1.5} className="text-slate-300" aria-hidden />
+          <p className="max-w-sm text-sm leading-relaxed text-slate-500">
+            <button type="button" onClick={() => add('table')}
+              className="rounded font-medium text-sky-600 underline underline-offset-2 hover:text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500">
+              Adicione um componente
+            </button>{' '}
+            para visualizar seus dados em tabelas, indicadores (KPI) e gráficos de pizza, barras e barras compostas.
+          </p>
+        </div>
+      )}
       <div className="flex flex-col gap-3">
         {blocks.map((b, i) => (
           <div key={b.id}
