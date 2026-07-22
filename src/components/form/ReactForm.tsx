@@ -749,7 +749,9 @@ function GroupTabsCards({ groups, extra }: { groups: Component[]; extra?: { lead
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
-        <div role="tablist" aria-label="Seções do formulário" className="flex flex-wrap gap-1">
+        {/* Mobile: cada botão de navegação ocupa 100% da largura (empilhados);
+            do sm pra cima volta a ser barra horizontal que quebra linha. */}
+        <div role="tablist" aria-label="Seções do formulário" className="flex flex-col gap-1 sm:flex-row sm:flex-wrap">
           {tabs.map((tab, i) => (
             <button key={tab.key} ref={(element) => { tabRefs.current[i] = element; }} type="button" role="tab"
               id={`septem-tab-${tab.key}`} aria-selected={i === idx} aria-controls={`septem-panel-${tab.key}`} tabIndex={i === idx ? 0 : -1}
@@ -760,7 +762,7 @@ function GroupTabsCards({ groups, extra }: { groups: Component[]; extra?: { lead
                 if (event.key === 'Home') { event.preventDefault(); moveFocus(0); }
                 if (event.key === 'End') { event.preventDefault(); moveFocus(tabs.length - 1); }
               }}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium uppercase tracking-wide ${i === idx ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+              className={`flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium uppercase tracking-wide sm:w-auto sm:justify-start ${i === idx ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
               {tab.icon}
               {tab.label}
               {tab.pending > 0 && (

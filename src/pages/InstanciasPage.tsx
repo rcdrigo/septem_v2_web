@@ -202,13 +202,10 @@ export function InstanceReport({ id, messageAccess }: { id: string; messageAcces
 }
 
 function OverviewTab({ d }: { d: import('@/lib/api/execution').InstanceDetail }) {
-  const s = STATUS[d.status] ?? { label: d.status, cls: 'bg-slate-100 text-slate-600' };
   return (
     <div className="space-y-3">
-      <div className={`flex items-center gap-2 rounded-md px-4 py-3 text-sm font-medium ${s.cls}`}>
-        <Clock size={15} /> Status do processo: {s.label}
-        {d.number != null ? <span className="font-normal opacity-80">· nº {d.number}</span> : null}
-      </div>
+      {/* O status vive no HEADER do relatório (StatusPill, largura do texto) — aqui
+          seria um bloco redundante ocupando a largura da página. */}
 
       {/* Resumo */}
       <div className="rounded-lg border border-slate-200 bg-white p-4">
@@ -273,11 +270,61 @@ function KeyValueData({ data }: { data: Record<string, unknown> }) {
 
 function TramitacaoTab({ d }: { d: import('@/lib/api/execution').InstanceDetail }) {
   const [hist, setHist] = useState<InstanceTask | null>(null);
+  // A tarefa do evento de início É a abertura do processo: ela ganha o selo "início"
+  // e o nó sintético só entra quando não há tarefa de início (instâncias legadas),
+  // senão o mesmo evento apareceria duas vezes seguidas.
+  const temTarefaDeInicio = d.tasks.some((t) => t.isStart);
   return (
     <>
       <ol className="relative ml-2 border-l-2 border-slate-200">
-        {/* Nó de abertura: o início do processo (requerente + data), sempre no topo. */}
-        <li className="ml-4 pb-4">
+        {/* Ordem DECRESCENTE: o mais recente primeiro; a abertura fecha a lista. */}
+        {[...d.tasks].reverse().map((t) => {
+          const active = t.status === 'pendente';
+          const changes = t.fieldHistory?.length ?? 0;
+          return (
+            <li key={t.id} className="ml-4 pb-4 last:pb-0">
+              <span className={`absolute -left-[7px] mt-1 h-3 w-3 rounded-full ring-2 ring-white ${t.isStart ? 'bg-sky-500' : active ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+              <div className={`rounded-md border px-3 py-2 text-sm ${active ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    {t.isStart ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700"><Play size={11} /> início</span>
+                    ) : (
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TASK_STATUS[t.status] ?? 'bg-slate-100 text-slate-600'}`}>{active ? 'em andamento' : t.status}</span>
+                    )}
+                    <span className="font-medium text-slate-800">{t.isStart ? 'Processo iniciado' : (t.name ?? 'Tarefa')}</span>
+                    {t.isStart && t.name && <span className="text-xs text-slate-400">· {t.name}</span>}
+                  </span>
+                  {changes > 0 && (
+                    <button type="button" onClick={() => setHist(t)}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                      <History size={12} /> Ver histórico de alterações
+                    </button>
+                  )}
+                </div>
+                <dl className="mt-1.5 grid gap-x-6 gap-y-0.5 text-xs text-slate-500 sm:grid-cols-2">
+                  <Info label={t.isStart ? 'Por' : active ? 'Com' : 'Concluída por'}>
+                    {active
+                      ? (t.assignee ?? 'Sem responsável')
+                      : (t.completedByImpersonator
+                          ? `${t.completedByImpersonator} em nome de ${t.completedBy}`
+                          // O requerente só serve de fallback na linha de ABERTURA. Numa tarefa
+                          // comum sem autor, cair no requerente atribuiria a ele algo que não fez.
+                          : (t.completedBy ?? (t.isStart ? d.requester : null) ?? '—'))}
+                  </Info>
+                  {t.isStart
+                    ? <Info label="Em">{fmt(t.completedAt ?? d.startedAt)}</Info>
+                    : <Info label="Recebida em">{fmt(t.createdAt)}</Info>}
+                  {!t.isStart && t.completedAt && <Info label="Concluída em">{fmt(t.completedAt)}</Info>}
+                  {t.action && <Info label="Ação">{t.action}</Info>}
+                  {t.justification && <Info label="Justificativa">{t.justification}</Info>}
+                </dl>
+              </div>
+            </li>
+          );
+        })}
+        {!temTarefaDeInicio && (
+        <li className="ml-4 pb-0">
           <span className="absolute -left-[7px] mt-1 h-3 w-3 rounded-full bg-sky-500 ring-2 ring-white" />
           <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
             <span className="flex items-center gap-2">
@@ -290,40 +337,7 @@ function TramitacaoTab({ d }: { d: import('@/lib/api/execution').InstanceDetail 
             </dl>
           </div>
         </li>
-        {d.tasks.map((t) => {
-          const active = t.status === 'pendente';
-          const changes = t.fieldHistory?.length ?? 0;
-          return (
-            <li key={t.id} className="ml-4 pb-4 last:pb-0">
-              <span className={`absolute -left-[7px] mt-1 h-3 w-3 rounded-full ring-2 ring-white ${active ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-              <div className={`rounded-md border px-3 py-2 text-sm ${active ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <span className="flex items-center gap-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TASK_STATUS[t.status] ?? 'bg-slate-100 text-slate-600'}`}>{active ? 'em andamento' : t.status}</span>
-                    <span className="font-medium text-slate-800">{t.name ?? 'Tarefa'}</span>
-                  </span>
-                  {changes > 0 && (
-                    <button type="button" onClick={() => setHist(t)}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
-                      <History size={12} /> Ver histórico de alterações
-                    </button>
-                  )}
-                </div>
-                <dl className="mt-1.5 grid gap-x-6 gap-y-0.5 text-xs text-slate-500 sm:grid-cols-2">
-                  <Info label={active ? 'Com' : 'Concluída por'}>
-                    {active
-                      ? (t.assignee ?? 'Sem responsável')
-                      : (t.completedByImpersonator ? `${t.completedByImpersonator} em nome de ${t.completedBy}` : (t.completedBy ?? '—'))}
-                  </Info>
-                  <Info label="Recebida em">{fmt(t.createdAt)}</Info>
-                  {t.completedAt && <Info label="Concluída em">{fmt(t.completedAt)}</Info>}
-                  {t.action && <Info label="Botão utilizado">{t.action}</Info>}
-                  {t.justification && <Info label="Justificativa">{t.justification}</Info>}
-                </dl>
-              </div>
-            </li>
-          );
-        })}
+        )}
       </ol>
       {hist && <FieldHistoryDialog task={hist} onClose={() => setHist(null)} />}
     </>
