@@ -3,6 +3,7 @@ import { AppShell } from './layout/AppShell';
 import { LoginPage } from './pages/LoginPage';
 import { ModeladorPage } from './pages/modelador/ModeladorPage';
 import { RelatorioBuilderPage } from './pages/relatorios/RelatorioBuilderPage';
+import { ConsultaViewPage } from './pages/relatorios/ConsultaViewPage';
 import { ProcessosPage } from './pages/processos/ProcessosPage';
 import { UsuariosPage } from './pages/admin/UsuariosPage';
 import { UnidadesPage } from './pages/admin/UnidadesPage';
@@ -57,6 +58,8 @@ export const router = createBrowserRouter(
     { path: '/processos/editar', element: <ModeladorPage /> },
     // Builder de relatórios em aba própria (Admin › Relatórios › Builder).
     { path: '/relatorios/editar', element: <RelatorioBuilderPage /> },
+    // Consulta (relatório publicado) em aba própria — aberta do catálogo (F7.1).
+    { path: '/consultas/ver', element: <ConsultaViewPage /> },
     // Unidade organizacional em aba própria (Fase 3) — imprimível.
     { path: '/unidade', element: <UnidadePage /> },
     {

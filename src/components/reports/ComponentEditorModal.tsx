@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, Hash, Layers, PieChart, Plus, Table, Trash2, type LucideIcon } from 'lucide-react';
+import { BarChart3, Grid3x3, Hash, Layers, PieChart, Plus, Table, Trash2, type LucideIcon } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { Field, Select, TextInput } from '@/components/ui/Field';
 import { PreviewBlockView } from '@/components/reports/ReportViewer';
-import { previewBlock, type BlockDef, type BlockFilterDef, type GlobalFilterDef, type RunBlock, type TableColumnDef } from '@/lib/api/reports';
+import { previewBlock, type BlockDef, type BlockFilterDef, type GlobalFilterDef, type RunBlock, type SortDef, type TableColumnDef } from '@/lib/api/reports';
+import { KPI_ICON_OPTIONS } from '@/components/reports/kpi-icons';
 
 type ColumnOption = { value: string; label: string };
 
@@ -13,6 +14,7 @@ export const BLOCK_TYPES: { value: BlockDef['type']; label: string; icon: Lucide
   { value: 'pie', label: 'Pizza', icon: PieChart },
   { value: 'bars', label: 'Barras', icon: BarChart3 },
   { value: 'stackedBars', label: 'Barras compostas', icon: Layers },
+  { value: 'heatmap', label: 'Mapa de calor', icon: Grid3x3 },
 ];
 export const blockTypeLabel = (t: string) => BLOCK_TYPES.find((b) => b.value === t)?.label ?? t;
 export const blockTypeIcon = (t: string) => BLOCK_TYPES.find((b) => b.value === t)?.icon ?? Table;
@@ -130,7 +132,7 @@ export function ComponentEditorModal({
           {block.type === 'table' ? (
             <div className="flex flex-col gap-3">
               <TableColumnsEditor block={block} onChange={(columns) => patch({ columns })} columnOptions={columnOptions} />
-              <SortEditor block={block} onChange={(sort) => patch({ sort })} columnOptions={columnOptions} allowValue={false} />
+              <MultiSortEditor block={block} onChange={(sorts) => patch({ sorts, sort: undefined })} columnOptions={columnOptions} allowValue={false} />
             </div>
           ) : (
             <div className="flex flex-col gap-3">
@@ -157,12 +159,31 @@ export function ComponentEditorModal({
                 <Field label="Formatação">
                   <Select value={block.format ?? ''} onChange={(e) => patch({ format: e.target.value || undefined })} options={FORMAT_OPTIONS} />
                 </Field>
-                <Field label="Limite">
-                  <TextInput type="number" value={block.limit ?? ''} placeholder="Todos"
+                <Field label={block.type === 'heatmap' ? 'Nº de cards (top-N)' : 'Limite'}
+                  hint={block.type === 'heatmap' ? 'Padrão 5.' : undefined}>
+                  <TextInput type="number" value={block.limit ?? ''} placeholder={block.type === 'heatmap' ? '5' : 'Todos'}
                     onChange={(e) => patch({ limit: e.target.value ? Number(e.target.value) : undefined })} />
                 </Field>
               </div>
-              <SortEditor block={block} onChange={(sort) => patch({ sort })} columnOptions={columnOptions} allowValue />
+
+              {block.type === 'kpi' && (
+                <div className="grid grid-cols-3 gap-3">
+                  <Field label="Ícone">
+                    <Select value={block.icon ?? ''} onChange={(e) => patch({ icon: e.target.value || undefined })} options={KPI_ICON_OPTIONS} />
+                  </Field>
+                  <Field label="Cor">
+                    <input type="color" aria-label="Cor do KPI" value={block.color ?? '#0ea5e9'}
+                      onChange={(e) => patch({ color: e.target.value })}
+                      className="h-9 w-full cursor-pointer rounded-md border border-slate-300" />
+                  </Field>
+                  <Field label="Evolução por (data)" hint="Sparkline por mês.">
+                    <Select value={block.trendField ?? ''} onChange={(e) => patch({ trendField: e.target.value || undefined })}
+                      options={[{ value: '', label: '—' }, ...columnOptions]} />
+                  </Field>
+                </div>
+              )}
+
+              <MultiSortEditor block={block} onChange={(sorts) => patch({ sorts, sort: undefined })} columnOptions={columnOptions} allowValue />
               <Field label="Fórmula avançada (opcional)" hint="Expressão por linha, ex.: [valor] * 1.1 — validada, sem SQL.">
                 <TextInput value={block.formula ?? ''} onChange={(e) => patch({ formula: e.target.value || undefined })} placeholder="[campo_a] + [campo_b]" />
               </Field>
@@ -216,29 +237,43 @@ function PreviewEmpty({ text }: { text: string }) {
   );
 }
 
-/** Ordenação do bloco: campo (ou valor agregado, nos gráficos) + direção. */
-function SortEditor({ block, onChange, columnOptions, allowValue }: {
-  block: BlockDef; onChange: (s: BlockDef['sort']) => void; columnOptions: ColumnOption[]; allowValue: boolean;
+/** Ordenação por VÁRIAS colunas (F7.7): cada nível = campo + direção; a 1ª é a
+ *  primária. Migra o `sort` legado (1 nível) para a lista na 1ª edição. */
+function MultiSortEditor({ block, onChange, columnOptions, allowValue }: {
+  block: BlockDef; onChange: (s: SortDef[]) => void; columnOptions: ColumnOption[]; allowValue: boolean;
 }) {
+  const sorts: SortDef[] = block.sorts && block.sorts.length ? block.sorts : block.sort ? [block.sort] : [];
   const opts = [
-    { value: '', label: 'Sem ordenação' },
     ...(allowValue ? [{ value: '_value', label: 'Valor agregado' }] : []),
     ...columnOptions,
   ];
+  const set = (next: SortDef[]) => onChange(next);
   return (
-    <div className="flex items-end gap-2">
-      <div className="min-w-0 flex-1">
-        <Field label="Ordenação">
-          <Select value={block.sort?.field ?? ''} options={opts}
-            onChange={(e) => onChange(e.target.value ? { field: e.target.value, desc: block.sort?.desc ?? true } : undefined)} />
-        </Field>
-      </div>
-      {block.sort && (
-        <button type="button" onClick={() => onChange({ field: block.sort!.field, desc: !block.sort!.desc })}
-          className="rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-50" title="Inverter direção">
-          {block.sort.desc ? '↓ desc' : '↑ asc'}
+    <div className="border-t border-slate-100 pt-3">
+      <div className="mb-1 flex items-center gap-2">
+        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Ordenação</span>
+        <button type="button" aria-label="Adicionar ordenação"
+          onClick={() => set([...sorts, { field: opts[0]?.value ?? '', desc: true }])}
+          className="inline-flex items-center gap-1 rounded border border-slate-300 px-1.5 py-0.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50">
+          <Plus size={10} /> coluna
         </button>
-      )}
+      </div>
+      {sorts.length === 0 && <p className="text-xs text-slate-400">Sem ordenação.</p>}
+      <div className="flex flex-col gap-1.5">
+        {sorts.map((s, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            {i > 0 && <span className="text-[10px] uppercase text-slate-400">depois</span>}
+            <Select value={s.field} aria-label={`Ordenar por ${i + 1}`} options={opts} className="min-w-0 flex-1"
+              onChange={(e) => set(sorts.map((x, j) => (j === i ? { ...x, field: e.target.value } : x)))} />
+            <button type="button" onClick={() => set(sorts.map((x, j) => (j === i ? { ...x, desc: !x.desc } : x)))}
+              className="rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-50" title="Inverter direção">
+              {s.desc ? '↓ desc' : '↑ asc'}
+            </button>
+            <button type="button" aria-label="Remover ordenação" onClick={() => set(sorts.filter((_, j) => j !== i))}
+              className="rounded p-1 text-rose-500 hover:bg-rose-50"><Trash2 size={13} /></button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

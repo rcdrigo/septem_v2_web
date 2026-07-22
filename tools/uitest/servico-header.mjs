@@ -19,7 +19,7 @@ await page.screenshot({ path: `${OUT}/servico-header.png` });
 
 const h = await page.evaluate(() => ({
   h1: document.querySelector('h1')?.textContent?.trim(),
-  processLine: [...document.querySelectorAll('header span')].map((s) => s.textContent?.trim()),
+  processLine: [...document.querySelectorAll('header p, header span')].map((s) => s.textContent?.trim()),
   paragraphCount: document.querySelectorAll('header > p').length,
 }));
 check(h.h1 === 'Preencher solicitação de pagamento', `h1 = nome da tarefa de início ("${h.h1}")`);

@@ -12,6 +12,13 @@ const ok = [];
 const bad = [];
 const check = (c, m) => (c ? ok.push(m) : bad.push(m));
 
+// No mobile, os botões de conclusão ficam atrás do acionador "Botões de conclusão".
+async function concluir(page, nome = 'Concluir') {
+  const trigger = page.getByRole('button', { name: 'Botões de conclusão' });
+  if (await trigger.isVisible().catch(() => false)) await trigger.click();
+  await page.getByRole('button', { name: nome }).click();
+}
+
 const api = async (token, path, method = 'GET', body) => {
   const r = await fetch(API + path, {
     method,
@@ -78,7 +85,7 @@ try {
     // Troca para um CPF INVÁLIDO e tenta concluir → erro vermelho + bloqueia.
     await campo.fill('');
     await campo.type('52998224724', { delay: 8 });
-    await page.getByRole('button', { name: 'Concluir' }).click();
+    await concluir(page);
     await page.waitForTimeout(500);
     const erroVisivel = await page.locator('text=CPF inválido.').count();
     check(erroVisivel > 0, `[${view.name}] CPF inválido mostra "CPF inválido." abaixo do campo`);
@@ -91,7 +98,7 @@ try {
     // Corrige para um CPF válido → conclui.
     await campo.fill('');
     await campo.type('52998224725', { delay: 8 });
-    await page.getByRole('button', { name: 'Concluir' }).click();
+    await concluir(page);
     await page.waitForTimeout(1500);
     const concluida = (await api(token, `/api/v1/workflow/instances`)).body;
     const doneOk = await page.locator('text=/conclu/i').count();

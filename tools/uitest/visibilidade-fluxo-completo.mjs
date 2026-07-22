@@ -57,12 +57,16 @@ await page.screenshot({ path: `${OUT}/vis-tarefa.png`, fullPage: true });
 const taskPage = page;
 
 const state = await taskPage.evaluate(() => {
+  // Os rótulos das abas de grupo renderizam em CAIXA ALTA (text-transform) e o
+  // innerText reflete isso — compara sem diferenciar maiúsculas/minúsculas, senão
+  // o check negativo do "Solicitante" passaria em falso com "SOLICITANTE" na tela.
   const text = document.body.innerText;
+  const up = text.toUpperCase();
   const enabledInputs = [...document.querySelectorAll('main input, main textarea')]
     .filter((i) => !i.disabled && i.type !== 'hidden').length;
   return {
-    solicitanteSumiu: !text.includes('Solicitante') && !text.includes('Nome do requisitante') && !text.includes('CPF'),
-    pagamentoPresente: text.includes('Pagamento') && text.includes('Valor da solicitação') && text.includes('Saldo de empenho'),
+    solicitanteSumiu: !up.includes('SOLICITANTE') && !up.includes('NOME DO REQUISITANTE') && !up.includes('CPF'),
+    pagamentoPresente: up.includes('PAGAMENTO') && up.includes('VALOR DA SOLICITAÇÃO') && up.includes('SALDO DE EMPENHO'),
     enabledInputs,
   };
 });

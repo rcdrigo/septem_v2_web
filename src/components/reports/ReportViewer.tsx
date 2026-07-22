@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, Info, Printer, RefreshCw } from 'lucide-react';
+import { Download, ExternalLink, Eye, Filter, Printer, RefreshCw, TrendingDown, TrendingUp } from 'lucide-react';
+import { KPI_ICONS } from '@/components/reports/kpi-icons';
 import {
   Chart,
   ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend, PieController, BarController,
@@ -9,7 +10,7 @@ import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
 import {
   useReportRun, refreshReport, fetchDrilldown, exportReport,
-  type GlobalFilterDef, type ReportRunResult, type RunBlock, type RunBlockTable,
+  type GlobalFilterDef, type ReportRunResult, type RunBlock, type RunBlockTable, type RunBlockKpi,
   type RunBlockGrouped, type RunBlockStacked, type DrilldownResult,
 } from '@/lib/api/reports';
 
@@ -53,6 +54,7 @@ export function ReportRunViewer({ reportKey, filtersDef, preview }: { reportKey:
   const [refreshing, setRefreshing] = useState(false);
   const [drill, setDrill] = useState<{ title: string; data: DrilldownResult; blockId: string; group: string; stack?: string } | null>(null);
   const [detailRow, setDetailRow] = useState<{ block: RunBlockTable; row: (string | null)[] } | null>(null);
+  const [showFilters, setShowFilters] = useState(false); // F7.8: filtros de tabela no viewer
 
   useEffect(() => { if (run.data) setData(run.data); }, [run.data]);
 
@@ -63,10 +65,11 @@ export function ReportRunViewer({ reportKey, filtersDef, preview }: { reportKey:
     finally { setRefreshing(false); }
   }
 
-  async function openDrill(block: RunBlockGrouped | RunBlockStacked, group: string, stack?: string) {
+  async function openDrill(block: RunBlockGrouped | RunBlockStacked, group?: string, stack?: string) {
     try {
       const result = await fetchDrilldown(reportKey, block.id, { filters: applied, group, stack });
-      setDrill({ title: `${block.title ?? 'Segmento'} — ${group}${stack ? ` / ${stack}` : ''}`, data: result, blockId: block.id, group, stack });
+      const seg = group === undefined ? 'Todos os registros' : `${block.title ?? 'Segmento'} — ${group}${stack ? ` / ${stack}` : ''}`;
+      setDrill({ title: seg, data: result, blockId: block.id, group: group ?? '', stack });
     } catch (err) {
       toast.error(err instanceof ApiError ? (err.detail ?? err.message) : 'Falha no drill-down.');
     }
@@ -128,6 +131,12 @@ export function ReportRunViewer({ reportKey, filtersDef, preview }: { reportKey:
             className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50">
             <RefreshCw size={14} className={refreshing ? 'animate-spin' : undefined} /> Obter dados mais recentes
           </button>
+          {data?.blocks.some((b) => b.type === 'table') && (
+            <button type="button" onClick={() => setShowFilters((v) => !v)} aria-pressed={showFilters}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm ${showFilters ? 'border-sky-500 bg-sky-50 text-sky-700' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}>
+              <Filter size={14} /> Filtrar
+            </button>
+          )}
           <button type="button" onClick={() => window.print()}
             className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
             <Printer size={14} /> Imprimir / PDF
@@ -142,7 +151,7 @@ export function ReportRunViewer({ reportKey, filtersDef, preview }: { reportKey:
       {data && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 print:grid-cols-1">
           {data.blocks.map((b) => (
-            <BlockView key={b.id} block={b} reportKey={reportKey} filters={applied}
+            <BlockView key={b.id} block={b} reportKey={reportKey} filters={applied} showFilters={showFilters}
               onDrill={openDrill} onDetail={(block, row) => setDetailRow({ block, row })} />
           ))}
         </div>
@@ -190,11 +199,12 @@ function DateRangeInput({ value, onChange }: { value: string; onChange: (v: stri
   );
 }
 
-function BlockView({ block, reportKey, filters, onDrill, onDetail }: {
+function BlockView({ block, reportKey, filters, showFilters, onDrill, onDetail }: {
   block: RunBlock;
   reportKey: string;
   filters: Record<string, string>;
-  onDrill: (b: RunBlockGrouped | RunBlockStacked, group: string, stack?: string) => void;
+  showFilters?: boolean;
+  onDrill: (b: RunBlockGrouped | RunBlockStacked, group?: string, stack?: string) => void;
   onDetail: (b: RunBlockTable, row: (string | null)[]) => void;
 }) {
   const isTable = block.type === 'table';
@@ -214,16 +224,17 @@ function BlockView({ block, reportKey, filters, onDrill, onDetail }: {
         )}
       </div>
 
-      {block.type === 'kpi' && (
-        <p className="py-4 text-center text-4xl font-semibold text-slate-900">{fmt(block.value, block.format)}</p>
-      )}
+      {block.type === 'kpi' && <KpiCard block={block} />}
       {(block.type === 'pie' || block.type === 'bars') && (
         <GroupedChart block={block} onDrill={(g) => onDrill(block, g)} />
+      )}
+      {block.type === 'heatmap' && (
+        <HeatmapBlock block={block} onDrill={(g) => onDrill(block, g)} />
       )}
       {block.type === 'stackedBars' && (
         <StackedChart block={block} onDrill={(g, s) => onDrill(block, g, s)} />
       )}
-      {block.type === 'table' && <TableBlock block={block} onDetail={(row) => onDetail(block, row)} />}
+      {block.type === 'table' && <TableBlock block={block} showFilters={showFilters} onDetail={(row) => onDetail(block, row)} />}
     </section>
   );
 }
@@ -237,10 +248,9 @@ export function PreviewBlockView({ block }: { block: RunBlock }) {
   return (
     <div className="flex flex-col">
       {block.title && <h3 className="mb-2 text-sm font-semibold text-slate-800">{block.title}</h3>}
-      {block.type === 'kpi' && (
-        <p className="py-6 text-center text-4xl font-semibold text-slate-900">{fmt(block.value, block.format)}</p>
-      )}
+      {block.type === 'kpi' && <KpiCard block={block} />}
       {(block.type === 'pie' || block.type === 'bars') && <GroupedChart block={block} onDrill={() => {}} />}
+      {block.type === 'heatmap' && <HeatmapBlock block={block} />}
       {block.type === 'stackedBars' && <StackedChart block={block} onDrill={() => {}} />}
       {isTable && <TableBlock block={block as RunBlockTable} onDetail={() => {}} />}
     </div>
@@ -268,24 +278,68 @@ function ExportButton({ reportKey, blockId, filters, format, group, stack }: { r
 
 const TABLE_PAGE_SIZE = 20;
 
-function TableBlock({ block, onDetail }: { block: RunBlockTable; onDetail: (row: (string | null)[]) => void }) {
+// Texto sem acento e sem caixa, para o filtro de "contém" (F7.8).
+const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+type ColFilter = { text?: string; min?: string; max?: string };
+const isRangeCol = (c: { colType: string; format?: string }) =>
+  c.colType === 'number' || c.colType === 'date' || c.format === 'number' || c.format === 'currency' || c.format === 'date';
+const isDateCol = (c: { colType: string; format?: string }) => c.colType === 'date' || c.format === 'date';
+
+function TableBlock({ block, onDetail, showFilters }: { block: RunBlockTable; onDetail: (row: (string | null)[]) => void; showFilters?: boolean }) {
   const visible = block.columns.map((c, i) => ({ ...c, index: i })).filter((c) => c.visible);
   const [page, setPage] = useState(1);
+  const [colFilters, setColFilters] = useState<Record<string, ColFilter>>({});
   if (block.rows.length === 0) return <p className="text-sm text-slate-400">Sem resultados.</p>;
 
+  // F7.8: filtro por coluna no viewer — intervalo (número/moeda/data), texto sem
+  // acento/caixa para o resto. Aplicado client-side sobre as linhas já carregadas.
+  const active = Object.entries(colFilters).filter(([, f]) => f.text || f.min || f.max);
+  const rows = active.length === 0 ? block.rows : block.rows.filter((row) =>
+    active.every(([key, f]) => {
+      const c = visible.find((v) => v.key === key);
+      if (!c) return true;
+      const raw = row[c.index];
+      if (isRangeCol(c)) {
+        if (isDateCol(c)) {
+          const d = raw ? new Date(raw).getTime() : NaN;
+          if (f.min && (Number.isNaN(d) || d < new Date(f.min).getTime())) return false;
+          if (f.max && (Number.isNaN(d) || d > new Date(`${f.max}T23:59:59`).getTime())) return false;
+          return true;
+        }
+        const n = raw != null ? Number(String(raw).replace(',', '.')) : NaN;
+        if (f.min && (Number.isNaN(n) || n < Number(f.min))) return false;
+        if (f.max && (Number.isNaN(n) || n > Number(f.max))) return false;
+        return true;
+      }
+      return f.text ? norm(raw ?? '').includes(norm(f.text)) : true;
+    }));
+  const setF = (key: string, patch: Partial<ColFilter>) => { setColFilters((p) => ({ ...p, [key]: { ...p[key], ...patch } })); setPage(1); };
+
   // Paginação client-side (impressão mostra tudo — CSS print ignora o recorte).
-  const totalPages = Math.max(1, Math.ceil(block.rows.length / TABLE_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(rows.length / TABLE_PAGE_SIZE));
   const current = Math.min(page, totalPages);
-  const pageRows = block.rows.slice((current - 1) * TABLE_PAGE_SIZE, current * TABLE_PAGE_SIZE);
+  const pageRows = rows.slice((current - 1) * TABLE_PAGE_SIZE, current * TABLE_PAGE_SIZE);
 
   const renderRow = (row: (string | null)[], i: number) => (
     <tr key={i} className="border-t border-slate-100">
-      {visible.map((c) => <td key={c.key} className="px-3 py-2 text-slate-700">{fmt(row[c.index], c.format, c.colType)}</td>)}
+      {visible.map((c) => (
+        <td key={c.key} className="px-3 py-2 text-slate-700">
+          {c.colType === 'processLink'
+            ? (row[c.index] ? (
+                <button type="button" onClick={() => window.open(`${import.meta.env.BASE_URL}solicitacao/${row[c.index]}`, '_blank', 'noopener')}
+                  className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-50 print:hidden">
+                  <ExternalLink size={12} /> Abrir
+                </button>
+              ) : '—')
+            : fmt(row[c.index], c.format, c.colType)}
+        </td>
+      ))}
       {block.hasHiddenColumns && (
         <td className="px-2 py-1.5 text-right print:hidden">
-          <button type="button" onClick={() => onDetail(row)} aria-label="Detalhes do registro"
+          {/* F7.9: ícone de olho + dica "Visualizar detalhamento" (colunas ocultas). */}
+          <button type="button" onClick={() => onDetail(row)} aria-label="Visualizar detalhamento" title="Visualizar detalhamento"
             className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-            <Info size={14} />
+            <Eye size={14} />
           </button>
         </td>
       )}
@@ -300,13 +354,34 @@ function TableBlock({ block, onDetail }: { block: RunBlockTable; onDetail: (row:
             {visible.map((c) => <th key={c.key} className="px-3 py-2 text-left">{c.label}</th>)}
             {block.hasHiddenColumns && <th className="w-10 print:hidden" aria-label="Detalhe" />}
           </tr>
+          {showFilters && (
+            <tr className="print:hidden">
+              {visible.map((c) => (
+                <th key={c.key} className="px-2 pb-2 align-top font-normal normal-case">
+                  {c.colType === 'processLink' ? null : isRangeCol(c) ? (
+                    <div className="flex items-center gap-1">
+                      <input type={isDateCol(c) ? 'date' : 'number'} aria-label={`Mínimo de ${c.label}`} value={colFilters[c.key]?.min ?? ''}
+                        onChange={(e) => setF(c.key, { min: e.target.value })} className="w-full min-w-0 rounded border border-slate-200 px-1 py-0.5 text-xs" />
+                      <span className="text-slate-300">–</span>
+                      <input type={isDateCol(c) ? 'date' : 'number'} aria-label={`Máximo de ${c.label}`} value={colFilters[c.key]?.max ?? ''}
+                        onChange={(e) => setF(c.key, { max: e.target.value })} className="w-full min-w-0 rounded border border-slate-200 px-1 py-0.5 text-xs" />
+                    </div>
+                  ) : (
+                    <input type="text" aria-label={`Filtrar ${c.label}`} placeholder="filtrar…" value={colFilters[c.key]?.text ?? ''}
+                      onChange={(e) => setF(c.key, { text: e.target.value })} className="w-full min-w-0 rounded border border-slate-200 px-1.5 py-0.5 text-xs" />
+                  )}
+                </th>
+              ))}
+              {block.hasHiddenColumns && <th className="print:hidden" />}
+            </tr>
+          )}
         </thead>
         <tbody className="print:hidden">{pageRows.map(renderRow)}</tbody>
-        {/* impressão: todas as linhas */}
-        <tbody className="hidden print:table-row-group">{block.rows.map(renderRow)}</tbody>
+        {/* impressão: todas as linhas (respeitando o filtro aplicado) */}
+        <tbody className="hidden print:table-row-group">{rows.map(renderRow)}</tbody>
       </table>
       <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-3 py-2 text-xs text-slate-400">
-        <span>{block.total} linha{block.total === 1 ? '' : 's'}</span>
+        <span>{active.length ? `${rows.length} de ${block.total}` : block.total} linha{block.total === 1 && !active.length ? '' : 's'}{active.length ? ' (filtrado)' : ''}</span>
         {totalPages > 1 && (
           <span className="ml-auto flex items-center gap-2 print:hidden">
             <button type="button" disabled={current <= 1} onClick={() => setPage(current - 1)}
@@ -331,6 +406,65 @@ function useChart(build: (ctx: HTMLCanvasElement) => Chart) {
     return () => chart.destroy();
   });
   return ref;
+}
+
+/** KPI (F7.11): ícone + valor coloridos e sparkline de evolução por mês. */
+function KpiCard({ block }: { block: RunBlockKpi }) {
+  const color = block.color || undefined;
+  const Icon = block.icon ? KPI_ICONS[block.icon] : null;
+  const spark = block.spark ?? [];
+  const trend = spark.length >= 2 ? spark[spark.length - 1] - spark[spark.length - 2] : 0;
+  return (
+    <div className="flex flex-col items-center gap-1.5 py-4">
+      {Icon && <Icon size={24} style={color ? { color } : undefined} aria-hidden />}
+      <p className="text-4xl font-semibold" style={color ? { color } : { color: '#0f172a' }}>{fmt(block.value, block.format)}</p>
+      {spark.length >= 2 && (
+        <div className="mt-1 flex items-center gap-2">
+          <Sparkline data={spark} color={color ?? '#0ea5e9'} />
+          {trend !== 0 && (
+            <span className={`inline-flex items-center ${trend > 0 ? 'text-emerald-600' : 'text-rose-600'}`} aria-label={trend > 0 ? 'em alta' : 'em queda'}>
+              {trend > 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Sparkline({ data, color }: { data: number[]; color: string }) {
+  const w = 96, h = 26;
+  const min = Math.min(...data), max = Math.max(...data);
+  const range = max - min || 1;
+  const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / range) * (h - 4) - 2}`).join(' ');
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label="Evolução temporal">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Mapa de calor (F7.10): mini-cards laranja (rótulo + total); clicar abre o
+ *  detalhamento do grupo, e "Ver todos" abre todos os registros. */
+function HeatmapBlock({ block, onDrill }: { block: RunBlockGrouped; onDrill?: (group: string | undefined) => void }) {
+  if (block.items.length === 0) return <p className="text-sm text-slate-400">Sem dados.</p>;
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      {block.items.map((it) => (
+        <button key={it.label} type="button" disabled={!onDrill} onClick={() => onDrill?.(it.label)}
+          className="flex flex-col rounded-md border border-amber-200 bg-amber-50 p-3 text-left transition-colors hover:bg-amber-100 disabled:cursor-default disabled:hover:bg-amber-50">
+          <span className="truncate text-xs font-semibold text-amber-900" title={it.label}>{it.label}</span>
+          <span className="mt-1 text-xl font-bold text-amber-700">{fmt(it.value, block.format)}</span>
+        </button>
+      ))}
+      {onDrill && (
+        <button type="button" onClick={() => onDrill(undefined)}
+          className="flex items-center justify-center rounded-md border border-dashed border-amber-300 bg-white p-3 text-center text-xs font-medium text-amber-700 hover:bg-amber-50">
+          Ver todos os registros
+        </button>
+      )}
+    </div>
+  );
 }
 
 function GroupedChart({ block, onDrill }: { block: RunBlockGrouped; onDrill: (group: string) => void }) {

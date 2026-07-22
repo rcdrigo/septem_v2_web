@@ -23,7 +23,9 @@ try {
   await page.locator('[data-element-id="T005"]').click();
   await page.waitForTimeout(700);
 
-  const aside = page.locator('aside').last();
+  // O modelador tem dois asides (config do elemento + config do campo de formulário);
+  // este teste é sobre o painel do ELEMENTO.
+  const aside = page.locator('aside').filter({ hasText: 'Informações gerais' }).first();
   check(await aside.locator('header p').count() === 0, '[elemento] cabeçalho não mostra o tipo BPMN');
   check(await aside.getByRole('switch').count() >= 5, '[elemento] opções booleanas da tarefa usam switches');
   check(await aside.locator('input:not([type=checkbox]):not([type=radio])[placeholder], textarea[placeholder]').count() === 0, '[elemento] inputs e textareas não usam placeholders instrutivos');

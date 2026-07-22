@@ -49,13 +49,18 @@ export type GlobalFilterDef = {
 };
 export type TableColumnDef = { key: string; label?: string; visible?: boolean; format?: string };
 export type BlockFilterDef = { field: string; op: string; value?: string };
+export type SortDef = { field: string; desc: boolean };
 export type BlockDef = {
-  id: string; type: 'table' | 'kpi' | 'pie' | 'bars' | 'stackedBars'; title?: string;
+  id: string; type: 'table' | 'kpi' | 'pie' | 'bars' | 'stackedBars' | 'heatmap'; title?: string;
   /** Layout no grid de 12 colunas: largura em colunas (1–12) e altura em linhas. */
   w?: number; h?: number;
   columns?: TableColumnDef[];
   groupBy?: string; stackBy?: string; valueField?: string; agg?: string; formula?: string; format?: string;
-  filters?: BlockFilterDef[]; sort?: { field: string; desc: boolean }; limit?: number;
+  filters?: BlockFilterDef[]; sort?: SortDef; limit?: number;
+  /** Ordenação por várias colunas (F7.7) — precede `sort`. */
+  sorts?: SortDef[];
+  /** KPI (F7.11): ícone, cor de destaque e campo de data para o sparkline. */
+  icon?: string; color?: string; trendField?: string;
 };
 export type ReportDefinition = {
   cacheTtlSeconds?: number;
@@ -63,6 +68,10 @@ export type ReportDefinition = {
   blocks?: BlockDef[];
   detail?: { fields: string[] };
   columnTypes?: Record<string, string>;
+  /** Rótulo customizado por coluna (renomear no relatório) — F7.5. */
+  columnLabels?: Record<string, string>;
+  /** Colunas removidas (origem processo) — F7.5. */
+  hiddenColumns?: string[];
 };
 
 export type RunBlockTable = {
@@ -70,8 +79,8 @@ export type RunBlockTable = {
   columns: { key: string; label: string; visible: boolean; format?: string; colType: string }[];
   rows: (string | null)[][]; hasHiddenColumns: boolean; total: number;
 };
-export type RunBlockKpi = { id: string; type: 'kpi'; title?: string; w?: number; h?: number; format?: string; value: number };
-export type RunBlockGrouped = { id: string; type: 'pie' | 'bars'; title?: string; w?: number; h?: number; format?: string; items: { label: string; value: number }[] };
+export type RunBlockKpi = { id: string; type: 'kpi'; title?: string; w?: number; h?: number; format?: string; value: number; icon?: string; color?: string; spark?: number[] };
+export type RunBlockGrouped = { id: string; type: 'pie' | 'bars' | 'heatmap'; title?: string; w?: number; h?: number; format?: string; items: { label: string; value: number }[] };
 export type RunBlockStacked = { id: string; type: 'stackedBars'; title?: string; w?: number; h?: number; format?: string; labels: string[]; series: { name: string; values: number[] }[] };
 export type RunBlock = RunBlockTable | RunBlockKpi | RunBlockGrouped | RunBlockStacked;
 

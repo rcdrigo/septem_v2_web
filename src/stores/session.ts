@@ -86,7 +86,12 @@ type TwoFactorChallenge = { twoFactorRequired: true; identifier: string; maskedE
 function readCachedTenant(): Tenant | null {
   try {
     const raw = localStorage.getItem(TENANT_KEY);
-    return raw ? (JSON.parse(raw) as Tenant) : null;
+    if (!raw) return null;
+    const tenant = JSON.parse(raw) as Tenant;
+    // Abas standalone (/servico, /tarefa) não disparam bootstrap: sem aplicar aqui,
+    // as meta tags de compartilhamento só sairiam certas depois do fetch.
+    applyTenantMeta(tenant);
+    return tenant;
   } catch {
     return null;
   }

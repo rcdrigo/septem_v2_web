@@ -6,6 +6,26 @@ function check(ok, msg) { if (!ok) failures++; console.log(`${ok ? '✓' : '✗ 
 const BASE = 'http://localhost:5173';
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
 
+// No mobile o footer de conclusão fica oculto atrás do acionador "Botões de
+// conclusão" (o <footer> existe, mas invisível). Aciona o primeiro botão de
+// conclusão em qualquer viewport.
+async function acionarConclusao(page) {
+  const trigger = page.getByRole('button', { name: 'Botões de conclusão' });
+  if (await trigger.isVisible().catch(() => false)) {
+    await trigger.click();
+    const dialog = page.getByRole('dialog', { name: 'Botões de conclusão' });
+    await dialog.waitFor({ timeout: 8000 });
+    await dialog
+      .getByRole('button')
+      .filter({ hasNotText: 'Voltar ao formulário' })
+      .filter({ hasText: /\S/ })
+      .first()
+      .click();
+    return;
+  }
+  await page.locator('footer button').first().click();
+}
+
 async function login(page, email = 'admin@prefeitura-x.local', pass = 'admin123') {
   await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
   await page.fill('input[name=identifier]', email);
@@ -94,7 +114,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await page.goto(BASE + '/servico/tres_tarefas_bug', { waitUntil: 'networkidle' });
   await page.waitForSelector('h1', { timeout: 15000 });
   await page.waitForTimeout(800);
-  await page.locator('footer button').first().click();
+  await acionarConclusao(page);
   await page.waitForTimeout(2500);
   check(await page.evaluate(() => document.body.innerText.includes('sucesso')), `[${vp.n}] item3: instância iniciada`);
 
@@ -102,7 +122,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await page.waitForURL(/\/tarefa\//, { timeout: 15000 });
   await page.waitForSelector('text=tarefa 1', { timeout: 15000 });
   await page.waitForTimeout(1000);
-  await page.locator('footer button').first().click(); // botão de conclusão
+  await acionarConclusao(page);
   await page.waitForTimeout(3000);
   await page.screenshot({ path: `${OUT}/fase0-item3-${vp.n}-apos-t1.png` });
 
@@ -131,7 +151,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await page.goto(BASE + '/servico/tres_tarefas_bug', { waitUntil: 'networkidle' });
   await page.waitForSelector('h1', { timeout: 15000 });
   await page.waitForTimeout(800);
-  await page.locator('footer button').first().click();
+  await acionarConclusao(page);
   await page.waitForTimeout(2000);
   const msgInicio = await page.evaluate(() => document.body.innerText);
   check(/Solicitação iniciada com sucesso/i.test(msgInicio), `[${vp.n}] item4: início mostra "Solicitação iniciada com sucesso"`);
@@ -142,7 +162,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await page.waitForURL(/\/tarefa\//, { timeout: 15000 });
   await page.waitForSelector('text=tarefa 1', { timeout: 15000 });
   await page.waitForTimeout(1000);
-  await page.locator('footer button').first().click();
+  await acionarConclusao(page);
   await page.waitForTimeout(2000);
   const msgTarefa = await page.evaluate(() => document.body.innerText);
   check(/Tarefa concluída com sucesso/i.test(msgTarefa), `[${vp.n}] item4: tarefa mostra "Tarefa concluída com sucesso"`);
@@ -151,7 +171,10 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await ctx.close();
 }
 
-// ══ ITEM 5 — "Tarefas executadas" inclui o que o usuário iniciou ════════════
+// ══ ITEM 5 — o histórico de executadas inclui o que o usuário iniciou ═══════
+// A página avulsa /tarefas-executadas virou a aba "Concluídas" dentro de /tarefas.
+// O que importa (item 5) continua o mesmo: iniciar um serviço registra a tarefa de
+// início como executada POR MIM e ela aparece no histórico.
 for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }]) {
   const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 2 });
   const page = await ctx.newPage();
@@ -161,14 +184,15 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await page.goto(BASE + '/servico/tres_tarefas_bug', { waitUntil: 'networkidle' });
   await page.waitForSelector('h1', { timeout: 15000 });
   await page.waitForTimeout(800);
-  await page.locator('footer button').first().click();
+  await acionarConclusao(page);
   await page.waitForTimeout(2500);
 
-  // a lista de executadas deve mostrar o processo que acabei de iniciar
-  await page.goto(BASE + '/tarefas-executadas', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(1500);
+  // o histórico de concluídas deve mostrar o processo que acabei de iniciar
+  await page.goto(BASE + '/tarefas', { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Concluídas' }).click();
+  await page.waitForTimeout(2000);
   const txt = await page.evaluate(() => document.body.innerText);
-  check(!/Nenhuma tarefa executada/i.test(txt), `[${vp.n}] item5: lista de executadas NÃO está vazia`);
+  check(!/Nenhuma tarefa|Nada por aqui/i.test(txt), `[${vp.n}] item5: histórico de concluídas NÃO está vazio`);
   check(/Tres Tarefas Bug/i.test(txt), `[${vp.n}] item5: aparece o processo que o usuário iniciou`);
   const semOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
   check(semOverflow, `[${vp.n}] item5: sem scroll horizontal`);
@@ -236,12 +260,12 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
 
   await login(page);
   const rotas = [
-    ['/tarefas', /Tarefas pendentes/i],
+    ['/tarefas', /Tarefas/i],
     ['/consultas', /Consultas/i],
     ['/admin/processos', /Processos/i],
     ['/admin/relatorios', /Relatórios/i],
     ['/processos/editar?key=tres_tarefas_bug', /Tres Tarefas Bug/i],   // modelador: nome do processo
-    ['/servico/tres_tarefas_bug', /Tres Tarefas Bug/i],                // início: nome do serviço
+    ['/servico/tres_tarefas_bug', /tarefa 1/i],                        // início: nome da TAREFA de início (ver servico-nome-inicio)
     ['/relatorios/editar?key=painel_de_despesas', /Painel de Despesas/i], // builder: nome do relatório
   ];
   for (const [rota, esperado] of rotas) {

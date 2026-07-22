@@ -21,7 +21,7 @@ const token = auth.accessToken;
 const rid = Math.floor(Math.random() * 1e6);
 let tree = (await api(token, '/api/v1/org-units/tree')).body ?? [];
 if (!Array.isArray(tree) || tree.length === 0) {
-  await api(token, '/api/v1/org-units/', 'POST', { name: `Secretaria ${rid}`, sigla: `sec${rid}` });
+  await api(token, '/api/v1/org-units/', 'POST', { key: `sec_${rid}`, name: `Secretaria ${rid}`, sigla: `sec${rid}` });
   tree = (await api(token, '/api/v1/org-units/tree')).body ?? [];
 }
 check(Array.isArray(tree) && tree.length > 0, `[api] há unidade(s) para o organograma (${tree.length})`);
@@ -31,12 +31,14 @@ check(Array.isArray(tree) && tree.length > 0, `[api] há unidade(s) para o organ
 const nomeLongo = `Secretaria Municipal de Planejamento Estratégico, Governança Digital e Coordenação Intersetorial ${rid}`;
 const criadas = [];
 const raizLonga = await api(token, '/api/v1/org-units/', 'POST', {
+  key: `org_${rid}`,
   name: nomeLongo,
   sigla: `ORG${rid}`,
 });
 if (raizLonga.body?.id) criadas.push(raizLonga.body.id);
 const filhaLonga = raizLonga.body?.id
   ? await api(token, '/api/v1/org-units/', 'POST', {
+      key: `sub_${rid}`,
       name: `Coordenação subordinada de acompanhamento e resultados ${rid}`,
       sigla: `SUB${rid}`,
       parentId: raizLonga.body.id,

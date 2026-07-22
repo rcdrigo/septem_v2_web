@@ -15,21 +15,23 @@ await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 await page.waitForTimeout(1000);
 check(await page.evaluate(() => !!localStorage.getItem('septem.tenant')), 'tenant cacheado no localStorage após o bootstrap');
 
-// Aba STANDALONE (/servico) com /api/tenant/config atrasado 4s: o header deve
-// pintar "Prefeitura X" imediatamente (cache) — antes era o fallback "Septem".
+// Aba STANDALONE (/servico) com /api/tenant/config atrasado 4s. O cabeçalho de
+// execução não exibe mais o nome do cliente (decisão de produto — servico-header.mjs
+// exige o header sem a linha de ambiente/cliente), então o que se prova aqui é o
+// efeito que resta do cache: o branding do tenant já está APLICADO antes do fetch
+// (meta tags de compartilhamento) e não há flash do fallback "Septem".
 await page.route('**/api/tenant/config', async (r) => {
   await new Promise((res) => setTimeout(res, 4000));
   await r.continue();
 });
 await page.goto('http://localhost:5173/servico/teste_condicoes_ui', { waitUntil: 'domcontentloaded' });
 await page.waitForTimeout(1200); // bem antes dos 4s do fetch
-const standalone = await page.evaluate(() => {
-  const header = document.querySelector('header')?.innerText ?? '';
-  const up = header.toUpperCase();
-  return { prefeitura: up.includes('PREFEITURA X'), fallbackSeptem: /\bSEPTEM\b/.test(up) };
-});
-check(standalone.prefeitura, 'aba standalone pinta "Prefeitura X" do cache, sem esperar o fetch');
-check(!standalone.fallbackSeptem, 'sem fallback "Septem" no header (fim do flash)');
+const standalone = await page.evaluate(() => ({
+  og: document.querySelector('meta[property="og:title"]')?.content ?? '',
+  header: (document.querySelector('header')?.innerText ?? '').toUpperCase(),
+}));
+check(standalone.og.includes('Prefeitura X'), `aba standalone aplica o branding do cache antes do fetch (og:title="${standalone.og}")`);
+check(!/\bSEPTEM\b/.test(standalone.header), 'sem fallback "Septem" no header (fim do flash)');
 
 // LOGIN: painel usa copy fixa — não depende do tenant, logo não pisca.
 await page.unroute('**/api/tenant/config');

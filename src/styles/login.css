@@ -41,6 +41,27 @@
   background-color: var(--color-login-hero);
 }
 
+/* Fundo do hero por Parâmetros (Fase 1): sobreposição escura + conteúdo acima dela. */
+.login-hero-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+}
+.login-tenant-brand,
+.login-hero-actions {
+  position: relative;
+  z-index: 1;
+}
+.login-hero-copy { z-index: 1; }
+.login-hero-descricao {
+  margin-top: 0.85rem;
+  max-width: 34ch;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  opacity: 0.95;
+}
+
 .login-corner-bands {
   position: absolute;
   z-index: 0;

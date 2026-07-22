@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, BarChart3, Eye, Pencil, Plus, RefreshCcw, Save, Send, Trash2 } from 'lucide-react';
+import { ArrowLeft, BarChart3, Pencil, Plus, RefreshCcw, Save, Send, Trash2 } from 'lucide-react';
+import { HelpPopover } from '@/components/ui/HelpPopover';
 import { useSessionStore } from '@/stores/session';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { Field, Checkbox, Select, TextInput } from '@/components/ui/Field';
@@ -45,7 +46,7 @@ export function RelatorioBuilderPage() {
   const [processKey, setProcessKey] = useState('');
   const [dataSourceId, setDataSourceId] = useState('');
   const [hydrated, setHydrated] = useState(false);
-  const [tab, setTab] = useState<'blocos' | 'filtros' | 'acesso' | 'preview'>('blocos');
+  const [tab, setTab] = useState<'origem' | 'blocos' | 'filtros' | 'acesso' | 'preview'>('blocos');
 
   const processes = useProcessList({ pageSize: 100 });
   const sources = useDataSourcesList('report');
@@ -60,9 +61,15 @@ export function RelatorioBuilderPage() {
   }, [detail.data, hydrated]);
 
   const columns = meta.data?.columns ?? [];
+  // F7.5: colunas ocultas somem das opções; rótulo custom substitui o original.
   const columnOptions = useMemo(
-    () => columns.map((c) => ({ value: c.key, label: c.group ? `${c.group} › ${c.label}` : c.label })),
-    [columns],
+    () => columns
+      .filter((c) => !(def.hiddenColumns ?? []).includes(c.key))
+      .map((c) => {
+        const label = def.columnLabels?.[c.key] || c.label;
+        return { value: c.key, label: c.group ? `${c.group} › ${label}` : label };
+      }),
+    [columns, def.hiddenColumns, def.columnLabels],
   );
 
   if (!token) return <Navigate to="/login" replace />;
@@ -99,6 +106,18 @@ export function RelatorioBuilderPage() {
     }
   }
 
+  // F7.5: renomear (rótulo custom, vazio = original) e remover/restaurar coluna.
+  function setColumnLabel(colKey: string, label: string) {
+    const next = { ...(def.columnLabels ?? {}) };
+    if (label.trim()) next[colKey] = label; else delete next[colKey];
+    setDef({ ...def, columnLabels: Object.keys(next).length ? next : undefined });
+  }
+  function toggleHidden(colKey: string, hide: boolean) {
+    const cur = def.hiddenColumns ?? [];
+    const next = hide ? [...cur, colKey] : cur.filter((k) => k !== colKey);
+    setDef({ ...def, hiddenColumns: next.length ? next : undefined });
+  }
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-slate-100">
       <header className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
@@ -110,13 +129,14 @@ export function RelatorioBuilderPage() {
           <p className="text-xs text-slate-400">v{detail.data?.version} · {detail.data?.status === 'published' ? 'publicado (editar cria novo rascunho)' : detail.data?.status}</p>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => sync.mutateAsync(key!).then(() => toast.success('Schema sincronizado com a origem.')).catch(() => toast.error('Falha ao sincronizar (há versão publicada?).'))}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50" title="Atualiza o snapshot da versão publicada com o schema atual da origem">
-            <RefreshCcw size={14} /> Sincronizar schema
-          </button>
-          <button type="button" onClick={() => setTab('preview')} className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
-            <Eye size={14} /> Preview
-          </button>
+          <div className="inline-flex items-center gap-1">
+            <button type="button" onClick={() => sync.mutateAsync(key!).then(() => toast.success('Campos atualizados a partir da origem.')).catch(() => toast.error('Não foi possível atualizar (existe versão publicada?).'))}
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
+              <RefreshCcw size={14} /> Atualizar campos da origem
+            </button>
+            <HelpPopover ariaLabel="O que faz atualizar os campos da origem"
+              html="Quando a fonte de dados ganha ou perde colunas, o relatório <b>já publicado</b> continua exibindo a lista antiga de campos. Este botão traz os campos atuais da origem para a versão publicada — sem precisar publicar de novo." />
+          </div>
           <button type="button" onClick={() => saveDraft()} disabled={update.isPending}
             className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
             <Save size={14} /> Salvar rascunho
@@ -129,10 +149,10 @@ export function RelatorioBuilderPage() {
       </header>
 
       <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-white px-4 pt-2">
-        {(['blocos', 'filtros', 'acesso', 'preview'] as const).map((t) => (
+        {(['origem', 'blocos', 'filtros', 'acesso', 'preview'] as const).map((t) => (
           <button key={t} type="button" onClick={() => setTab(t)}
             className={`whitespace-nowrap rounded-t-md px-3 py-1.5 text-sm font-medium capitalize ${tab === t ? 'border border-b-0 border-slate-200 bg-slate-100 text-slate-900' : 'text-slate-500 hover:text-slate-800'}`}>
-            {t === 'blocos' ? 'Blocos' : t === 'filtros' ? 'Filtros e detalhe' : t === 'acesso' ? 'Acesso' : 'Preview'}
+            {t === 'origem' ? 'Origem dos dados' : t === 'blocos' ? 'Blocos' : t === 'filtros' ? 'Filtros e detalhe' : t === 'acesso' ? 'Acesso' : 'Preview'}
           </button>
         ))}
       </nav>
@@ -144,9 +164,8 @@ export function RelatorioBuilderPage() {
           </div>
         )}
 
-        {tab !== 'preview' && tab !== 'acesso' && (
+        {tab === 'origem' && (
           <div className="mx-auto flex max-w-5xl flex-col gap-4">
-            {/* Origem */}
             <section className="rounded-md border border-slate-200 bg-white p-4">
               <h2 className="mb-3 text-sm font-semibold text-slate-800">Origem dos dados</h2>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -171,40 +190,75 @@ export function RelatorioBuilderPage() {
               {meta.isError && <p className="mt-2 text-xs text-amber-600">Origem ainda sem schema — salve o rascunho para carregar os campos.</p>}
               {columns.length > 0 && (
                 <div className="mt-3 overflow-x-auto">
+                  <p className="mb-1.5 text-xs text-slate-500">
+                    Renomeie como cada campo aparece no relatório{sourceType === 'process' ? '; remova os que não vai usar' : ''}.
+                  </p>
                   <table className="w-full text-xs">
                     <thead className="text-left uppercase tracking-wide text-slate-400">
-                      <tr><th className="py-1 pr-3">Campo</th><th className="py-1 pr-3">Grupo</th><th className="py-1">Tipo</th></tr>
+                      <tr>
+                        <th className="py-1 pr-3">Campo</th>
+                        <th className="py-1 pr-3">Rótulo no relatório</th>
+                        <th className="py-1 pr-3">Grupo</th>
+                        <th className="py-1 pr-3">Tipo</th>
+                        {sourceType === 'process' && <th className="w-8 py-1" aria-label="Ação" />}
+                      </tr>
                     </thead>
                     <tbody>
-                      {columns.map((c) => (
-                        <tr key={c.key} className="border-t border-slate-100">
-                          <td className="py-1 pr-3 font-medium text-slate-700">{c.label} <span className="font-normal text-slate-400">({c.key})</span></td>
-                          <td className="py-1 pr-3 text-slate-500">{c.group ?? '—'}</td>
-                          <td className="py-1">
-                            {sourceType === 'dataSource' ? (
-                              <select value={def.columnTypes?.[c.key] ?? c.type}
-                                onChange={(e) => setDef({ ...def, columnTypes: { ...def.columnTypes, [c.key]: e.target.value } })}
-                                className="rounded border border-slate-200 px-1 py-0.5 text-xs">
-                                <option value="text">texto</option><option value="number">número</option>
-                                <option value="date">data</option><option value="bool">sim/não</option>
-                              </select>
-                            ) : <span className="text-slate-500">{c.type}</span>}
-                          </td>
-                        </tr>
-                      ))}
+                      {columns.map((c) => {
+                        const hidden = (def.hiddenColumns ?? []).includes(c.key);
+                        return (
+                          <tr key={c.key} className={`border-t border-slate-100 ${hidden ? 'opacity-45' : ''}`}>
+                            <td className="py-1 pr-3 font-medium text-slate-700">{c.label} <span className="font-normal text-slate-400">({c.key})</span></td>
+                            <td className="py-1 pr-3">
+                              <input value={def.columnLabels?.[c.key] ?? ''} placeholder={c.label} disabled={hidden}
+                                aria-label={`Rótulo de ${c.key}`}
+                                onChange={(e) => setColumnLabel(c.key, e.target.value)}
+                                className="w-full min-w-28 rounded border border-slate-200 px-1.5 py-0.5 text-xs disabled:bg-slate-50" />
+                            </td>
+                            <td className="py-1 pr-3 text-slate-500">{c.group ?? '—'}</td>
+                            <td className="py-1 pr-3">
+                              {sourceType === 'dataSource' ? (
+                                <select value={def.columnTypes?.[c.key] ?? c.type}
+                                  onChange={(e) => setDef({ ...def, columnTypes: { ...def.columnTypes, [c.key]: e.target.value } })}
+                                  className="rounded border border-slate-200 px-1 py-0.5 text-xs">
+                                  <option value="text">texto</option><option value="number">número</option>
+                                  <option value="date">data</option><option value="bool">sim/não</option>
+                                </select>
+                              ) : <span className="text-slate-500">{c.type}</span>}
+                            </td>
+                            {sourceType === 'process' && (
+                              <td className="py-1 text-right">
+                                {hidden ? (
+                                  <button type="button" onClick={() => toggleHidden(c.key, false)}
+                                    className="rounded px-1.5 py-0.5 text-[11px] font-medium text-sky-600 hover:bg-sky-50">restaurar</button>
+                                ) : (
+                                  <button type="button" onClick={() => toggleHidden(c.key, true)} aria-label={`Remover ${c.key}`}
+                                    className="rounded p-1 text-rose-500 hover:bg-rose-50"><Trash2 size={13} /></button>
+                                )}
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
             </section>
 
-            {tab === 'blocos' && (
-              <BlocksEditor def={def} setDef={setDef} columnOptions={columnOptions}
-                reportKey={key} hasSource={columns.length > 0} />
-            )}
-            {tab === 'filtros' && (
-              <FiltersAndDetailEditor def={def} setDef={setDef} columnOptions={columnOptions} />
-            )}
+          </div>
+        )}
+
+        {tab === 'blocos' && (
+          <div className="mx-auto flex max-w-5xl flex-col gap-4">
+            <BlocksEditor def={def} setDef={setDef} columnOptions={columnOptions}
+              reportKey={key} hasSource={columns.length > 0} />
+          </div>
+        )}
+
+        {tab === 'filtros' && (
+          <div className="mx-auto max-w-5xl">
+            <FiltersAndDetailEditor def={def} setDef={setDef} columnOptions={columnOptions} />
           </div>
         )}
 

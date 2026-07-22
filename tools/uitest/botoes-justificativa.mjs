@@ -59,6 +59,10 @@ try {
     const inst = await api(token, '/api/v1/workflow/instances', 'POST', { key, data: {} });
     const taskId = inst.body.tasks[0].id;
     await page.goto(`${BASE}/tarefa/${taskId}`, { waitUntil: 'networkidle' });
+    // No mobile os botões de conclusão ficam atrás do acionador "Botões de conclusão".
+    const trigger = page.getByRole('button', { name: 'Botões de conclusão' });
+    await page.waitForTimeout(800);
+    if (await trigger.isVisible().catch(() => false)) await trigger.click();
     await page.getByRole('button', { name: 'Reprovar' }).waitFor({ timeout: 15000 });
 
     // Clicar no botão abre a área de justificativa (não conclui direto).
@@ -114,7 +118,8 @@ try {
     // Configura na tela: escolhe a cor vermelha (#b91c1c) e marca justificativa.
     await page.locator('[data-testid=cor-swatch]').nth(8).click();
     await page.waitForTimeout(300);
-    await page.getByRole('switch', { name: 'Obrigar justificativa' }).click();
+    // O <Switch> tem input sr-only (clique interceptado) — aciona pelo <label> ancestral.
+    await page.getByRole('switch', { name: 'Obrigar justificativa' }).locator('xpath=ancestor::label[1]').click();
     await page.waitForTimeout(300);
     await page.locator('header button', { hasText: 'Salvar' }).first().click();
     await page.waitForTimeout(3000);

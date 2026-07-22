@@ -59,8 +59,8 @@ await page.waitForTimeout(500);
 const fin = await page.evaluate(() => {
   const secs = [...document.querySelectorAll('section')];
   const s = secs.find((x) => x.querySelector('h2')?.textContent?.trim() === 'Financeiro');
-  const cards = [...(s?.querySelectorAll('.grid > div') ?? [])].map((c) => c.querySelector('p')?.textContent?.trim());
-  const btn = [...(s?.querySelectorAll('button') ?? [])].find((b) => b.textContent?.includes('Abrir') && b.closest('div')?.textContent?.includes('Indicadores de RH'));
+  const cards = [...(s?.querySelectorAll('.grid > article') ?? [])].map((c) => c.querySelector('p')?.textContent?.trim());
+  const btn = [...(s?.querySelectorAll('button') ?? [])].find((b) => b.textContent?.includes('Abrir') && b.closest('article')?.textContent?.includes('Indicadores de RH'));
   return { cards, btnColor: btn?.style.backgroundColor ?? null };
 });
 check(fin.cards.some((c) => c?.startsWith('Indicadores de RH')), `card no grupo Financeiro: ${JSON.stringify(fin.cards)}`);

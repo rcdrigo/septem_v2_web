@@ -11,6 +11,13 @@ const ok = [];
 const bad = [];
 const check = (c, m) => (c ? ok.push(m) : bad.push(m));
 
+// No mobile, os botões de conclusão ficam atrás do acionador "Botões de conclusão".
+async function concluir(page, nome = 'Concluir') {
+  const trigger = page.getByRole('button', { name: 'Botões de conclusão' });
+  if (await trigger.isVisible().catch(() => false)) await trigger.click();
+  await page.getByRole('button', { name: nome }).click();
+}
+
 const api = async (token, path, method = 'GET', body) => {
   const r = await fetch(API + path, {
     method,
@@ -103,7 +110,7 @@ try {
     // Concluir com o anexo reenviado.
     await page.setInputFiles('[data-testid=anexo-input]', pdf);
     await page.waitForSelector('[data-testid=anexo-item]', { timeout: 15000 });
-    await page.getByRole('button', { name: 'Concluir' }).click();
+    await concluir(page);
     await page.waitForTimeout(1500);
     check(await page.locator('text=/conclu/i').count() > 0, `[${view.name}] conclui a tarefa com o anexo`);
 

@@ -182,7 +182,11 @@ export function LoginPage() {
     <div className="login-page">
       <div className="login-card">
         {/* ── Painel institucional (esquerda) ─────────────────────────────── */}
-        <aside className="login-hero-panel" data-testid="login-hero">
+        <aside className="login-hero-panel" data-testid="login-hero"
+          style={tenant?.heroImageUrl ? { backgroundImage: `url("${tenant.heroImageUrl}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
+          {/* Fundo do hero vindo dos Parâmetros do sistema (Fase 1): sobreposição
+              escura mantém o texto legível por cima da imagem. */}
+          {tenant?.heroImageUrl && <div className="login-hero-overlay bg-slate-900/75" aria-hidden="true" />}
           <div className="login-corner-bands login-corner-bands--top-right" aria-hidden="true">
             <i /><i /><i />
           </div>
@@ -203,6 +207,9 @@ export function LoginPage() {
               Processos claros,<br />
               conformidade em<br className="login-hero-title-break" /> cada decisão.
             </h2>
+            {tenant?.systemDescription && (
+              <p className="login-hero-descricao" data-testid="login-descricao">{tenant.systemDescription}</p>
+            )}
           </div>
 
           <div className="login-hero-actions">

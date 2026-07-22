@@ -11,7 +11,7 @@ page.on('pageerror', (e) => console.log('pageerror:', e.message.slice(0, 200)));
 // ── layout desktop ────────────────────────────────────────────────────────────
 await page.goto('http://localhost:5173/login', { waitUntil: 'networkidle' });
 // tenant chega via bootstrap (fetch anônimo) — espera o nome real renderizar
-await page.waitForFunction(() => document.body.innerText.includes('Prefeitura Municipal'), { timeout: 10000 }).catch(() => {});
+await page.waitForFunction(() => document.body.innerText.includes('Prefeitura X'), { timeout: 10000 }).catch(() => {});
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT}/login-desktop.png` });
 
@@ -23,7 +23,7 @@ const layout = await page.evaluate(() => {
     welcome: t.includes('Bem-vindo de volta') && t.includes('Entre com seus dados para acessar o Septem.'),
     cards: t.includes('Precisa de ajuda?') && t.includes('Consultar processo'),
     extras: t.includes('Manter-me conectado') && t.includes('Esqueci minha senha') && t.includes('Solicitar acesso') && t.includes('Tecnologia'),
-    tenant: t.includes('Prefeitura Municipal') && t.includes('Gestão integrada'),
+    tenant: t.includes('Prefeitura X') && t.includes('Gestão integrada'),
   };
 });
 for (const [k, v] of Object.entries(layout)) check(v, `layout: ${k}`);
