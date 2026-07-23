@@ -4,6 +4,7 @@
  * contrast: pass
  */
 import { ArrowLeft } from 'lucide-react';
+import { TestBadge } from '@/components/execution/TestBadge';
 
 type Props = {
   processName?: string | null;
@@ -11,6 +12,8 @@ type Props = {
   alias?: string | null;
   sector?: string | null;
   processNumber?: number | null;
+  /** Processo iniciado em simulação: o selo fica visível no topo da tarefa. */
+  isTest?: boolean;
   onBack?: () => void;
   onOpenReport?: () => void;
 };
@@ -22,6 +25,7 @@ export function ExecutionHeader({
   alias,
   sector,
   processNumber,
+  isTest,
   onBack,
   onOpenReport,
 }: Props) {
@@ -48,7 +52,10 @@ export function ExecutionHeader({
             {taskName || 'Tarefa'}
             {sector && <span className="font-normal text-slate-500"> <span aria-hidden="true">·</span>{' '}{sector}</span>}
           </h1>
-          {processName && <p className="mt-1 break-words text-sm text-slate-500 [overflow-wrap:anywhere]">{processName}</p>}
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            {processName && <p className="min-w-0 break-words text-sm text-slate-500 [overflow-wrap:anywhere]">{processName}</p>}
+            {isTest && <TestBadge compact />}
+          </div>
         </div>
 
         {hasProcessNumber && (

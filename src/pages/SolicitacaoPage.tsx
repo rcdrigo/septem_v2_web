@@ -4,6 +4,7 @@ import { useInstance } from '@/lib/api/execution';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { useSessionStore } from '@/stores/session';
 import { InstanceReport, StatusPill } from './InstanciasPage';
+import { TestBadge } from '@/components/execution/TestBadge';
 
 /**
  * Relatório/acompanhamento de uma instância em tela cheia (rota
@@ -37,6 +38,7 @@ export function SolicitacaoPage() {
               Detalhamento do processo{d?.number != null ? ` nº ${d.number}` : ''}
             </h1>
             {d?.status && <StatusPill status={d.status} />}
+            {d?.isTest && <TestBadge />}
           </div>
           {d?.process && <p className="mt-1 break-words text-sm text-slate-500 [overflow-wrap:anywhere]">{d.process}</p>}
           {d?.category && <p className="mt-1 truncate text-xs text-slate-400">Categoria: {d.category}</p>}

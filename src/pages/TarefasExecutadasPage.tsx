@@ -2,6 +2,7 @@ import { ClipboardCheck, User } from 'lucide-react';
 import { useExecutedTasks, type ExecutedTask } from '@/lib/api/execution';
 import { openTab } from '@/lib/nav';
 import { useViewMode, ViewToggle } from '@/pages/TarefasPage';
+import { TestBadge } from '@/components/execution/TestBadge';
 
 /**
  * Geral › Tarefas executadas: tarefas que o usuário concluiu (não estão mais com
@@ -34,6 +35,7 @@ export function TarefasExecutadasPage() {
                   <div className="min-w-0">
                     <p className="truncate font-medium text-slate-800">{t.name ?? 'Tarefa'}</p>
                     <p className="truncate text-xs text-slate-500">{t.process ?? 'Processo'}</p>
+                    {t.isTest && <div className="mt-1"><TestBadge compact /></div>}
                   </div>
                   {t.processNumber != null && (
                     <button type="button" onClick={() => openReport(t.executionId)} title="Ver relatório do processo"
@@ -85,7 +87,7 @@ export function TarefasExecutadasPage() {
                       ? <button type="button" onClick={() => openReport(t.executionId)} title="Ver relatório do processo" className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-600 hover:bg-slate-200">#{t.processNumber}</button>
                       : <span className="text-slate-400">—</span>}
                   </td>
-                  <td className="px-4 py-2 font-medium text-slate-800">{t.process ?? '—'}</td>
+                  <td className="px-4 py-2 font-medium text-slate-800">{t.process ?? '—'}{t.isTest && <div className="mt-1"><TestBadge compact /></div>}</td>
                   <td className="px-4 py-2 text-slate-600">{t.name ?? 'Tarefa'}</td>
                   <td className="px-4 py-2 text-slate-500">{t.action ?? '—'}</td>
                   <td className="px-4 py-2 text-xs text-slate-500">

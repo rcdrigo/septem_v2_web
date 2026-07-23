@@ -26,6 +26,8 @@ type Props = {
   utilityActions?: ExecutionAction[];
   loading?: boolean;
   compactDesktop?: boolean;
+  /** Conteúdo exibido ACIMA dos botões (ex.: "iniciar como teste") — vale no desktop e no mobile. */
+  notice?: ReactNode;
 };
 
 function ActionButton({ action, fullWidth, onRun, compact }: {
@@ -65,7 +67,7 @@ function ActionButton({ action, fullWidth, onRun, compact }: {
 }
 
 /** Rodapé desktop e bottom sheet mobile compartilhados pelas telas de execução. */
-export function TaskActionFooter({ completionActions, utilityActions = [], loading, compactDesktop = false }: Props) {
+export function TaskActionFooter({ completionActions, utilityActions = [], loading, compactDesktop = false, notice }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -144,6 +146,7 @@ export function TaskActionFooter({ completionActions, utilityActions = [], loadi
   return (
     <>
       <footer className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
+        {notice && <div className="mb-3">{notice}</div>}
         <div className="hidden items-center gap-2 sm:flex">
           {completionActions.map((action) => <ActionButton key={action.id} action={action} compact={compactDesktop} />)}
           {utilityActions.length > 0 && (

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { Play } from 'lucide-react';
 import { useProcessDefinition } from '@/lib/api/process-definitions';
@@ -23,7 +23,14 @@ export function ServicoFormPage() {
   const detail = useProcessDefinition(processKey ?? null);
   const form = useProcessForm(processKey ?? null);
   const start = useStartInstance();
+  // Aba standalone (sem AppShell): sem bootstrap próprio o usuário e as permissões
+  // não chegam a carregar, e o "iniciar como teste" sumiria de quem pode simular.
+  const sessionStatus = useSessionStore((s) => s.status);
+  const bootstrap = useSessionStore((s) => s.bootstrap);
+  useEffect(() => { if (sessionStatus === 'idle') void bootstrap(); }, [sessionStatus, bootstrap]);
+  const canSimulate = useSessionStore((s) => s.can('workflow:simulate'));
   const fillRef = useRef<ReactFormHandle>(null);
+  const [isTest, setIsTest] = useState(false);
   const [done, setDone] = useState<{ nextTaskForMe?: string | null; executionId?: string } | null>(null);
   const processName = form.data?.processName ?? detail.data?.name ?? 'Serviço';
   const taskName = form.data?.startTaskName || processName;
@@ -35,7 +42,7 @@ export function ServicoFormPage() {
     const { data, errors } = fillRef.current?.submit() ?? { data: {}, errors: {} };
     if ((button?.validateForm ?? true) && Object.keys(errors).length) { toast.error('Preencha os campos obrigatórios.'); return; }
     try {
-      const r = await start.mutateAsync({ key: processKey!, data });
+      const r = await start.mutateAsync({ key: processKey!, data, isTest: canSimulate && isTest });
       setDone({ nextTaskForMe: r.nextTaskForMe, executionId: r.executionId });
     } catch { toast.error('Não foi possível iniciar o processo.'); }
   }
@@ -85,7 +92,25 @@ export function ServicoFormPage() {
             {form.data?.documentationUrl && <DocBanner url={form.data.documentationUrl} />}
             {form.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={form.data?.formSchema} data={form.data?.data ?? undefined} optionsByField={form.data?.fieldOptions} uploadContext={{ processKey: processKey ?? undefined }} />}
           </main>
-          <TaskActionFooter completionActions={completionActions} loading={form.isLoading} />
+          <TaskActionFooter
+            completionActions={completionActions}
+            loading={form.isLoading}
+            notice={canSimulate ? (
+              <label className="inline-flex items-start gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  data-testid="iniciar-como-teste"
+                  checked={isTest}
+                  onChange={(event) => setIsTest(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+                />
+                <span>
+                  Iniciar como <strong>teste</strong>
+                  <span className="block text-xs text-slate-500">O processo é marcado como teste e todas as tarefas ficam com você.</span>
+                </span>
+              </label>
+            ) : undefined}
+          />
         </>
       )}
       <Toaster />

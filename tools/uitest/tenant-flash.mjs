@@ -34,16 +34,24 @@ check(standalone.og.includes('Prefeitura X'), `aba standalone aplica o branding 
 check(!/\bSEPTEM\b/.test(standalone.header), 'sem fallback "Septem" no header (fim do flash)');
 
 // LOGIN: painel usa copy fixa — não depende do tenant, logo não pisca.
-await page.unroute('**/api/tenant/config');
-await page.evaluate(() => { localStorage.clear(); });
-await page.route('**/api/tenant/config', async (r) => {
+// Contexto NOVO em vez de limpar o localStorage: a aba /servico também faz bootstrap
+// (precisa das permissões do usuário), e a resposta atrasada do /tenant/config regrava
+// o cache logo depois do clear — "sem tenant" só é verdade num contexto que nunca teve.
+const limpo = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const semCache = await limpo.newPage();
+await semCache.route('**/api/tenant/config', async (r) => {
   await new Promise((res) => setTimeout(res, 4000));
   await r.continue();
 });
-await page.goto('http://localhost:5173/login', { waitUntil: 'domcontentloaded' });
-await page.waitForTimeout(800);
-const loginText = await page.evaluate(() => document.body.innerText);
+await semCache.goto('http://localhost:5173/login', { waitUntil: 'domcontentloaded' });
+await semCache.waitForTimeout(800);
+// Sem isto o caso perderia o sentido: se houvesse tenant em cache, a copy do cliente
+// apareceria por cache e não por "copy fixa".
+check(await semCache.evaluate(() => localStorage.getItem('septem.tenant')) === null,
+  'o contexto de teste realmente não tem tenant em cache');
+const loginText = await semCache.evaluate(() => document.body.innerText);
 check(loginText.includes('Prefeitura Municipal'), 'login mostra a copy fixa imediatamente (sem tenant)');
+await limpo.close();
 
 console.log(failures === 0 ? 'PASSOU' : `FALHOU: ${failures} caso(s)`);
 await browser.close();

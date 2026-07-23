@@ -4,15 +4,31 @@ import { api } from '@/lib/api';
 export type StartedInstance = { executionId: string; status: string; tasks: { id: string; name: string | null }[]; nextTaskForMe?: string | null };
 export type RequestSummary = { label: string; value: string };
 export type ProcessMetadata = { process?: string | null; processKey?: string | null; processIcon?: string | null; categoryName?: string | null; categoryColor?: string | null; inboxText?: string | null; processNumber?: number; requester?: string | null };
-export type MyTask = ProcessMetadata & { id: string; name: string | null; executionId: string; createdAt: string; dueAt: string | null; completedAt?: string | null; action?: string | null; summary?: RequestSummary[] };
+/** isTest: instância iniciada em modo simulação (todas as tarefas ficam com o requisitante). */
+export type MyTask = ProcessMetadata & { id: string; name: string | null; executionId: string; createdAt: string; startedAt?: string; dueAt: string | null; completedAt?: string | null; action?: string | null; isTest?: boolean; summary?: RequestSummary[] };
 export type ExecutedTask = MyTask & { completedAt: string | null; action: string | null };
 export type TaskListItem = MyTask | ExecutedTask;
+/** Faceta de um botão de processo: nome + quantas tarefas ele tem nos filtros atuais. */
+export type ProcessFacet = { key: string; name: string; count: number };
+export type TasksResult = { items: TaskListItem[]; processes: ProcessFacet[] };
+/** Filtros da lista de tarefas (Fase 9) — todos resolvidos no servidor. */
+export type TaskFilters = {
+  q?: string;
+  process?: string;
+  number?: string;
+  requestedFrom?: string;
+  requestedTo?: string;
+  receivedFrom?: string;
+  receivedTo?: string;
+  sort?: 'prazo' | 'numero';
+  dir?: 'asc' | 'desc';
+};
 export type TaskSummary = { pendingCount: number };
 export type TaskButton = { id: string; label: string; validateForm: boolean; requireJustification?: boolean; primaryColor?: string | null; textColor?: string | null; icon?: string | null; hint?: string | null };
 export type FieldOptions = Record<string, { value: string; label: string }[]>;
 export type TaskDetail = {
   id: string; name: string | null; status: string; executionId: string;
-  process?: string | null; processNumber?: number | null;
+  process?: string | null; processNumber?: number | null; isTest?: boolean;
   alias?: string | null; sector?: string | null;
   documentationUrl?: string | null;
   formSchema: unknown; data: unknown; buttons: TaskButton[]; fieldOptions?: FieldOptions;
@@ -22,6 +38,8 @@ export type CompleteResult = { taskStatus: string; executionStatus: string; pend
 
 const execKeys = { tasks: ['workflow', 'tasks'] as const, summary: ['workflow', 'tasks', 'summary'] as const, task: (id: string) => ['workflow', 'task', id] as const };
 const TASKS_REFETCH_INTERVAL_MS = 60_000;
+/** Fase 9: a lista de tarefas se atualiza sozinha a cada 5 minutos. */
+export const TASKS_LIST_REFETCH_INTERVAL_MS = 300_000;
 
 /** Schema form-js do processo (formulário inicial de "Iniciar"). */
 export type StartForm = {
@@ -43,7 +61,7 @@ export function useProcessForm(key: string | null) {
 export function useStartInstance() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { key: string; data?: unknown }) => api.post<StartedInstance>('/api/v1/workflow/instances', body),
+    mutationFn: (body: { key: string; data?: unknown; isTest?: boolean }) => api.post<StartedInstance>('/api/v1/workflow/instances', body),
     onSuccess: () => qc.invalidateQueries({ queryKey: execKeys.tasks }),
   });
 }
@@ -54,16 +72,33 @@ export function useMyTasks() {
 
 /** Tarefas que o usuário concluiu (não estão mais com ele). */
 export function useExecutedTasks() {
-  return useQuery({ queryKey: [...execKeys.tasks, 'concluidas'], queryFn: () => api.get<ExecutedTask[]>('/api/v1/workflow/tasks?status=concluida') });
+  return useQuery({
+    queryKey: [...execKeys.tasks, 'concluidas'],
+    queryFn: async () => (await api.get<TasksResult>('/api/v1/workflow/tasks?status=concluida')).items as ExecutedTask[],
+  });
 }
 
-export function useTasks(status: 'pendentes' | 'concluidas') {
-  const query = status === 'concluidas' ? 'status=concluida' : 'assignee=me';
+/** Monta a query string só com o que o usuário realmente preencheu. */
+function taskFilterParams(status: 'pendentes' | 'concluidas', filters: TaskFilters) {
+  const qs = new URLSearchParams(status === 'concluidas' ? { status: 'concluida' } : { assignee: 'me' });
+  for (const [key, value] of Object.entries(filters)) {
+    if (value != null && String(value).trim() !== '') qs.set(key, String(value).trim());
+  }
+  return qs;
+}
+
+export function useTasks(status: 'pendentes' | 'concluidas', filters: TaskFilters = {}) {
+  const qs = taskFilterParams(status, filters);
   return useQuery({
-    queryKey: [...execKeys.tasks, status],
-    queryFn: () => api.get<TaskListItem[]>(`/api/v1/workflow/tasks?${query}`),
-    refetchInterval: TASKS_REFETCH_INTERVAL_MS,
+    queryKey: [...execKeys.tasks, status, qs.toString()],
+    queryFn: () => api.get<TasksResult>(`/api/v1/workflow/tasks?${qs.toString()}`),
+    // staleTime 0 porque o padrão global (60s) faria o refetch ao voltar o foco
+    // ser ignorado justamente na janela em que ele é mais esperado.
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: TASKS_LIST_REFETCH_INTERVAL_MS,
     refetchIntervalInBackground: true,
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -98,13 +133,13 @@ export function useSaveTask() {
 }
 
 // ── instâncias (acompanhamento) ───────────────────────────────────────
-export type InstanceListItem = ProcessMetadata & { id: string; number?: number; status: string; startedAt: string; endedAt: string | null; pendingTasks: number };
+export type InstanceListItem = ProcessMetadata & { id: string; number?: number; status: string; isTest?: boolean; startedAt: string; endedAt: string | null; pendingTasks: number };
 export type InstancesPage = { items: InstanceListItem[]; total: number; page: number; pageSize: number };
 export type FieldChange = { changedAt: string; changedBy: string | null; impersonator: string | null; action: string; group: string | null; field: string; changeType: string; oldValue: string | null; newValue: string | null };
 /** isStart: a tarefa nasceu do evento de início — na tramitação ela É o nó de abertura. */
 export type InstanceTask = { id: string; name: string | null; status: string; isStart?: boolean; assignee: string | null; completedBy: string | null; completedByImpersonator?: string | null; createdAt: string; completedAt: string | null; dueAt: string | null; action: string | null; justification?: string | null; fieldHistory?: FieldChange[] };
 export type ActiveTask = { name: string | null; assignee: string | null; startedAt?: string | null; dueAt: string | null };
-export type InstanceDetail = { id: string; number?: number; process: string | null; category?: string | null; flowKey?: string | null; requester?: string | null; status: string; startedAt: string; endedAt: string | null; data: unknown; formSchema?: unknown; inboxHtml?: string | null; activeTask?: ActiveTask | null; tasks: InstanceTask[]; canEdit?: boolean; canCancel?: boolean; canDelete?: boolean; messages?: { count: number; canPost: boolean } };
+export type InstanceDetail = { id: string; number?: number; process: string | null; category?: string | null; flowKey?: string | null; requester?: string | null; status: string; isTest?: boolean; startedAt: string; endedAt: string | null; data: unknown; formSchema?: unknown; inboxHtml?: string | null; activeTask?: ActiveTask | null; tasks: InstanceTask[]; canEdit?: boolean; canCancel?: boolean; canDelete?: boolean; messages?: { count: number; canPost: boolean } };
 export type InstancesParams = { q?: string; status?: string; mine?: boolean; page?: number; pageSize?: number };
 
 export function useInstances(params: InstancesParams) {
