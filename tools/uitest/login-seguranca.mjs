@@ -64,7 +64,7 @@ for (const view of [
   await page.click('button[type=submit]');
   await page.waitForURL((x) => !x.pathname.includes('login'), { timeout: 15000 });
   check(true, `[${view.name}] entra pelo CPF (não só pelo e-mail)`);
-  await page.evaluate(() => localStorage.clear());
+  await ctx.clearCookies(); // logout real (sessão em cookie httpOnly — Fase 11)
 
   // ── 2) Aviso progressivo e bloqueio na 5ª tentativa ───────────────────────
   await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
@@ -145,7 +145,7 @@ for (const view of [
   // ── 5) Layout ────────────────────────────────────────────────────────────
   // Sai da sessão: logado, /login redireciona para o app e mediríamos o shell
   // (o menu off-canvas do mobile fica fora da viewport de propósito).
-  await page.evaluate(() => localStorage.clear());
+  await ctx.clearCookies(); // logout real (sessão em cookie httpOnly — Fase 11)
   await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid=form-credenciais]');
   const L = await page.evaluate(() => {

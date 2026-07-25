@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath, URL } from 'node:url';
 import { copyFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { bffDev } from './src/bff/vite-plugin';
 
 /**
  * GitHub Pages não faz fallback de SPA: rotas como `/modelador` viram 404 porque
@@ -30,7 +31,9 @@ export default defineConfig({
   // Raiz por padrão (Cloudflare Pages/Netlify em domínio próprio). O deploy do
   // GitHub Pages passa VITE_BASE=/septem_v2_web/ por servir sob subpath.
   base: process.env.VITE_BASE || '/',
-  plugins: [react(), tailwindcss(), spaFallback()],
+  // bffDev() roda o núcleo do BFF em dev (proxy /api + bootstrap SSR em cookie),
+  // o mesmo que a Cloudflare executa em produção — nada de token em localStorage.
+  plugins: [bffDev(), react(), tailwindcss(), spaFallback()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -46,15 +49,9 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
-    // Em dev, `/api` aponta para o backend local (Septem.Api em :5000). O header
-    // `X-Tenant` injetado no cliente HTTP escolhe o tenant — não precisa mexer em
-    // /etc/hosts pra simular subdomínios.
-    proxy: {
-      '/api': {
-        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:5000',
-        changeOrigin: true,
-      },
-    },
+    // `/api` e o bootstrap SSR são tratados pelo plugin bffDev() (não mais por um
+    // proxy simples): é o BFF quem injeta X-Tenant/Authorization a partir do host
+    // e do cookie httpOnly. O backend continua em VITE_API_PROXY_TARGET (:5000).
   },
   assetsInclude: ['**/*.bpmn'],
 });

@@ -30,7 +30,7 @@ import { useUsersList } from '@/lib/api/users';
  * snapshot do schema (mudança na origem exige "Sincronizar schema").
  */
 export function RelatorioBuilderPage() {
-  const token = useSessionStore((s) => s.accessToken);
+  const user = useSessionStore((s) => s.user);
   const [params] = useSearchParams();
   const key = params.get('key');
 
@@ -72,7 +72,7 @@ export function RelatorioBuilderPage() {
     [columns, def.hiddenColumns, def.columnLabels],
   );
 
-  if (!token) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" replace />;
   if (!key) return <Navigate to="/admin/relatorios" replace />;
 
   async function saveDraft(showToast = true) {

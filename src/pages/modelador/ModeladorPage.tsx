@@ -34,9 +34,9 @@ import type { BpmnModelerHandle } from '@/components/bpmn/BpmnModeler';
  *  - injeta os handlers do dropdown "Recursos"
  */
 export function ModeladorPage() {
-  // Roda em aba própria (sem AppShell). Compartilha o token via localStorage com
-  // a aba principal; sem sessão → volta para o login.
-  const token = useSessionStore((s) => s.accessToken);
+  // Roda em aba própria (sem AppShell). A sessão vem do cookie httpOnly (BFF);
+  // o estado inicial é injetado no HTML — sem sessão → volta para o login.
+  const user = useSessionStore((s) => s.user);
 
   const currentView = useModeladorStore((s) => s.currentView);
   const processName = useModeladorStore((s) => s.processName);
@@ -213,7 +213,7 @@ export function ModeladorPage() {
   };
 
   // Guard de sessão depois de todos os hooks (regras de hooks).
-  if (!token) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" replace />;
 
   return (
     <div className="flex h-screen flex-1 flex-col overflow-hidden">

@@ -1,39 +1,17 @@
 import { toast } from '@/stores/toast';
 
 /**
- * Cliente HTTP único do app. Toda chamada ao backend passa por aqui:
- *  - Bearer token automático (tira do session store).
- *  - Header `X-Tenant` em dev (decide o tenant sem mexer em /etc/hosts).
- *  - Parse de `application/problem+json` → `ApiError` + toast de erro.
- *  - 1 retry transparente em 401 via `/auth/refresh` (rotacionando).
+ * Cliente HTTP único do app. Toda chamada ao backend passa por aqui.
  *
- * Importações tardias para quebrar o ciclo `session ↔ api`.
+ * Fase 11: o app roda atrás de um BFF (Cloudflare em prod, plugin do Vite em dev)
+ * na MESMA origem. Quem injeta `X-Tenant` (resolvido pelo host) e o `Authorization:
+ * Bearer` (a partir do cookie httpOnly) é o BFF — o navegador nunca vê o token.
+ * Por isso aqui só mandamos `credentials: 'include'` (o cookie de sessão vai junto)
+ * e tratamos erros/refresh de forma transparente.
  */
 
-/**
- * Base das chamadas. Em dev fica vazia (Vite faz proxy de `/api` → backend).
- * Em prod com o backend publicado numa origem separada, defina `VITE_API_URL`
- * (ex.: `https://septem-api.onrender.com`); se vazio, assume mesma origem.
- */
-const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? '';
-
-/**
- * Tenant enviado no header `X-Tenant`. Em dev é fixo (VITE_TENANT ou prefeitura-x).
- * Em prod, com o front publicado em `{tenant}.dominio.com`, derivamos do primeiro
- * rótulo do hostname (VITE_TENANT força um valor fixo, útil para preview). Hosts
- * sem subdomínio de tenant (`www`, apex) → sem header (resolução por host no back).
- */
-const TENANT_HEADER: string | undefined = resolveTenantHeader();
-
-function resolveTenantHeader(): string | undefined {
-  const forced = import.meta.env.VITE_TENANT as string | undefined;
-  if (import.meta.env.DEV) return forced ?? 'prefeitura-x';
-  if (forced) return forced;
-  if (typeof window === 'undefined') return undefined;
-  const label = window.location.hostname.split('.')[0];
-  if (!label || label === 'www' || label === 'localhost') return undefined;
-  return label;
-}
+/** Mesma origem do BFF — ele faz o proxy de `/api` para o backend. */
+const BASE_URL = '';
 
 export class ApiError extends Error {
   status: number;
@@ -59,25 +37,23 @@ export class ApiError extends Error {
 }
 
 type ApiOptions = RequestInit & {
-  /** Se true, NÃO injeta Authorization (usado por login/refresh/logout iniciais). */
+  /** Se true, um 401 NÃO desloga (usado por login/refresh: 401 ali é credencial ruim). */
   anonymous?: boolean;
-  /** Se true, evita o retry em 401 (usado pelo próprio refresh para não loopar). */
+  /** Reservado p/ compatibilidade — o refresh hoje é feito pelo BFF. */
   skipRefresh?: boolean;
 };
 
-/** Hooks para o session store; setados pelo store no boot. Evita ciclo de import. */
-let tokenProvider: () => string | null = () => null;
-let refreshHandler: () => Promise<string | null> = async () => null;
+/** Hook para o session store deslogar quando a sessão morre de vez. */
 let logoutHandler: () => Promise<void> = async () => {};
+let refreshHandler: () => Promise<string | null> = async () => null;
 
 export function configureApi(opts: {
-  getAccessToken: () => string | null;
-  refresh: () => Promise<string | null>;
+  getAccessToken?: () => string | null;
+  refresh?: () => Promise<string | null>;
   logout: () => Promise<void>;
 }) {
-  tokenProvider = opts.getAccessToken;
-  refreshHandler = opts.refresh;
   logoutHandler = opts.logout;
+  if (opts.refresh) refreshHandler = opts.refresh;
 }
 
 async function buildResponse(resp: Response): Promise<unknown> {
@@ -99,27 +75,15 @@ async function readError(resp: Response): Promise<ApiError> {
 
 export async function apiFetch<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
   const { anonymous, skipRefresh, headers, ...rest } = options;
+  void skipRefresh;
   const finalHeaders = new Headers(headers);
   if (!finalHeaders.has('Content-Type') && rest.body && typeof rest.body === 'string')
     finalHeaders.set('Content-Type', 'application/json');
-  if (!anonymous) {
-    const token = tokenProvider();
-    if (token) finalHeaders.set('Authorization', `Bearer ${token}`);
-  }
-  if (TENANT_HEADER && !finalHeaders.has('X-Tenant'))
-    finalHeaders.set('X-Tenant', TENANT_HEADER);
 
-  const resp = await fetch(`${BASE_URL}${path}`, { ...rest, headers: finalHeaders });
+  const resp = await fetch(`${BASE_URL}${path}`, { ...rest, headers: finalHeaders, credentials: 'include' });
 
-  if (resp.status === 401 && !anonymous && !skipRefresh) {
-    const newToken = await refreshHandler();
-    if (newToken) {
-      finalHeaders.set('Authorization', `Bearer ${newToken}`);
-      const retry = await fetch(`${BASE_URL}${path}`, { ...rest, headers: finalHeaders });
-      if (!retry.ok) throw await readError(retry);
-      return (await buildResponse(retry)) as T;
-    }
-    // refresh falhou → desloga e sobe erro original
+  if (resp.status === 401 && !anonymous) {
+    // O BFF já tentou o refresh (cookie). Um 401 aqui = sessão realmente encerrada.
     await logoutHandler();
     throw await readError(resp);
   }
@@ -143,36 +107,35 @@ export const api = {
   patch: <T = unknown>(path: string, body?: unknown, opts?: ApiOptions) =>
     apiFetch<T>(path, { method: 'PATCH', body: body !== undefined ? JSON.stringify(body) : undefined, ...opts }),
   del: <T = unknown>(path: string, opts?: ApiOptions) => apiFetch<T>(path, { method: 'DELETE', ...opts }),
+
   /** POST que devolve o corpo cru (Blob) — downloads (export CSV/XLSX). */
   postBlob: async (path: string, body?: unknown): Promise<Blob> => {
-    const headers = new Headers({ 'Content-Type': 'application/json' });
-    const token = tokenProvider();
-    if (token) headers.set('Authorization', `Bearer ${token}`);
-    if (TENANT_HEADER) headers.set('X-Tenant', TENANT_HEADER);
-    const resp = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: JSON.stringify(body ?? {}) });
+    const resp = await fetch(`${BASE_URL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body ?? {}),
+      credentials: 'include',
+    });
     if (!resp.ok) throw await readError(resp);
     return resp.blob();
   },
 
   /** GET que devolve o corpo cru (Blob) — downloads (modelo XLSX, anexos). */
   getBlob: async (path: string): Promise<Blob> => {
-    const headers = new Headers();
-    const token = tokenProvider();
-    if (token) headers.set('Authorization', `Bearer ${token}`);
-    if (TENANT_HEADER) headers.set('X-Tenant', TENANT_HEADER);
-    const resp = await fetch(`${BASE_URL}${path}`, { headers });
+    const resp = await fetch(`${BASE_URL}${path}`, { credentials: 'include' });
     if (!resp.ok) throw await readError(resp);
     return resp.blob();
   },
 
   /** POST multipart (upload de arquivo) — não define Content-Type (o browser põe o boundary). */
   postForm: async <T = unknown>(path: string, form: FormData): Promise<T> => {
-    const headers = new Headers();
-    const token = tokenProvider();
-    if (token) headers.set('Authorization', `Bearer ${token}`);
-    if (TENANT_HEADER) headers.set('X-Tenant', TENANT_HEADER);
-    const resp = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: form });
+    const resp = await fetch(`${BASE_URL}${path}`, { method: 'POST', body: form, credentials: 'include' });
     if (!resp.ok) throw await readError(resp);
     return (await buildResponse(resp)) as T;
   },
 };
+
+/** Exposto p/ o session store: força um refresh (delega ao BFF). */
+export function requestRefresh(): Promise<string | null> {
+  return refreshHandler();
+}

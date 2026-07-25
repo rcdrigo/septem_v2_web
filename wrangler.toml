@@ -1,0 +1,9 @@
+# Cloudflare Pages — hospeda o front (SPA) + o BFF (functions/).
+# O backend (.NET) continua no Render e o banco no Neon: o BFF só faz o proxy.
+#
+# Deploy: `wrangler pages deploy dist` (após `npm run build`). As variáveis
+# BACKEND_URL e (opcional) FORCED_TENANT são configuradas no painel do projeto
+# Pages → Settings → Environment variables. Em dev local usam-se `.dev.vars`.
+name = "septem"
+pages_build_output_dir = "dist"
+compatibility_date = "2024-11-01"

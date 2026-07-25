@@ -19,7 +19,7 @@ import { TaskActionFooter, type ExecutionAction } from '@/components/execution/T
  */
 export function ServicoFormPage() {
   const { processKey } = useParams();
-  const token = useSessionStore((s) => s.accessToken);
+  const user = useSessionStore((s) => s.user);
   const detail = useProcessDefinition(processKey ?? null);
   const form = useProcessForm(processKey ?? null);
   const start = useStartInstance();
@@ -36,7 +36,8 @@ export function ServicoFormPage() {
   const taskName = form.data?.startTaskName || processName;
   useDocumentTitle(taskName);
 
-  if (!token) return <Navigate to="/login" replace />;
+  if (sessionStatus === 'idle' || sessionStatus === 'booting') return null;
+  if (!user) return <Navigate to="/login" replace />;
 
   async function submit(button?: TaskButton) {
     const { data, errors } = fillRef.current?.submit() ?? { data: {}, errors: {} };

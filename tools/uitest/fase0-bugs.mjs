@@ -83,6 +83,11 @@ for (const alvo of ['Maximiliano', 'Cidadao Externo']) {
 
     await page.locator('aside button', { hasText: 'Personificar' }).click();
     await page.waitForTimeout(1000);
+    // O dialog lista só os 20 primeiros usuários (paginado + busca). Com muitos
+    // usuários no tenant o alvo não vem no render inicial — usar a busca, como o
+    // usuário real faria, em vez de depender da ordem da lista.
+    await page.locator('[role=dialog] input[type="search"]').fill(alvo);
+    await page.waitForTimeout(1200);
     await page.locator('[role=dialog] button', { hasText: alvo }).first().click();
     await page.waitForTimeout(2000);
     if (vp.n === 'mobile') { await page.locator('button[aria-label="Abrir menu"]').click().catch(() => {}); await page.waitForTimeout(400); }

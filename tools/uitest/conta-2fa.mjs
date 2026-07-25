@@ -50,6 +50,14 @@ const login = async (page, identifier, senha) => {
   await page.click('button[type=submit]');
 };
 
+// Fase 11: logout = limpar os cookies de sessão. `clearSession` preserva o cookie
+// do dispositivo confiável (septem_dt) para simular "novo login no mesmo device".
+const clearSession = async (ctx) => {
+  const dt = (await ctx.cookies('http://localhost:5173')).find((c) => c.name === 'septem_dt');
+  await ctx.clearCookies();
+  if (dt) await ctx.addCookies([{ name: 'septem_dt', value: dt.value, url: 'http://localhost:5173', httpOnly: true }]);
+};
+
 try {
   for (const view of [
     { name: 'web', width: 1280, height: 900 },
@@ -81,7 +89,7 @@ try {
     await page.screenshot({ path: `${OUT}/parametros-seguranca-${view.name}.png`, fullPage: true });
 
     // ── 2) Login vira duas etapas ──────────────────────────────────────────
-    await page.evaluate(() => localStorage.clear());
+    await ctx.clearCookies(); // logout do admin (sessão em cookie httpOnly)
     await login(page, u.email, u.senha);
     await page.waitForSelector('[data-testid=form-2fa]', { timeout: 15000 });
     const texto = await page.locator('main, body').first().innerText();
@@ -102,14 +110,11 @@ try {
     await page.waitForURL((x) => !x.pathname.includes('login'), { timeout: 15000 });
     check(true, `[${view.name}] código certo conclui o login`);
 
-    const deviceToken = await page.evaluate(() => localStorage.getItem('septem.deviceToken'));
-    check(!!deviceToken, `[${view.name}] o dispositivo confiável foi registrado no navegador`);
+    const deviceCookie = (await ctx.cookies('http://localhost:5173')).find((c) => c.name === 'septem_dt');
+    check(!!deviceCookie && deviceCookie.httpOnly, `[${view.name}] o dispositivo confiável foi registrado (cookie httpOnly septem_dt)`);
 
     // ── 3) Próximo login no mesmo dispositivo NÃO pede código ───────────────
-    await page.evaluate(() => {
-      localStorage.removeItem('septem.accessToken');
-      localStorage.removeItem('septem.refreshToken');
-    });
+    await clearSession(ctx); // desloga mas MANTÉM o device cookie
     await login(page, u.email, u.senha);
     await page.waitForURL((x) => !x.pathname.includes('login'), { timeout: 15000 });
     check(true, `[${view.name}] no dispositivo confiável, o login entra direto (sem código)`);
@@ -168,10 +173,7 @@ try {
     await page.waitForSelector('text=removido', { timeout: 10000 });
     check(true, `[${view.name}] remove o dispositivo confiável em Meus dados`);
 
-    await page.evaluate(() => {
-      localStorage.removeItem('septem.accessToken');
-      localStorage.removeItem('septem.refreshToken');
-    });
+    await clearSession(ctx); // desloga; o device foi removido no servidor → volta a desafiar
     await login(page, u.email, u.senha);
     await page.waitForSelector('[data-testid=form-2fa]', { timeout: 15000 });
     check(true, `[${view.name}] sem o dispositivo confiável, o login volta a pedir o código`);

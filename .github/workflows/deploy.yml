@@ -1,8 +1,11 @@
-name: Deploy to GitHub Pages
+name: Deploy to GitHub Pages (DESATIVADO — Fase 11)
 
+# Fase 11: o front migrou para a Cloudflare Pages (front + BFF) — ver
+# `deploy-cloudflare.yml`. O GitHub Pages é estático e NÃO tem o BFF; publicar o
+# build modo-cookie aqui resultaria num app quebrado (sem proxy /api, sem
+# bootstrap SSR, sem cookie de sessão). Por isso este workflow NÃO roda mais em
+# push — fica só manual (workflow_dispatch), como referência histórica.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

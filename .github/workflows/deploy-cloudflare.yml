@@ -1,0 +1,40 @@
+name: Deploy to Cloudflare Pages
+
+# Fase 11: o front + BFF passam a viver na Cloudflare Pages (saímos do GitHub
+# Pages, que é estático e não tem servidor para o BFF/SSR). O backend (.NET)
+# continua no Render e o banco no Neon.
+#
+# Segredos necessários (repo → Settings → Secrets and variables → Actions),
+# fornecidos pela conta Cloudflare do dono:
+#   - CLOUDFLARE_API_TOKEN   (token com permissão "Cloudflare Pages: Edit")
+#   - CLOUDFLARE_ACCOUNT_ID  (ID da conta Cloudflare)
+# A variável BACKEND_URL (base do backend no Render) é configurada no projeto
+# Pages → Settings → Environment variables (NÃO é build-time).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # base '/' (domínio próprio na Cloudflare). Sem VITE_API_URL/VITE_TENANT:
+      # o BFF resolve tenant pelo host e injeta o token do cookie.
+      - run: npm run build
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=septem --branch=main

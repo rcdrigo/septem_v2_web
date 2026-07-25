@@ -12,7 +12,7 @@ import { useSessionStore } from '@/stores/session';
  * página do catálogo; agora é uma aba dedicada (compartilhável, imprimível).
  */
 export function ConsultaViewPage() {
-  const token = useSessionStore((s) => s.accessToken);
+  const user = useSessionStore((s) => s.user);
   const [params] = useSearchParams();
   const key = params.get('key');
   const detail = useReport(key);
@@ -23,7 +23,7 @@ export function ConsultaViewPage() {
     catch { return []; }
   }, [detail.data?.definitionJson]);
 
-  if (!token) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" replace />;
   if (!key) return <Navigate to="/consultas" replace />;
 
   return (

@@ -43,30 +43,34 @@ check(!mob, 'mobile sem scroll horizontal');
 await page.screenshot({ path: `${OUT}/login-mobile.png`, fullPage: true });
 await page.setViewportSize({ width: 1440, height: 900 });
 
-// ── login SEM "manter-me conectado": não guarda refresh token ────────────────
+// ── Fase 11: a sessão vive em COOKIE httpOnly (fim do token em localStorage). ──
+// SEM "manter-me conectado" → cookies de SESSÃO (sem expiração persistente).
 await page.locator('label:has-text("Manter-me conectado") input').uncheck();
 await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
 await page.fill('input[type=password]', 'admin123');
 await page.getByRole('button', { name: 'Entrar' }).click();
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
-const tokens1 = await page.evaluate(() => ({
+const ck1 = await ctx.cookies('http://localhost:5173');
+const at1 = ck1.find((c) => c.name === 'septem_at');
+const rt1 = ck1.find((c) => c.name === 'septem_rt');
+const ls1 = await page.evaluate(() => ({
   access: !!localStorage.getItem('septem.accessToken'),
   refresh: !!localStorage.getItem('septem.refreshToken'),
 }));
-check(tokens1.access && !tokens1.refresh, `desmarcado: access sim, refresh NÃO (${JSON.stringify(tokens1)})`);
+check(!!at1 && at1.httpOnly && !!rt1 && rt1.httpOnly, 'sessão em cookie httpOnly (at + rt)');
+check(!ls1.access && !ls1.refresh, 'NENHUM token em localStorage (só cookie httpOnly)');
+check(rt1?.expires === -1, `desmarcado: refresh é cookie de SESSÃO (expires=${rt1?.expires})`);
 
-// ── login COM "manter-me conectado": guarda refresh ───────────────────────────
-await page.evaluate(() => { localStorage.clear(); });
+// COM "manter-me conectado" (default) → refresh cookie PERSISTENTE (com expiração).
+await ctx.clearCookies();
 await page.goto('http://localhost:5173/login', { waitUntil: 'networkidle' });
 await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
 await page.fill('input[type=password]', 'admin123');
 await page.getByRole('button', { name: 'Entrar' }).click();
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
-const tokens2 = await page.evaluate(() => ({
-  access: !!localStorage.getItem('septem.accessToken'),
-  refresh: !!localStorage.getItem('septem.refreshToken'),
-}));
-check(tokens2.access && tokens2.refresh, `marcado (default): access + refresh (${JSON.stringify(tokens2)})`);
+const ck2 = await ctx.cookies('http://localhost:5173');
+const rt2 = ck2.find((c) => c.name === 'septem_rt');
+check(!!rt2 && rt2.expires > 0, `marcado (default): refresh cookie PERSISTENTE (expires=${rt2?.expires})`);
 
 console.log(failures === 0 ? 'PASSOU' : `FALHOU: ${failures} caso(s)`);
 await browser.close();

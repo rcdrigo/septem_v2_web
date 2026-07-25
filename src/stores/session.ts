@@ -3,9 +3,13 @@ import { applyTenantMeta } from '@/lib/tenant-meta';
 import { api, configureApi } from '@/lib/api';
 
 /**
- * Sessão real do app — substitui o mock anterior do B0/B1 do frontend.
- * Tokens persistidos em <c>localStorage</c> sobrevivem a F5; `bootstrap()`
- * é chamado no AppShell e popula tenant + user a partir do backend.
+ * Sessão real do app.
+ *
+ * Fase 11: a sessão vive em COOKIE httpOnly (o token nunca aparece no JS). O BFF
+ * injeta o estado inicial em `window.__BOOTSTRAP__` (tenant + me) no HTML servido,
+ * então `/tenant/config` e `/me` NÃO saem do navegador na carga da página. Login/
+ * logout/refresh continuam sendo chamadas normais — quem move os tokens para
+ * cookie e injeta `Authorization`/`X-Tenant` é o BFF.
  */
 
 export type AccessMode = 'interno' | 'externo';
@@ -47,8 +51,6 @@ type SessionState = {
   error?: string;
   user: SessionUser | null;
   tenant: Tenant | null;
-  accessToken: string | null;
-  refreshToken: string | null;
   accessMode: AccessMode;
   /** Sessão atual é uma personificação (admin agindo como outro usuário). */
   isImpersonating: boolean;
@@ -71,44 +73,10 @@ type SessionState = {
   can: (perm?: string) => boolean;
 };
 
-const ACCESS_KEY = 'septem.accessToken';
-const REFRESH_KEY = 'septem.refreshToken';
 const TENANT_KEY = 'septem.tenant';
-/** Dispositivo confiável (2FA): enviado no login para pular o desafio. */
-const DEVICE_KEY = 'septem.deviceToken';
 
 export type LoginOutcome = { kind: 'ok' } | { kind: 'two-factor'; maskedEmail: string };
 type TwoFactorChallenge = { twoFactorRequired: true; identifier: string; maskedEmail: string };
-
-/** Branding do tenant cacheado — evita o "flash" de fallback (Septem V2 →
- *  Prefeitura X) a cada carga enquanto o /tenant/config responde. O bootstrap
- *  sempre sobrescreve com o valor fresco. */
-function readCachedTenant(): Tenant | null {
-  try {
-    const raw = localStorage.getItem(TENANT_KEY);
-    if (!raw) return null;
-    const tenant = JSON.parse(raw) as Tenant;
-    // Abas standalone (/servico, /tarefa) não disparam bootstrap: sem aplicar aqui,
-    // as meta tags de compartilhamento só sairiam certas depois do fetch.
-    applyTenantMeta(tenant);
-    return tenant;
-  } catch {
-    return null;
-  }
-}
-function cacheTenant(t: Tenant) {
-  applyTenantMeta(t);   // OG tags saem dos Parâmetros do sistema (Fase 1)
-  try { localStorage.setItem(TENANT_KEY, JSON.stringify(t)); } catch { /* storage cheio */ }
-}
-
-type TokenResponse = {
-  accessToken: string;
-  refreshToken: string;
-  accessExpiresAt: string;
-  refreshExpiresAt: string;
-  /** Só vem quando o usuário marca "confiar neste dispositivo" no 2FA. */
-  deviceToken?: string | null;
-};
 
 type MeResponse = {
   id: string;
@@ -119,51 +87,96 @@ type MeResponse = {
   perms: string[];
   accessProfiles: { id: string; name: string }[];
   impersonatedBy?: string | null;
+  cpf?: string | null;
+  matricula?: string | null;
+  telefone?: string | null;
+  photoUrl?: string | null;
 };
 
-/**
- * Guarda os tokens e conclui a sessão. "Manter-me conectado" = guardar o refresh
- * token (a sessão se renova sozinha). Desmarcado: sem refresh — quando o access
- * expirar, pede login de novo. (Não usamos sessionStorage: as abas standalone —
- * modelador/tarefa/serviço — compartilham o token entre abas via localStorage.)
- */
-async function applyTokens(
-  set: (partial: Partial<SessionState>) => void,
-  tokens: TokenResponse,
-  keepConnected: boolean,
-) {
-  localStorage.setItem(ACCESS_KEY, tokens.accessToken);
-  if (keepConnected) localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
-  else localStorage.removeItem(REFRESH_KEY);
-  set({ accessToken: tokens.accessToken, refreshToken: keepConnected ? tokens.refreshToken : null });
+type BootstrapData = { tenant: Tenant | null; me: MeResponse | null };
 
-  const user = await api.get<MeResponse>('/api/v1/me');
-  set({ status: 'authenticated', user });
+/** Estado inicial injetado pelo BFF no HTML (uma vez por carga de página). */
+function peekBootstrap(): BootstrapData | null {
+  if (typeof window === 'undefined') return null;
+  const raw = (window as unknown as { __BOOTSTRAP__?: BootstrapData }).__BOOTSTRAP__;
+  if (!raw) return null;
+  return { tenant: raw.tenant ?? null, me: raw.me ?? null };
+}
+function consumeBootstrap(): BootstrapData | null {
+  const b = peekBootstrap();
+  try {
+    delete (window as unknown as { __BOOTSTRAP__?: BootstrapData }).__BOOTSTRAP__;
+  } catch {
+    /* ignore */
+  }
+  return b;
 }
 
+/** Branding do tenant cacheado — evita o "flash" de fallback a cada carga. */
+function readCachedTenant(): Tenant | null {
+  try {
+    const raw = localStorage.getItem(TENANT_KEY);
+    if (!raw) return null;
+    const tenant = JSON.parse(raw) as Tenant;
+    applyTenantMeta(tenant);
+    return tenant;
+  } catch {
+    return null;
+  }
+}
+function cacheTenant(t: Tenant) {
+  applyTenantMeta(t); // OG tags saem dos Parâmetros do sistema (Fase 1)
+  try {
+    localStorage.setItem(TENANT_KEY, JSON.stringify(t));
+  } catch {
+    /* storage cheio */
+  }
+}
+
+const initialBoot = peekBootstrap();
+// Com SSR o status já nasce resolvido (não 'idle'), então componentes que só
+// chamam bootstrap() em 'idle' não rodam — persistimos o tenant injetado aqui
+// mesmo (aplica meta + grava no localStorage), evitando qualquer flash.
+if (initialBoot?.tenant) cacheTenant(initialBoot.tenant);
+const initialTenant = initialBoot?.tenant ?? readCachedTenant();
+
 export const useSessionStore = create<SessionState>((set, get) => ({
-  status: 'idle',
-  user: null,
-  tenant: readCachedTenant(),
-  accessToken: localStorage.getItem(ACCESS_KEY),
-  refreshToken: localStorage.getItem(REFRESH_KEY),
+  status: initialBoot ? (initialBoot.me ? 'authenticated' : 'unauthenticated') : 'idle',
+  user: initialBoot?.me ?? null,
+  tenant: initialTenant,
   accessMode: 'interno',
-  isImpersonating: false,
+  isImpersonating: !!initialBoot?.me?.impersonatedBy,
 
   bootstrap: async () => {
+    // 1) Estado injetado pelo BFF (nada sai do browser). Consome uma vez.
+    const boot = consumeBootstrap();
+    if (boot) {
+      if (boot.tenant) cacheTenant(boot.tenant);
+      set({
+        status: boot.me ? 'authenticated' : 'unauthenticated',
+        tenant: boot.tenant ?? get().tenant,
+        user: boot.me,
+        isImpersonating: !!boot.me?.impersonatedBy,
+        error: undefined,
+      });
+      return;
+    }
+
+    // 2) Sem injeção fresca (re-bootstrap após ação, ou navegação client-only):
+    //    busca do backend via BFF (cookie carrega a sessão).
     set({ status: 'booting', error: undefined });
     try {
-      // /tenant/config é não-autenticado — sempre tenta.
-      const tenant = await api.get<Tenant>('/api/tenant/config', { anonymous: true });
+      let tenant = get().tenant;
+      if (!tenant) tenant = await api.get<Tenant>('/api/tenant/config', { anonymous: true });
       cacheTenant(tenant);
-      if (!get().accessToken) {
-        set({ status: 'unauthenticated', tenant });
-        return;
+      try {
+        // anonymous: um 401 aqui não deve deslogar — apenas indica "sem sessão".
+        const user = await api.get<MeResponse>('/api/v1/me', { anonymous: true });
+        set({ status: 'authenticated', tenant, user, isImpersonating: !!user.impersonatedBy });
+      } catch {
+        set({ status: 'unauthenticated', tenant, user: null });
       }
-      const user = await api.get<MeResponse>('/api/v1/me');
-      set({ status: 'authenticated', tenant, user, isImpersonating: !!user.impersonatedBy });
     } catch (err) {
-      // Token expirado / inválido sem refresh válido → cai pra unauthenticated.
       const tenant = get().tenant;
       set({ status: tenant ? 'unauthenticated' : 'error', error: (err as Error).message });
     }
@@ -176,76 +189,52 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   login: async (identifier, password, keepConnected = true) => {
-    const res = await api.post<TokenResponse | TwoFactorChallenge>(
+    const res = await api.post<TwoFactorChallenge | { user: MeResponse }>(
       '/api/v1/auth/login',
-      // O deviceToken é o "dispositivo confiável": com ele, o backend pula o 2FA.
-      { identifier, password, deviceToken: localStorage.getItem(DEVICE_KEY) },
+      { identifier, password, keepConnected },
       { anonymous: true },
     );
-
-    if ('twoFactorRequired' in res) {
-      return { kind: 'two-factor', maskedEmail: res.maskedEmail };
+    if (res && 'twoFactorRequired' in res) {
+      return { kind: 'two-factor', maskedEmail: (res as TwoFactorChallenge).maskedEmail };
     }
-
-    await applyTokens(set, res, keepConnected);
+    // O BFF gravou a sessão em cookie E já devolveu o /me — nada de /me no browser.
+    const user = (res as { user: MeResponse }).user;
+    set({ status: 'authenticated', user, isImpersonating: !!user.impersonatedBy });
     return { kind: 'ok' };
   },
 
   completeTwoFactor: async (identifier, code, trustDevice, keepConnected = true) => {
-    const tokens = await api.post<TokenResponse>(
-      '/api/v1/auth/2fa',
-      { identifier, code, trustDevice },
-      { anonymous: true },
-    );
-    // O token do dispositivo confiável fica no navegador; no servidor só o hash.
-    if (tokens.deviceToken) localStorage.setItem(DEVICE_KEY, tokens.deviceToken);
-    await applyTokens(set, tokens, keepConnected);
+    const res = await api.post<{ user: MeResponse }>('/api/v1/auth/2fa', { identifier, code, trustDevice, keepConnected }, { anonymous: true });
+    set({ status: 'authenticated', user: res.user, isImpersonating: !!res.user.impersonatedBy });
   },
 
   impersonate: async (userId) => {
-    const tokens = await api.post<TokenResponse>(`/api/v1/impersonate/${userId}`);
-    localStorage.setItem(ACCESS_KEY, tokens.accessToken);
-    localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
-    set({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
-
-    const user = await api.get<MeResponse>('/api/v1/me');
-    set({ status: 'authenticated', user, isImpersonating: true });
+    const res = await api.post<{ user: MeResponse }>(`/api/v1/impersonate/${userId}`);
+    set({ status: 'authenticated', user: res.user, isImpersonating: true });
   },
 
   stopImpersonation: async () => {
-    const tokens = await api.post<TokenResponse>('/api/v1/impersonate/stop');
-    localStorage.setItem(ACCESS_KEY, tokens.accessToken);
-    localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
-    set({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
-    const user = await api.get<MeResponse>('/api/v1/me');
-    set({ status: 'authenticated', user, isImpersonating: false });
+    const res = await api.post<{ user: MeResponse }>('/api/v1/impersonate/stop');
+    set({ status: 'authenticated', user: res.user, isImpersonating: false });
   },
 
   refresh: async () => {
-    const refreshToken = get().refreshToken;
-    if (!refreshToken) return null;
+    // O refresh real é do BFF (cookie). Aqui só pedimos a rotação.
     try {
-      const tokens = await api.post<TokenResponse>('/api/v1/auth/refresh', { refreshToken }, { anonymous: true, skipRefresh: true });
-      localStorage.setItem(ACCESS_KEY, tokens.accessToken);
-      localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
-      set({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
-      return tokens.accessToken;
+      await api.post('/api/v1/auth/refresh', {}, { anonymous: true, skipRefresh: true });
+      return 'ok';
     } catch {
       return null;
     }
   },
 
   logout: async () => {
-    const refreshToken = get().refreshToken;
     try {
-      if (refreshToken)
-        await api.post('/api/v1/auth/logout', { refreshToken }, { anonymous: true, skipRefresh: true });
+      await api.post('/api/v1/auth/logout', {}, { anonymous: true });
     } catch {
-      // best-effort
+      // best-effort — o BFF limpa os cookies de qualquer forma.
     }
-    localStorage.removeItem(ACCESS_KEY);
-    localStorage.removeItem(REFRESH_KEY);
-    set({ accessToken: null, refreshToken: null, user: null, status: 'unauthenticated', isImpersonating: false });
+    set({ user: null, status: 'unauthenticated', isImpersonating: false });
   },
 
   setAccessMode: (mode) => set({ accessMode: mode }),
@@ -257,9 +246,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 }));
 
-// Liga o api.ts à store para token + refresh + logout (quebra ciclo de import).
+// Liga o api.ts à store para deslogar quando a sessão morre (401 real).
 configureApi({
-  getAccessToken: () => useSessionStore.getState().accessToken,
   refresh: () => useSessionStore.getState().refresh(),
   logout: () => useSessionStore.getState().logout(),
 });

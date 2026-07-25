@@ -155,7 +155,7 @@ for (const view of [
   );
 
   // 9) Ponta a ponta: a descrição salva aparece na TELA DE LOGIN (config público).
-  await page.evaluate(() => localStorage.clear());
+  await ctx.clearCookies(); // logout real (sessão em cookie httpOnly — Fase 11)
   await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
   check(

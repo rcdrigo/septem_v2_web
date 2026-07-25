@@ -33,9 +33,27 @@ const schema = {
   }],
 };
 
+// Fase 11: a auth vem do cookie httpOnly + bootstrap injetado pelo BFF (server-
+// side, não interceptável por rota do browser). Pegamos um cookie real de sessão
+// (node fetch → BFF) e injetamos no contexto; os DADOS seguem mockados por rota.
+let _authCookies;
+async function authCookies() {
+  if (_authCookies) return _authCookies;
+  const r = await fetch('http://localhost:5173/api/v1/auth/login', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ identifier: 'admin@prefeitura-x.local', password: 'admin123', keepConnected: true }),
+  });
+  const raw = r.headers.getSetCookie ? r.headers.getSetCookie() : (r.headers.get('set-cookie') || '').split(/,(?=\s*septem_)/);
+  _authCookies = raw
+    .map((c) => { const nv = c.split(';')[0]; const i = nv.indexOf('='); return { name: nv.slice(0, i).trim(), value: nv.slice(i + 1).trim(), url: 'http://localhost:5173', httpOnly: true }; })
+    .filter((c) => c.name.startsWith('septem_'));
+  return _authCookies;
+}
+
 async function mockedContext(browser, viewport) {
   const context = await browser.newContext({ viewport });
-  await context.addInitScript(() => localStorage.setItem('septem.accessToken', 'mock-token'));
+  await context.addCookies(await authCookies());
   await context.route('**/api/**', async (route) => {
     const url = new URL(route.request().url());
     if (!url.pathname.startsWith('/api/')) {
