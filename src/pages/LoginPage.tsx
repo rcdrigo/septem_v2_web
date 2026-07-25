@@ -213,7 +213,7 @@ export function LoginPage() {
           </div>
 
           <div className="login-hero-actions">
-            <button type="button" className="login-hero-action">
+            <button type="button" className="login-hero-action" data-testid="login-abrir-guide" onClick={() => navigate('/guide')}>
               <strong>Precisa de ajuda?</strong>
               <span>Domine a plataforma com nosso guia.</span>
             </button>

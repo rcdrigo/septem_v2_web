@@ -20,12 +20,14 @@ import { ConsultasPage } from './pages/ConsultasPage';
 import { RelatoriosPage } from './pages/admin/RelatoriosPage';
 import { FontesDadosPage } from './pages/admin/FontesDadosPage';
 import { ModelosEmailPage } from './pages/admin/ModelosEmailPage';
+import { ManuaisPage } from './pages/admin/ManuaisPage';
 import { ModelosDocumentoPage } from './pages/admin/ModelosDocumentoPage';
 import { CamposServicoPage } from './pages/CamposServicoPage';
 import { ManualTemplatesPage } from './pages/ManualTemplatesPage';
 import { ServicoFormPage } from './pages/ServicoFormPage';
 import { TarefaPage } from './pages/TarefaPage';
 import { SolicitacaoPage } from './pages/SolicitacaoPage';
+import { GuidePage } from './pages/GuidePage';
 import { FonteDadosPage } from './pages/FonteDadosPage';
 import { StubPage } from './pages/StubPage';
 
@@ -43,6 +45,8 @@ function stub(path: string, title: string, opts?: { phase?: string; hint?: strin
 export const router = createBrowserRouter(
   [
     { path: '/login', element: <LoginPage /> },
+    // Guide público (Fase 10) — fora do AppShell, acessível deslogado.
+    { path: '/guide', element: <GuidePage /> },
     // Aba limpa (sem menus) para preencher e iniciar um serviço.
     { path: '/servico/:processKey', element: <ServicoFormPage /> },
     // Tarefa pendente em aba própria (sem menus), como a de início.
@@ -94,7 +98,7 @@ export const router = createBrowserRouter(
 
         // --- Admin › Configurações ----------------------------------------
         { path: 'admin/parametros', element: <ParametrosPage /> },
-        stub('admin/manuais', 'Manuais', { phase: 'Fase 7' }),
+        { path: 'admin/manuais', element: <ManuaisPage /> },
         { path: 'admin/usuarios', element: <UsuariosPage /> },
         { path: 'admin/unidades', element: <UnidadesPage /> },
         { path: 'admin/posicoes', element: <PosicoesPage /> },
