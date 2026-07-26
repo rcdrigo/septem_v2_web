@@ -14,6 +14,7 @@ import { IconSearchPicker } from '@/components/ui/IconSearchPicker';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
+import { openTab } from '@/lib/nav';
 
 const AUDIENCE_OPTIONS = [
   { value: 'externo', label: 'Externo (público)' },
@@ -32,8 +33,6 @@ export function ManuaisPage() {
   const [tab, setTab] = useState<'normal' | 'tecnico'>('normal');
   const list = useManuals();
   const del = useDeleteManual();
-  const [editId, setEditId] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
 
   const visible = (list.data ?? []).filter((m) => (tab === 'tecnico' ? m.isTechnical : !m.isTechnical));
 
@@ -50,14 +49,14 @@ export function ManuaisPage() {
           <h1 className="text-lg font-semibold text-slate-900">Manuais</h1>
           <p className="mt-0.5 text-sm text-slate-500">Conteúdo do guia (Guide) por categoria, público e unidade.</p>
         </div>
-        <button type="button" data-testid="novo-manual" onClick={() => setCreating(true)}
+        <button type="button" data-testid="novo-manual" onClick={() => openTab(`/manual/nova${tab === 'tecnico' ? '?tecnico=1' : ''}`)}
           className="inline-flex min-h-10 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-700">
           <Plus size={16} /> Novo manual
         </button>
       </header>
 
       {canTechnical && (
-        <div className="flex gap-2 border-b border-slate-200 bg-white px-4 py-2 sm:px-6">
+        <div className="flex border-b border-slate-200 bg-white px-4 py-2 sm:px-6">
           <TabBtn active={tab === 'normal'} onClick={() => setTab('normal')} icon={<BookOpen size={14} />}>Manuais</TabBtn>
           <TabBtn active={tab === 'tecnico'} onClick={() => setTab('tecnico')} icon={<FlaskConical size={14} />}>Técnico</TabBtn>
         </div>
@@ -81,7 +80,7 @@ export function ManuaisPage() {
                     {m.icon && <i className={m.icon} aria-hidden="true" />}<span className="truncate">{m.categoryName}</span>
                   </span>
                   <div className="flex shrink-0 gap-1">
-                    <button type="button" aria-label="Editar" onClick={() => setEditId(m.id)} className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"><Pencil size={15} /></button>
+                    <button type="button" aria-label="Editar" onClick={() => openTab(`/manual/${m.id}`)} className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"><Pencil size={15} /></button>
                     <button type="button" aria-label="Excluir" onClick={() => askDelete(m)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"><Trash2 size={15} /></button>
                   </div>
                 </div>
@@ -97,14 +96,6 @@ export function ManuaisPage() {
         )}
       </div>
 
-      {(creating || editId) && (
-        <ManualEditor
-          id={editId}
-          defaultTechnical={tab === 'tecnico'}
-          canTechnical={canTechnical}
-          onClose={() => { setCreating(false); setEditId(null); }}
-        />
-      )}
     </div>
   );
 }
@@ -130,8 +121,8 @@ type FormState = {
 
 const EMPTY: FormState = { title: '', contentHtml: '', categoryId: '', parentId: '', audience: 'externo', icon: '', isTechnical: false, published: false, orgUnitIds: [] };
 
-function ManualEditor({ id, defaultTechnical, canTechnical, onClose }: {
-  id: string | null; defaultTechnical: boolean; canTechnical: boolean; onClose: () => void;
+export function ManualEditor({ id, defaultTechnical, canTechnical, onClose, fullPage }: {
+  id: string | null; defaultTechnical: boolean; canTechnical: boolean; onClose: () => void; fullPage?: boolean;
 }) {
   const detail = useManual(id);
   const categories = useManualCategories();
@@ -142,6 +133,8 @@ function ManualEditor({ id, defaultTechnical, canTechnical, onClose }: {
   const createCategory = useCreateManualCategory();
   const [form, setForm] = useState<FormState>({ ...EMPTY, isTechnical: defaultTechnical });
   const [ready, setReady] = useState(id === null);
+  const [catOpen, setCatOpen] = useState(false);
+  const [catName, setCatName] = useState('');
 
   // Só carrega o form quando o detalhe chega (evita salvar-antes-de-carregar).
   useEffect(() => {
@@ -166,12 +159,14 @@ function ManualEditor({ id, defaultTechnical, canTechnical, onClose }: {
 
   const showUnits = form.audience !== 'externo'; // interno/ambos → escolher unidades (vazio = todas)
 
-  async function addCategory() {
-    const name = window.prompt('Nome da nova categoria:');
-    if (!name?.trim()) return;
+  async function submitCategory() {
+    const name = catName.trim();
+    if (!name) { toast.error('Informe o nome da categoria.'); return; }
     try {
-      const { id: newId } = await createCategory.mutateAsync({ name: name.trim() });
+      const { id: newId } = await createCategory.mutateAsync({ name });
       setForm((f) => ({ ...f, categoryId: newId }));
+      setCatOpen(false);
+      setCatName('');
       toast.success('Categoria criada.');
     } catch { toast.error('Não foi possível criar a categoria.'); }
   }
@@ -203,13 +198,16 @@ function ManualEditor({ id, defaultTechnical, canTechnical, onClose }: {
 
   const busy = create.isPending || update.isPending;
 
-  return (
-    <Dialog open onClose={onClose} width="xl" title={id ? 'Editar manual' : 'Novo manual'}
-      footer={<>
-        <button type="button" onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Cancelar</button>
-        <button type="button" data-testid="salvar-manual" disabled={busy || !ready} onClick={save}
-          className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60">{busy ? 'Salvando…' : 'Salvar'}</button>
-      </>}>
+  const title = id ? 'Editar manual' : 'Novo manual';
+  const footer = (
+    <>
+      <button type="button" onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Cancelar</button>
+      <button type="button" data-testid="salvar-manual" disabled={busy || !ready} onClick={save}
+        className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60">{busy ? 'Salvando…' : 'Salvar'}</button>
+    </>
+  );
+  const content = (
+    <>
       {!ready ? <p className="p-4 text-sm text-slate-400">Carregando…</p> : (
         <div className="grid gap-4">
           <Field label="Título"><TextInput data-testid="manual-titulo" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ex.: Como abrir uma requisição" /></Field>
@@ -226,7 +224,7 @@ function ManualEditor({ id, defaultTechnical, canTechnical, onClose }: {
                   onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
                   options={(categories.data ?? []).map((c) => ({ value: c.id, label: c.name }))} />
                 {!form.parentId && (
-                  <button type="button" data-testid="nova-categoria" onClick={addCategory} title="Nova categoria"
+                  <button type="button" data-testid="nova-categoria" onClick={() => { setCatName(''); setCatOpen(true); }} title="Nova categoria"
                     className="shrink-0 rounded-md border border-slate-300 px-2.5 text-sm text-slate-700 hover:bg-slate-50"><Plus size={16} /></button>
                 )}
               </div>
@@ -269,6 +267,39 @@ function ManualEditor({ id, defaultTechnical, canTechnical, onClose }: {
           </div>
         </div>
       )}
+    </>
+  );
+
+  const catModal = catOpen && (
+    <Dialog open onClose={() => setCatOpen(false)} width="sm" title="Nova categoria"
+      footer={<>
+        <button type="button" onClick={() => setCatOpen(false)} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Cancelar</button>
+        <button type="button" data-testid="nova-categoria-salvar" disabled={createCategory.isPending} onClick={submitCategory}
+          className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60">Criar</button>
+      </>}>
+      <Field label="Nome da categoria">
+        <TextInput data-testid="nova-categoria-nome" autoFocus value={catName}
+          onChange={(e) => setCatName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') submitCategory(); }}
+          placeholder="Ex.: Primeiros passos" />
+      </Field>
+    </Dialog>
+  );
+
+  if (fullPage) {
+    return (
+      <div className="flex h-screen flex-col bg-slate-100">
+        <header className="border-b border-slate-200 bg-white px-6 py-4"><h1 className="text-lg font-semibold text-slate-900">{title}</h1></header>
+        <main className="flex-1 overflow-auto p-6"><div className="mx-auto w-full max-w-4xl rounded-lg border border-slate-200 bg-white p-6 shadow-sm">{content}</div></main>
+        <footer className="flex justify-end gap-2 border-t border-slate-200 bg-white px-6 py-3">{footer}</footer>
+        {catModal}
+      </div>
+    );
+  }
+  return (
+    <Dialog open onClose={onClose} width="xl" title={title} footer={footer}>
+      {content}
+      {catModal}
     </Dialog>
   );
 }

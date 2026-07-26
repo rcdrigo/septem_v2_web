@@ -29,6 +29,7 @@ import { TarefaPage } from './pages/TarefaPage';
 import { SolicitacaoPage } from './pages/SolicitacaoPage';
 import { GuidePage } from './pages/GuidePage';
 import { FonteDadosPage } from './pages/FonteDadosPage';
+import { ManualEditorPage } from './pages/ManualEditorPage';
 import { StubPage } from './pages/StubPage';
 
 /** Redirect que preserva a query string (ex.: /modelador?key=x → /processos/editar?key=x). */
@@ -55,6 +56,8 @@ export const router = createBrowserRouter(
     { path: '/solicitacao/:instanceId', element: <SolicitacaoPage /> },
     // Criar/editar fonte de dados em aba própria (sem menus).
     { path: '/fonte-dados/:id', element: <FonteDadosPage /> },
+    // Criar/editar manual em aba própria (sem menus) — como a fonte de dados.
+    { path: '/manual/:id', element: <ManualEditorPage /> },
     // Abrem em aba própria a partir do editor de modelos de documento (Fase 6e).
     { path: '/campos-servico', element: <CamposServicoPage /> },
     { path: '/manual-templates', element: <ManualTemplatesPage /> },

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { applyTenantMeta } from '@/lib/tenant-meta';
 import { api, configureApi } from '@/lib/api';
+import { queryClient } from '@/lib/queryClient';
 
 /**
  * Sessão real do app — substitui o mock anterior do B0/B1 do frontend.
@@ -210,6 +211,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
     const user = await api.get<MeResponse>('/api/v1/me');
     set({ status: 'authenticated', user, isImpersonating: true });
+    // Trocou de identidade: descarta o cache do usuário anterior para que o
+    // summary de tarefas pendentes (e todo o resto) recarregue para quem entrou.
+    queryClient.clear();
   },
 
   stopImpersonation: async () => {
@@ -219,6 +223,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
     const user = await api.get<MeResponse>('/api/v1/me');
     set({ status: 'authenticated', user, isImpersonating: false });
+    // Voltou ao titular: descarta o cache do personificado para recarregar o
+    // summary de tarefas pendentes (e o resto) com os dados de quem voltou.
+    queryClient.clear();
   },
 
   refresh: async () => {

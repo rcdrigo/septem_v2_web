@@ -30,10 +30,14 @@ const tPai = `Guia do painel ${rid}`;
 const tFilho = `Detalhe do painel ${rid}`;
 const tExterno2 = `Segundo externo ${rid}`;
 const tInterno = `Área interna ${rid}`;
-const idPai = await criar({ title: tPai, audience: 'externo', contentHtml: `<h2>Introdução ${rid}</h2><p>corpo do painel ${rid}</p><h2>Detalhes ${rid}</h2><p>mais</p>` });
+const idPai = await criar({ title: tPai, audience: 'externo', icon: 'fa-solid fa-book', contentHtml: `<h2>Introdução ${rid}</h2><p>corpo do painel ${rid}</p><h2>Detalhes ${rid}</h2><p>mais</p>` });
 await criar({ title: tFilho, parentId: idPai, audience: 'externo', contentHtml: '<p>filho</p>' });
 await criar({ title: tExterno2, audience: 'externo', contentHtml: '<p>outro externo</p>' });
 await criar({ title: tInterno, audience: 'interno', contentHtml: '<p>somente interno</p>' });
+// Categoria SÓ interna (item 24: o "Comece aqui" de cada aba lista só a categoria da aba).
+const catInterna = (await api(token, '/api/v1/manual-categories', 'POST', { name: `Interna ${rid}` })).body.id;
+const nomeCatInterna = `Interna ${rid}`;
+await api(token, '/api/v1/manuals', 'POST', { categoryId: catInterna, published: true, title: `Manual interno cat ${rid}`, audience: 'interno', contentHtml: '<p>x</p>' });
 
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
 const login = async (page) => {
@@ -55,40 +59,49 @@ try {
   page.on('pageerror', (e) => console.log('pageerror:', e.message.slice(0, 160)));
   await login(page);
 
-  // ══════════ 10b — ADMIN: criar manual com categoria inline + HTML source ══════════
+  // ══════════ 10b — ADMIN: criar manual (aba própria) + categoria (modal) + HTML source ══════════
   await page.goto(`${BASE}/admin/manuais`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid=novo-manual]', { timeout: 15000 });
   check(await page.locator('button[aria-pressed]', { hasText: 'Técnico' }).count() > 0, '[10b] aba Técnico aparece para o admin');
 
-  await page.click('[data-testid=novo-manual]');
+  // Item 19: o editor abre em ABA PRÓPRIA (rota /manual/nova), não em modal.
+  await page.goto(`${BASE}/manual/nova`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid=manual-titulo]', { timeout: 10000 });
+  check(await page.locator('[data-testid=rich-text-editor]').count() === 1 && await page.locator('h1', { hasText: 'Novo manual' }).count() > 0,
+    '[item19] editor de manual abre em página própria (aba), não em modal');
   const tituloNovo = `Criado pela tela ${rid}`;
   await page.fill('[data-testid=manual-titulo]', tituloNovo);
 
-  // Categoria inline (window.prompt) — manuais:6.
-  const catInline = `Inline ${rid}`;
-  page.once('dialog', (d) => d.accept(catInline));
-  await page.click('[data-testid=nova-categoria]');
-  await page.waitForTimeout(1200);
-  const catSelecionada = await page.locator('[data-testid=manual-categoria] option:checked').innerText().catch(() => '');
-  check(catSelecionada.includes(catInline), `[10b] categoria criada inline já fica selecionada ("${catSelecionada}")`);
+  // Item 20: o rich-text tem botões de Título e Subtítulo (headings).
+  check(await page.locator('[data-testid=rich-text-editor] button[title="Título"]').count() === 1
+     && await page.locator('[data-testid=rich-text-editor] button[title="Subtítulo"]').count() === 1,
+    '[item20] rich-text dos manuais tem Título e Subtítulo');
 
-  // Conteúdo via HTML source (manuais:10) — prova a edição de HTML.
+  // Item 21: nova categoria abre em MODAL (não window.prompt/alert).
+  const catInline = `Inline ${rid}`;
+  await page.click('[data-testid=nova-categoria]');
+  await page.waitForSelector('[data-testid=nova-categoria-nome]', { timeout: 5000 });
+  check(await page.locator('[role=dialog]', { hasText: 'Nova categoria' }).count() > 0, '[item21] nova categoria abre em MODAL');
+  await page.fill('[data-testid=nova-categoria-nome]', catInline);
+  await page.click('[data-testid=nova-categoria-salvar]');
+  await page.waitForTimeout(1000);
+  const catSelecionada = await page.locator('[data-testid=manual-categoria] option:checked').innerText().catch(() => '');
+  check(catSelecionada.includes(catInline), `[10b] categoria criada no modal já fica selecionada ("${catSelecionada}")`);
+
+  // Conteúdo via HTML source (manuais:10).
   await page.click('[data-testid=toggle-html-source]');
   await page.waitForTimeout(300);
   await page.fill('[data-testid=html-source]', `<h2>Seção ${rid}</h2><p>texto salvo pela tela ${rid}</p>`);
   await page.click('[data-testid=toggle-html-source]');
   await page.waitForTimeout(300);
-
   await page.locator('[data-testid=manual-publico]').selectOption('externo');
   await page.click('[data-testid=salvar-manual]');
   await page.waitForTimeout(1500);
   const criadoNaApi = (await api(token, '/api/v1/manuals/')).body.find((m) => m.title === tituloNovo);
-  check(!!criadoNaApi, '[10b] manual criado pela tela é persistido');
-  check(await page.locator('[data-testid=lista-manuais]').innerText().then((t) => t.includes(tituloNovo)), '[10b] o novo manual aparece na lista');
+  check(!!criadoNaApi, '[10b] manual criado pela tela (aba própria) é persistido');
 
-  // manuais:10 — imagem e vídeo por URL no editor (efeito, não só o botão existir).
-  await page.click('[data-testid=novo-manual]');
+  // manuais:10 — imagem e vídeo por URL no editor (nova aba).
+  await page.goto(`${BASE}/manual/nova`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid=rich-text-editor]', { timeout: 10000 });
   await page.locator('[data-testid=rich-text-editor] [contenteditable]').click();
   page.once('dialog', (d) => d.accept(`https://ex.com/img-${rid}.png`));
@@ -100,11 +113,9 @@ try {
   const editorHtml = await page.locator('[data-testid=rich-text-editor] [contenteditable]').innerHTML();
   check(editorHtml.includes(`img-${rid}.png`), '[10b] botão de imagem insere a <img> pela URL');
   check(/youtube\.com\/embed\/vid/.test(editorHtml), '[10b] botão de vídeo converte o link do YouTube em iframe de embed');
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(300);
 
-  // Público interno mostra as unidades; externo esconde (manuais:12).
-  await page.click('[data-testid=novo-manual]');
+  // Público interno mostra as unidades; externo esconde (manuais:12) — nova aba.
+  await page.goto(`${BASE}/manual/nova`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid=manual-publico]', { timeout: 10000 });
   await page.locator('[data-testid=manual-publico]').selectOption('externo');
   await page.waitForTimeout(300);
@@ -117,11 +128,11 @@ try {
   await page.locator('[data-testid=manual-pai]').selectOption({ label: tPai });
   await page.waitForTimeout(400);
   check(await page.locator('[data-testid=manual-categoria]').isDisabled(), '[10b] com artigo-pai a categoria fica bloqueada (herdada)');
-  await page.click('[data-testid=salvar-manual] ~ button, [role=dialog] button', { hasText: 'Cancelar' }).catch(() => {});
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(400);
 
-  // Aba Técnico lista os manuais técnicos auto-gerados (10d).
+  // Lista mostra o manual criado + aba Técnico lista os auto-gerados (10d).
+  await page.goto(`${BASE}/admin/manuais`, { waitUntil: 'networkidle' });
+  await page.waitForSelector('[data-testid=lista-manuais]', { timeout: 15000 });
+  check(await page.locator('[data-testid=lista-manuais]').innerText().then((t) => t.includes(tituloNovo)), '[10b] o novo manual aparece na lista');
   await page.locator('button[aria-pressed]', { hasText: 'Técnico' }).click();
   await page.waitForTimeout(800);
   const tecnicoTxt = await page.locator('[data-testid=lista-manuais]').innerText().catch(() => '');
@@ -153,26 +164,49 @@ try {
   await page.waitForTimeout(500);
   check(await page.locator('[data-testid=guide-anterior]').count() > 0, '[10c] após avançar, existe "anterior"');
 
-  // Busca destaca o termo e filtra o menu.
-  await page.fill('[data-testid=guide-busca]', tExterno2.slice(0, 12));
-  await page.waitForTimeout(600);
-  check(await page.locator('[data-testid=guide-menu] mark').count() > 0, '[10c] a busca destaca o termo nos resultados');
-  check(await page.locator('[data-testid=guide-menu-item]', { hasText: tExterno2 }).count() > 0, '[10c] a busca encontra o manual pelo título');
-
-  // Destaque também no CORPO do manual aberto (manuais:20). Abre o pai e busca uma
-  // palavra que só existe no conteúdo (não no título) — o <mark> tem de aparecer lá.
-  await page.fill('[data-testid=guide-busca]', '');
-  await page.waitForTimeout(300);
+  // Item 22: o ícone do manual aparece no menu do guia.
   await page.locator('[data-testid=guide-menu-item]', { hasText: tPai }).first().click();
   await page.waitForTimeout(500);
-  await page.fill('[data-testid=guide-busca]', `corpo do painel ${rid}`);
+  check(await page.locator('[data-testid=guide-menu-item] i').count() > 0, '[item22] o ícone do manual é exibido no menu do guia');
+
+  // Item 25: o "Nesta página" (TOC) fica à ESQUERDA do conteúdo e sem background.
+  const tocPos = await page.evaluate(() => {
+    const toc = document.querySelector('[data-testid=guide-toc]');
+    const cont = document.querySelector('[data-testid=guide-conteudo]');
+    if (!toc || !cont) return null;
+    const t = toc.getBoundingClientRect(), c = cont.getBoundingClientRect();
+    const bg = getComputedStyle(toc).backgroundColor;
+    return { left: t.left < c.left, transparent: bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent' };
+  });
+  check(!!tocPos && tocPos.left, '[item25] "Nesta página" fica à esquerda do conteúdo');
+  check(!!tocPos && tocPos.transparent, '[item25] "Nesta página" não tem background');
+
+  // Item 26: a busca abre um POPOVER de resultados (não filtra o menu lateral).
+  const menuItensAntes = await page.locator('[data-testid=guide-menu-item]').count();
+  await page.fill('[data-testid=guide-busca]', tExterno2.slice(0, 12));
   await page.waitForTimeout(600);
-  const marksNoCorpo = await page.locator('[data-testid=guide-conteudo] mark').count();
-  check(marksNoCorpo > 0, `[10c] a busca destaca o termo também no CORPO do manual (${marksNoCorpo} marca(s))`);
-  const textoMarcado = await page.locator('[data-testid=guide-conteudo] mark').first().innerText().catch(() => '');
-  check(/corpo do painel/i.test(textoMarcado), `[10c] o trecho destacado é o termo buscado ("${textoMarcado}")`);
-  await page.fill('[data-testid=guide-busca]', '');
+  check(await page.locator('[data-testid=guide-busca-resultados]').count() === 1, '[item26] a busca abre um popover flutuante de resultados');
+  check(await page.locator('[data-testid=guide-busca-resultado]', { hasText: tExterno2 }).count() > 0, '[item26] o popover lista o manual encontrado pelo título');
+  check(await page.locator('[data-testid=guide-menu-item]').count() === menuItensAntes, '[item26] a busca NÃO filtra o menu lateral (continua completo)');
+  await page.locator('[data-testid=guide-busca-resultado]', { hasText: tExterno2 }).first().click();
+  await page.waitForTimeout(500);
+  check(await page.locator('[data-testid=guide-busca-resultados]').count() === 0, '[item26] escolher um resultado fecha o popover');
+  check((await page.locator('[data-testid=guide-conteudo]').innerText()).includes('outro externo'), '[item26] o resultado escolhido abre o manual');
+
+  // Item 23: o campo de busca é centralizado (estreito, não ocupa a largura toda).
+  const larg = await page.evaluate(() => ({ inp: document.querySelector('[data-testid=guide-busca]').getBoundingClientRect().width, header: document.querySelector('header').getBoundingClientRect().width }));
+  check(larg.inp < larg.header * 0.6, `[item23] busca centralizada e estreita (${Math.round(larg.inp)}/${Math.round(larg.header)}px)`);
+
+  // Item 24: "Comece aqui" lista só a categoria da aba ativa (externo não vê a só-interna).
+  await page.locator('[data-testid=guide-tab-externo]').click();
   await page.waitForTimeout(400);
+  await page.locator('[data-testid=guide-menu] button', { hasText: 'Comece aqui' }).first().click();
+  await page.waitForTimeout(400);
+  const welcomeExterno = await page.locator('[data-testid=guide-welcome]').innerText();
+  check(!welcomeExterno.includes(nomeCatInterna), '[item24] "Comece aqui" (externo) NÃO lista a categoria só-interna');
+
+  await page.fill('[data-testid=guide-busca]', '');
+  await page.waitForTimeout(300);
   check(await semOverflow(page), '[10c] Guide sem overflow horizontal (web)');
   await page.screenshot({ path: `${OUT}/f10-guide-web.png`, fullPage: true });
   await ctx.close();
@@ -205,12 +239,12 @@ try {
   await login(m);
   await m.goto(`${BASE}/admin/manuais`, { waitUntil: 'networkidle' });
   await m.waitForSelector('[data-testid=novo-manual]', { timeout: 15000 });
-  await m.click('[data-testid=novo-manual]');
+  check(await semOverflow(m), '[mobile] lista de manuais sem overflow horizontal');
+  await m.goto(`${BASE}/manual/nova`, { waitUntil: 'networkidle' });
   await m.waitForSelector('[data-testid=manual-titulo]', { timeout: 10000 });
-  check(await clipped(m, '[role=dialog] input, [role=dialog] select, [role=dialog] button, [data-testid=rich-text-editor] button') === 0, '[mobile] editor de manual sem controles cortados');
-  check(await semOverflow(m), '[mobile] tela admin de manuais sem overflow horizontal');
+  check(await clipped(m, '[data-testid=manual-titulo], [data-testid=manual-categoria], [data-testid=manual-publico], [data-testid=rich-text-editor] button') === 0, '[mobile] editor de manual (aba própria) sem controles cortados');
+  check(await semOverflow(m), '[mobile] editor de manual sem overflow horizontal');
   await m.screenshot({ path: `${OUT}/f10-admin-mobile.png`, fullPage: true });
-  await m.keyboard.press('Escape');
 
   await m.goto(`${BASE}/guide`, { waitUntil: 'networkidle' });
   await m.waitForSelector('[data-testid=guide-navbar]', { timeout: 15000 });

@@ -119,17 +119,17 @@ function OrgUnitTreeNode({
               <span className={`text-sm font-semibold ${node.active ? 'text-slate-900' : 'text-slate-500'}`}>
                 {primaryLabel}
               </span>
+              {info?.sigla && (
+                <span className="whitespace-nowrap text-xs text-slate-600" data-testid="org-unit-name">
+                  {node.name}
+                </span>
+              )}
               {!node.active && (
                 <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
                   inativa
                 </span>
               )}
             </span>
-            {info?.sigla && (
-              <span className="block whitespace-nowrap text-xs text-slate-600" data-testid="org-unit-name">
-                {node.name}
-              </span>
-            )}
             <span className="block whitespace-nowrap text-xs text-slate-500" data-testid="org-unit-holder">
               {titular ? titular.name : 'Sem titular'}
             </span>

@@ -68,15 +68,25 @@ export function GuidePage() {
   // Ao trocar de aba, volta ao "Comece aqui".
   useEffect(() => { setActiveId(WELCOME_ID); }, [tab]);
 
-  // Agrupa o menu por categoria (respeitando o filtro de busca).
+  // Menu por categoria (SEM filtro de busca — a busca agora abre um popover de resultados).
   const byCategory = useMemo(() => {
     const map = new Map<string, { name: string; order: number; items: GuideManual[] }>();
-    for (const m of filtered) {
+    for (const m of ordered) {
       const g = map.get(m.categoryId) ?? { name: m.categoryName, order: m.categoryOrder, items: [] };
       g.items.push(m); map.set(m.categoryId, g);
     }
     return [...map.values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, 'pt-BR'));
-  }, [filtered]);
+  }, [ordered]);
+
+  // "Comece aqui": categorias APENAS da aba ativa (item 24). ordered já vem ordenado,
+  // então o 1º manual de cada categoria é o firstManualId.
+  const welcomeCategories = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; order: number; firstManualId: string }>();
+    for (const m of ordered) {
+      if (!map.has(m.categoryId)) map.set(m.categoryId, { id: m.categoryId, name: m.categoryName, order: m.categoryOrder, firstManualId: m.id });
+    }
+    return [...map.values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, 'pt-BR'));
+  }, [ordered]);
 
   return (
     <div className="flex h-[100dvh] flex-col bg-slate-50">
@@ -86,11 +96,31 @@ export function GuidePage() {
           {d?.logoUrl ? <img src={d.logoUrl} alt={d.tenantName} className="h-8 w-auto" /> : <LifeBuoy className="text-slate-700" />}
           <span className="truncate text-base font-semibold text-slate-900">{d?.tenantName ?? 'Guia'}</span>
         </div>
-        <div className="relative order-last w-full min-w-0 flex-1 sm:order-none sm:w-auto">
-          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="search" data-testid="guide-busca" value={query} onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar nos manuais…"
-            className="min-h-10 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm focus:border-slate-500 focus:outline-none" />
+        <div className="order-last w-full min-w-0 flex-1 sm:order-none">
+          {/* Busca centralizada (não ocupa a largura toda) com popover flutuante de resultados. */}
+          <div className="relative mx-auto w-full max-w-md">
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input type="search" data-testid="guide-busca" value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Escape') setQuery(''); }}
+              placeholder="Buscar nos manuais…"
+              className="min-h-10 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm focus:border-slate-500 focus:outline-none" />
+            {query.trim() && (
+              <div data-testid="guide-busca-resultados" className="absolute left-0 right-0 top-full z-50 mt-1 max-h-80 overflow-y-auto rounded-md border border-slate-200 bg-white py-1 text-left shadow-xl">
+                {filtered.length === 0 ? (
+                  <p className="px-3 py-2 text-sm text-slate-400">Nada encontrado para "{query}".</p>
+                ) : filtered.slice(0, 20).map((m) => (
+                  <button key={m.id} type="button" data-testid="guide-busca-resultado"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => { openManual(m.id); setQuery(''); }}
+                    className="flex w-full flex-col items-start gap-0.5 px-3 py-2 hover:bg-slate-50">
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-slate-800">{m.icon && <i className={m.icon} aria-hidden="true" />}{highlight(m.title, query)}</span>
+                    <span className="text-xs text-slate-400">{m.categoryName}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button type="button" data-testid="guide-voltar-login" onClick={() => navigate('/login')}
@@ -106,7 +136,7 @@ export function GuidePage() {
 
       {/* Navbar de abas (Interno/Externo/Técnico) */}
       {tabs.length > 1 && (
-        <nav className="flex shrink-0 gap-1 border-b border-slate-200 bg-white px-4 py-2 sm:px-6" data-testid="guide-navbar">
+        <nav className="flex shrink-0 border-b border-slate-200 bg-white px-4 py-2 sm:px-6" data-testid="guide-navbar">
           {tabs.map((t) => (
             <button key={t.key} type="button" aria-pressed={tab === t.key} data-testid={`guide-tab-${t.key}`} onClick={() => setTab(t.key)}
               className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === t.key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{t.label}</button>
@@ -126,23 +156,38 @@ export function GuidePage() {
               <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{cat.name}</p>
               {groupByParent(cat.items).map((node) => (
                 <div key={node.manual.id}>
-                  <MenuLink m={node.manual} activeId={activeId} query={query} onClick={openManual} />
+                  <MenuLink m={node.manual} activeId={activeId} onClick={openManual} />
                   {node.children.map((child) => (
-                    <div key={child.id} className="pl-3"><MenuLink m={child} activeId={activeId} query={query} onClick={openManual} /></div>
+                    <div key={child.id} className="pl-3"><MenuLink m={child} activeId={activeId} onClick={openManual} /></div>
                   ))}
                 </div>
               ))}
             </div>
           ))}
-          {byCategory.length === 0 && query && <p className="px-3 py-2 text-xs text-slate-400">Nada encontrado para "{query}".</p>}
+          {byCategory.length === 0 && <p className="px-3 py-2 text-xs text-slate-400">Nenhum manual disponível.</p>}
         </aside>
+
+        {/* TOC "Nesta página" — entre o menu e o conteúdo, sem background (item 25) */}
+        {activeId !== WELCOME_ID && toc.length > 0 && (
+          <aside className="hidden shrink-0 overflow-y-auto p-4 xl:block xl:w-52" data-testid="guide-toc">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Nesta página</p>
+            <ul className="space-y-1 text-sm">
+              {toc.map((h) => (
+                <li key={h.id} style={{ paddingLeft: (h.level - 2) * 10 }}>
+                  <a href={`#${h.id}`} onClick={(e) => { e.preventDefault(); document.getElementById(h.id)?.scrollIntoView({ behavior: 'smooth' }); }}
+                    className="block truncate text-slate-600 hover:text-slate-900">{h.text}</a>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        )}
 
         {/* Conteúdo ao centro */}
         <main id="guide-scroll" className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8">
           {guide.isLoading ? (
             <p className="text-sm text-slate-400">Carregando…</p>
           ) : activeId === WELCOME_ID ? (
-            <Welcome welcome={d?.welcome} onOpenCategory={openCategoryFirst} />
+            <Welcome welcome={d?.welcome ? { title: d.welcome.title, description: d.welcome.description, categories: welcomeCategories } : undefined} onOpenCategory={openCategoryFirst} />
           ) : active ? (
             <article className="mx-auto max-w-3xl">
               <h1 className="text-2xl font-bold text-slate-900">{active.title}</h1>
@@ -171,30 +216,17 @@ export function GuidePage() {
           )}
         </main>
 
-        {/* TOC à direita */}
-        {activeId !== WELCOME_ID && toc.length > 0 && (
-          <aside className="hidden shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-4 xl:block xl:w-56" data-testid="guide-toc">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Nesta página</p>
-            <ul className="space-y-1 text-sm">
-              {toc.map((h) => (
-                <li key={h.id} style={{ paddingLeft: (h.level - 2) * 10 }}>
-                  <a href={`#${h.id}`} onClick={(e) => { e.preventDefault(); document.getElementById(h.id)?.scrollIntoView({ behavior: 'smooth' }); }}
-                    className="block truncate text-slate-600 hover:text-slate-900">{h.text}</a>
-                </li>
-              ))}
-            </ul>
-          </aside>
-        )}
       </div>
     </div>
   );
 }
 
-function MenuLink({ m, activeId, query, onClick }: { m: GuideManual; activeId: string; query: string; onClick: (id: string) => void }) {
+function MenuLink({ m, activeId, onClick }: { m: GuideManual; activeId: string; onClick: (id: string) => void }) {
   return (
     <button type="button" data-testid="guide-menu-item" onClick={() => onClick(m.id)}
-      className={`block w-full truncate rounded-md px-3 py-1.5 text-left text-sm ${activeId === m.id ? 'bg-slate-100 font-semibold text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}>
-      {highlight(m.title, query)}
+      className={`flex w-full items-center gap-1.5 rounded-md px-3 py-1.5 text-left text-sm ${activeId === m.id ? 'bg-slate-100 font-semibold text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}>
+      {m.icon && <i className={`${m.icon} shrink-0 text-slate-400`} aria-hidden="true" />}
+      <span className="truncate">{m.title}</span>
     </button>
   );
 }

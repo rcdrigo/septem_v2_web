@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Bold, Italic, Underline, List, ListOrdered, Link2, Eraser, Image as ImageIcon, Video, Code } from 'lucide-react';
+import { Bold, Italic, Underline, List, ListOrdered, Link2, Eraser, Image as ImageIcon, Video, Code, Heading2, Heading3 } from 'lucide-react';
 
 /**
  * Editor rich-text leve (contentEditable + execCommand) — sem dependência extra.
@@ -59,6 +59,14 @@ export function RichTextEditor({
   const emit = () => onChange(clean(ref.current?.innerHTML));
   // Foca ANTES do comando — senão sem caret o execCommand (listas) não aplica.
   const exec = (cmd: string, arg?: string) => { ref.current?.focus(); document.execCommand(cmd, false, arg); emit(); };
+  // Título/subtítulo: aplica H2/H3 no bloco; clicar de novo no mesmo nível volta a parágrafo.
+  const toggleHeading = (tag: 'H2' | 'H3') => {
+    ref.current?.focus();
+    let current = '';
+    try { current = String(document.queryCommandValue('formatBlock') || ''); } catch { /* noop */ }
+    document.execCommand('formatBlock', false, current.toUpperCase() === tag ? 'P' : tag);
+    emit();
+  };
   const addLink = () => { const url = window.prompt('URL do link:'); if (url) exec('createLink', url); };
   const addImage = () => { const url = window.prompt('URL da imagem:'); if (url) exec('insertImage', url); };
   const addVideo = () => {
@@ -74,6 +82,9 @@ export function RichTextEditor({
         <Btn title="Negrito" onClick={() => exec('bold')} disabled={sourceMode}><Bold size={14} /></Btn>
         <Btn title="Itálico" onClick={() => exec('italic')} disabled={sourceMode}><Italic size={14} /></Btn>
         <Btn title="Sublinhado" onClick={() => exec('underline')} disabled={sourceMode}><Underline size={14} /></Btn>
+        <span className="mx-1 w-px bg-slate-200" />
+        <Btn title="Título" onClick={() => toggleHeading('H2')} disabled={sourceMode}><Heading2 size={14} /></Btn>
+        <Btn title="Subtítulo" onClick={() => toggleHeading('H3')} disabled={sourceMode}><Heading3 size={14} /></Btn>
         <span className="mx-1 w-px bg-slate-200" />
         <Btn title="Lista" onClick={() => exec('insertUnorderedList')} disabled={sourceMode}><List size={14} /></Btn>
         <Btn title="Lista numerada" onClick={() => exec('insertOrderedList')} disabled={sourceMode}><ListOrdered size={14} /></Btn>
@@ -115,7 +126,7 @@ export function RichTextEditor({
           onFocus={() => window.setTimeout(resetTypingStyle, 0)}
           onInput={emit}
           onBlur={() => onBlur?.(clean(ref.current?.innerHTML))}
-          className="min-h-[120px] max-w-none overflow-x-auto p-2 text-sm focus:outline-none [&_a]:text-sky-600 [&_a]:underline [&_img]:my-2 [&_img]:max-w-full [&_iframe]:my-2 [&_iframe]:aspect-video [&_iframe]:w-full [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5"
+          className="min-h-[120px] max-w-none overflow-x-auto p-2 text-sm focus:outline-none [&_a]:text-sky-600 [&_a]:underline [&_h2]:mb-1 [&_h2]:mt-3 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-slate-900 [&_h3]:mb-1 [&_h3]:mt-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-slate-800 [&_img]:my-2 [&_img]:max-w-full [&_iframe]:my-2 [&_iframe]:aspect-video [&_iframe]:w-full [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5"
         />
       )}
     </div>

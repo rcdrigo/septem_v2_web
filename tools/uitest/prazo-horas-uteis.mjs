@@ -91,8 +91,15 @@ for (const view of [
   const prazoDe = async (nome) => {
     const card = page.locator('article').filter({ hasText: nome }).first();
     const pill = card.locator('button').filter({ hasText: /Prazo:|Em atraso:/ }).first();
-    await pill.hover();
-    const texto = await card.getByRole('tooltip').innerText();
+    await pill.scrollIntoViewIfNeeded();
+    // O popover de prazos agora é renderizado em PORTAL (document.body) sob demanda:
+    // focar o pill o abre na hora. A data exata fica no texto acessível do popover.
+    await pill.focus();
+    const tip = page.locator('[data-testid=due-popover]');
+    await tip.waitFor({ state: 'visible', timeout: 5000 });
+    const texto = await tip.evaluate((el) => el.textContent ?? '');
+    await pill.evaluate((el) => el.blur());
+    await page.waitForTimeout(150);
     return texto.match(/Conclusão estimada:\s*([^\n]+)/)?.[1]?.trim() ?? '';
   };
 

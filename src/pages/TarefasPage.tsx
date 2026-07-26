@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { AlertCircle, ArrowDownAZ, ArrowRight, ArrowUpAZ, CheckCircle2, Clock, ExternalLink, Inbox, LayoutGrid, LifeBuoy, RotateCw, SlidersHorizontal, Table as TableIcon, User, X } from 'lucide-react';
 import { useTasks, useTask, useCompleteTask, useSaveTask, type TaskButton, type TaskFilters, type TaskListItem } from '@/lib/api/execution';
@@ -13,6 +14,7 @@ import { ExecutionHeader } from '@/components/execution/ExecutionHeader';
 import { TaskActionFooter, type ExecutionAction } from '@/components/execution/TaskActionFooter';
 import { processMessagesExtra } from '@/components/execution/ProcessMessages';
 import { renderIcon } from '@/lib/icon-catalog';
+import { queryClient } from '@/lib/queryClient';
 import '@/styles/task-index.css';
 
 type TaskStatusFilter = 'pendentes' | 'concluidas';
@@ -56,6 +58,20 @@ export function TarefasPage() {
     }
   }, [processes, selectedProcess, setParams, tasks.isFetching]);
 
+  // Sempre que a página de Tarefas entra em foco (montagem + volta de aba/janela),
+  // atualiza a lista E o summary de pendentes (prefixo ['workflow','tasks'] cobre os dois).
+  useEffect(() => {
+    const refresh = () => queryClient.invalidateQueries({ queryKey: ['workflow', 'tasks'] });
+    refresh();
+    const onFocus = () => { if (document.visibilityState === 'visible') refresh(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, []);
+
   function patchParams(changes: Record<string, string | undefined>) {
     setParams((current) => {
       for (const [key, value] of Object.entries(changes)) {
@@ -78,7 +94,7 @@ export function TarefasPage() {
         <ViewToggle view={view} setView={setView} />
       </header>
       <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
-        <div className="flex flex-wrap items-center gap-2" aria-label="Status das tarefas">
+        <div className="flex flex-wrap items-center" aria-label="Status das tarefas">
           <FilterPill active={status === 'pendentes'} onClick={() => selectStatus('pendentes')}>Pendentes</FilterPill>
           <FilterPill active={status === 'concluidas'} onClick={() => selectStatus('concluidas')}>Concluídas</FilterPill>
           <span className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" aria-hidden="true" />
@@ -315,35 +331,69 @@ export function DuePill({ dueAt, createdAt, completedAt, completed = false }: { 
   const now = useNow();
   const state = deadlineState(dueAt, completedAt, completed, now);
   const id = useMemo(() => `deadline-${Math.random().toString(36).slice(2)}`, []);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const timer = useRef<number | undefined>(undefined);
+  // Posição calculada na abertura: o popover é renderizado em PORTAL (position:fixed)
+  // para NÃO ser recortado pelo container com overflow-auto da lista (bug: o balão
+  // subia e ficava "atrás/abaixo" do header). Vira acima ou abaixo conforme o espaço.
+  const [pos, setPos] = useState<{ left: number; top: number; place: 'top' | 'bottom' } | null>(null);
   const milestones = [
     { label: 'Recebimento', value: createdAt, kind: 'start' },
     { label: 'Conclusão estimada', value: dueAt, kind: 'due' },
     ...(completedAt ? [{ label: 'Conclusão efetiva', value: completedAt, kind: 'done' }] : []),
   ];
+
+  const locate = () => {
+    const el = btnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const place: 'top' | 'bottom' = r.top > 240 ? 'top' : 'bottom';
+    setPos({ left: r.left, top: place === 'top' ? r.top - 12 : r.bottom + 12, place });
+  };
+  const openSoon = () => { window.clearTimeout(timer.current); timer.current = window.setTimeout(locate, 500); };
+  const openNow = () => { window.clearTimeout(timer.current); locate(); };
+  const close = () => { window.clearTimeout(timer.current); setPos(null); };
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
   return (
-    <span className="group/deadline relative inline-flex" onClick={(event) => event.stopPropagation()}>
-      <button type="button" aria-describedby={id} className={`inline-flex min-h-7 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 ${state.cls}`}><Clock size={12} />{state.label}</button>
-      <span id={id} role="tooltip" className="pointer-events-none invisible absolute bottom-full left-0 z-30 mb-3 w-72 max-w-[calc(100vw-2rem)] rounded-lg bg-slate-950 p-4 text-left font-normal text-white opacity-0 shadow-xl ring-1 ring-white/10 transition-opacity delay-[800ms] duration-150 group-hover/deadline:visible group-hover/deadline:opacity-100 group-focus-within/deadline:visible group-focus-within/deadline:opacity-100 group-focus-within/deadline:delay-0">
-        <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Prazo da tarefa</span>
-        <span className="sr-only">{milestones.map((milestone) => `${milestone.label}: ${formatDate(milestone.value)}`).join('. ')}</span>
-        <span aria-hidden="true" className="mt-3 block">
-          {milestones.map((milestone, index) => (
-            <span key={milestone.label} className={`grid grid-cols-[1.25rem_minmax(0,1fr)] gap-x-3 ${index < milestones.length - 1 ? 'pb-4' : ''}`}>
-              <span className="relative flex justify-center pt-1">
-                {index < milestones.length - 1 && <span className="absolute bottom-[-1rem] top-4 w-px bg-slate-700" />}
-                {milestone.kind === 'done'
-                  ? <CheckCircle2 size={16} className="relative z-10 text-emerald-400" />
-                  : <span className={`relative z-10 mt-0.5 block h-2.5 w-2.5 rounded-full ${milestone.kind === 'due' ? 'border-2 border-slate-300 bg-slate-950' : 'bg-slate-400'}`} />}
+    <span
+      className="relative inline-flex"
+      onClick={(event) => event.stopPropagation()}
+      onMouseEnter={openSoon}
+      onMouseLeave={close}
+      onFocus={openNow}
+      onBlur={close}
+    >
+      <button ref={btnRef} type="button" aria-describedby={id} className={`inline-flex min-h-7 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 ${state.cls}`}><Clock size={12} />{state.label}</button>
+      {pos && createPortal(
+        <span
+          id={id}
+          role="tooltip"
+          data-testid="due-popover"
+          style={{ position: 'fixed', left: pos.left, top: pos.top, transform: pos.place === 'top' ? 'translateY(-100%)' : undefined }}
+          className="pointer-events-none z-[1000] block w-72 max-w-[calc(100vw-2rem)] rounded-lg bg-slate-950 p-4 text-left font-normal text-white shadow-xl ring-1 ring-white/10"
+        >
+          <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Prazo da tarefa</span>
+          <span className="sr-only">{milestones.map((milestone) => `${milestone.label}: ${formatDate(milestone.value)}`).join('. ')}</span>
+          <span aria-hidden="true" className="mt-3 block">
+            {milestones.map((milestone, index) => (
+              <span key={milestone.label} className={`grid grid-cols-[1.25rem_minmax(0,1fr)] gap-x-3 ${index < milestones.length - 1 ? 'pb-4' : ''}`}>
+                <span className="relative flex justify-center pt-1">
+                  {index < milestones.length - 1 && <span className="absolute bottom-[-1rem] top-4 w-px bg-slate-700" />}
+                  {milestone.kind === 'done'
+                    ? <CheckCircle2 size={16} className="relative z-10 text-emerald-400" />
+                    : <span className={`relative z-10 mt-0.5 block h-2.5 w-2.5 rounded-full ${milestone.kind === 'due' ? 'border-2 border-slate-300 bg-slate-950' : 'bg-slate-400'}`} />}
+                </span>
+                <span className="min-w-0">
+                  <strong className="block text-sm font-semibold leading-5 text-white">{formatDate(milestone.value)}</strong>
+                  <span className="mt-0.5 block text-[11px] leading-4 text-slate-400">{milestone.label}</span>
+                </span>
               </span>
-              <span className="min-w-0">
-                <strong className="block text-sm font-semibold leading-5 text-white">{formatDate(milestone.value)}</strong>
-                <span className="mt-0.5 block text-[11px] leading-4 text-slate-400">{milestone.label}</span>
-              </span>
-            </span>
-          ))}
-        </span>
-        <span aria-hidden="true" className="absolute -bottom-1.5 left-5 h-3 w-3 rotate-45 bg-slate-950 ring-1 ring-white/10" />
-      </span>
+            ))}
+          </span>
+        </span>,
+        document.body,
+      )}
     </span>
   );
 }
@@ -362,7 +412,7 @@ export function useViewMode(storageKey = 'septem.tasks.view'): ['cards' | 'table
 
 export function ViewToggle({ view, setView }: { view: 'cards' | 'table'; setView: (v: 'cards' | 'table') => void }) {
   return (
-    <div className="flex rounded-md bg-slate-100 p-0.5">
+    <div className="flex rounded-md bg-slate-100">
       <button type="button" aria-pressed={view === 'cards'} onClick={() => setView('cards')} title="Cards" className={`flex h-7 w-8 items-center justify-center rounded focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-slate-500 ${view === 'cards' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><LayoutGrid size={14} /></button>
       <button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')} title="Tabela" className={`flex h-7 w-8 items-center justify-center rounded focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-slate-500 ${view === 'table' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><TableIcon size={14} /></button>
     </div>

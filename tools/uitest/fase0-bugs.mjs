@@ -73,33 +73,36 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await ctx.close();
 }
 
-// ══ ITEM 2 — Sair da personificação (não-admin interno E externo) ═══════════
-for (const alvo of ['Maximiliano', 'Cidadao Externo']) {
-  for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }]) {
-    const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 2 });
-    const page = await ctx.newPage();
-    await login(page);
-    if (vp.n === 'mobile') { await page.locator('button[aria-label="Abrir menu"]').click(); await page.waitForTimeout(400); }
+// ══ ITEM 2 — Sair da personificação (primeiro usuário não-admin do ambiente) ═══
+for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 2 });
+  const page = await ctx.newPage();
+  await login(page);
+  if (vp.n === 'mobile') { await page.locator('button[aria-label="Abrir menu"]').click(); await page.waitForTimeout(400); }
 
-    await page.locator('aside button', { hasText: 'Personificar' }).click();
-    await page.waitForTimeout(1000);
-    await page.locator('[role=dialog] button', { hasText: alvo }).first().click();
-    await page.waitForTimeout(2000);
-    if (vp.n === 'mobile') { await page.locator('button[aria-label="Abrir menu"]').click().catch(() => {}); await page.waitForTimeout(400); }
+  await page.locator('aside button', { hasText: 'Personificar' }).click();
+  await page.waitForSelector('[role=dialog]', { timeout: 8000 });
+  await page.waitForTimeout(800);
+  // Primeiro usuário da lista (o diálogo já exclui o próprio admin) — robusto a quais
+  // usuários existem no ambiente; o que importa é o fluxo de SAIR da personificação.
+  const alvoBtn = page.locator('[role=dialog] .overflow-auto button').first();
+  const alvoNome = (await alvoBtn.innerText().catch(() => 'usuário')).split('\n')[0].trim();
+  await alvoBtn.click();
+  await page.waitForTimeout(2000);
+  if (vp.n === 'mobile') { await page.locator('button[aria-label="Abrir menu"]').click().catch(() => {}); await page.waitForTimeout(400); }
 
-    const banner = page.locator('aside .bg-amber-50 button', { hasText: 'Sair' });
-    const visivel = await banner.count();
-    const habilitado = visivel ? await banner.isEnabled() : false;
-    check(visivel === 1, `[${vp.n}][${alvo}] botão "Sair da personificação" presente`);
-    check(habilitado, `[${vp.n}][${alvo}] botão HABILITADO (bug do dono: ficava desativado)`);
+  const banner = page.locator('aside .bg-amber-50 button', { hasText: 'Sair' });
+  const visivel = await banner.count();
+  const habilitado = visivel ? await banner.isEnabled() : false;
+  check(visivel === 1, `[${vp.n}][${alvoNome}] botão "Sair da personificação" presente`);
+  check(habilitado, `[${vp.n}][${alvoNome}] botão HABILITADO (bug do dono: ficava desativado)`);
 
-    await banner.click();
-    await page.waitForTimeout(2500);
-    const voltou = await page.evaluate(() => !document.body.innerText.includes('Personificando'));
-    check(voltou, `[${vp.n}][${alvo}] voltou ao usuário original (sem re-login)`);
-    await page.screenshot({ path: `${OUT}/fase0-impersonate-${vp.n}-${alvo.split(' ')[0]}.png` });
-    await ctx.close();
-  }
+  await banner.click();
+  await page.waitForTimeout(2500);
+  const voltou = await page.evaluate(() => !document.body.innerText.includes('Personificando'));
+  check(voltou, `[${vp.n}][${alvoNome}] voltou ao usuário original (sem re-login)`);
+  await page.screenshot({ path: `${OUT}/fase0-impersonate-${vp.n}.png` });
+  await ctx.close();
 }
 
 // ══ ITEM 3 — Fluxo com 3 tarefas percorrido do início ao fim (web + mobile) ══

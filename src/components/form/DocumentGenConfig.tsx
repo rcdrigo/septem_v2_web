@@ -54,11 +54,21 @@ export function DocumentGenConfig({
 }) {
   const modelos = useDocumentTemplates();
   const [picker, setPicker] = useState<null | { multi: boolean; ruleIndex?: number }>(null);
+  const [regrasOpen, setRegrasOpen] = useState(false);
 
   const ativos = (modelos.data ?? []).filter((m) => m.active);
   const nomeDoModelo = (id?: string) => ativos.find((m) => m.id === id)?.name ?? (id ? '(modelo removido)' : '— nenhum —');
 
-  const setMode = (mode: DocGenConfig['mode']) => onChange({ ...value, mode });
+  // Ao alternar o modo, limpa os valores dos DEMAIS modos — cada modo guarda só o
+  // que lhe pertence (fixo→templateId, lista→templateIds, regra→rules); trocar não
+  // pode deixar resíduo do modo anterior no JSON gravado.
+  const setMode = (mode: DocGenConfig['mode']) =>
+    onChange({
+      mode,
+      templateId: mode === 'fixo' ? value.templateId : undefined,
+      templateIds: mode === 'lista' ? (value.templateIds ?? []) : [],
+      rules: mode === 'regra' ? (value.rules ?? []) : [],
+    });
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 p-2" data-testid="doc-param">
@@ -116,7 +126,38 @@ export function DocumentGenConfig({
         Por regra de negócio
       </label>
       {value.mode === 'regra' && (
-        <div className="ml-5 flex flex-col gap-1" data-testid="doc-param-regras">
+        <div className="ml-5 flex flex-col gap-1">
+          <button
+            type="button"
+            data-testid="doc-param-regras-abrir"
+            onClick={() => setRegrasOpen(true)}
+            className="inline-flex w-fit items-center gap-1 rounded border border-slate-300 bg-white px-2 py-0.5 text-xs text-slate-700 hover:bg-slate-50"
+          >
+            <FileStack size={12} /> Configurar regras{(value.rules?.length ?? 0) > 0 ? ` (${value.rules?.length})` : ''}
+          </button>
+          <p className="text-[11px] text-slate-500">
+            A primeira regra atendida define o modelo. Se nenhuma for atendida, nenhum modelo fica disponível.
+          </p>
+        </div>
+      )}
+
+      {regrasOpen && (
+        <Dialog
+          open
+          onClose={() => setRegrasOpen(false)}
+          width="lg"
+          title="Regras de negócio do documento"
+          footer={
+            <button
+              type="button"
+              onClick={() => setRegrasOpen(false)}
+              className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
+            >
+              Concluir
+            </button>
+          }
+        >
+          <div className="flex flex-col gap-1" data-testid="doc-param-regras">
           {(value.rules ?? []).map((r, i) => (
             <div key={i} className="flex flex-wrap items-center gap-1 rounded border border-slate-200 bg-white p-1">
               <span className="text-[11px] text-slate-500">se</span>
@@ -166,10 +207,8 @@ export function DocumentGenConfig({
           >
             <Plus size={12} /> Adicionar regra
           </button>
-          <p className="text-[11px] text-slate-500">
-            A primeira regra atendida define o modelo. Se nenhuma for atendida, nenhum modelo fica disponível.
-          </p>
-        </div>
+          </div>
+        </Dialog>
       )}
 
       {picker && (

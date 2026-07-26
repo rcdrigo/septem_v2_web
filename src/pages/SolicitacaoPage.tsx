@@ -41,7 +41,6 @@ export function SolicitacaoPage() {
             {d?.isTest && <TestBadge />}
           </div>
           {d?.process && <p className="mt-1 break-words text-sm text-slate-500 [overflow-wrap:anywhere]">{d.process}</p>}
-          {d?.category && <p className="mt-1 truncate text-xs text-slate-400">Categoria: {d.category}</p>}
         </div>
       </header>
       <main className="flex-1 overflow-auto p-6">

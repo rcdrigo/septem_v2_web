@@ -110,9 +110,14 @@ try {
   const escolhidos = await page.locator('[data-testid=doc-param-lista] li').count();
   check(escolhidos === Math.min(2, nCaixas), `[web] os modelos escolhidos aparecem na lista (${escolhidos})`);
 
-  // :57/:58 — regra de negócio PREENCHIDA: campo/operador/valor → modelo.
+  // :57/:58 — regra de negócio PREENCHIDA: campo/operador/valor → modelo (agora em MODAL).
   await page.locator('[data-testid=doc-param] input[type=radio]').nth(2).check();
   await page.waitForTimeout(300);
+  // AJUSTE B: as regras abrem num modal (antes eram inline).
+  await page.locator('[data-testid=doc-param-regras-abrir]').click();
+  await page.waitForSelector('[role=dialog] [data-testid=doc-param-regras]', { timeout: 8000 });
+  check(await page.locator('[role=dialog] [data-testid=doc-param-regras]').count() === 1,
+    '[web] AJUSTE B: regras de negócio abrem em um MODAL');
   await page.locator('[data-testid=doc-param-add-regra]').click();
   await page.waitForTimeout(300);
   const linhaRegra = page.locator('[data-testid=doc-param-regras] > div').first();
@@ -134,6 +139,9 @@ try {
   await page.waitForTimeout(400);
   check((await linhaRegra.innerText()).includes(`Modelo Anexo ${rid}`),
     '[web] a regra aponta para o modelo escolhido');
+  // Fecha o modal de regras (Concluir).
+  await page.locator('[role=dialog] button', { hasText: 'Concluir' }).click();
+  await page.waitForTimeout(300);
 
   // Salva no modo REGRA para provar que a regra PREENCHIDA persiste (:58).
   await page.locator('header button', { hasText: 'Salvar' }).first().click();
@@ -146,9 +154,21 @@ try {
   check(xmlRegra.includes('urgente'), '[web] a condição preenchida (valor "urgente") persiste');
   void cfgRegra;
 
-  // Volta para FIXO (é o que vamos persistir e verificar).
+  // Volta para FIXO. AJUSTE A: trocar de modo LIMPA os valores dos outros modos,
+  // então o modelo fixo precisa ser (re)selecionado — e a regra "urgente" não deve sobrar.
   await page.locator('[data-testid=doc-param] input[type=radio]').first().check();
   await page.waitForTimeout(300);
+  await page.locator('[data-testid=doc-param] button', { hasText: 'Buscar modelo' }).click();
+  await page.waitForSelector('[data-testid=modelo-picker-ok]', { timeout: 8000 });
+  await page.locator('[role=dialog] button', { hasText: 'Selecione o modelo' }).first().click();
+  await page.waitForSelector('input[placeholder="Pesquisar…"]', { timeout: 5000 });
+  await page.fill('input[placeholder="Pesquisar…"]', `Modelo Anexo ${rid}`);
+  await page.waitForTimeout(400);
+  await page.locator('input[placeholder="Pesquisar…"]').locator('xpath=../../ul/li/button').first().click();
+  await page.locator('[data-testid=modelo-picker-ok]').click();
+  await page.waitForTimeout(500);
+  check((await page.locator('[data-testid=doc-param-fixo]').innerText()).includes(`Modelo Anexo ${rid}`),
+    '[web] modelo fixo re-selecionado após trocar de modo');
   await manualCb.locator("xpath=ancestor::label[1]").click(); // marca o anexo manual para provar que persiste também
   // SEM espera antes do Salvar: o schema do formulário entra no BPMN por polling
   // (600ms), então salvar "no susto" é justamente o caso que perdia a alteração.
@@ -163,6 +183,8 @@ try {
   check(/septemDocGen/.test(xml), '[api] "Gera documento?" persiste no processo salvo');
   check(/septemDocManual/.test(xml), '[api] "permitir anexo manual" persiste');
   check(xml.includes(modelo.body.id), '[api] o modelo escolhido persiste na parametrização');
+  check(!xml.includes('urgente'),
+    '[api] AJUSTE A: ao voltar para FIXO, os valores da regra ("urgente") foram limpos');
   await page.screenshot({ path: `${OUT}/doc-gera-documento.png`, fullPage: false });
 } finally { await browser.close(); }
 

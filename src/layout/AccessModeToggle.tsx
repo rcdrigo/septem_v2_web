@@ -28,7 +28,7 @@ export function AccessModeToggle() {
 
   return (
     <div className="px-3 pb-2">
-      <div className="flex rounded-md bg-slate-100 p-0.5">
+      <div className="flex rounded-md bg-slate-100">
         {options.map(({ mode, label, icon: Icon }) => {
           const active = mode === accessMode;
           return (
