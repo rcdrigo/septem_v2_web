@@ -26,3 +26,7 @@ pnpm-debug.log*
 .env
 .env.local
 .env.*.local
+.dev.vars
+
+# Wrangler (cache local do BFF)
+.wrangler/

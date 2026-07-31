@@ -579,7 +579,8 @@ function DynamicList({ comp }: { comp: Component }) {
   const setRows = (next: Record<string, unknown>[]) => rt.set(key, next);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+      data-testid="lista-dinamica" data-lista={key}>
       <header className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
         <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
           {comp.properties?.septemGroupIcon && <i className={`${comp.properties.septemGroupIcon} text-slate-500`} />}
@@ -588,6 +589,7 @@ function DynamicList({ comp }: { comp: Component }) {
         </span>
         {!rt.readOnly && (
           <button type="button" onClick={() => setRows([...rows, {}])}
+            data-testid="lista-adicionar"
             className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">
             <Plus size={13} /> Adicionar
           </button>
@@ -596,7 +598,8 @@ function DynamicList({ comp }: { comp: Component }) {
       <div className="flex flex-col gap-3 p-4">
         {rows.length === 0 && <p className="text-sm text-slate-400">Nenhum item. Clique em "Adicionar".</p>}
         {rows.map((row, i) => (
-          <div key={i} className="relative rounded-md border border-slate-200 p-3">
+          <div key={i} className="relative rounded-md border border-slate-200 p-3"
+            data-testid="lista-item" data-indice={i}>
             {!rt.readOnly && (
               <button type="button" onClick={() => setRows(rows.filter((_, j) => j !== i))}
                 className="absolute right-2 top-2 rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" aria-label="Remover item">

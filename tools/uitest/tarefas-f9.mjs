@@ -16,6 +16,12 @@ const ok = [];
 const bad = [];
 const check = (c, m) => (c ? ok.push(m) : bad.push(m));
 
+// "Hoje" no fuso do TENANT (America/Sao_Paulo), não em UTC: o backend traduz a data
+// do filtro com BusinessCalendar.TimeZone (ExecutionEndpoints.ParseDay). Com
+// toISOString() a suíte pedia o dia seguinte entre 21h e 00h locais e não achava
+// nada — flake diário, não bug do produto.
+const hojeLocal = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+
 const api = async (t, p, m = 'GET', b) => {
   const r = await fetch(API + p, {
     method: m,
@@ -224,7 +230,7 @@ try {
   await page.fill('[data-testid=filtro-numero]', '');
   await page.waitForTimeout(1400);
 
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = hojeLocal();
   await page.fill('[data-testid=filtro-req-de]', hoje);
   await page.fill('[data-testid=filtro-req-ate]', hoje);
   await page.waitForTimeout(1200);
@@ -413,7 +419,7 @@ try {
   check(await cardTesteMob.locator('[data-testid=selo-teste]').count() > 0, '[mobile] o selo de teste aparece no card');
   check(!(await m.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)),
     '[mobile] lista de tarefas sem rolagem horizontal');
-  const hojeMob = new Date().toISOString().slice(0, 10);
+  const hojeMob = hojeLocal();
   for (const campo of ['filtro-req-de', 'filtro-req-ate', 'filtro-rec-de', 'filtro-rec-ate']) await m.fill(`[data-testid=${campo}]`, hojeMob);
   await m.waitForTimeout(1200);
   const cortadosMob = await controlesCortados(m);

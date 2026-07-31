@@ -1,12 +1,61 @@
 import { chromium } from 'playwright-core';
 
 const BASE = 'http://localhost:5173';
+const API = 'http://localhost:5000';
 const OUT = process.env.OUT_DIR || '.';
 let failures = 0;
 function check(ok, msg) {
   if (!ok) failures++;
   console.log(`${ok ? '✓' : '✗ FALHOU'} ${msg}`);
 }
+
+// ── AUTOSSUFICIÊNCIA ─────────────────────────────────────────────────────────
+// A suíte dependia dos 3 relatórios demo do seeder aparecerem no catálogo. Mas
+// /consultas carrega no máximo 100 publicados (useReportsList pageSize:100, sem
+// paginação): num tenant com mais que isso, os demo simplesmente somem da tela e a
+// suíte quebrava por dado alheio. Agora ela CLONA os 3 demo (mesma fonte, mesma
+// definição, nome com rid) e trabalha nas cópias — que, sendo as mais recentes,
+// estão sempre visíveis. Idempotente e imune ao volume do banco.
+const rid = Math.floor(Math.random() * 1e9);
+const api = async (t, p, m = 'GET', b) => {
+  const r = await fetch(API + p, {
+    method: m,
+    headers: { 'Content-Type': 'application/json', 'X-Tenant': 'prefeitura-x', ...(t ? { Authorization: `Bearer ${t}` } : {}) },
+    body: b ? JSON.stringify(b) : undefined,
+  });
+  return { status: r.status, body: await r.json().catch(() => null) };
+};
+const { body: auth } = await api(null, '/api/v1/auth/login', 'POST', { identifier: 'admin@prefeitura-x.local', password: 'admin123' });
+const token = auth.accessToken;
+
+/** Cria e publica um relatório sobre a fonte informada. Devolve {nome, key}. */
+async function criar(rotulo, dataSourceId, definitionJson) {
+  const nome = `${rotulo} ${rid}`;
+  const criado = await api(token, '/api/v1/reports/', 'POST', { name: nome, sourceType: 'dataSource', dataSourceId, definitionJson });
+  if (criado.status !== 201) throw new Error(`criação de "${nome}" falhou (${criado.status})`);
+  const pub = await api(token, `/api/v1/reports/${criado.body.key}/publish`, 'POST', {});
+  if (pub.status !== 200) throw new Error(`publicação de "${nome}" falhou (${pub.status}): ${JSON.stringify(pub.body)}`);
+  return { nome, key: criado.body.key };
+}
+
+/** Lê um relatório demo do seeder para reaproveitar fonte e definição. */
+async function demo(origem) {
+  // Sem fixar versão: os demo não têm todos a mesma (despesas_por_unidade nasceu
+  // na v0) e o que interessa é a definição corrente.
+  const { body } = await api(token, `/api/v1/reports/${origem}`);
+  if (!body) throw new Error(`relatório demo "${origem}" não encontrado`);
+  return body;
+}
+
+const basePainel = await demo('painel_de_despesas');
+const basePaginada = await demo('tabela_paginada');
+
+const painel = await criar('Painel de Despesas', basePainel.dataSourceId, basePainel.definitionJson);
+// "Sem coluna oculta" = tabela default sobre a mesma fonte do painel. O demo
+// `despesas_por_unidade` não serve de molde: está sem fonte no banco (só sobrevive
+// pelo snapshot congelado da v0), então não é clonável nem republicável.
+const porUnidade = await criar('Despesas por unidade', basePainel.dataSourceId, '{}');
+const paginada = await criar('Tabela Paginada', basePaginada.dataSourceId, basePaginada.definitionJson);
 
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 950 }, deviceScaleFactor: 2, acceptDownloads: true });
@@ -34,7 +83,7 @@ async function abrirRelatorio(nome) {
 }
 
 // ── 1. Consultas: abrir o painel e conferir blocos ───────────────────────────
-let viewer = await abrirRelatorio('Painel de Despesas');
+let viewer = await abrirRelatorio(painel.nome);
 check(/\/consultas\/ver\?key=/.test(viewer.url()), `"Abrir" leva o relatório para a aba própria (${new URL(viewer.url()).pathname})`);
 await viewer.waitForSelector('text=Total de despesas', { timeout: 20000 });
 await viewer.waitForTimeout(800);
@@ -106,7 +155,7 @@ await viewer.screenshot({ path: `${OUT}/viewer-mobile.png` });
 await viewer.close();
 
 // relatório SEM coluna oculta (tabela default) → botão de detalhe NÃO aparece
-viewer = await abrirRelatorio('Despesas por unidade');
+viewer = await abrirRelatorio(porUnidade.nome);
 await viewer.waitForSelector('text=Obter dados mais recentes', { timeout: 20000 });
 await viewer.waitForTimeout(1000);
 const noHidden = await viewer.evaluate(() => document.querySelectorAll('button[aria-label="Visualizar detalhamento"]').length);
@@ -114,7 +163,7 @@ check(noHidden === 0, `sem coluna oculta → sem botão de detalhe (${noHidden})
 await viewer.close();
 
 // paginação da tabela (relatório com 25 linhas → 2 páginas)
-viewer = await abrirRelatorio('Tabela Paginada');
+viewer = await abrirRelatorio(paginada.nome);
 await viewer.waitForSelector('text=Obter dados mais recentes', { timeout: 20000 });
 await viewer.waitForTimeout(1000);
 check(await viewer.evaluate(() => document.body.innerText.includes('1 / 2')), 'tabela paginada mostra pager 1 / 2');
@@ -128,7 +177,7 @@ await viewer.close();
 const cardsDoGrid = () => page.locator('section', { hasText: 'Componentes do relatório' }).last().locator('[draggable="true"]');
 
 // ── 2. Builder: abrir, ver campos da origem, adicionar bloco, salvar, preview ─
-await page.goto(BASE + '/relatorios/editar?key=painel_de_despesas', { waitUntil: 'networkidle' });
+await page.goto(`${BASE}/relatorios/editar?key=${painel.key}`, { waitUntil: 'networkidle' });
 await page.waitForSelector('text=Origem dos dados', { timeout: 15000 });
 await page.waitForTimeout(600);
 await page.screenshot({ path: `${OUT}/builder-desktop.png`, fullPage: true });
@@ -181,10 +230,10 @@ await page.screenshot({ path: `${OUT}/builder-preview.png`, fullPage: true });
 
 // catálogo continua servindo a v1 publicada (rascunho v2 não vazou)
 await page.goto(BASE + '/consultas', { waitUntil: 'networkidle' });
-check(await cardDoRelatorio('Painel de Despesas').count() > 0, 'catálogo segue com a versão publicada após criar rascunho v2');
+check(await cardDoRelatorio(painel.nome).count() > 0, 'catálogo segue com a versão publicada após criar rascunho v2');
 
 // ── 3. Builder: controles avançados e regras de acesso ──────────────────────
-await page.goto(BASE + '/relatorios/editar?key=painel_de_despesas', { waitUntil: 'networkidle' });
+await page.goto(`${BASE}/relatorios/editar?key=${painel.key}`, { waitUntil: 'networkidle' });
 await page.waitForSelector('text=Origem dos dados', { timeout: 15000 });
 await page.waitForTimeout(600);
 

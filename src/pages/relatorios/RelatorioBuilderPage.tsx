@@ -16,8 +16,10 @@ import {
   useReport, useUpdateReport, usePublishReport, useSyncReportSchema, useReportSourceMetadata,
   useReportAccessRules, useSaveReportAccessRules,
   type BlockDef, type GlobalFilterDef, type ReportDefinition, type ReportAccessRule,
+  type FieldChoice, type FieldChoices,
 } from '@/lib/api/reports';
 import { ComponentEditorModal, blockTypeLabel, blockTypeIcon } from '@/components/reports/ComponentEditorModal';
+import { PublishIssuesDialog } from '@/components/reports/PublishIssuesDialog';
 import { useAccessProfiles } from '@/lib/api/access-profiles';
 import { useOrgUnitsFlat } from '@/lib/api/org-units';
 import { useUsersList } from '@/lib/api/users';
@@ -46,6 +48,8 @@ export function RelatorioBuilderPage() {
   const [processKey, setProcessKey] = useState('');
   const [dataSourceId, setDataSourceId] = useState('');
   const [hydrated, setHydrated] = useState(false);
+  const [publishIssues, setPublishIssues] = useState<
+    { acao: 'publish' | 'sync'; choices: FieldChoice[]; issues: string[] } | null>(null);
   const [tab, setTab] = useState<'origem' | 'blocos' | 'filtros' | 'acesso' | 'preview'>('blocos');
 
   const processes = useProcessList({ pageSize: 100 });
@@ -95,14 +99,59 @@ export function RelatorioBuilderPage() {
     }
   }
 
-  async function doPublish() {
-    if (!(await saveDraft(false))) return;
+  /**
+   * Publicar/sincronizar podem parar para PERGUNTAR (key ambígua → de qual lista
+   * vem o campo) ou para RECUSAR (campo de lista usado como valor único). Os dois
+   * chegam como 422 e abrem o mesmo diálogo — um toast de uma linha não dava
+   * conta de nenhum dos dois casos.
+   */
+  function tratarErroDePublicacao(err: unknown, acao: 'publish' | 'sync', fallback: string) {
+    const body = err instanceof ApiError ? err.body : undefined;
+    const issues = Array.isArray(body?.issues) ? (body!.issues as string[]) : [];
+    if (body?.error === 'field_choice_required' && Array.isArray(body.choices)) {
+      setPublishIssues({ acao, choices: body.choices as FieldChoice[], issues });
+      return;
+    }
+    if (body?.error === 'repeated_field_not_reducible' && issues.length > 0) {
+      setPublishIssues({ acao, choices: [], issues });
+      return;
+    }
+    toast.error(issues[0] ?? (err instanceof ApiError ? (err.detail ?? err.message) : fallback));
+  }
+
+  /**
+   * Publicar e sincronizar REESCREVEM a definição no servidor (migram a key antiga
+   * para o caminho, aplicam a escolha do usuário, tiram coluna que saiu do schema).
+   * Sem recarregar aqui, o editor seguiria com a definição velha em memória e o
+   * próximo "Salvar rascunho" gravaria por cima — desfazendo a migração que acabou
+   * de ser feita, e a publicação seguinte perguntaria tudo de novo.
+   */
+  async function reidratarDoServidor() {
+    const { data } = await detail.refetch();
+    if (!data) return;
+    try { setDef(JSON.parse(data.definitionJson || '{}')); } catch { /* mantém o que está na tela */ }
+  }
+
+  async function doPublish(fieldChoices?: FieldChoices) {
+    if (!fieldChoices && !(await saveDraft(false))) return;
     try {
-      await publish.mutateAsync(key!);
+      await publish.mutateAsync({ key: key!, fieldChoices });
+      setPublishIssues(null);
+      await reidratarDoServidor();
       toast.success('Relatório publicado (schema congelado).');
     } catch (err) {
-      const issues = err instanceof ApiError && Array.isArray(err.issues) ? (err.issues as string[]) : null;
-      toast.error(issues?.[0] ?? (err instanceof ApiError ? (err.detail ?? err.message) : 'Falha ao publicar.'));
+      tratarErroDePublicacao(err, 'publish', 'Falha ao publicar.');
+    }
+  }
+
+  async function doSync(fieldChoices?: FieldChoices) {
+    try {
+      await sync.mutateAsync({ key: key!, fieldChoices });
+      setPublishIssues(null);
+      await Promise.all([meta.refetch(), reidratarDoServidor()]);
+      toast.success('Campos atualizados a partir da origem.');
+    } catch (err) {
+      tratarErroDePublicacao(err, 'sync', 'Não foi possível atualizar (existe versão publicada?).');
     }
   }
 
@@ -130,7 +179,7 @@ export function RelatorioBuilderPage() {
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <div className="inline-flex items-center gap-1">
-            <button type="button" onClick={() => sync.mutateAsync(key!).then(() => toast.success('Campos atualizados a partir da origem.')).catch(() => toast.error('Não foi possível atualizar (existe versão publicada?).'))}
+            <button type="button" onClick={() => doSync()}
               className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
               <RefreshCcw size={14} /> Atualizar campos da origem
             </button>
@@ -141,7 +190,7 @@ export function RelatorioBuilderPage() {
             className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
             <Save size={14} /> Salvar rascunho
           </button>
-          <button type="button" onClick={doPublish} disabled={publish.isPending}
+          <button type="button" onClick={() => doPublish()} disabled={publish.isPending}
             className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50">
             <Send size={14} /> Publicar
           </button>
@@ -269,6 +318,16 @@ export function RelatorioBuilderPage() {
           </div>
         )}
       </main>
+      <PublishIssuesDialog
+        open={!!publishIssues}
+        onClose={() => setPublishIssues(null)}
+        choices={publishIssues?.choices ?? []}
+        issues={publishIssues?.issues ?? []}
+        columns={columns}
+        pending={publish.isPending || sync.isPending}
+        onConfirm={(escolhas) =>
+          publishIssues?.acao === 'sync' ? doSync(escolhas) : doPublish(escolhas)}
+      />
       <Toaster />
     </div>
   );

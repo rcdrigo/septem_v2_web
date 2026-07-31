@@ -161,10 +161,20 @@ export function useReportSourceMetadata(key: string | null) {
   });
 }
 
+/**
+ * Campo ambíguo devolvido no erro `field_choice_required` (422): a mesma key existe
+ * em mais de uma lista do processo e o backend NÃO escolhe sozinho (spec §7.4).
+ */
+export type FieldChoice = { field: string; options: string[] };
+
+/** key ambígua → caminho escolhido. Quem reescreve a definição é o backend. */
+export type FieldChoices = Record<string, string>;
+
 export function usePublishReport() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (key: string) => api.post(`${BASE}/${key}/publish`, {}),
+    mutationFn: ({ key, fieldChoices }: { key: string; fieldChoices?: FieldChoices }) =>
+      api.post(`${BASE}/${key}/publish`, { fieldChoices }),
     onSuccess: () => qc.invalidateQueries({ queryKey: reportKeys.all }),
   });
 }
@@ -172,7 +182,8 @@ export function usePublishReport() {
 export function useSyncReportSchema() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (key: string) => api.post(`${BASE}/${key}/sync-schema`, {}),
+    mutationFn: ({ key, fieldChoices }: { key: string; fieldChoices?: FieldChoices }) =>
+      api.post(`${BASE}/${key}/sync-schema`, { fieldChoices }),
     onSuccess: () => qc.invalidateQueries({ queryKey: reportKeys.all }),
   });
 }

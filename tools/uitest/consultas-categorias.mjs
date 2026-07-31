@@ -1,12 +1,49 @@
 import { chromium } from 'playwright-core';
 
 const BASE = 'http://localhost:5173';
+const API = 'http://localhost:5000';
 const OUT = process.env.OUT_DIR || '.';
 let failures = 0;
 function check(ok, msg) {
   if (!ok) failures++;
   console.log(`${ok ? '✓' : '✗ FALHOU'} ${msg}`);
 }
+
+// ── AUTOSSUFICIÊNCIA ─────────────────────────────────────────────────────────
+// A suíte dependia de já existir um relatório PUBLICADO na categoria "Financeiro".
+// Isso se perdia entre rodadas (as versões viram `inactive`) e, com mais de 100
+// publicados no tenant, /consultas nem carrega tudo (pageSize 100, sem paginação).
+// Agora ela cria e publica o próprio relatório na categoria antes de olhar a tela —
+// e o apaga no fim.
+const rid = Math.floor(Math.random() * 1e9);
+const api = async (t, p, m = 'GET', b) => {
+  const r = await fetch(API + p, {
+    method: m,
+    headers: { 'Content-Type': 'application/json', 'X-Tenant': 'prefeitura-x', ...(t ? { Authorization: `Bearer ${t}` } : {}) },
+    body: b ? JSON.stringify(b) : undefined,
+  });
+  return { status: r.status, body: await r.json().catch(() => null) };
+};
+const { body: auth } = await api(null, '/api/v1/auth/login', 'POST', { identifier: 'admin@prefeitura-x.local', password: 'admin123' });
+const token = auth.accessToken;
+
+const CATEGORIA = 'Financeiro';
+const COR = '#0e7490'; // rgb(14, 116, 144) — a cor conferida no botão "Abrir"
+const { body: cats } = await api(token, '/api/v1/report-categories');
+let categoria = (cats?.items ?? cats ?? []).find((c) => c.name === CATEGORIA);
+if (!categoria) categoria = (await api(token, '/api/v1/report-categories/', 'POST', { name: CATEGORIA, color: COR })).body;
+
+// Fonte fixa própria: não depende de nenhuma fonte do seeder continuar existindo.
+const { body: fonte } = await api(token, '/api/v1/data-sources', 'POST', {
+  name: `Fonte consultas cat ${rid}`, scope: 'report', type: 'fixed',
+  config: { items: [{ value: '10', label: 'Obras' }, { value: '5', label: 'Saúde' }] },
+});
+const { body: relatorio } = await api(token, '/api/v1/reports/', 'POST', {
+  name: `Consulta Categoria ${rid}`, sourceType: 'dataSource', dataSourceId: fonte.id,
+  categoryId: categoria.id, definitionJson: '{}',
+});
+const pub = await api(token, `/api/v1/reports/${relatorio.key}/publish`, 'POST', {});
+if (pub.status !== 200) throw new Error(`publicação da fixture falhou (${pub.status}): ${JSON.stringify(pub.body)}`);
 
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 });
@@ -96,6 +133,11 @@ await page.waitForSelector('text=Novo relatório', { timeout: 5000 });
 const hasCategoryField = await page.locator('[role=dialog] label', { hasText: 'Categoria' }).count();
 check(hasCategoryField > 0, 'form do relatório tem campo "Categoria"');
 await page.keyboard.press('Escape');
+
+// Limpa a fixture desta rodada (relatório e fonte); a categoria fica, é dado do
+// tenant e as próximas rodadas a reaproveitam.
+await api(token, `/api/v1/reports/${relatorio.key}`, 'DELETE');
+await api(token, `/api/v1/data-sources/${fonte.id}`, 'DELETE');
 
 console.log(failures === 0 ? 'PASSOU (todos os casos)' : `FALHOU: ${failures} caso(s)`);
 await browser.close();

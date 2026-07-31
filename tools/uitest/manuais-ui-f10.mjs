@@ -183,7 +183,7 @@ try {
 
   // Item 26: a busca abre um POPOVER de resultados (não filtra o menu lateral).
   const menuItensAntes = await page.locator('[data-testid=guide-menu-item]').count();
-  await page.fill('[data-testid=guide-busca]', tExterno2.slice(0, 12));
+  await page.fill('[data-testid=guide-busca]', `externo ${rid}`);
   await page.waitForTimeout(600);
   check(await page.locator('[data-testid=guide-busca-resultados]').count() === 1, '[item26] a busca abre um popover flutuante de resultados');
   check(await page.locator('[data-testid=guide-busca-resultado]', { hasText: tExterno2 }).count() > 0, '[item26] o popover lista o manual encontrado pelo título');
@@ -260,6 +260,15 @@ try {
 } finally {
   await browser.close();
 }
+
+// Limpeza: sem isto, cada rodada deixa manuais para trás e a busca do guide (que
+// mostra só os primeiros resultados) acaba não achando o manual da rodada atual —
+// foi exatamente assim que esta suíte ficou vermelha depois de 22 execuções.
+try {
+  const todos = (await api(token, '/api/v1/manuals/')).body ?? [];
+  for (const m of todos.filter((x) => (x.title ?? '').includes(String(rid))))
+    await api(token, `/api/v1/manuals/${m.id}`, 'DELETE');
+} catch (e) { console.log('! limpeza dos manuais falhou: ' + e.message); }
 
 console.log(ok.map((m) => `✓ ${m}`).join('\n'));
 if (bad.length) console.log(bad.map((m) => `✗ ${m}`).join('\n'));

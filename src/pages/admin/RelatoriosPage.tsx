@@ -47,6 +47,14 @@ export function RelatoriosPage() {
       await patch.mutateAsync({ key: r.key, status: 'published' });
       toast.success(`"${r.name}" publicado.`);
     } catch (err) {
+      // Campo ambíguo e campo de lista usado como valor único se resolvem NO EDITOR
+      // (é lá que mora o diálogo de escolha). Sem esta dica o usuário lê o motivo
+      // aqui e não tem o que fazer na tela em que está.
+      const erro = err instanceof ApiError ? (err.body?.error as string | undefined) : undefined;
+      if (erro === 'field_choice_required' || erro === 'repeated_field_not_reducible') {
+        toast.error(`${(err as ApiError).detail ?? 'Não foi possível publicar.'} Abra o editor do relatório para resolver.`);
+        return;
+      }
       toast.error(err instanceof ApiError ? err.message : 'Falha ao publicar.');
     }
   }
