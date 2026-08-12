@@ -8,7 +8,7 @@ import { HelpPopover } from '@/components/ui/HelpPopover';
 import { api, ApiError } from '@/lib/api';
 import { regexToTemplate, applyMask, isAllDigits } from '@/lib/mask';
 import { maskDocumento, validateDocumento, type DocKind } from '@/lib/documento';
-import { normalizeDateMode, validateDateClient, type DateMode, type DateLimit } from '@/lib/datafield';
+import { dateModeOfComponent, validateDateClient, type DateMode, type DateLimit } from '@/lib/datafield';
 import { uploadAttachment, parseAttachments, fetchDocumentOptions, generateDocument, type Attachment, type UploadContext } from '@/lib/upload';
 import { DatePickerField } from './DatePickerField';
 
@@ -53,7 +53,7 @@ function colSpan(c: Component): number {
 }
 
 function dateModeOf(component: Component): DateMode {
-  return normalizeDateMode(component.properties?.septemDateMode ?? component.subtype);
+  return dateModeOfComponent(component);
 }
 
 type OptionsMap = Record<string, { value: string; label: string }[]>;

@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { FormEditor } from '@bpmn-io/form-js';
 import emptySchema from '@/assets/empty-form.json';
+import { septemDatetimeEditorModule } from '@/components/form/editorDatetime';
 
 /** MIME usado no drag-and-drop dos cards da paleta para o canvas. */
 export const DND_TYPE = 'application/x-septem-field';
@@ -15,6 +16,14 @@ function applyNewFieldDefaults(editor: any, field: any) {
   if (field.type === 'datetime') {
     try { editor.get('modeling').editFormField(field, ['subtype'], 'datetime'); }
     catch { /* mantém o padrão da engine se a versão não aceitar subtype */ }
+    // O form-js nasce com `dateLabel: 'Date'` (inglês) e sem `label` — o que
+    // aparecia como "Date*" no canvas e deixava o campo SEM nome na execução
+    // (o ReactForm lê `label`). Nasce com os três em português, como o painel
+    // de configuração grava ao renomear.
+    for (const path of ['label', 'dateLabel', 'timeLabel']) {
+      try { editor.get('modeling').editFormField(field, [path], 'Data'); }
+      catch { /* propriedade não aceita nessa versão — segue */ }
+    }
   }
 }
 
@@ -64,7 +73,11 @@ export const FormBuilder = forwardRef<FormBuilderHandle, FormBuilderProps>(({ on
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const editor = new FormEditor({ container: containerRef.current } as any);
+    const editor = new FormEditor({
+      container: containerRef.current,
+      // Prévia do campo de data igual ao preenchimento (UM campo, 24h).
+      additionalModules: [septemDatetimeEditorModule],
+    } as any);
     editorRef.current = editor;
 
     // Liga a seleção do canvas ao nosso painel de campo (cockpit).

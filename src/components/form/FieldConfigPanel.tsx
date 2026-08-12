@@ -6,7 +6,7 @@ import { DataSourceSelect } from '@/components/modelador/fields/DataSourceSelect
 import { IconSearchPicker } from '@/components/ui/IconSearchPicker';
 import { slugify } from '@/lib/slugify';
 import { DOC_KIND_OPTIONS } from '@/lib/documento';
-import { DATE_MODE_OPTIONS, DATE_LIMIT_OPTIONS } from '@/lib/datafield';
+import { DATE_MODE_OPTIONS, DATE_LIMIT_OPTIONS, dateFieldLabel, dateModeOfComponent } from '@/lib/datafield';
 import { ExtensionPicker } from '@/components/form/ExtensionPicker';
 import { DocumentGenConfig, parseDocGen } from '@/components/form/DocumentGenConfig';
 import { useFormStore } from '@/stores/form';
@@ -100,11 +100,7 @@ export function FieldConfigPanel({ field, editField, masks }: {
   useEffect(() => {
     // O campo de data (form-js datetime) NÃO usa `label`: seu nome visível vem de
     // `dateLabel`/`timeLabel`. Semeia o draft a partir deles nesse caso.
-    setDraftLabel(
-      field?.type === 'datetime'
-        ? (field?.dateLabel ?? field?.timeLabel ?? field?.label ?? '')
-        : (field?.label ?? ''),
-    );
+    setDraftLabel(field?.type === 'datetime' ? dateFieldLabel(field) : (field?.label ?? ''));
     setDraftKey(field?.key ?? '');
     setHelpDraft(field?.properties?.septemHelpText ?? '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -308,7 +304,7 @@ export function FieldConfigPanel({ field, editField, masks }: {
                 onChange={(v) => merge('properties', { septemDocKind: v || undefined })} />
             )}
             {field.type === 'datetime' && (
-              <Select label="Tipo" value={props.septemDateMode ?? field.subtype ?? 'datetime'} options={DATE_MODE_OPTIONS}
+              <Select label="Tipo" value={dateModeOfComponent(field)} options={DATE_MODE_OPTIONS}
                 hint="Escolhe o seletor: data e hora, só data ou só hora."
                 onChange={(v) => {
                   // `subtype` controla o próprio form-js; a propriedade Septem é

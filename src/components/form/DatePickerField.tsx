@@ -8,6 +8,7 @@ import { Popover } from '@base-ui/react/popover';
 import type { Matcher } from 'react-day-picker';
 import { CalendarDays, Check, Clock3, X } from 'lucide-react';
 import { Calendar } from '@/components/ui/Calendar';
+import { DATE_PLACEHOLDER } from '@/lib/datafield';
 
 export type DateMode = 'date' | 'time' | 'datetime';
 export type DateLimit = '' | 'noPast' | 'noFuture';
@@ -276,7 +277,7 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
   const invalidReason = localError ? reasonText[localError] : undefined;
   const invalid = !!error || !!localError;
   const inputLabel = ariaLabel || (mode === 'time' ? 'Hora' : mode === 'date' ? 'Data' : 'Data e hora');
-  const placeholder = mode === 'time' ? 'HH:mm' : mode === 'date' ? 'DD/MM/YYYY' : 'DD/MM/YYYY HH:mm';
+  const placeholder = DATE_PLACEHOLDER[mode];
   const inputMinWidth = mode === 'datetime' ? 'min-w-[17ch]' : mode === 'date' ? 'min-w-[11ch]' : 'min-w-[6ch]';
   const inputClass = [
     `septem-date-picker-input h-10 w-0 flex-1 ${inputMinWidth} bg-white px-3 text-sm text-slate-800 outline-none`,
@@ -407,12 +408,26 @@ function TimeColumns({ hour, minute, onHour, onMinute, className = '' }: {
 }
 
 function TimeList({ label, values, selected, onSelect }: { label: string; values: string[]; selected: string; onSelect: (value: string) => void }) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const selectedRef = useRef<HTMLButtonElement>(null);
+
+  // Ao abrir, centraliza o valor atual na coluna. Sem isso, 18:45 nasce fora da
+  // área visível (24 horas / 60 minutos numa lista baixa) e parece não estar
+  // selecionado. Mexe só no scroll da COLUNA — `scrollIntoView` arrastaria a
+  // página junto quando o popover está perto do rodapé.
+  useEffect(() => {
+    const list = listRef.current;
+    const item = selectedRef.current;
+    if (!list || !item) return;
+    list.scrollTop = Math.max(0, item.offsetTop - (list.clientHeight - item.offsetHeight) / 2);
+  }, []);
+
   return (
     <div className="min-w-0">
       <p className="mb-1.5 px-1 text-xs font-semibold text-slate-500">{label}</p>
-      <div role="listbox" aria-label={label} className="max-h-28 space-y-0.5 overflow-y-auto overscroll-contain pr-1 sm:max-h-52">
+      <div ref={listRef} role="listbox" aria-label={label} className="max-h-28 space-y-0.5 overflow-y-auto overscroll-contain pr-1 sm:max-h-52">
         {values.map((value) => (
-          <button key={value} type="button" role="option" aria-selected={selected === value} onClick={() => onSelect(value)}
+          <button key={value} type="button" role="option" ref={selected === value ? selectedRef : undefined} aria-selected={selected === value} onClick={() => onSelect(value)}
             className={`flex h-9 w-full items-center justify-center rounded-md text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-slate-500 ${selected === value ? 'bg-slate-900 font-semibold text-white' : 'text-slate-700 hover:bg-slate-100'}`}>
             {value}
           </button>

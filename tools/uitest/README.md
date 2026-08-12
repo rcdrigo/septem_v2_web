@@ -33,6 +33,7 @@ Protection e a API passa a responder 500; reiniciar a API cura). Sequência segu
 | `servicos-categorias.mjs` | Modal “Nova requisição” (categorias, busca, cards e abertura em nova aba) e modal CRUD de categorias de processos |
 | `consultas-categorias.mjs` | Consultas agrupadas por categoria (lista própria de relatórios), filtro, cores, modal CRUD de categorias de relatórios |
 | `relatorio-fluxo-completo.mjs` | Fluxo real ponta-a-ponta: criar relatório pela UI escolhendo categoria → publicar → conferir card/cor em Consultas → limpar |
+| `campo-data-tipo.mjs` | Campo Data/Hora: no modelador o canvas mostra UM campo no formato do tipo (24h, nome em português) e anuncia a restrição; no preenchimento o calendário adapta (data / data+horas / só horas) e a restrição bloqueia exatamente o que foi configurado |
 
 ```bash
 cd tools/uitest && npm install

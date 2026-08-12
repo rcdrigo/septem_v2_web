@@ -28,6 +28,41 @@ export const DATE_LIMIT_OPTIONS = [
   { value: 'noFuture', label: 'Não permitir data no futuro' },
 ];
 
+/**
+ * Modo efetivo do componente. O editor grava `subtype` (propriedade do próprio
+ * form-js); versões anteriores gravavam só `properties.septemDateMode`. Fonte
+ * ÚNICA da regra — usada no canvas do modelador e no preenchimento, para os dois
+ * nunca divergirem.
+ */
+export function dateModeOfComponent(
+  component: { subtype?: string; properties?: Record<string, string | undefined> } | null | undefined,
+): DateMode {
+  return normalizeDateMode(component?.properties?.septemDateMode ?? component?.subtype);
+}
+
+/**
+ * Nome visível do campo de data. O form-js NÃO usa `label` no datetime: guarda o
+ * nome em `dateLabel`/`timeLabel`. Schemas antigos só têm esses dois.
+ */
+export function dateFieldLabel(
+  field: { label?: string; dateLabel?: string; timeLabel?: string } | null | undefined,
+): string {
+  return field?.label ?? field?.dateLabel ?? field?.timeLabel ?? '';
+}
+
+/** Formato exibido por modo — o MESMO no canvas do modelador e no preenchimento. */
+export const DATE_PLACEHOLDER: Record<DateMode, string> = {
+  datetime: 'DD/MM/YYYY HH:mm',
+  date: 'DD/MM/YYYY',
+  time: 'HH:mm',
+};
+
+/** Efeito da restrição em uma linha — o modelador vê no canvas o que configurou. */
+export const DATE_LIMIT_HINT: Record<Exclude<DateLimit, ''>, string> = {
+  noPast: 'Não permite data no passado.',
+  noFuture: 'Não permite data no futuro.',
+};
+
 /** Tipo equivalente do campo, mantido para consumidores legados. */
 export function inputTypeForDateMode(mode: DateMode | undefined): string {
   return mode === 'date' ? 'date' : mode === 'time' ? 'time' : 'datetime-local';
