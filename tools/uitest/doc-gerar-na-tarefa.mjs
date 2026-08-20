@@ -139,7 +139,7 @@ try {
     // ── modo FIXO ───────────────────────────────────────────────────
     const i1 = await api(token, '/api/v1/workflow/instances', 'POST', { key: keyFixo, data: { nome: `Joana ${rid}` } });
     const t1 = i1.body.tasks[0].id;
-    await page.goto(`${BASE}/tarefa/${t1}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/tasks/${t1}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('[data-testid=anexo-gerar]', { timeout: 15000 });
 
     check(await page.locator('[data-testid=anexo-input]').count() === 0,
@@ -196,7 +196,7 @@ try {
     // ── modo LISTA ──────────────────────────────────────────────────
     const i2 = await api(token, '/api/v1/workflow/instances', 'POST', { key: keyLista, data: { nome: `Rui ${rid}` } });
     const t2 = i2.body.tasks[0].id;
-    await page.goto(`${BASE}/tarefa/${t2}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/tasks/${t2}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('[data-testid=anexo-modelo]', { timeout: 15000 });
 
     check(await page.locator('[data-testid=anexo-input]').count() === 1,
@@ -222,7 +222,7 @@ try {
     if (t2b) {
       const negado = await api(token, `/api/v1/workflow/tasks/${t2b}/generate-document`, 'POST', { fieldKey: 'doc' });
       check(negado.status === 403, `[${view.name}] campo somente-leitura na tarefa: geração recusada (${negado.status})`);
-      await page.goto(`${BASE}/tarefa/${t2b}`, { waitUntil: 'networkidle' });
+      await page.goto(`${BASE}/tasks/${t2b}`, { waitUntil: 'networkidle' });
       await page.waitForTimeout(1500);
       check(await page.locator('[data-testid=anexo-gerar]').count() === 0,
         `[${view.name}] e a UI nem oferece o botão nessa tarefa`);

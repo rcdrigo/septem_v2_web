@@ -3,6 +3,7 @@ import { useExecutedTasks, type ExecutedTask } from '@/lib/api/execution';
 import { openTab } from '@/lib/nav';
 import { useViewMode, ViewToggle } from '@/pages/TarefasPage';
 import { TestBadge } from '@/components/execution/TestBadge';
+import { routes } from '@/lib/routes';
 
 /**
  * Geral › Tarefas executadas: tarefas que o usuário concluiu (não estão mais com
@@ -11,7 +12,7 @@ import { TestBadge } from '@/components/execution/TestBadge';
 export function TarefasExecutadasPage() {
   const tasks = useExecutedTasks();
   const [view, setView] = useViewMode();
-  const openReport = (id: string) => openTab(`/solicitacao/${id}`);
+  const openReport = (id: string) => openTab(routes.request(id));
   const empty = !tasks.isLoading && (tasks.data?.length ?? 0) === 0;
 
   return (

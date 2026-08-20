@@ -72,7 +72,7 @@ const login = async (page) => {
  * a aba "Processos" da unidade se alimenta.
  */
 async function definirUnidadeDoProcesso(page, rotuloUnidade) {
-  await page.goto(`${BASE}/processos/editar?key=${PROCESSO_KEY}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/flows/edit?key=${PROCESSO_KEY}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(2500);
   await page.locator('header button', { hasText: 'Configurações' }).click();
   await page.waitForTimeout(600);
@@ -112,7 +112,7 @@ try {
     const nome = `Secretaria de Teste ${uniq} (${view.name})`;
 
     // ── 1) Criar a unidade pela tela, com todos os campos novos ─────────────
-    await page.goto(BASE + '/admin/unidades', { waitUntil: 'networkidle' });
+    await page.goto(BASE + '/admin/org-units', { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Nova unidade raiz' }).click();
     await page.waitForSelector('[data-testid=form-unidade]');
 
@@ -163,7 +163,7 @@ try {
       `[${view.name}] o modelador grava a unidade responsável do processo (PUT ${salvo.status})`);
 
     // ── 3) Listagem: foto do titular + sigla em destaque + nome do titular ──
-    await page.goto(BASE + '/admin/unidades', { waitUntil: 'networkidle' });
+    await page.goto(BASE + '/admin/org-units', { waitUntil: 'networkidle' });
     await page.waitForSelector('[data-testid=unidade-linha]');
     const linha = page.locator('[data-testid=unidade-linha]', { hasText: sigla }).first();
     const texto = await linha.innerText();
@@ -225,11 +225,11 @@ try {
       ctx.waitForEvent('page', { timeout: 8000 }).catch(() => null),
       linha.locator('button[title="Abrir a unidade em nova aba"]').click(),
     ]);
-    check(!!popupDetalhe && popupDetalhe.url().includes(`/unidade?id=${criada.id}`),
+    check(!!popupDetalhe && popupDetalhe.url().includes(`/org-unit?id=${criada.id}`),
       `[${view.name}] clicar no card abre o detalhe em nova aba`);
     if (popupDetalhe) await popupDetalhe.close();
 
-    await page.goto(`${BASE}/unidade?id=${criada.id}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/org-unit?id=${criada.id}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('[data-testid=abas-unidade]');
     const detalhe = await page.locator('body').innerText();
     check(
@@ -296,7 +296,7 @@ try {
 
     // ── 6) EDITAR pela tela: o diálogo carrega o que existe e grava a mudança ─
     const sigla2 = `${sigla}X`;
-    await page.goto(BASE + '/admin/unidades', { waitUntil: 'networkidle' });
+    await page.goto(BASE + '/admin/org-units', { waitUntil: 'networkidle' });
     await page.waitForSelector('[data-testid=unidade-linha]');
 
     // Atrasa o GET do detalhe da unidade para o estado "carregando" ser DETERMINÍSTICO
@@ -356,7 +356,7 @@ try {
       `[${view.name}] a listagem já mostra a sigla nova`);
 
     // ── 7) Layout ──────────────────────────────────────────────────────────
-    await page.goto(`${BASE}/unidade?id=${criada.id}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/org-unit?id=${criada.id}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('[data-testid=abas-unidade]');
     const L = await page.evaluate(() => {
       const doc = document.documentElement;
@@ -372,7 +372,7 @@ try {
     // ── 8) "Área" virou "Unidade organizacional" no modelador ──────────────
     // Varre TEXTO + placeholder + label + title + aria-label: `innerText` não enxerga
     // placeholder, e foi assim que "Selecione a área" passou despercebido.
-    await page.goto(`${BASE}/processos/editar?key=${PROCESSO_KEY}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/flows/edit?key=${PROCESSO_KEY}`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(2500);
     const varrer = () =>
       page.evaluate(() => {

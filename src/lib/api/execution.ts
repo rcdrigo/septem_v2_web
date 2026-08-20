@@ -54,14 +54,36 @@ export type StartForm = {
   startTaskAlias?: string | null;
   startTaskSector?: string | null;
 };
-export function useProcessForm(key: string | null) {
-  return useQuery({ queryKey: ['workflow', 'process-form', key], queryFn: () => api.get<StartForm>(`/api/v1/workflow/process-definitions/${key}/form`), enabled: !!key });
+/**
+ * Formulário inicial do serviço. Com `homologation`, serve o formulário da versão EM
+ * HOMOLOGAÇÃO (Fase 5) — sem isso a simulação abriria o formulário de PRODUÇÃO e
+ * mandaria os dados para a versão de teste: o usuário veria o campo antigo e juraria
+ * que a homologação não funcionou.
+ */
+export function useProcessForm(key: string | null, homologation = false) {
+  return useQuery({
+    queryKey: ['workflow', 'process-form', key, homologation],
+    queryFn: () => api.get<StartForm>(
+      `/api/v1/workflow/process-definitions/${key}/form${homologation ? '?homologation=true' : ''}`),
+    enabled: !!key,
+  });
+}
+
+/** Existe versão em homologação para este processo? Decide se a tela pergunta a versão. */
+export function useHasHomologation(key: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ['workflow', 'process-form', key, 'has-homologation'],
+    queryFn: () => api.get<StartForm>(`/api/v1/workflow/process-definitions/${key}/form?homologation=true`)
+      .then((r) => !!r.formSchema)
+      .catch(() => false),
+    enabled: !!key && enabled,
+  });
 }
 
 export function useStartInstance() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { key: string; data?: unknown; isTest?: boolean }) => api.post<StartedInstance>('/api/v1/workflow/instances', body),
+    mutationFn: (body: { key: string; data?: unknown; isTest?: boolean; useHomologation?: boolean }) => api.post<StartedInstance>('/api/v1/workflow/instances', body),
     onSuccess: () => qc.invalidateQueries({ queryKey: execKeys.tasks }),
   });
 }
@@ -139,7 +161,17 @@ export type FieldChange = { changedAt: string; changedBy: string | null; imperso
 /** isStart: a tarefa nasceu do evento de início — na tramitação ela É o nó de abertura. */
 export type InstanceTask = { id: string; name: string | null; status: string; isStart?: boolean; assignee: string | null; completedBy: string | null; completedByImpersonator?: string | null; createdAt: string; completedAt: string | null; dueAt: string | null; action: string | null; justification?: string | null; fieldHistory?: FieldChange[] };
 export type ActiveTask = { name: string | null; assignee: string | null; startedAt?: string | null; dueAt: string | null };
-export type InstanceDetail = { id: string; number?: number; process: string | null; category?: string | null; flowKey?: string | null; requester?: string | null; status: string; isTest?: boolean; startedAt: string; endedAt: string | null; data: unknown; formSchema?: unknown; inboxHtml?: string | null; activeTask?: ActiveTask | null; tasks: InstanceTask[]; canEdit?: boolean; canCancel?: boolean; canDelete?: boolean; messages?: { count: number; canPost: boolean } };
+/** Ação administrativa registrada na tramitação (Fase 4). */
+export type InstanceAction = { action: string; justification: string; at: string; actor: string | null; onBehalfOf?: string | null; targetTaskName?: string | null; targetUser?: string | null };
+/** Opções dos modais — vêm PRONTAS do servidor; a tela não recalcula a regra. */
+export type ActionOptions = {
+  returnTargets: { taskBpmnId: string; name: string | null }[];
+  forwardTargets: { taskBpmnId: string; name: string | null }[];
+  reopenTargets: { taskBpmnId: string; name: string | null }[];
+  reassignCandidates: { id: string; name: string }[];
+  reassignSource: string | null;
+};
+export type InstanceDetail = { id: string; number?: number; process: string | null; category?: string | null; flowKey?: string | null; requester?: string | null; status: string; isTest?: boolean; startedAt: string; endedAt: string | null; data: unknown; formSchema?: unknown; inboxHtml?: string | null; activeTask?: ActiveTask | null; tasks: InstanceTask[]; actions?: InstanceAction[]; canEdit?: boolean; canCancel?: boolean; canDelete?: boolean; canReopen?: boolean; canReturn?: boolean; canForward?: boolean; canReassign?: boolean; messages?: { count: number; canPost: boolean } };
 export type InstancesParams = { q?: string; status?: string; mine?: boolean; page?: number; pageSize?: number };
 
 export function useInstances(params: InstancesParams) {
@@ -166,11 +198,45 @@ export function useUpdateInstance() {
   });
 }
 
+/** Cancelar agora EXIGE justificativa — a regra é do servidor (422 sem ela). */
 export function useCancelInstance() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.post<void>(`/api/v1/workflow/instances/${id}/cancel`, {}),
-    onSuccess: (_d, id) => { qc.invalidateQueries({ queryKey: ['workflow', 'instance', id] }); qc.invalidateQueries({ queryKey: ['workflow', 'instances'] }); },
+    mutationFn: ({ id, justification }: { id: string; justification: string }) =>
+      api.post<void>(`/api/v1/workflow/instances/${id}/cancel`, { justification }),
+    onSuccess: (_d, { id }) => { qc.invalidateQueries({ queryKey: ['workflow', 'instance', id] }); qc.invalidateQueries({ queryKey: ['workflow', 'instances'] }); },
+  });
+}
+
+/**
+ * Devolver / encaminhar / reabrir — a etapa de destino e a justificativa.
+ * As três compartilham o contrato; o que muda é a rota e o universo de etapas,
+ * decidido pelo SERVIDOR (ver useActionOptions).
+ */
+export function useMoveInstance(action: 'return' | 'forward' | 'reopen') {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, taskBpmnId, justification }: { id: string; taskBpmnId: string; justification: string }) =>
+      api.post<{ taskId: string; name: string | null }>(`/api/v1/workflow/instances/${id}/${action}`, { taskBpmnId, justification }),
+    onSuccess: (_d, { id }) => { qc.invalidateQueries({ queryKey: ['workflow', 'instance', id] }); qc.invalidateQueries({ queryKey: ['workflow', 'instances'] }); qc.invalidateQueries({ queryKey: ['workflow', 'tasks'] }); },
+  });
+}
+
+export function useReassignInstance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, userId, justification }: { id: string; userId: string; justification: string }) =>
+      api.post<{ taskId: string }>(`/api/v1/workflow/instances/${id}/reassign`, { userId, justification }),
+    onSuccess: (_d, { id }) => { qc.invalidateQueries({ queryKey: ['workflow', 'instance', id] }); qc.invalidateQueries({ queryKey: ['workflow', 'tasks'] }); },
+  });
+}
+
+/** Listas dos modais. Só busca quando o modal abre (`enabled`) — não pesa o relatório. */
+export function useActionOptions(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['workflow', 'instance', id, 'action-options'],
+    queryFn: () => api.get<ActionOptions>(`/api/v1/workflow/instances/${id}/action-options`),
+    enabled,
   });
 }
 

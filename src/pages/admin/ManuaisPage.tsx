@@ -15,6 +15,7 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
 import { openTab } from '@/lib/nav';
+import { routes } from '@/lib/routes';
 
 const AUDIENCE_OPTIONS = [
   { value: 'externo', label: 'Externo (público)' },
@@ -49,7 +50,7 @@ export function ManuaisPage() {
           <h1 className="text-lg font-semibold text-slate-900">Manuais</h1>
           <p className="mt-0.5 text-sm text-slate-500">Conteúdo do guia (Guide) por categoria, público e unidade.</p>
         </div>
-        <button type="button" data-testid="novo-manual" onClick={() => openTab(`/manual/nova${tab === 'tecnico' ? '?tecnico=1' : ''}`)}
+        <button type="button" data-testid="novo-manual" onClick={() => openTab(`${routes.manual('nova')}${tab === 'tecnico' ? '?tecnico=1' : ''}`)}
           className="inline-flex min-h-10 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-700">
           <Plus size={16} /> Novo manual
         </button>
@@ -80,7 +81,7 @@ export function ManuaisPage() {
                     {m.icon && <i className={m.icon} aria-hidden="true" />}<span className="truncate">{m.categoryName}</span>
                   </span>
                   <div className="flex shrink-0 gap-1">
-                    <button type="button" aria-label="Editar" onClick={() => openTab(`/manual/${m.id}`)} className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"><Pencil size={15} /></button>
+                    <button type="button" aria-label="Editar" onClick={() => openTab(routes.manual(m.id))} className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"><Pencil size={15} /></button>
                     <button type="button" aria-label="Excluir" onClick={() => askDelete(m)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"><Trash2 size={15} /></button>
                   </div>
                 </div>

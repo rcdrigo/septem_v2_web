@@ -139,7 +139,7 @@ try {
   page.on('pageerror', (e) => console.log('pageerror:', e.message.slice(0, 160)));
   await login(page);
 
-  await page.goto(`${BASE}/consultas/ver?key=${rkey}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/reports/view?key=${rkey}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('table', { timeout: 20000 });
 
   const total = await linhasVisiveis(page);
@@ -195,7 +195,7 @@ try {
   m.on('pageerror', (e) => console.log('pageerror(mobile):', e.message.slice(0, 160)));
   await login(m);
 
-  await m.goto(`${BASE}/consultas/ver?key=${rkey}`, { waitUntil: 'networkidle' });
+  await m.goto(`${BASE}/reports/view?key=${rkey}`, { waitUntil: 'networkidle' });
   await m.waitForSelector('table', { timeout: 20000 });
 
   await filtrar(m, 'recife');

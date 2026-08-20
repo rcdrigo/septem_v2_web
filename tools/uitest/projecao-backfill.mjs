@@ -181,7 +181,7 @@ const login = async (page) => {
 };
 
 const conferirTela = async (page, view) => {
-  await page.goto(`${BASE}/solicitacao/${escolhida}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/requests/${escolhida}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('h1', { timeout: 20000 });
   await page.waitForTimeout(1200);
   const texto = await page.innerText('body');

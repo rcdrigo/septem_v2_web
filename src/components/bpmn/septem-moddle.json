@@ -2,205 +2,576 @@
   "name": "Septem",
   "uri": "http://septem.app/schema/1.0/bpmn",
   "prefix": "septem",
-  "xml": { "tagAlias": "lowerCase" },
+  "xml": {
+    "tagAlias": "lowerCase"
+  },
   "types": [
     {
       "name": "Alias",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "value", "isAttr": true, "type": "String" }
+        {
+          "name": "value",
+          "isAttr": true,
+          "type": "String"
+        }
       ]
     },
     {
       "name": "Setor",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "value", "isAttr": true, "type": "String" }
+        {
+          "name": "value",
+          "isAttr": true,
+          "type": "String"
+        }
       ]
     },
     {
       "name": "Routines",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "preCreate", "isAttr": true, "type": "String" },
-        { "name": "postCreate", "isAttr": true, "type": "String" },
-        { "name": "preFinish", "isAttr": true, "type": "String" },
-        { "name": "postFinish", "isAttr": true, "type": "String" }
+        {
+          "name": "preCreate",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "postCreate",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "preFinish",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "postFinish",
+          "isAttr": true,
+          "type": "String"
+        }
       ]
     },
     {
       "name": "ActionButton",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "id", "isAttr": true, "type": "String" },
-        { "name": "label", "isAttr": true, "type": "String" },
-        { "name": "primaryColor", "isAttr": true, "type": "String" },
-        { "name": "textColor", "isAttr": true, "type": "String" },
-        { "name": "validateForm", "isAttr": true, "type": "Boolean", "default": true },
-        { "name": "needsReason", "isAttr": true, "type": "Boolean", "default": false },
-        { "name": "icon", "isAttr": true, "type": "String" },
-        { "name": "hint", "isAttr": true, "type": "String" }
+        {
+          "name": "id",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "label",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "primaryColor",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "textColor",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "validateForm",
+          "isAttr": true,
+          "type": "Boolean",
+          "default": true
+        },
+        {
+          "name": "needsReason",
+          "isAttr": true,
+          "type": "Boolean",
+          "default": false
+        },
+        {
+          "name": "icon",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "hint",
+          "isAttr": true,
+          "type": "String"
+        }
       ]
     },
     {
       "name": "ActionButtons",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "buttons", "isMany": true, "type": "ActionButton" }
+        {
+          "name": "buttons",
+          "isMany": true,
+          "type": "ActionButton"
+        }
       ]
     },
     {
       "name": "Signature",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "mode", "isAttr": true, "type": "String", "default": "none" },
-        { "name": "fields", "isAttr": true, "type": "String" }
+        {
+          "name": "mode",
+          "isAttr": true,
+          "type": "String",
+          "default": "none"
+        },
+        {
+          "name": "fields",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "required",
+          "isAttr": true,
+          "type": "Boolean",
+          "default": false
+        },
+        {
+          "name": "batch",
+          "isAttr": true,
+          "type": "Boolean",
+          "default": false
+        }
       ]
     },
     {
       "name": "ServiceSource",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "dataSourceRef", "isAttr": true, "type": "String" }
+        {
+          "name": "dataSourceRef",
+          "isAttr": true,
+          "type": "String"
+        }
       ]
     },
     {
       "name": "SubprocessConfig",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "processRef", "isAttr": true, "type": "String" },
-        { "name": "sync", "isAttr": true, "type": "Boolean", "default": true },
-        { "name": "copyValues", "isAttr": true, "type": "Boolean", "default": false },
-        { "name": "showParentMessages", "isAttr": true, "type": "Boolean", "default": false },
-        { "name": "multiInstanceGroupRef", "isAttr": true, "type": "String" }
+        {
+          "name": "processRef",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "sync",
+          "isAttr": true,
+          "type": "Boolean",
+          "default": true
+        },
+        {
+          "name": "copyValues",
+          "isAttr": true,
+          "type": "Boolean",
+          "default": false
+        },
+        {
+          "name": "showParentMessages",
+          "isAttr": true,
+          "type": "Boolean",
+          "default": false
+        },
+        {
+          "name": "multiInstanceGroupRef",
+          "isAttr": true,
+          "type": "String"
+        }
       ]
     },
     {
       "name": "EmailTemplate",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "templateRef", "isAttr": true, "type": "String" }
+        {
+          "name": "templateRef",
+          "isAttr": true,
+          "type": "String"
+        }
       ]
     },
     {
       "name": "TimerConfig",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "kind", "isAttr": true, "type": "String", "default": "untilDate" },
-        { "name": "mode", "isAttr": true, "type": "String", "default": "fixed" },
-        { "name": "value", "isAttr": true, "type": "String" },
-        { "name": "fieldRef", "isAttr": true, "type": "String" }
+        {
+          "name": "kind",
+          "isAttr": true,
+          "type": "String",
+          "default": "untilDate"
+        },
+        {
+          "name": "mode",
+          "isAttr": true,
+          "type": "String",
+          "default": "fixed"
+        },
+        {
+          "name": "value",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "fieldRef",
+          "isAttr": true,
+          "type": "String"
+        }
       ]
     },
     {
       "name": "MilestoneConfig",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "action", "isAttr": true, "type": "String", "default": "open" },
-        { "name": "name", "isAttr": true, "type": "String" }
+        {
+          "name": "action",
+          "isAttr": true,
+          "type": "String",
+          "default": "open"
+        },
+        {
+          "name": "name",
+          "isAttr": true,
+          "type": "String"
+        }
       ]
     },
     {
       "name": "ActorConfig",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "actorType", "isAttr": true, "type": "String", "default": "requester" },
-        { "name": "areaId", "isAttr": true, "type": "String" },
-        { "name": "positionId", "isAttr": true, "type": "String" },
-        { "name": "fieldRef", "isAttr": true, "type": "String" },
-        { "name": "dataSourceRef", "isAttr": true, "type": "String" }
+        {
+          "name": "actorType",
+          "isAttr": true,
+          "type": "String",
+          "default": "requester"
+        },
+        {
+          "name": "areaId",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "positionId",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "fieldRef",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "dataSourceRef",
+          "isAttr": true,
+          "type": "String"
+        }
       ]
     },
     {
       "name": "DeadlineConfig",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "respectWorkHours", "isAttr": true, "type": "Boolean", "default": false },
-        { "name": "sendReceiptMail", "isAttr": true, "type": "Boolean", "default": false },
-        { "name": "sendDeadlineMail", "isAttr": true, "type": "Boolean", "default": false },
-        { "name": "expiresIn", "isAttr": true, "type": "String" },
-        { "name": "expiresInFieldRef", "isAttr": true, "type": "String" }
+        {
+          "name": "respectWorkHours",
+          "isAttr": true,
+          "type": "Boolean",
+          "default": false
+        },
+        {
+          "name": "sendReceiptMail",
+          "isAttr": true,
+          "type": "Boolean",
+          "default": false
+        },
+        {
+          "name": "sendDeadlineMail",
+          "isAttr": true,
+          "type": "Boolean",
+          "default": false
+        },
+        {
+          "name": "expiresIn",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "expiresInFieldRef",
+          "isAttr": true,
+          "type": "String"
+        }
       ]
     },
     {
       "name": "DeadlineAlert",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "id", "isAttr": true, "type": "String" },
-        { "name": "kind", "isAttr": true, "type": "String", "default": "once" },
-        { "name": "trigger", "isAttr": true, "type": "String", "default": "beforeHours" },
-        { "name": "value", "isAttr": true, "type": "Integer" },
-        { "name": "intervalHours", "isAttr": true, "type": "Integer" }
+        {
+          "name": "id",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "kind",
+          "isAttr": true,
+          "type": "String",
+          "default": "once"
+        },
+        {
+          "name": "trigger",
+          "isAttr": true,
+          "type": "String",
+          "default": "beforeHours"
+        },
+        {
+          "name": "value",
+          "isAttr": true,
+          "type": "Integer"
+        },
+        {
+          "name": "intervalHours",
+          "isAttr": true,
+          "type": "Integer"
+        }
       ]
     },
     {
       "name": "DeadlineAlerts",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "alerts", "isMany": true, "type": "DeadlineAlert" }
+        {
+          "name": "alerts",
+          "isMany": true,
+          "type": "DeadlineAlert"
+        }
       ]
     },
     {
       "name": "FormRule",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "fieldRef", "isAttr": true, "type": "String" },
-        { "name": "operator", "isAttr": true, "type": "String", "default": "eq" },
-        { "name": "value", "isAttr": true, "type": "String" },
-        { "name": "connector", "isAttr": true, "type": "String" },
-        { "name": "open", "isAttr": true, "type": "Boolean" },
-        { "name": "close", "isAttr": true, "type": "Boolean" }
+        {
+          "name": "fieldRef",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "operator",
+          "isAttr": true,
+          "type": "String",
+          "default": "eq"
+        },
+        {
+          "name": "value",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "connector",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "open",
+          "isAttr": true,
+          "type": "Boolean"
+        },
+        {
+          "name": "close",
+          "isAttr": true,
+          "type": "Boolean"
+        }
       ]
     },
     {
       "name": "GatewayCondition",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "mode", "isAttr": true, "type": "String", "default": "formValues" },
-        { "name": "buttonId", "isAttr": true, "type": "String" },
-        { "name": "buttonConnector", "isAttr": true, "type": "String" },
-        { "name": "logic", "isAttr": true, "type": "String", "default": "all" },
-        { "name": "rules", "isMany": true, "type": "FormRule" }
+        {
+          "name": "mode",
+          "isAttr": true,
+          "type": "String",
+          "default": "formValues"
+        },
+        {
+          "name": "buttonId",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "buttonConnector",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "logic",
+          "isAttr": true,
+          "type": "String",
+          "default": "all"
+        },
+        {
+          "name": "rules",
+          "isMany": true,
+          "type": "FormRule"
+        }
       ]
     },
     {
       "name": "FormFieldEntry",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "fieldRef", "isAttr": true, "type": "String" },
-        { "name": "visibility", "isAttr": true, "type": "String", "default": "visible" },
-        { "name": "dataSourceRef", "isAttr": true, "type": "String" }
+        {
+          "name": "fieldRef",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "visibility",
+          "isAttr": true,
+          "type": "String",
+          "default": "visible"
+        },
+        {
+          "name": "dataSourceRef",
+          "isAttr": true,
+          "type": "String"
+        }
       ]
     },
     {
       "name": "FormFields",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "entries", "isMany": true, "type": "FormFieldEntry" }
+        {
+          "name": "entries",
+          "isMany": true,
+          "type": "FormFieldEntry"
+        }
       ]
     },
     {
       "name": "ProcessConfig",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "description", "isAttr": true, "type": "String" },
-        { "name": "documentationUrl", "isAttr": true, "type": "String" },
-        { "name": "icon", "isAttr": true, "type": "String" },
-        { "name": "inbox", "isAttr": true, "type": "String" },
-        { "name": "categoryId", "isAttr": true, "type": "String" },
-        { "name": "areaId", "isAttr": true, "type": "String" },
-        { "name": "status", "isAttr": true, "type": "String", "default": "draft" },
-        { "name": "allowMessages", "isAttr": true, "type": "Boolean", "default": true },
-        { "name": "allowCancel", "isAttr": true, "type": "Boolean", "default": true },
-        { "name": "allowAnonymous", "isAttr": true, "type": "Boolean", "default": false },
-        { "name": "accessRules", "isAttr": true, "type": "String" }
+        {
+          "name": "description",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "documentationUrl",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "icon",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "inbox",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "categoryId",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "areaId",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "isAttr": true,
+          "type": "String",
+          "default": "draft"
+        },
+        {
+          "name": "allowMessages",
+          "isAttr": true,
+          "type": "Boolean",
+          "default": true
+        },
+        {
+          "name": "allowCancel",
+          "isAttr": true,
+          "type": "Boolean",
+          "default": true
+        },
+        {
+          "name": "allowAnonymous",
+          "isAttr": true,
+          "type": "Boolean",
+          "default": false
+        },
+        {
+          "name": "accessRules",
+          "isAttr": true,
+          "type": "String"
+        }
       ]
     },
     {
       "name": "FormSchema",
-      "superClass": ["Element"],
+      "superClass": [
+        "Element"
+      ],
       "properties": [
-        { "name": "json", "type": "String", "isBody": true }
+        {
+          "name": "json",
+          "type": "String",
+          "isBody": true
+        }
       ]
     }
   ]

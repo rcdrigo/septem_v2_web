@@ -22,6 +22,7 @@ import {
   Workflow,
 } from 'lucide-react';
 import type { MenuByMode } from './types';
+import { routes } from '@/lib/routes';
 
 /**
  * Fonte única da árvore de navegação. Cada `perm` será resolvido contra
@@ -40,14 +41,14 @@ export const MENU: MenuByMode = {
           {
             kind: 'link',
             label: 'Dashboard',
-            to: '/dashboard',
+            to: routes.dashboard,
             icon: LayoutDashboard,
             visible: (s) => s.user?.hasDashboard ?? false,
           },
-          { kind: 'link', label: 'Tarefas', to: '/tarefas', icon: Inbox, badge: 'pendingTasks' },
-          { kind: 'link', label: 'Requisições', to: '/requisicoes', icon: ListChecks },
-          { kind: 'link', label: 'Consultas', to: '/consultas', icon: FileSearch },
-          { kind: 'link', label: 'Organograma', to: '/organograma', icon: Network },
+          { kind: 'link', label: 'Tarefas', to: routes.tasks, icon: Inbox, badge: 'pendingTasks' },
+          { kind: 'link', label: 'Requisições', to: routes.requests, icon: ListChecks },
+          { kind: 'link', label: 'Consultas', to: routes.reports, icon: FileSearch },
+          { kind: 'link', label: 'Organograma', to: routes.orgchart, icon: Network },
         ],
       },
       {
@@ -59,11 +60,11 @@ export const MENU: MenuByMode = {
             icon: Workflow,
             perm: 'workflow:read',
             children: [
-              { kind: 'link', label: 'Processos', to: '/admin/processos', icon: Workflow },
+              { kind: 'link', label: 'Processos', to: routes.adminFlows, icon: Workflow },
               // Categorias não têm mais página própria: modal "Categorias" em Admin › Processos.
-              { kind: 'link', label: 'Modelos de e-mails', to: '/admin/modelos-email', icon: Mail },
-              { kind: 'link', label: 'Modelos de documentos', to: '/admin/modelos-doc', icon: FileStack },
-              { kind: 'link', label: 'Fontes de dados', to: '/admin/fontes-dados', icon: Database },
+              { kind: 'link', label: 'Modelos de e-mails', to: routes.adminEmailTemplates, icon: Mail },
+              { kind: 'link', label: 'Modelos de documentos', to: routes.adminDocumentTemplates, icon: FileStack },
+              { kind: 'link', label: 'Fontes de dados', to: routes.adminDataSources, icon: Database },
             ],
           },
           {
@@ -72,10 +73,10 @@ export const MENU: MenuByMode = {
             icon: BarChart3,
             perm: 'reports:read',
             children: [
-              { kind: 'link', label: 'Relatórios', to: '/admin/relatorios', icon: FileSearch },
+              { kind: 'link', label: 'Relatórios', to: routes.adminReports, icon: FileSearch },
               // Categorias não têm mais página própria: modal "Categorias" em Admin › Relatórios.
-              { kind: 'link', label: 'Dashboards', to: '/admin/dashboards', icon: BarChart3 },
-              { kind: 'link', label: 'Fontes de dados', to: '/admin/fontes-dados?scope=report', icon: Database },
+              { kind: 'link', label: 'Dashboards', to: routes.adminDashboards, icon: BarChart3 },
+              { kind: 'link', label: 'Fontes de dados', to: `${routes.adminDataSources}?scope=report`, icon: Database },
             ],
           },
           {
@@ -84,13 +85,13 @@ export const MENU: MenuByMode = {
             icon: ShieldCheck,
             perm: 'admin:settings',
             children: [
-              { kind: 'link', label: 'Parâmetros do sistema', to: '/admin/parametros', icon: SlidersHorizontal },
-              { kind: 'link', label: 'Manuais', to: '/admin/manuais', icon: BookOpen },
-              { kind: 'link', label: 'Usuários', to: '/admin/usuarios', icon: Users },
-              { kind: 'link', label: 'Unidades organizacionais', to: '/admin/unidades', icon: Building2 },
-              { kind: 'link', label: 'Posições', to: '/admin/posicoes', icon: UserCog },
-              { kind: 'link', label: 'Perfis de acesso', to: '/admin/perfis', icon: ShieldCheck },
-              { kind: 'link', label: 'Logs', to: '/admin/logs', icon: ScrollText },
+              { kind: 'link', label: 'Parâmetros do sistema', to: routes.adminSettings, icon: SlidersHorizontal },
+              { kind: 'link', label: 'Manuais', to: routes.adminManuals, icon: BookOpen },
+              { kind: 'link', label: 'Usuários', to: routes.adminUsers, icon: Users },
+              { kind: 'link', label: 'Unidades organizacionais', to: routes.adminOrgUnits, icon: Building2 },
+              { kind: 'link', label: 'Posições', to: routes.adminPositions, icon: UserCog },
+              { kind: 'link', label: 'Perfis de acesso', to: routes.adminProfiles, icon: ShieldCheck },
+              { kind: 'link', label: 'Logs', to: routes.adminLogs, icon: ScrollText },
             ],
           },
         ],
@@ -98,7 +99,7 @@ export const MENU: MenuByMode = {
     ],
     footer: [
       { kind: 'action', label: 'Personificar', icon: ArrowLeftRight, action: 'impersonate', perm: 'users:impersonate' },
-      { kind: 'link', label: 'Suporte', to: '/suporte', icon: LifeBuoy },
+      { kind: 'link', label: 'Suporte', to: routes.support, icon: LifeBuoy },
       { kind: 'action', label: 'Sair', icon: LogOut, action: 'logout' },
     ],
   },
@@ -108,14 +109,14 @@ export const MENU: MenuByMode = {
     main: [
       {
         items: [
-          { kind: 'link', label: 'Tarefas', to: '/tarefas', icon: Inbox, badge: 'pendingTasks' },
-          { kind: 'link', label: 'Requisições', to: '/requisicoes', icon: ListChecks },
-          { kind: 'link', label: 'Organograma', to: '/organograma', icon: FolderTree },
+          { kind: 'link', label: 'Tarefas', to: routes.tasks, icon: Inbox, badge: 'pendingTasks' },
+          { kind: 'link', label: 'Requisições', to: routes.requests, icon: ListChecks },
+          { kind: 'link', label: 'Organograma', to: routes.orgchart, icon: FolderTree },
         ],
       },
     ],
     footer: [
-      { kind: 'link', label: 'Suporte', to: '/suporte', icon: LifeBuoy },
+      { kind: 'link', label: 'Suporte', to: routes.support, icon: LifeBuoy },
       { kind: 'action', label: 'Sair', icon: LogOut, action: 'logout' },
     ],
   },

@@ -58,7 +58,7 @@ try {
 
     const inst = await api(token, '/api/v1/workflow/instances', 'POST', { key, data: {} });
     const taskId = inst.body.tasks[0].id;
-    await page.goto(`${BASE}/tarefa/${taskId}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/tasks/${taskId}`, { waitUntil: 'networkidle' });
     // No mobile os botões de conclusão ficam atrás do acionador "Botões de conclusão".
     const trigger = page.getByRole('button', { name: 'Botões de conclusão' });
     await page.waitForTimeout(800);
@@ -103,7 +103,7 @@ try {
   const page = await ctx.newPage();
   await login(page);
   try {
-    await page.goto(`${BASE}/processos/editar?key=${rtKey}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/flows/edit?key=${rtKey}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('[data-element-id="T005"]', { state: 'attached', timeout: 20000 });
     await page.locator('[data-element-id="T005"]').click();
     await page.waitForTimeout(800);

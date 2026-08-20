@@ -14,7 +14,7 @@ await page.click('button[type=submit]');
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
 // abre o modelador e vai DIRETO para Tarefas × Campos (sem abrir Formulário)
-await page.goto('http://localhost:5173/processos/editar?key=teste_condicoes_ui', { waitUntil: 'networkidle' });
+await page.goto('http://localhost:5173/flows/edit?key=teste_condicoes_ui', { waitUntil: 'networkidle' });
 await page.waitForSelector('[data-element-id="T005"]', { timeout: 20000 });
 await page.waitForTimeout(600);
 await page.locator('header button', { hasText: 'Campos' }).click();

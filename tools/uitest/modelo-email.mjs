@@ -34,7 +34,7 @@ try {
   await page.fill('input[type=password]', 'admin123');
   await page.click('button[type=submit]');
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
-  await page.goto(BASE + '/admin/modelos-email', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/admin/email-templates', { waitUntil: 'networkidle' });
   await page.waitForSelector('table', { timeout: 15000 });
 
   // (2) EDITAR → o corpo carrega no editor.

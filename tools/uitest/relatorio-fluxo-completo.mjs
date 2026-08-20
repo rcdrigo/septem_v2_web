@@ -21,7 +21,7 @@ await page.click('button[type=submit]');
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
 // ── Fluxo real: criar relatório pela UI escolhendo a categoria ───────────────
-await page.goto(BASE + '/admin/relatorios', { waitUntil: 'networkidle' });
+await page.goto(BASE + '/admin/reports', { waitUntil: 'networkidle' });
 await page.locator('button', { hasText: 'Novo relatório' }).click();
 await page.waitForSelector('[role=dialog] form#report-form', { timeout: 5000 });
 await page.fill('[role=dialog] form input:first-of-type', NAME);
@@ -54,7 +54,7 @@ check(comboText?.trim() === 'Financeiro', `categoria persistida no relatório: "
 await page.keyboard.press('Escape');
 
 // ── Consultas: o novo relatório entra no grupo Financeiro com a cor ──────────
-await page.goto(BASE + '/consultas', { waitUntil: 'networkidle' });
+await page.goto(BASE + '/reports', { waitUntil: 'networkidle' });
 await page.waitForTimeout(500);
 const fin = await page.evaluate(() => {
   const secs = [...document.querySelectorAll('section')];
@@ -68,7 +68,7 @@ check(fin.btnColor === 'rgb(14, 116, 144)', `botão Abrir com a cor da categoria
 await page.screenshot({ path: `${OUT}/consultas-fluxo-completo.png` });
 
 // limpeza: inativa o relatório criado (volta ao estado anterior)
-await page.goto(BASE + '/admin/relatorios', { waitUntil: 'networkidle' });
+await page.goto(BASE + '/admin/reports', { waitUntil: 'networkidle' });
 await page.locator('tr', { hasText: NAME }).locator('button[title="Inativar"]').click();
 await page.locator('button', { hasText: 'Inativar' }).last().click();
 await page.waitForTimeout(600);

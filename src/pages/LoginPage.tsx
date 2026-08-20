@@ -54,9 +54,20 @@ export function LoginPage() {
   const [trustDevice, setTrustDevice] = useState(false);
   const [novaSenha, setNovaSenha] = useState('');
 
+  // "Não recebeu o e-mail?" — o servidor permite 1 envio por minuto. Este contador é
+  // só conveniência: quem burlar a tela leva 429 do backend do mesmo jeito.
+  const [esperaReenvio, setEsperaReenvio] = useState(0);
+  const [reenviando, setReenviando] = useState(false);
+
   useEffect(() => {
     if (status === 'authenticated') navigate(returnUrl, { replace: true });
   }, [status, navigate, returnUrl]);
+
+  useEffect(() => {
+    if (esperaReenvio <= 0) return;
+    const t = setTimeout(() => setEsperaReenvio((v) => v - 1), 1000);
+    return () => clearTimeout(t);
+  }, [esperaReenvio]);
 
   function limparFluxo() {
     setCode('');
@@ -149,11 +160,44 @@ export function LoginPage() {
       // Resposta idêntica exista ou não a conta — não entregamos quais contas existem.
       setMaskedEmail(r.maskedEmail ?? '');
       limparFluxo();
+      setEsperaReenvio(60);
       setStep('redefinir');
-    } catch {
+    } catch (err) {
+      // Já havia um envio no último minuto: cai direto na tela do código com a espera
+      // que o SERVIDOR informou — mandar o usuário de volta seria pior.
+      if (err instanceof ApiError && (err.body as { error?: string })?.error === 'too_many_requests') {
+        const body = err.body as { retryAfterSeconds?: number; maskedEmail?: string | null };
+        setMaskedEmail(body.maskedEmail ?? '');
+        limparFluxo();
+        setEsperaReenvio(body.retryAfterSeconds ?? 60);
+        setStep('redefinir');
+        return;
+      }
       toast.error('Não foi possível enviar o código.');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function reenviarCodigo() {
+    if (esperaReenvio > 0 || reenviando) return;
+    setReenviando(true);
+    setAviso(null);
+    try {
+      await forgotPassword(identifier);
+      setEsperaReenvio(60);
+      toast.success('Enviamos outro código.');
+    } catch (err) {
+      // A autoridade é o servidor: se ele disser que ainda falta tempo, a tela obedece.
+      if (err instanceof ApiError && (err.body as { error?: string })?.error === 'too_many_requests') {
+        const faltam = (err.body as { retryAfterSeconds?: number }).retryAfterSeconds ?? 60;
+        setEsperaReenvio(faltam);
+        setAviso(`Aguarde ${faltam} segundo${faltam === 1 ? '' : 's'} para pedir outro código.`);
+        return;
+      }
+      toast.error('Não foi possível reenviar o código.');
+    } finally {
+      setReenviando(false);
     }
   }
 
@@ -373,6 +417,27 @@ export function LoginPage() {
 
               <form onSubmit={redefinir} className="mt-8 space-y-5" data-testid="form-redefinir">
                 <CampoCodigo value={code} onChange={setCode} />
+
+                <div className="-mt-2 text-sm">
+                  {esperaReenvio > 0 ? (
+                    <span className="text-slate-500" data-testid="reenvio-espera">
+                      Não recebeu o e-mail? Você poderá enviar novamente em {esperaReenvio}s.
+                    </span>
+                  ) : (
+                    <span className="text-slate-500">
+                      Não recebeu o e-mail?{' '}
+                      <button
+                        type="button"
+                        onClick={reenviarCodigo}
+                        disabled={reenviando}
+                        data-testid="reenviar-codigo"
+                        className="font-medium text-cyan-700 underline underline-offset-2 hover:text-cyan-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700 disabled:cursor-not-allowed disabled:opacity-55"
+                      >
+                        {reenviando ? 'Enviando…' : 'Clique aqui para enviar novamente'}
+                      </button>
+                    </span>
+                  )}
+                </div>
 
                 <Campo label="Nova senha" icon={Lock}>
                   <input

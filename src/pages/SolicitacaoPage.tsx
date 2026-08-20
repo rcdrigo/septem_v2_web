@@ -5,10 +5,11 @@ import { useDocumentTitle } from '@/lib/use-document-title';
 import { useSessionStore } from '@/stores/session';
 import { InstanceReport, StatusPill } from './InstanciasPage';
 import { TestBadge } from '@/components/execution/TestBadge';
+import { routes } from '@/lib/routes';
 
 /**
  * Relatório/acompanhamento de uma instância em tela cheia (rota
- * /solicitacao/:instanceId, fora do AppShell — sem menus). Aberto em nova aba
+ * /requests/:instanceId, fora do AppShell — sem menus). Aberto em nova aba
  * a partir das listas e da conclusão de tarefa.
  */
 export function SolicitacaoPage() {
@@ -27,7 +28,7 @@ export function SolicitacaoPage() {
   if (!instanceId) return null;
   if (status === 'unauthenticated') {
     const returnUrl = `${location.pathname}${location.search}`;
-    return <Navigate to={`/login?returnUrl=${encodeURIComponent(returnUrl)}`} replace />;
+    return <Navigate to={`${routes.login}?returnUrl=${encodeURIComponent(returnUrl)}`} replace />;
   }
   return (
     <div className="flex h-screen flex-col bg-slate-100">

@@ -21,7 +21,7 @@ async function login(page) {
 }
 
 async function abrirAba(page) {
-  await page.goto(BASE + '/admin/parametros', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/admin/settings', { waitUntil: 'networkidle' });
   await page.getByRole('tab', { name: 'Arquivos' }).click();
   await page.waitForSelector('[data-testid=form-arquivos]', { timeout: 10000 });
 }

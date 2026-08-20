@@ -16,6 +16,7 @@ import { processMessagesExtra } from '@/components/execution/ProcessMessages';
 import { renderIcon } from '@/lib/icon-catalog';
 import { queryClient } from '@/lib/queryClient';
 import '@/styles/task-index.css';
+import { routes } from '@/lib/routes';
 
 type TaskStatusFilter = 'pendentes' | 'concluidas';
 const ALL_PROCESSES = 'todos';
@@ -43,7 +44,7 @@ export function TarefasPage() {
   const tasks = useTasks(status, filters);
   const [view, setView] = useViewMode();
   const [panelOpen, setPanelOpen] = useState(false);
-  const openTask = (task: TaskListItem) => openTab(status === 'concluidas' ? `/solicitacao/${task.executionId}` : `/tarefa/${task.id}`);
+  const openTask = (task: TaskListItem) => openTab(status === 'concluidas' ? routes.request(task.executionId) : routes.task(task.id));
   const processes = tasks.data?.processes ?? [];
   const items = tasks.data?.items ?? [];
 
@@ -515,7 +516,7 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
         processNumber={task.data?.processNumber}
         isTest={task.data?.isTest}
         onBack={onClose}
-        onOpenReport={task.data?.executionId ? () => openTab(`/solicitacao/${task.data!.executionId}`) : undefined}
+        onOpenReport={task.data?.executionId ? () => openTab(routes.request(task.data!.executionId)) : undefined}
       />
 
       {/* Cada grupo renderiza seu próprio card (sem container único). */}
@@ -579,7 +580,7 @@ export function CompletionScreen({ next, executionId, onClose, kind = 'task' }: 
 }) {
   useEffect(() => {
     if (!next) return;
-    const t = setTimeout(() => navTo(`/tarefa/${next}`), 2500);
+    const t = setTimeout(() => navTo(routes.task(next)), 2500);
     return () => clearTimeout(t);
   }, [next]);
 
@@ -600,7 +601,7 @@ export function CompletionScreen({ next, executionId, onClose, kind = 'task' }: 
             <div className="mt-5 flex justify-center gap-2">
               <button type="button" onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Fechar</button>
               {executionId && (
-                <button type="button" onClick={() => openTab(`/solicitacao/${executionId}`)}
+                <button type="button" onClick={() => openTab(routes.request(executionId))}
                   className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700">
                   <ExternalLink size={14} /> Acompanhar processo
                 </button>

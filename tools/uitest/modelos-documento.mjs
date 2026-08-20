@@ -46,7 +46,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
     await page.fill('input[type=password]', 'admin123');
     await page.click('button[type=submit]');
     await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
-    await page.goto(BASE + '/admin/modelos-doc', { waitUntil: 'networkidle' });
+    await page.goto(BASE + '/admin/document-templates', { waitUntil: 'networkidle' });
     await page.waitForSelector('h1:has-text("Modelos de documentos")', { timeout: 15000 });
 
     // A página real substituiu o stub ("Fase 7" era o placeholder).
@@ -388,7 +388,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
         // O ponto central do :44: campo de LISTA DINÂMICA sai com a chave já agrupada.
         check(/itens\.valor_item/.test(txtCampos), '[web] campo de lista dinâmica sai com a chave AGRUPADA (itens.valor_item)');
         check(/lista dinâmica/i.test(txtCampos), '[web] a aba sinaliza que o campo vem de lista dinâmica');
-        await abaCampos.screenshot({ path: `${OUT}/campos-servico.png` });
+        await abaCampos.screenshot({ path: `${OUT}/service-fields.png` });
         await abaCampos.close();
       }
       await page.locator('[role=dialog] button', { hasText: 'Fechar' }).click().catch(() => {});

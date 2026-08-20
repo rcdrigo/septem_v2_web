@@ -4,6 +4,7 @@ import { Building2, FileStack, FileText, Mail, MapPin, Phone, Printer, Users, Wo
 import { useOrgUnit, type OrgPerson } from '@/lib/api/org-units';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { openTab } from '@/lib/nav';
+import { routes } from '@/lib/routes';
 
 type AbaKey = 'processos' | 'manuais' | 'documentos' | 'usuarios';
 
@@ -143,7 +144,7 @@ function Processos({ itens }: { itens: { id: string; key: string; name: string; 
         <li key={p.id} className="flex flex-wrap items-center gap-2 py-2.5">
           <button
             type="button"
-            onClick={() => openTab(`processos/editar?key=${p.key}`)}
+            onClick={() => openTab(`${routes.flowEdit}?key=${p.key}`)}
             className="text-sm font-medium text-slate-800 hover:underline print:no-underline"
           >
             {p.name}

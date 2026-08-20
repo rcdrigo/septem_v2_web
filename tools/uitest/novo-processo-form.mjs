@@ -24,7 +24,7 @@ try {
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
   // (A) Processo EXISTENTE ainda carrega o próprio formulário (regressão).
-  await page.goto(`${BASE}/processos/editar?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/flows/edit?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-element-id="G1"]', { timeout: 20000 });
   await irFormulario(page);
   const existenteCarrega = await page.evaluate(() => document.body.innerText.includes('Nome do requisitante'));
@@ -37,7 +37,7 @@ try {
   });
 
   // (B) Processo NOVO (sem ?key=): NÃO deve exibir o form fantasma do localStorage.
-  await page.goto(`${BASE}/processos/editar`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/flows/edit`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.djs-palette', { timeout: 15000 });
   await page.waitForTimeout(1500);
   await irFormulario(page);

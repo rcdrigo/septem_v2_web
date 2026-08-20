@@ -155,7 +155,7 @@ const medir = (page) => page.evaluate(() => {
 
 /** Preenche e envia o formulário do serviço; devolve o id da execução criada. */
 const iniciarPelaTela = async (page, view, sufixo, itens) => {
-  await page.goto(`${BASE}/servico/${pkey}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/services/${pkey}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid=lista-dinamica]', { timeout: 20000 });
 
   await page.locator('main input[type=text]').nth(0).fill(`Solicitante ${sufixo}`);
@@ -240,7 +240,7 @@ try {
   const taskId = (det.body?.tasks ?? []).find((t) => t.status === 'pendente')?.id;
   check(!!taskId, '[web] tarefa pendente encontrada para o rascunho');
 
-  await page.goto(`${BASE}/tarefa/${taskId}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/tasks/${taskId}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid=lista-dinamica]', { timeout: 20000 });
   await page.locator('main input[type=text]').nth(1).fill('Observacao editada');
   await acao(page, 'Salvar');
@@ -278,7 +278,7 @@ try {
   await conferirParidade(execId, 'web', 'após concluir');
 
   // ── 2.10 editar pelo relatório da solicitação ────────────────────────────
-  await page.goto(`${BASE}/solicitacao/${execId}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/requests/${execId}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('h1', { timeout: 20000 });
   await page.waitForTimeout(1200);
   const mRel = await medir(page);
@@ -318,7 +318,7 @@ try {
 
   const detM = await api(token, `/api/v1/workflow/instances/${execMob}`);
   const taskM = (detM.body?.tasks ?? []).find((t) => t.status === 'pendente')?.id;
-  await m.goto(`${BASE}/tarefa/${taskM}`, { waitUntil: 'networkidle' });
+  await m.goto(`${BASE}/tasks/${taskM}`, { waitUntil: 'networkidle' });
   await m.waitForSelector('[data-testid=lista-dinamica]', { timeout: 20000 });
   const mt = await medir(m);
   check(!mt.overflows, '[mobile] tela da tarefa sem overflow horizontal');

@@ -12,6 +12,8 @@ import {
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
+import { routes } from '@/lib/routes';
+import { openTab } from '@/lib/nav';
 
 /**
  * Admin › Processos — IF2. Lista real de `/api/v1/workflow/process-definitions`
@@ -21,7 +23,7 @@ import { ApiError } from '@/lib/api';
 /** Abre o modelador em aba própria (sem menu lateral). `key` omitido = novo processo. */
 function openModeler(key?: string) {
   const qs = key ? `?key=${encodeURIComponent(key)}` : '';
-  window.open(`${import.meta.env.BASE_URL}processos/editar${qs}`, '_blank', 'noopener');
+  openTab(`${routes.flowEdit}${qs}`);
 }
 
 export function ProcessosPage() {
@@ -259,9 +261,12 @@ function EmptyState({ onNew, hasFilters }: { onNew: () => void; hasFilters: bool
 
 function StatusBadge({ status }: { status: ProcessStatus }) {
   const map: Record<ProcessStatus, { label: string; cls: string }> = {
-    draft:     { label: 'Rascunho',  cls: 'bg-amber-100 text-amber-700' },
-    published: { label: 'Publicado', cls: 'bg-emerald-100 text-emerald-700' },
-    inactive:  { label: 'Inativo',   cls: 'bg-slate-200 text-slate-600' },
+    draft:        { label: 'Rascunho',       cls: 'bg-amber-100 text-amber-700' },
+    // Fase 5: âmbar mais forte que o rascunho — é uma versão de teste de algo que JÁ
+    // está no ar, e confundi-la com produção é o erro caro desta tela.
+    homologation: { label: 'Em homologação', cls: 'bg-orange-100 text-orange-800' },
+    published:    { label: 'Publicado',      cls: 'bg-emerald-100 text-emerald-700' },
+    inactive:     { label: 'Inativo',        cls: 'bg-slate-200 text-slate-600' },
   };
   const v = map[status];
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${v.cls}`}>{v.label}</span>;

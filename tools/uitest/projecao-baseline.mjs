@@ -156,7 +156,7 @@ const medir = (page) => page.evaluate(() => {
 
 /** Percurso completo do usuário no formulário do serviço, com lista dinâmica. */
 const iniciarPelaTela = async (page, view, sufixo) => {
-  await page.goto(`${BASE}/servico/${pkey}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/services/${pkey}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid=lista-dinamica]', { timeout: 20000 });
 
   await page.locator('main input[type=text]').first().fill(`Solicitante ${sufixo}`);
@@ -242,7 +242,7 @@ try {
     `[E3] a lista dinâmica NÃO multiplica as linhas do relatório (${bloco?.rows?.length} linhas para ${run.body?.totalRows} execuções)`);
 
   // Viewer na tela (web)
-  await page.goto(`${BASE}/consultas/ver?key=${rkey}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/reports/view?key=${rkey}`, { waitUntil: 'networkidle' });
   await page.waitForSelector(`text=Baseline ${rid}`, { timeout: 20000 });
   await page.waitForTimeout(800);
   const lw = await medir(page);
@@ -259,7 +259,7 @@ try {
   await login(m);
   await iniciarPelaTela(m, 'mobile', 'mob');
 
-  await m.goto(`${BASE}/consultas/ver?key=${rkey}`, { waitUntil: 'networkidle' });
+  await m.goto(`${BASE}/reports/view?key=${rkey}`, { waitUntil: 'networkidle' });
   await m.waitForSelector(`text=Baseline ${rid}`, { timeout: 20000 });
   await m.waitForTimeout(800);
   const lm = await medir(m);

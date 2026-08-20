@@ -5,9 +5,10 @@ import { useReport, type GlobalFilterDef } from '@/lib/api/reports';
 import { ReportRunViewer } from '@/components/reports/ReportViewer';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { useSessionStore } from '@/stores/session';
+import { routes } from '@/lib/routes';
 
 /**
- * Consulta (relatório publicado) em ABA PRÓPRIA — link direto /consultas/ver?key=,
+ * Consulta (relatório publicado) em ABA PRÓPRIA — link direto /reports/view?key=,
  * aberta a partir do catálogo de Consultas (F7.1). Antes o viewer era embutido na
  * página do catálogo; agora é uma aba dedicada (compartilhável, imprimível).
  */
@@ -23,8 +24,8 @@ export function ConsultaViewPage() {
     catch { return []; }
   }, [detail.data?.definitionJson]);
 
-  if (!token) return <Navigate to="/login" replace />;
-  if (!key) return <Navigate to="/consultas" replace />;
+  if (!token) return <Navigate to={routes.login} replace />;
+  if (!key) return <Navigate to={routes.reports} replace />;
 
   return (
     <div className="flex h-screen flex-col">

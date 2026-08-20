@@ -21,7 +21,7 @@ async function login(page) {
 }
 
 async function abrirAbaEmail(page) {
-  await page.goto(BASE + '/admin/parametros', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/admin/settings', { waitUntil: 'networkidle' });
   await page.getByRole('tab', { name: 'E-mail' }).click();
   await page.waitForSelector('[data-testid=form-email]', { timeout: 10000 });
 }

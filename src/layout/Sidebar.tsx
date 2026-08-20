@@ -186,8 +186,8 @@ const rowBase = 'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-mediu
 /**
  * Ativo = mesmo pathname E mesma query string (comparadas de forma canônica).
  * Itens irmãos podem compartilhar o pathname e divergir só na query — ex.:
- * "Fontes de dados" de Processos (/admin/fontes-dados) vs de Relatórios
- * (/admin/fontes-dados?scope=report). O NavLink ignora a query no match, então
+ * "Fontes de dados" de Processos (/admin/data-sources) vs de Relatórios
+ * (/admin/data-sources?scope=report). O NavLink ignora a query no match, então
  * ambos acenderiam juntos.
  */
 function isMenuLinkActive(to: string, pathname: string, search: string): boolean {
@@ -233,7 +233,7 @@ function GroupRow({ group }: { group: MenuGroup }) {
   const hasActiveChild = group.children.some((c) => isMenuLinkActive(c.to, pathname, search));
   const [open, setOpen] = useState(hasActiveChild);
   // Abre (nunca fecha) quando um filho fica ativo após o mount — ex.: chegar por
-  // redirect (/admin/processos/categorias → /admin/processos) ou por outro link.
+  // redirect (/admin/flows/categories → /admin/flows) ou por outro link.
   useEffect(() => {
     if (hasActiveChild) setOpen(true);
   }, [hasActiveChild]);
@@ -255,7 +255,7 @@ function GroupRow({ group }: { group: MenuGroup }) {
           {group.children.map((child) => {
             const Ci = child.icon;
             // Match manual (pathname + query exatos) em vez do isActive do NavLink:
-            // resolve tanto irmãos por prefixo (/admin/processos vs .../categorias)
+            // resolve tanto irmãos por prefixo (/admin/flows vs .../categories)
             // quanto irmãos que divergem só na query (?scope=report).
             const active = isMenuLinkActive(child.to, pathname, search);
             return (

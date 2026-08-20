@@ -132,7 +132,7 @@ const login = async (page) => {
 };
 
 const abrirViewer = async (page) => {
-  await page.goto(`${BASE}/consultas/ver?key=${rkey}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/reports/view?key=${rkey}`, { waitUntil: 'networkidle' });
   await page.waitForSelector(`text=Tabela ${rid}`, { timeout: 25000 });
   await page.waitForTimeout(1000);
 };

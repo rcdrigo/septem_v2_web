@@ -36,7 +36,7 @@ try {
   await page.click('button[type=submit]');
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
-  await page.goto(`${BASE}/relatorios/editar?key=${key}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/reports/edit?key=${key}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('text=Origem dos dados', { timeout: 15000 });
   await page.locator('nav button', { hasText: 'Blocos' }).click();
   await page.waitForTimeout(400);

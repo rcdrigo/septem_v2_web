@@ -89,7 +89,7 @@ function readCachedTenant(): Tenant | null {
     const raw = localStorage.getItem(TENANT_KEY);
     if (!raw) return null;
     const tenant = JSON.parse(raw) as Tenant;
-    // Abas standalone (/servico, /tarefa) não disparam bootstrap: sem aplicar aqui,
+    // Abas standalone (/services, /tasks) não disparam bootstrap: sem aplicar aqui,
     // as meta tags de compartilhamento só sairiam certas depois do fetch.
     applyTenantMeta(tenant);
     return tenant;

@@ -53,7 +53,7 @@ for (const view of [{ name: 'web', width: 1280, height: 900 }, { name: 'mobile',
   if (mobile) await page.keyboard.press('Escape'); // fecha o menu off-canvas
 
   // ── Itens 15-18: card de requisições ──
-  await page.goto(BASE + '/requisicoes', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/requests', { waitUntil: 'networkidle' });
   // Garante a visão em cards (no web o default pode ser tabela).
   const cardsToggle = page.locator('button[title="Cards"]');
   if (await cardsToggle.count()) await cardsToggle.first().click();
@@ -89,7 +89,7 @@ for (const view of [{ name: 'web', width: 1280, height: 900 }, { name: 'mobile',
 
   // ── Item 11: header do relatório sem "Categoria:" ──
   if (instanceId) {
-    await page.goto(BASE + `/solicitacao/${instanceId}`, { waitUntil: 'networkidle' });
+    await page.goto(BASE + `/requests/${instanceId}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('h1', { timeout: 12000 });
     const header = await page.locator('header').first().innerText();
     check(!/Categoria:/i.test(header), `[${view.name}] header do relatório SEM "Categoria:" (item 11) — "${header.replace(/\n/g, ' | ').slice(0, 80)}"`);
@@ -104,7 +104,7 @@ for (const view of [{ name: 'web', width: 1280, height: 900 }, { name: 'mobile',
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
   await login(page);
-  await page.goto(BASE + '/requisicoes', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/requests', { waitUntil: 'networkidle' });
   const tabelaToggle = page.locator('button[title="Tabela"]');
   if (await tabelaToggle.count()) await tabelaToggle.first().click();
   await page.waitForSelector('table', { timeout: 12000 });

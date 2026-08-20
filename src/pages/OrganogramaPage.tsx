@@ -2,12 +2,13 @@ import { Building2 } from 'lucide-react';
 import { useOrgUnitsTree, useOrgUnitsFlat } from '@/lib/api/org-units';
 import { openTab } from '@/lib/nav';
 import { OrgUnitTree } from '@/components/org-units/OrgUnitTree';
+import { routes } from '@/lib/routes';
 
 /**
  * Organograma — visão somente-leitura da hierarquia de unidades organizacionais.
  * Usa o MESMO layout de Configurações › Unidades (lista em card, com sigla, nome,
  * avatar e titular), porém sem as ações de gestão (criar/editar/excluir). Clicar
- * numa unidade abre o detalhamento (`/unidade?id=`) em aba própria.
+ * numa unidade abre o detalhamento (`/org-unit?id=`) em aba própria.
  */
 export function OrganogramaPage() {
   const tree = useOrgUnitsTree();
@@ -39,7 +40,7 @@ export function OrganogramaPage() {
             variant="read"
             cardTestId="organograma-linha"
             ariaLabel="Organograma de unidades organizacionais"
-            onOpen={(node) => openTab(`unidade?id=${node.id}`)}
+            onOpen={(node) => openTab(`${routes.orgUnit}?id=${node.id}`)}
           />
         )}
       </div>

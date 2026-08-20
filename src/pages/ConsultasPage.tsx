@@ -12,6 +12,8 @@ import {
 import { FavoriteButton } from '@/components/discovery/FavoriteButton';
 import { useFavorites, useToggleFavorite } from '@/lib/api/discovery';
 import { toast } from '@/stores/toast';
+import { routes } from '@/lib/routes';
+import { openTab } from '@/lib/nav';
 
 /**
  * Geral › Consultas (item 8): catálogo de relatórios publicados — mesma lógica
@@ -30,7 +32,7 @@ export function ConsultasPage() {
 
   // F7.1: a consulta abre em ABA PRÓPRIA (link direto), não mais embutida aqui.
   function openReport(key: string) {
-    window.open(`${import.meta.env.BASE_URL}consultas/ver?key=${encodeURIComponent(key)}`, '_blank', 'noopener');
+    openTab(`${routes.reportView}?key=${encodeURIComponent(key)}`);
   }
 
   async function toggle(key: string) {

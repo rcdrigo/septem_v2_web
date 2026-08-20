@@ -66,7 +66,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   check(state.semMock, `[${vp.n}] sem a mensagem "(mock)"`);
 
   // rota protegida não abre mais sem logar
-  await page.goto(BASE + '/admin/usuarios', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/admin/users', { waitUntil: 'networkidle' });
   await page.waitForTimeout(800);
   check(await page.evaluate(() => location.pathname.includes('/login')), `[${vp.n}] rota protegida barrada após sair`);
   await page.screenshot({ path: `${OUT}/fase0-logout-${vp.n}.png` });
@@ -114,7 +114,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await login(page);
 
   // inicia o serviço pela UI
-  await page.goto(BASE + '/servico/tres_tarefas_bug', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/services/tres_tarefas_bug', { waitUntil: 'networkidle' });
   await page.waitForSelector('h1', { timeout: 15000 });
   await page.waitForTimeout(800);
   await acionarConclusao(page);
@@ -122,7 +122,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   check(await page.evaluate(() => document.body.innerText.includes('sucesso')), `[${vp.n}] item3: instância iniciada`);
 
   // auto-navega para a tarefa 1 → concluir
-  await page.waitForURL(/\/tarefa\//, { timeout: 15000 });
+  await page.waitForURL(/\/tasks\//, { timeout: 15000 });
   await page.waitForSelector('text=tarefa 1', { timeout: 15000 });
   await page.waitForTimeout(1000);
   await acionarConclusao(page);
@@ -135,7 +135,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   // deve seguir para a TAREFA 2 (auto-navegação ou lista)
   let naT2 = /tarefa 2/i.test(txt);
   if (!naT2) {
-    await page.goto(BASE + '/tarefas', { waitUntil: 'networkidle' });
+    await page.goto(BASE + '/tasks', { waitUntil: 'networkidle' });
     await page.waitForTimeout(1200);
     naT2 = await page.evaluate(() => /tarefa 2/i.test(document.body.innerText));
   }
@@ -151,7 +151,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await login(page);
 
   // (a) INÍCIO → "Solicitação iniciada com sucesso"
-  await page.goto(BASE + '/servico/tres_tarefas_bug', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/services/tres_tarefas_bug', { waitUntil: 'networkidle' });
   await page.waitForSelector('h1', { timeout: 15000 });
   await page.waitForTimeout(800);
   await acionarConclusao(page);
@@ -162,7 +162,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await page.screenshot({ path: `${OUT}/fase0-item4-${vp.n}-inicio.png` });
 
   // (b) TAREFA → "Tarefa concluída com sucesso"
-  await page.waitForURL(/\/tarefa\//, { timeout: 15000 });
+  await page.waitForURL(/\/tasks\//, { timeout: 15000 });
   await page.waitForSelector('text=tarefa 1', { timeout: 15000 });
   await page.waitForTimeout(1000);
   await acionarConclusao(page);
@@ -175,7 +175,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
 }
 
 // ══ ITEM 5 — o histórico de executadas inclui o que o usuário iniciou ═══════
-// A página avulsa /tarefas-executadas virou a aba "Concluídas" dentro de /tarefas.
+// A página avulsa /tarefas-executadas virou a aba "Concluídas" dentro de /tasks.
 // O que importa (item 5) continua o mesmo: iniciar um serviço registra a tarefa de
 // início como executada POR MIM e ela aparece no histórico.
 for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }]) {
@@ -184,14 +184,14 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await login(page);
 
   // inicia um serviço (a tarefa de início é executada por MIM)
-  await page.goto(BASE + '/servico/tres_tarefas_bug', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/services/tres_tarefas_bug', { waitUntil: 'networkidle' });
   await page.waitForSelector('h1', { timeout: 15000 });
   await page.waitForTimeout(800);
   await acionarConclusao(page);
   await page.waitForTimeout(2500);
 
   // o histórico de concluídas deve mostrar o processo que acabei de iniciar
-  await page.goto(BASE + '/tarefas', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/tasks', { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: 'Concluídas' }).click();
   await page.waitForTimeout(2000);
   const txt = await page.evaluate(() => document.body.innerText);
@@ -222,7 +222,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 2 });
   const page = await ctx.newPage();
   await login(page);
-  await page.goto(BASE + '/admin/processos', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/admin/flows', { waitUntil: 'networkidle' });
   await page.waitForTimeout(1200);
 
   // (a) processo COM solicitações → excluir é BLOQUEADO com explicação
@@ -263,13 +263,13 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
 
   await login(page);
   const rotas = [
-    ['/tarefas', /Tarefas/i],
-    ['/consultas', /Consultas/i],
-    ['/admin/processos', /Processos/i],
-    ['/admin/relatorios', /Relatórios/i],
-    ['/processos/editar?key=tres_tarefas_bug', /Tres Tarefas Bug/i],   // modelador: nome do processo
-    ['/servico/tres_tarefas_bug', /tarefa 1/i],                        // início: nome da TAREFA de início (ver servico-nome-inicio)
-    ['/relatorios/editar?key=painel_de_despesas', /Painel de Despesas/i], // builder: nome do relatório
+    ['/tasks', /Tarefas/i],
+    ['/reports', /Consultas/i],
+    ['/admin/flows', /Processos/i],
+    ['/admin/reports', /Relatórios/i],
+    ['/flows/edit?key=tres_tarefas_bug', /Tres Tarefas Bug/i],   // modelador: nome do processo
+    ['/services/tres_tarefas_bug', /tarefa 1/i],                        // início: nome da TAREFA de início (ver servico-nome-inicio)
+    ['/reports/edit?key=painel_de_despesas', /Painel de Despesas/i], // builder: nome do relatório
   ];
   for (const [rota, esperado] of rotas) {
     await page.goto(BASE + rota, { waitUntil: 'networkidle' });

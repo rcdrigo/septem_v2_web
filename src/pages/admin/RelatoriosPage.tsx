@@ -22,6 +22,8 @@ import { Combobox } from '@/components/ui/Combobox';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
+import { routes } from '@/lib/routes';
+import { openTab } from '@/lib/nav';
 
 /**
  * Admin › Relatórios (item 8). Espelha Admin › Processos: lista com
@@ -149,7 +151,7 @@ export function RelatoriosPage() {
                     <td className="px-4 py-2 text-slate-500">{formatDate(r.updatedAt)}</td>
                     <td className="px-4 py-2">
                       <div className="flex justify-end gap-1">
-                        <button type="button" onClick={() => window.open(`${import.meta.env.BASE_URL}relatorios/editar?key=${encodeURIComponent(r.key)}`, '_blank', 'noopener')} className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800" title="Abrir no builder (blocos, filtros, preview)"><LayoutDashboard size={15} /></button>
+                        <button type="button" onClick={() => openTab(`${routes.reportEdit}?key=${encodeURIComponent(r.key)}`)} className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800" title="Abrir no builder (blocos, filtros, preview)"><LayoutDashboard size={15} /></button>
                         <button type="button" onClick={() => setEditKey(r.key)} className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800" title="Editar dados básicos"><Pencil size={15} /></button>
                         {r.status === 'draft' && <button type="button" onClick={() => publish(r)} className="rounded p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700" title="Publicar"><Send size={15} /></button>}
                         {r.status !== 'inactive' && <button type="button" onClick={() => inactivate(r)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="Inativar"><Archive size={15} /></button>}

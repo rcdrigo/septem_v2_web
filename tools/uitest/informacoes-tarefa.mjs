@@ -60,7 +60,7 @@ try {
   await page.click('button[type=submit]');
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
-  await page.goto(`${BASE}/processos/editar?key=${key}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/flows/edit?key=${key}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(3500);
   // Seleciona a tarefa (clique no centro do shape).
   const box = await page.locator('[data-element-id="T"]').boundingBox();
@@ -120,7 +120,7 @@ try {
   check(/septem:setor\b[^>]*value="Jurídico"/i.test(startBlock), '[web] round-trip: o Setor do início sobrevive ao Salvar');
 
   // Processo SEM raias → o Setor mostra o estado vazio.
-  await page.goto(`${BASE}/processos/editar?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/flows/edit?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-element-id="T005"]', { timeout: 20000 });
   await page.locator('[data-element-id="T005"]').click();
   await page.waitForTimeout(800);

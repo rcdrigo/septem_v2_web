@@ -21,6 +21,7 @@ import { Field, TextInput, TextArea, Select } from '@/components/ui/Field';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
+import { routes } from '@/lib/routes';
 
 const TYPE_LABEL: Record<DataSourceType, string> = { fixed: 'Fixa', sql: 'SQL', api: 'API (JSON)' };
 
@@ -34,7 +35,7 @@ export function FontesDadosPage() {
   const scope: DataSourceScope = params.get('scope') === 'report' ? 'report' : 'process';
   const list = useDataSourcesList(scope);
   // Criar/editar abre em nova aba (sem menus).
-  const openEditor = (id?: string) => openTab(`/fonte-dados/${id ?? 'nova'}?scope=${scope}`);
+  const openEditor = (id?: string) => openTab(`${routes.dataSource(id ?? 'nova')}?scope=${scope}`);
   const del = useDeleteDataSource();
 
   async function askDelete(d: DataSourceListItem) {

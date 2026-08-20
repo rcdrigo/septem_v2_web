@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Briefcase, Globe } from 'lucide-react';
 import { useSessionStore, type AccessMode } from '@/stores/session';
+import { routes } from '@/lib/routes';
 
 /**
  * Alterna entre layout Interno e Externo. Só renderiza para usuários internos
@@ -18,7 +19,7 @@ export function AccessModeToggle() {
     if (mode === accessMode) return;
     setAccessMode(mode);
     // Layout externo não compartilha as rotas de admin — leva para o índice operacional.
-    if (mode === 'externo') navigate('/tarefas');
+    if (mode === 'externo') navigate(routes.tasks);
   }
 
   const options: { mode: AccessMode; label: string; icon: typeof Briefcase }[] = [

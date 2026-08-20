@@ -73,7 +73,7 @@ try {
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
   // ═══ F7.5 — REMOVER coluna (efeito de verdade) ═══
-  await page.goto(`${BASE}/relatorios/editar?key=${pkeyReport}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/reports/edit?key=${pkeyReport}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('nav button:has-text("Origem dos dados")', { timeout: 15000 });
   await page.locator('nav button', { hasText: 'Origem dos dados' }).click();
   await page.waitForTimeout(800);
@@ -102,7 +102,7 @@ try {
   await dlg.getByRole('button', { name: 'Cancelar' }).click();
 
   // ═══ F7.8 — filtro de INTERVALO numérico (efeito de verdade) ═══
-  await page.goto(`${BASE}/consultas/ver?key=${dkey}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/reports/view?key=${dkey}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('text=Nums', { timeout: 15000 });
   await page.waitForTimeout(1000);
   const table = page.locator('section:has-text("Nums")');
@@ -123,7 +123,7 @@ try {
   check(soUm === 1, `[F7.8-EFEITO] min=20 e max=20 deixa só a linha 20 (${soUm})`);
 
   // ═══ F7.11 — sparkline de verdade (3 meses → renderiza + tendência) ═══
-  await page.goto(`${BASE}/consultas/ver?key=${skey}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/reports/view?key=${skey}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('text=Evolucao', { timeout: 15000 });
   await page.waitForTimeout(1200);
   check(/\b16\b/.test(await page.locator('body').innerText()), '[F7.11] KPI mostra o total (soma 5+8+3=16)');

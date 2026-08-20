@@ -6,6 +6,7 @@ import { Dialog } from '@/components/ui/Dialog';
 import { useSessionStore } from '@/stores/session';
 import { useUsersList } from '@/lib/api/users';
 import { toast } from '@/stores/toast';
+import { routes } from '@/lib/routes';
 
 /** Bloco de identidade do usuário no topo da sidebar, com dropdown de conta. */
 export function SidebarUser() {
@@ -28,7 +29,7 @@ export function SidebarUser() {
       navigate('/', { replace: true });
     } catch {
       toast.error('Não foi possível voltar ao seu usuário. Encerrando a sessão.');
-      try { await logout(); } finally { navigate('/login', { replace: true }); }
+      try { await logout(); } finally { navigate(routes.login, { replace: true }); }
     } finally {
       setLeaving(false);
     }
@@ -42,7 +43,7 @@ export function SidebarUser() {
 
   async function endSession() {
     await logout();
-    navigate('/login', { replace: true });
+    navigate(routes.login, { replace: true });
   }
 
   return (
@@ -81,10 +82,10 @@ export function SidebarUser() {
       >
         {(close) => (
           <>
-            <MenuItem onClick={() => { close(); navigate('/me'); }}>
+            <MenuItem onClick={() => { close(); navigate(routes.me); }}>
               <User size={15} /> Meus dados
             </MenuItem>
-            <MenuItem onClick={() => { close(); navigate('/me/senha'); }}>
+            <MenuItem onClick={() => { close(); navigate(routes.me); }}>
               <KeyRound size={15} /> Mudar senha
             </MenuItem>
             {/* Segunda porta de saída da personificação: o banner pode ficar fora

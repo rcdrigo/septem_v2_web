@@ -6,7 +6,7 @@ await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
 await page.fill('input[type=password]', 'admin123');
 await page.click('button[type=submit]');
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
-await page.goto('http://localhost:5173/tarefas', { waitUntil: 'networkidle' });
+await page.goto('http://localhost:5173/tasks', { waitUntil: 'networkidle' });
 await page.waitForTimeout(1500);
 await page.screenshot({ path: 'debug-tarefas.png', fullPage: true });
 console.log((await page.evaluate(() => document.body.innerText.slice(0, 600))).replace(/\n/g, ' | '));

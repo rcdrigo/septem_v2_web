@@ -13,7 +13,7 @@ await page.fill('input[type=password]', 'admin123');
 await page.click('button[type=submit]');
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
-await page.goto('http://localhost:5173/processos/editar?key=teste_condicoes_ui', { waitUntil: 'networkidle' });
+await page.goto('http://localhost:5173/flows/edit?key=teste_condicoes_ui', { waitUntil: 'networkidle' });
 await page.waitForSelector('[data-element-id="T005"]', { timeout: 20000 });
 await page.waitForTimeout(1000);
 // vai direto para a aba Formulário

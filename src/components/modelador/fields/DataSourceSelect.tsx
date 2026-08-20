@@ -2,6 +2,7 @@ import { Pencil, Plus, RefreshCw } from 'lucide-react';
 import { Combobox } from '@/components/ui/Combobox';
 import { useDataSources } from '@/lib/api/catalog';
 import { openTab } from '@/lib/nav';
+import { routes } from '@/lib/routes';
 
 /**
  * Seletor de fonte de dados (T1) — combobox pesquisável. Grava o id (publicId);
@@ -58,7 +59,7 @@ export function DataSourceSelect({
         {showNew && (
           <button
             type="button"
-            onClick={() => openTab(`/fonte-dados/nova?scope=${scope}`)}
+            onClick={() => openTab(`${routes.dataSource('nova')}?scope=${scope}`)}
             className="inline-flex w-fit items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800"
           >
             <Plus size={12} /> Nova fonte de dados
@@ -67,7 +68,7 @@ export function DataSourceSelect({
         {canEdit && (
           <button
             type="button"
-            onClick={() => openTab(`/fonte-dados/${value}?scope=${scope}`)}
+            onClick={() => openTab(`${routes.dataSource(value)}?scope=${scope}`)}
             className="inline-flex w-fit items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800"
           >
             <Pencil size={12} /> Editar fonte selecionada

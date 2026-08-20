@@ -2,7 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 /** draft = rascunho, published = publicado, inactive = inativo (soft-delete). */
-export type ProcessStatus = 'draft' | 'published' | 'inactive';
+/**
+ * `homologation` (Fase 5): versão em teste de um processo já publicado. Só a simulação
+ * a executa; produção continua na versão `published` até alguém publicar.
+ */
+export type ProcessStatus = 'draft' | 'homologation' | 'published' | 'inactive';
 
 export type ProcessListItem = {
   key: string;

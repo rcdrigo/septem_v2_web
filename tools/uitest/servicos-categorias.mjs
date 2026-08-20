@@ -20,7 +20,7 @@ await page.click('button[type=submit]');
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
 // ── 1. Nova requisição: modal, categorias, busca e abertura ──────────────────
-await page.goto(BASE + '/tarefas', { waitUntil: 'networkidle' });
+await page.goto(BASE + '/tasks', { waitUntil: 'networkidle' });
 await page.getByRole('button', { name: 'Nova requisição' }).click();
 await page.waitForSelector('[role=dialog]');
 await page.waitForTimeout(500);
@@ -80,7 +80,7 @@ const [servicePage] = await Promise.all([
   page.locator('[role=dialog] .new-request-card').first().click(),
 ]);
 await servicePage.waitForLoadState('domcontentloaded');
-check(new URL(servicePage.url()).pathname.includes('/servico/'), `serviço abriu em nova aba: ${servicePage.url()}`);
+check(new URL(servicePage.url()).pathname.includes('/services/'), `serviço abriu em nova aba: ${servicePage.url()}`);
 check(await page.locator('[role=dialog]').count() === 0, 'modal fecha após iniciar serviço');
 await servicePage.close();
 
@@ -99,7 +99,7 @@ await page.getByRole('button', { name: 'Fechar' }).click();
 await page.setViewportSize({ width: 1280, height: 900 });
 
 // ── 2. Menu: Categorias sumiu do grupo Processos ─────────────────────────────
-await page.goto(BASE + '/admin/processos', { waitUntil: 'networkidle' });
+await page.goto(BASE + '/admin/flows', { waitUntil: 'networkidle' });
 await page.waitForTimeout(400);
 const menuItems = await page.evaluate(() => {
   const groups = [...document.querySelectorAll('aside li')];

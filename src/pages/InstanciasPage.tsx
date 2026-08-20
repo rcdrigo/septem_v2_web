@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { AlertCircle, ArrowRight, CalendarCheck2, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, Clock, History, LayoutDashboard, ListTree, Pencil, Play, Printer, RotateCw, Save, Search, Trash2, User, Workflow, X, XCircle } from 'lucide-react';
-import { useInstances, useInstance, useCancelInstance, useDeleteInstance, useUpdateInstance, type InstanceListItem, type InstanceTask, type FieldChange } from '@/lib/api/execution';
+import { AlertCircle, ArrowRight, CalendarCheck2, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, Clock, History, LayoutDashboard, ListTree, Pencil, Play, Printer, RotateCw, Save, Search, Trash2, User, Workflow, X } from 'lucide-react';
+import { useInstances, useInstance, useDeleteInstance, useUpdateInstance, type InstanceListItem, type InstanceTask, type FieldChange } from '@/lib/api/execution';
 import { openTab } from '@/lib/nav';
 import { Dialog } from '@/components/ui/Dialog';
 import { ReactForm, type ReactFormHandle } from '@/components/form/ReactForm';
@@ -10,6 +10,8 @@ import { toast } from '@/stores/toast';
 import { renderIcon } from '@/lib/icon-catalog';
 import { useViewMode, ViewToggle } from './TarefasPage';
 import { ProcessMessages, processMessagesExtra } from '@/components/execution/ProcessMessages';
+import { routes } from '@/lib/routes';
+import { AcoesDoProcesso } from '@/components/execution/AcoesDoProcesso';
 
 const STATUS = { em_andamento: { label: 'Em andamento', cls: 'bg-sky-100 text-sky-700' }, concluido: { label: 'Concluído', cls: 'bg-emerald-100 text-emerald-700' }, cancelado: { label: 'Cancelado', cls: 'bg-rose-100 text-rose-700' } } as Record<string, { label: string; cls: string }>;
 const TASK_STATUS = { pendente: 'bg-amber-100 text-amber-700', concluida: 'bg-emerald-100 text-emerald-700' } as Record<string, string>;
@@ -35,7 +37,7 @@ export function InstanciasPage({ title = 'Requisições', initialStatus = 'em_an
   const page = Math.max(1, Number(params.get('page')) || 1);
   const [view, setView] = useViewMode('septem.requests.view');
   const pageSize = 20;
-  const openReport = (id: string) => openTab(`/solicitacao/${id}`);
+  const openReport = (id: string) => openTab(routes.request(id));
   const list = useInstances({ q: q || undefined, status: status === 'todos' ? undefined : status, mine: true, page, pageSize });
   const total = list.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -95,7 +97,6 @@ function RequestError({ onRetry }: { onRetry: () => void }) { return <div role="
 export function InstanceReport({ id, messageAccess }: { id: string; messageAccess?: string | null }) {
   const inst = useInstance(id, messageAccess);
   const update = useUpdateInstance();
-  const cancel = useCancelInstance();
   const del = useDeleteInstance();
   const formRef = useRef<ReactFormHandle>(null);
   const [editing, setEditing] = useState(false);
@@ -108,7 +109,7 @@ export function InstanceReport({ id, messageAccess }: { id: string; messageAcces
   const d = inst.data;
   const data = (d.data ?? {}) as Record<string, unknown>;
   const canEditForm = !!d.canEdit && !!d.formSchema; // edição inline só quando há schema
-  const hasActions = !!d.canCancel || !!d.canDelete;
+  const hasActions = !!d.canCancel || !!d.canDelete || !!d.canReturn || !!d.canForward || !!d.canReassign || !!d.canReopen;
   const showMessages = (d.messages?.count ?? 0) > 0 || d.messages?.canPost === true;
   const messageExtra = showMessages ? processMessagesExtra({ executionId: id, originType: 'report', messageAccess }) : null;
 
@@ -118,11 +119,6 @@ export function InstanceReport({ id, messageAccess }: { id: string; messageAcces
     if (Object.keys(res.errors).length > 0) { toast.error('Corrija os campos destacados antes de salvar.'); return; }
     try { await update.mutateAsync({ id, data: res.data }); toast.success('Alterações salvas.'); setEditing(false); }
     catch { toast.error('Não foi possível salvar as alterações.'); }
-  }
-  async function doCancel() {
-    setActionsOpen(false);
-    if (!(await confirm({ title: 'Cancelar processo', message: 'A instância será marcada como cancelada. Continuar?' }))) return;
-    try { await cancel.mutateAsync(id); toast.success('Processo cancelado.'); } catch { toast.error('Não foi possível cancelar.'); }
   }
   async function doDelete() {
     setActionsOpen(false);
@@ -157,11 +153,10 @@ export function InstanceReport({ id, messageAccess }: { id: string; messageAcces
             {actionsOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setActionsOpen(false)} />
-                <div className="absolute right-0 z-20 mt-1 w-48 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-lg">
-                  {d.canCancel && (
-                    <button type="button" onClick={doCancel}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-amber-700 hover:bg-amber-50"><XCircle size={14} /> Cancelar processo</button>
-                  )}
+                <div className="absolute right-0 z-20 mt-1 w-64 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+                  {/* Ações administrativas (Fase 4): cada uma abre um modal com
+                      justificativa obrigatória. O menu fecha ao escolher. */}
+                  <AcoesDoProcesso id={id} d={d} onFeito={() => setActionsOpen(false)} />
                   {d.canDelete && (
                     <button type="button" onClick={doDelete}
                       className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-rose-700 hover:bg-rose-50"><Trash2 size={14} /> Excluir processo</button>
@@ -268,14 +263,48 @@ function KeyValueData({ data }: { data: Record<string, unknown> }) {
   );
 }
 
+/** Rótulos das ações administrativas na tramitação. */
+const ROTULO_ACAO: Record<string, string> = {
+  cancel: 'Processo cancelado',
+  reopen: 'Processo reaberto',
+  return: 'Devolvido para tarefa já executada',
+  forward: 'Encaminhado para nova tarefa',
+  reassign: 'Processo realocado',
+};
+
 function TramitacaoTab({ d }: { d: import('@/lib/api/execution').InstanceDetail }) {
   const [hist, setHist] = useState<InstanceTask | null>(null);
   // A tarefa do evento de início É a abertura do processo: ela ganha o selo "início"
   // e o nó sintético só entra quando não há tarefa de início (instâncias legadas),
   // senão o mesmo evento apareceria duas vezes seguidas.
   const temTarefaDeInicio = d.tasks.some((t) => t.isStart);
+  const acoes = d.actions ?? [];
   return (
     <>
+      {/* Card À PARTE das ações administrativas, como a spec pede — separado do
+          histórico de tarefas porque são intervenções DE FORA do fluxo. */}
+      {acoes.length > 0 && (
+        <div data-testid="card-acoes" className="mb-4 rounded-md border border-amber-200 bg-amber-50/60 p-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-800">
+            Ações administrativas
+          </p>
+          <ul className="space-y-2">
+            {[...acoes].reverse().map((a, i) => (
+              <li key={i} className="text-sm text-slate-700">
+                <span className="font-medium text-slate-900">{ROTULO_ACAO[a.action] ?? a.action}</span>
+                {a.targetTaskName && <> · <span className="text-slate-600">{a.targetTaskName}</span></>}
+                {a.targetUser && <> · <span className="text-slate-600">para {a.targetUser}</span></>}
+                <div className="text-xs text-slate-500">
+                  {a.actor ?? '—'}
+                  {a.onBehalfOf && <> (em nome de {a.onBehalfOf})</>}
+                  {' · '}{new Date(a.at).toLocaleString('pt-BR')}
+                </div>
+                <div className="mt-0.5 text-slate-700">{a.justification}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <ol className="relative ml-2 border-l-2 border-slate-200">
         {/* Ordem DECRESCENTE: o mais recente primeiro; a abertura fecha a lista. */}
         {[...d.tasks].reverse().map((t) => {

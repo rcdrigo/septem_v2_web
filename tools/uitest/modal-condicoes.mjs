@@ -14,7 +14,7 @@ async function openModal(page) {
     await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
   }
   // Modelador com o processo de teste
-  await page.goto(BASE + '/processos/editar?key=teste_condicoes_ui', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/flows/edit?key=teste_condicoes_ui', { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-element-id="G1"]', { timeout: 20000 });
   await page.click('[data-element-id="G1"]');
   const btn = page.locator('li', { hasText: '006.' }).locator('button', { hasText: 'Configurar' }).first();

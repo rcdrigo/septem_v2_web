@@ -76,7 +76,7 @@ try {
     const page = await context.newPage();
     page.on('pageerror', (error) => console.log(`[pageerror start ${width}] ${error.message}`));
     page.on('requestfailed', (request) => console.log(`[requestfailed start ${width}] ${request.url()} ${request.failure()?.errorText}`));
-    await page.goto(`${BASE}/servico/mock-process`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/services/mock-process`, { waitUntil: 'networkidle' });
     await page.waitForSelector('h1', { timeout: 5000 });
 
     check((await page.locator('h1').innerText()).trim() === 'INIC · Preencher solicitação · Protocolo', `[start ${width}] sigla e setor compõem o título`);
@@ -172,7 +172,7 @@ try {
     const page = await context.newPage();
     page.on('pageerror', (error) => console.log(`[pageerror task ${view.name}] ${error.message}`));
     page.on('requestfailed', (request) => console.log(`[requestfailed task ${view.name}] ${request.url()} ${request.failure()?.errorText}`));
-    await page.goto(`${BASE}/tarefa/mock-task`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/tasks/mock-task`, { waitUntil: 'networkidle' });
     await page.waitForSelector('h1', { timeout: 5000 });
 
     check((await page.locator('h1').innerText()).trim() === 'ANAL · Analisar solicitação · Financeiro', `[task ${view.name}] setor aparece como sufixo`);

@@ -24,9 +24,10 @@ import {
   type SavedProcess,
 } from '@/lib/api/process-definitions';
 import type { BpmnModelerHandle } from '@/components/bpmn/BpmnModeler';
+import { routes } from '@/lib/routes';
 
 /**
- * Shell da página `/modelador`. Não contém lógica de modelagem — só:
+ * Shell da página `/flows/edit`. Não contém lógica de modelagem — só:
  *  - monta a navbar
  *  - mantém a instância do modeler (vivo em todas as views via display:none)
  *  - troca qual view está visível conforme `currentView`
@@ -57,6 +58,10 @@ export function ModeladorPage() {
   const updateMut = useUpdateProcess(); // PUT  = salva no lugar (Salvar)
   const patchMut = usePatchProcessStatus();
   const loadedKeyRef = useRef<string | null>(null);
+  // Status/versão da definição carregada. Vem do backend e é atualizado a cada save —
+  // é o que o selo "Em homologação" mostra (Fase 5).
+  const [statusAtual, setStatusAtual] = useState<string | null>(null);
+  const [versaoAtual, setVersaoAtual] = useState<number | null>(null);
   const [dirty, setDirty] = useState(false);
   const [pendingAction, setPendingAction] = useState<'save' | 'publish' | 'version' | null>(null);
   const suppressDirty = useRef(false);
@@ -93,6 +98,8 @@ export function ModeladorPage() {
 
   function afterPersist(r: SavedProcess) {
     setDirty(false);
+    setStatusAtual(r.status ?? null);
+    setVersaoAtual(r.version ?? null);
     if (key !== r.key) {
       loadedKeyRef.current = r.key; // não re-importar o que acabamos de salvar
       setSearchParams({ key: r.key }, { replace: true });
@@ -127,8 +134,12 @@ export function ModeladorPage() {
       const r = key
         ? await updateMut.mutateAsync({ key, bpmnXml: xml })
         : await saveMut.mutateAsync({ bpmnXml: xml });
-      // Editar publicado salva no lugar (sem versionar); rascunho idem.
-      const label = r.status === 'published' ? `Salvo (publicado) v${r.version}` : `Rascunho salvo v${r.version}`;
+      // Fase 5: salvar um processo PUBLICADO cria uma versão de homologação — o aviso
+      // precisa dizer isso, senão o usuário acha que acabou de mexer em produção (que
+      // era, aliás, o que acontecia antes).
+      const label = r.status === 'homologation'
+        ? `Salvo em homologação v${r.version} — produção segue na versão publicada`
+        : r.status === 'published' ? `Salvo (publicado) v${r.version}` : `Rascunho salvo v${r.version}`;
       toast.success(label + warnSuffix(r));
       afterPersist(r);
     } catch (err) { handleError(err); }
@@ -172,6 +183,8 @@ export function ModeladorPage() {
     onVersion,
     dirty,
     pendingAction,
+    status: statusAtual ?? detail.data?.status ?? null,
+    version: versaoAtual ?? detail.data?.version ?? null,
   };
 
   const recursos: RecursosHandlers = {
@@ -213,7 +226,7 @@ export function ModeladorPage() {
   };
 
   // Guard de sessão depois de todos os hooks (regras de hooks).
-  if (!token) return <Navigate to="/login" replace />;
+  if (!token) return <Navigate to={routes.login} replace />;
 
   return (
     <div className="flex h-screen flex-1 flex-col overflow-hidden">

@@ -54,7 +54,7 @@ try {
   await page.click('button[type=submit]');
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
-  await page.goto(`${BASE}/processos/editar?key=${key}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/flows/edit?key=${key}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.djs-palette', { timeout: 20000 });
   await page.locator('header button, nav button', { hasText: 'Formulário' }).first().click();
   await page.waitForTimeout(2000);

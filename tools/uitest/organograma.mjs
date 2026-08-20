@@ -63,7 +63,7 @@ for (const vp of [
     await page.fill('input[type=password]', 'admin123');
     await page.click('button[type=submit]');
     await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
-    await page.goto(BASE + '/organograma', { waitUntil: 'networkidle' });
+    await page.goto(BASE + '/orgchart', { waitUntil: 'networkidle' });
     await page.waitForSelector('[data-testid=organograma-linha]', { timeout: 15000 });
 
     // Cada unidade é seu próprio card; o viewport externo é transparente e rolável.
@@ -113,13 +113,13 @@ for (const vp of [
       `[${vp.n}] expandir restaura as subunidades`);
 
     if (vp.n === 'web') {
-      // Clicar numa unidade abre o detalhamento /unidade?id= em nova aba.
+      // Clicar numa unidade abre o detalhamento /org-unit?id= em nova aba.
       const [popup] = await Promise.all([
         ctx.waitForEvent('page', { timeout: 8000 }).catch(() => null),
         linhaLonga.locator('button[title="Abrir a unidade em nova aba"]').click(),
       ]);
       const url = popup ? popup.url() : '';
-      check(/\/unidade\?id=/.test(url), `[web] clicar na unidade abre o detalhamento (/unidade?id=) — url="${url}"`);
+      check(/\/org-unit\?id=/.test(url), `[web] clicar na unidade abre o detalhamento (/org-unit?id=) — url="${url}"`);
       if (popup) await popup.close();
     }
     await page.screenshot({ path: `${OUT}/organograma-${vp.n}.png`, fullPage: true });

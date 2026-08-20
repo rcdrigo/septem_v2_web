@@ -23,9 +23,10 @@ import { PublishIssuesDialog } from '@/components/reports/PublishIssuesDialog';
 import { useAccessProfiles } from '@/lib/api/access-profiles';
 import { useOrgUnitsFlat } from '@/lib/api/org-units';
 import { useUsersList } from '@/lib/api/users';
+import { routes } from '@/lib/routes';
 
 /**
- * Builder do relatório (aba própria — /relatorios/editar?key=): staging de
+ * Builder do relatório (aba própria — /reports/edit?key=): staging de
  * blocos (tabela/KPI/pizza/barras/compostas) sobre a origem (fonte de dados ou
  * processo), filtros globais, fórmulas (básicas e NCalc), conjunto de detalhe,
  * cache e preview com dados reais. Salvar = rascunho; Publicar congela o
@@ -76,8 +77,8 @@ export function RelatorioBuilderPage() {
     [columns, def.hiddenColumns, def.columnLabels],
   );
 
-  if (!token) return <Navigate to="/login" replace />;
-  if (!key) return <Navigate to="/admin/relatorios" replace />;
+  if (!token) return <Navigate to={routes.login} replace />;
+  if (!key) return <Navigate to={routes.adminReports} replace />;
 
   async function saveDraft(showToast = true) {
     try {

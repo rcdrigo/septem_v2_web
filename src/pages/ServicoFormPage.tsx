@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { Play } from 'lucide-react';
 import { useProcessDefinition } from '@/lib/api/process-definitions';
-import { useProcessForm, useStartInstance, type TaskButton } from '@/lib/api/execution';
+import { useHasHomologation, useProcessForm, useStartInstance, type TaskButton } from '@/lib/api/execution';
 import { ReactForm, FormSkeleton, type ReactFormHandle } from '@/components/form/ReactForm';
 import { CompletionScreen, DocBanner } from '@/pages/TarefasPage';
 import { useDocumentTitle } from '@/lib/use-document-title';
@@ -11,6 +11,7 @@ import { useSessionStore } from '@/stores/session';
 import { toast } from '@/stores/toast';
 import { ExecutionHeader } from '@/components/execution/ExecutionHeader';
 import { TaskActionFooter, type ExecutionAction } from '@/components/execution/TaskActionFooter';
+import { routes } from '@/lib/routes';
 
 /**
  * Aba standalone (sem menus) para preencher e iniciar um serviço (req. 7). O
@@ -21,7 +22,7 @@ export function ServicoFormPage() {
   const { processKey } = useParams();
   const token = useSessionStore((s) => s.accessToken);
   const detail = useProcessDefinition(processKey ?? null);
-  const form = useProcessForm(processKey ?? null);
+  const form = useProcessForm(processKey ?? null, false);
   const start = useStartInstance();
   // Aba standalone (sem AppShell): sem bootstrap próprio o usuário e as permissões
   // não chegam a carregar, e o "iniciar como teste" sumiria de quem pode simular.
@@ -31,25 +32,38 @@ export function ServicoFormPage() {
   const canSimulate = useSessionStore((s) => s.can('workflow:simulate'));
   const fillRef = useRef<ReactFormHandle>(null);
   const [isTest, setIsTest] = useState(false);
+  // Fase 5: com uma versão em homologação disponível, o teste pergunta CONTRA QUAL
+  // versão rodar. A pergunta só aparece quando existe homologação — quem não usa o
+  // recurso não vê nada de novo.
+  const [usarHomologacao, setUsarHomologacao] = useState(false);
+  const temHomologacao = useHasHomologation(processKey ?? null, true);
+  // O formulário TEM de vir da versão escolhida: abrir o de produção e enviar para a
+  // homologação faria o usuário ver o campo antigo e concluir que o recurso não funciona.
+  const formHomologacao = useProcessForm(processKey ?? null, true);
+  const formEscolhido = isTest && usarHomologacao ? formHomologacao : form;
   const [done, setDone] = useState<{ nextTaskForMe?: string | null; executionId?: string } | null>(null);
-  const processName = form.data?.processName ?? detail.data?.name ?? 'Serviço';
-  const taskName = form.data?.startTaskName || processName;
+  const processName = formEscolhido.data?.processName ?? detail.data?.name ?? 'Serviço';
+  const taskName = formEscolhido.data?.startTaskName || processName;
   useDocumentTitle(taskName);
 
-  if (!token) return <Navigate to="/login" replace />;
+  if (!token) return <Navigate to={routes.login} replace />;
 
   async function submit(button?: TaskButton) {
     const { data, errors } = fillRef.current?.submit() ?? { data: {}, errors: {} };
     if ((button?.validateForm ?? true) && Object.keys(errors).length) { toast.error('Preencha os campos obrigatórios.'); return; }
     try {
-      const r = await start.mutateAsync({ key: processKey!, data, isTest: canSimulate && isTest });
+      const r = await start.mutateAsync({
+        key: processKey!, data,
+        isTest: canSimulate && isTest,
+        useHomologation: canSimulate && isTest && usarHomologacao,
+      });
       setDone({ nextTaskForMe: r.nextTaskForMe, executionId: r.executionId });
     } catch { toast.error('Não foi possível iniciar o processo.'); }
   }
 
   // Cabeçalho no MESMO padrão das demais tarefas: tarefa em destaque e processo
   // como contexto secundário.
-  const buttons = form.data?.buttons ?? [];
+  const buttons = formEscolhido.data?.buttons ?? [];
   const completionActions: ExecutionAction[] = buttons.length === 0
     ? [{
         id: '__start',
@@ -57,7 +71,7 @@ export function ServicoFormPage() {
         loadingLabel: 'Iniciando…',
         icon: <Play size={15} aria-hidden="true" />,
         onClick: () => submit(),
-        disabled: start.isPending || form.isLoading,
+        disabled: start.isPending || formEscolhido.isLoading,
         loading: start.isPending,
       }]
     : buttons.map((button) => ({
@@ -66,7 +80,7 @@ export function ServicoFormPage() {
         hint: button.hint,
         icon: button.icon ? <i className={button.icon} aria-hidden="true" /> : undefined,
         onClick: () => submit(button),
-        disabled: start.isPending || form.isLoading,
+        disabled: start.isPending || formEscolhido.isLoading,
         loading: start.isPending,
         loadingLabel: 'Iniciando…',
         style: button.primaryColor ? { backgroundColor: button.primaryColor, color: button.textColor ?? '#fff' } : undefined,
@@ -77,8 +91,8 @@ export function ServicoFormPage() {
       <ExecutionHeader
         processName={processName}
         taskName={taskName}
-        alias={form.data?.startTaskAlias}
-        sector={form.data?.startTaskSector}
+        alias={formEscolhido.data?.startTaskAlias}
+        sector={formEscolhido.data?.startTaskSector}
       />
 
       {done ? (
@@ -89,12 +103,12 @@ export function ServicoFormPage() {
         <>
           {/* Cada grupo renderiza seu próprio card (sem container único). */}
           <main className="flex-1 overflow-auto p-4 sm:p-6">
-            {form.data?.documentationUrl && <DocBanner url={form.data.documentationUrl} />}
-            {form.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={form.data?.formSchema} data={form.data?.data ?? undefined} optionsByField={form.data?.fieldOptions} uploadContext={{ processKey: processKey ?? undefined }} />}
+            {formEscolhido.data?.documentationUrl && <DocBanner url={formEscolhido.data.documentationUrl} />}
+            {formEscolhido.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={formEscolhido.data?.formSchema} data={formEscolhido.data?.data ?? undefined} optionsByField={formEscolhido.data?.fieldOptions} uploadContext={{ processKey: processKey ?? undefined }} />}
           </main>
           <TaskActionFooter
             completionActions={completionActions}
-            loading={form.isLoading}
+            loading={formEscolhido.isLoading}
             notice={canSimulate ? (
               <label className="inline-flex items-start gap-2 text-sm text-slate-700">
                 <input
@@ -107,6 +121,23 @@ export function ServicoFormPage() {
                 <span>
                   Iniciar como <strong>teste</strong>
                   <span className="block text-xs text-slate-500">O processo é marcado como teste e todas as tarefas ficam com você.</span>
+                  {isTest && temHomologacao.data === true && (
+                    <span className="mt-2 block rounded-md border border-orange-200 bg-orange-50 px-2.5 py-2">
+                      <span className="block text-xs font-semibold text-orange-900">Qual versão testar?</span>
+                      <span className="mt-1 flex flex-wrap gap-3">
+                        <label className="inline-flex items-center gap-1.5 text-xs text-slate-700">
+                          <input type="radio" name="versao-teste" data-testid="versao-producao"
+                            checked={!usarHomologacao} onChange={() => setUsarHomologacao(false)} />
+                          Produção (publicada)
+                        </label>
+                        <label className="inline-flex items-center gap-1.5 text-xs text-slate-700">
+                          <input type="radio" name="versao-teste" data-testid="versao-homologacao"
+                            checked={usarHomologacao} onChange={() => setUsarHomologacao(true)} />
+                          Em homologação
+                        </label>
+                      </span>
+                    </span>
+                  )}
                 </span>
               </label>
             ) : undefined}

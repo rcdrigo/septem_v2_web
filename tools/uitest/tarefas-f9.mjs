@@ -139,7 +139,7 @@ try {
   await login(page);
 
   // ── Item 7: iniciar como teste pela tela do serviço ───────────────────────
-  await page.goto(`${BASE}/servico/${keyC}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/services/${keyC}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid=iniciar-como-teste]', { timeout: 15000 });
   const caixa = await page.locator('[data-testid=iniciar-como-teste]').boundingBox();
   const enviar = await page.getByRole('button', { name: /Iniciar/ }).first().boundingBox();
@@ -160,7 +160,7 @@ try {
   check(tarefaTeste?.isTest === true, '[item7] a tarefa se identifica como de processo de teste');
 
   // ── Itens 1 a 4: a lista de tarefas ───────────────────────────────────────
-  await page.goto(`${BASE}/tarefas`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/tasks`, { waitUntil: 'networkidle' });
   await page.waitForSelector('article[role=link]', { timeout: 15000 });
   await page.click('[data-testid=abrir-filtros]');
   await page.fill('[data-testid=filtro-q]', String(rid));
@@ -289,7 +289,7 @@ try {
   await page.waitForTimeout(800);
   check(await page.locator('article[role=link]').count() > 0, '[item7] alternar de volta para cards funciona');
 
-  await page.goto(`${BASE}/tarefa/${tarefaTeste.id}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/tasks/${tarefaTeste.id}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('header', { timeout: 15000 });
   await page.waitForTimeout(800);
   check((await page.locator('header').first().innerText()).includes('Processo de teste'),
@@ -298,7 +298,7 @@ try {
 
   // Concluída, o selo continua na lista de executadas.
   await api(token, `/api/v1/workflow/tasks/${tarefaTeste.id}/complete`, 'POST', { data: {} });
-  await page.goto(`${BASE}/tarefas?status=concluidas`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/tasks?status=concluidas`, { waitUntil: 'networkidle' });
   await page.waitForSelector('article[role=link]', { timeout: 15000 });
   await page.click('[data-testid=abrir-filtros]');
   await page.fill('[data-testid=filtro-q]', String(rid));
@@ -316,7 +316,7 @@ try {
   await page.waitForTimeout(800);
 
   // ── Item 5: a lista se atualiza ao voltar o foco da aba ───────────────────
-  await page.goto(`${BASE}/tarefas`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/tasks`, { waitUntil: 'networkidle' });
   await page.waitForSelector('article[role=link]', { timeout: 15000 });
   await page.click('[data-testid=abrir-filtros]');
   await page.fill('[data-testid=filtro-q]', String(rid));
@@ -348,7 +348,7 @@ try {
   await relogio.clock.install();
   const pr = await relogio.newPage();
   await login(pr);
-  await pr.goto(`${BASE}/tarefas?q=${rid}`, { waitUntil: 'networkidle' });
+  await pr.goto(`${BASE}/tasks?q=${rid}`, { waitUntil: 'networkidle' });
   await pr.waitForSelector('article[role=link]', { timeout: 15000 });
   const antesTimer = await pr.locator('article[role=link]').count();
   await api(token, '/api/v1/workflow/instances', 'POST', { key: keyA, data: { assunto: `timer${rid}` } });
@@ -378,7 +378,7 @@ try {
   await sp.fill('input[type=password]', semPerm.body.initialPassword);
   await sp.click('button[type=submit]');
   await sp.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
-  await sp.goto(`${BASE}/servico/${keyA}`, { waitUntil: 'networkidle' });
+  await sp.goto(`${BASE}/services/${keyA}`, { waitUntil: 'networkidle' });
   await sp.waitForSelector('footer button', { timeout: 15000 });
   await sp.waitForTimeout(1500);
   // A ausência só vale se a tela REALMENTE carregou: sem o botão de enviar, o
@@ -394,7 +394,7 @@ try {
   const admCtx = await browser.newContext({ viewport: { width: 1280, height: 950 } });
   const adm = await admCtx.newPage();
   await login(adm);
-  await adm.goto(`${BASE}/admin/perfis`, { waitUntil: 'networkidle' });
+  await adm.goto(`${BASE}/admin/profiles`, { waitUntil: 'networkidle' });
   await adm.waitForTimeout(1500);
   const perfilTexto = await adm.locator('body').innerText();
   check(perfilTexto.includes('Simulador de serviços'), '[item6] o perfil aparece em Configurações › Perfis');
@@ -407,7 +407,7 @@ try {
   const mobCtx = await browser.newContext({ viewport: { width: 375, height: 812 }, deviceScaleFactor: 2 });
   const m = await mobCtx.newPage();
   await login(m);
-  await m.goto(`${BASE}/tarefas`, { waitUntil: 'networkidle' });
+  await m.goto(`${BASE}/tasks`, { waitUntil: 'networkidle' });
   await m.waitForSelector('article[role=link]', { timeout: 15000 });
   await m.click('[data-testid=abrir-filtros]');
   await m.fill('[data-testid=filtro-q]', String(rid));
@@ -429,7 +429,7 @@ try {
   check(alturas.every((h) => h >= 32), `[mobile] campos de filtro com altura tocável (mín ${Math.round(Math.min(...alturas))}px)`);
   await m.screenshot({ path: `${OUT}/f9-tarefas-filtros-mobile.png`, fullPage: true });
 
-  await m.goto(`${BASE}/servico/${keyC}`, { waitUntil: 'networkidle' });
+  await m.goto(`${BASE}/services/${keyC}`, { waitUntil: 'networkidle' });
   await m.waitForSelector('[data-testid=iniciar-como-teste]', { timeout: 15000 });
   const caixaMob = await m.locator('[data-testid=iniciar-como-teste]').boundingBox();
   const botaoMob = await m.getByRole('button', { name: /Iniciar|Botões de conclusão/ }).first().boundingBox();

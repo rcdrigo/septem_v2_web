@@ -73,8 +73,27 @@ const login = async (page) => {
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 };
 
-/** Overflow horizontal + controles cortados (critério objetivo do protocolo). */
-const diagnostico = (page) => page.evaluate(() => {
+/**
+ * Overflow horizontal + controles cortados (critério objetivo do protocolo).
+ *
+ * ⚠️ Tolera UMA navegação no meio da medição: depois de abrir uma requisição a tela
+ * de sucesso auto-navega para a próxima tarefa em 2,5 s (CompletionScreen), e uma
+ * medição solta morre com "Execution context was destroyed" quando a máquina está
+ * sob carga. Sem isto a suíte fica intermitente — e sonda intermitente some com o
+ * sinal do gate inteiro.
+ */
+const diagnostico = async (page) => {
+  for (let tentativa = 0; tentativa < 2; tentativa++) {
+    try { return await medir(page); }
+    catch (e) {
+      if (!/Execution context was destroyed/.test(String(e))) throw e;
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+    }
+  }
+  return medir(page);
+};
+
+const medir = (page) => page.evaluate(() => {
   const overflows = document.documentElement.scrollWidth > document.documentElement.clientWidth + 1;
   const w = window.innerWidth;
   const clipped = [...document.querySelectorAll('button, input, select, [role="option"]')]
@@ -111,7 +130,7 @@ try {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 });
     const page = await ctx.newPage();
     await login(page);
-    await page.goto(`${BASE}/processos/editar?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/flows/edit?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
     await page.waitForSelector('[data-element-id="T005"]', { timeout: 20000 });
     await page.getByRole('button', { name: 'Formulário', exact: true }).click();
     await page.waitForTimeout(2500);
@@ -210,7 +229,7 @@ try {
     const erros = [];
     page.on('pageerror', (e) => erros.push(String(e).slice(0, 160)));
     await login(page);
-    await page.goto(`${BASE}/processos/editar?key=${keyAninhado}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/flows/edit?key=${keyAninhado}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('.djs-palette', { timeout: 20000 });
     await page.waitForTimeout(3000);
     await page.getByRole('button', { name: 'Formulário', exact: true }).click();
@@ -268,7 +287,7 @@ try {
     const ctx = await browser.newContext({ viewport: { width: view.w, height: view.h }, deviceScaleFactor: 2 });
     const page = await ctx.newPage();
     await login(page);
-    await page.goto(`${BASE}/servico/${key}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/services/${key}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('.septem-date-picker-input', { timeout: 15000 });
     await page.waitForTimeout(600);
 
@@ -315,11 +334,48 @@ try {
     await page.waitForTimeout(400);
     await iniciar();
     check(respostas.includes(201), `[${view.name}] simulação com a data de HOJE é aceita (201) — ${JSON.stringify(respostas)}`);
-    const tela = await page.evaluate(() => document.body.innerText.replace(/\s+/g, ' '));
-    check(/iniciada com sucesso/i.test(tela), `[${view.name}] tela de sucesso da abertura — ${JSON.stringify(tela.slice(0, 90))}`);
-    check(await page.locator('.septem-date-picker-input').count() === 0,
-      `[${view.name}] o formulário some após abrir (não fica pedindo os campos de novo)`);
+    // ⚠️ Corrida conhecida: com a próxima tarefa sendo do mesmo usuário (é o caso na
+    // simulação), a tela de sucesso AUTO-NAVEGA em 2,5 s (CompletionScreen →
+    // navTo). Um page.evaluate solto aqui morre com "Execution context was
+    // destroyed" quando a máquina está sob carga — aconteceu no gate de 17/08.
+    // Por isso: os dois sinais saem de UMA leitura só, com uma segunda tentativa
+    // se a navegação cortar a primeira.
+    const lerTela = async () => {
+      for (let tentativa = 0; tentativa < 2; tentativa++) {
+        try {
+          return await page.evaluate(() => ({
+            texto: document.body.innerText.replace(/\s+/g, ' '),
+            pickers: document.querySelectorAll('.septem-date-picker-input').length,
+            path: location.pathname,
+          }));
+        } catch (e) {
+          if (!/Execution context was destroyed/.test(String(e))) throw e;
+          await page.waitForLoadState('domcontentloaded').catch(() => {});
+        }
+      }
+      return null;
+    };
+    await page.waitForSelector('text=/iniciada com sucesso/i', { timeout: 4000 }).catch(() => {});
+    const tela = await lerTela();
+    const naTelaDeSucesso = !!tela && /iniciada com sucesso/i.test(tela.texto);
+    // Duas saídas legítimas depois do 201: a tela de sucesso, ou — se a auto-navegação
+    // já disparou — a PRÓXIMA TAREFA. Ambas provam que o formulário de abertura saiu;
+    // exigir só a primeira é o que tornava este trecho instável.
+    // Discriminador pelo CAMINHO, não por palavra da tela: a tarefa seguinte pode se
+    // chamar qualquer coisa, e foi por isso que "procurar a palavra Tarefa" falhou.
+    const naProximaTarefa = (tela?.path ?? '').startsWith('/tasks/');
+    check(naTelaDeSucesso || naProximaTarefa,
+      `[${view.name}] a abertura saiu do formulário (path=${tela?.path}) — ${JSON.stringify((tela?.texto ?? '').slice(0, 70))}`);
+    // O "não fica pedindo os campos de novo" só faz sentido NA tela de sucesso: se já
+    // navegamos, os campos visíveis são os da tarefa seguinte, não os do formulário.
+    check(!naTelaDeSucesso || tela.pickers === 0,
+      `[${view.name}] o formulário some após abrir (pickers na tela de sucesso: ${tela?.pickers})`);
 
+    // A tela de sucesso auto-navega para a próxima tarefa em ~2,5 s. Esperar o
+    // desfecho (navegou ou não) é o que elimina a corrida — medir no meio dela não
+    // mede nem uma tela nem a outra.
+    await page.waitForURL(/\/tasks\//, { timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle').catch(() => {});
     const d2 = await diagnostico(page);
     check(!d2.overflows, `[${view.name}] sem overflow horizontal`);
     check(d2.clipped === 0, `[${view.name}] nenhum controle cortado (clipped=${d2.clipped})`);
@@ -335,7 +391,7 @@ try {
 
     const inst = await api(token, '/api/v1/workflow/instances', 'POST', { key, data: {} });
     const taskId = inst.body?.tasks?.[0]?.id;
-    await page.goto(`${BASE}/tarefa/${taskId}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/tasks/${taskId}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('.septem-date-picker-input', { timeout: 15000 });
     await page.waitForTimeout(500);
 

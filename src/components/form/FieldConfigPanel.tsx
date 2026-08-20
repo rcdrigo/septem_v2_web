@@ -15,6 +15,7 @@ import { openTab } from '@/lib/nav';
 import { toast } from '@/stores/toast';
 import { Switch } from '@/components/ui/Field';
 import { HelpPopover } from '@/components/ui/HelpPopover';
+import { routes } from '@/lib/routes';
 
 type Opt = { value: string; label: string };
 type MaskOpt = Opt & { regex: string; template?: string | null; shouldValidate: boolean };
@@ -250,7 +251,7 @@ export function FieldConfigPanel({ field, editField, masks }: {
                   }} />
                 {props.septemDataSourceId && (
                   <button type="button"
-                    onClick={() => openTab(`/fonte-dados/${encodeURIComponent(props.septemDataSourceId)}`)}
+                    onClick={() => openTab(routes.dataSource(encodeURIComponent(props.septemDataSourceId)))}
                     className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900">
                     <ExternalLink size={12} /> Editar fonte de dados
                   </button>

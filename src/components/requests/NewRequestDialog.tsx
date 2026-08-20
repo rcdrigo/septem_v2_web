@@ -9,6 +9,7 @@ import { useFavorites, useToggleFavorite } from '@/lib/api/discovery';
 import { FavoriteButton } from '@/components/discovery/FavoriteButton';
 import { toast } from '@/stores/toast';
 import '@/styles/new-request.css';
+import { routes } from '@/lib/routes';
 
 const ALL_CATEGORIES = 'all';
 
@@ -35,7 +36,7 @@ export function NewRequestDialog({ onClose }: { onClose: () => void }) {
   const selectedCategory = groups.find((group) => group.key === category);
 
   function start(service: ProcessListItem) {
-    openTab(`/servico/${service.key}`);
+    openTab(routes.service(service.key));
     onClose();
   }
 

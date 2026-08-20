@@ -1,5 +1,5 @@
 // F7.1 — a Consulta (relatório publicado) abre em ABA PRÓPRIA (link direto
-// /consultas/ver?key=), não mais embutida no catálogo. Prova: (a) o botão Abrir
+// /reports/view?key=), não mais embutida no catálogo. Prova: (a) o botão Abrir
 // dispara window.open para a rota standalone; (b) a rota standalone renderiza o
 // viewer com os dados. Testa web 1280 e a rota no mobile 375.
 import { chromium } from 'playwright-core';
@@ -44,7 +44,7 @@ try {
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
   // Catálogo de Consultas: o card do relatório publicado + botão Abrir.
-  await page.goto(BASE + '/consultas', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/reports', { waitUntil: 'networkidle' });
   const card = page.locator('article', { hasText: `Consulta Aba ${rid}` });
   await card.waitFor({ timeout: 10000 });
   check(await card.count() === 1, '[web] o relatório publicado aparece no catálogo de Consultas');
@@ -53,12 +53,12 @@ try {
   await card.getByRole('button', { name: 'Abrir' }).click();
   await page.waitForTimeout(400);
   const opened = await page.evaluate(() => window.__opened || []);
-  check(opened.some((u) => u.includes(`consultas/ver?key=${key}`)), `[F7.1] Abrir dispara aba própria (${opened.join(',') || 'nada'})`);
+  check(opened.some((u) => u.includes(`reports/view?key=${key}`)), `[F7.1] Abrir dispara aba própria (${opened.join(',') || 'nada'})`);
   // A página do catálogo continua sendo o catálogo (não virou o viewer embutido).
   check(await page.locator('h1', { hasText: 'Consultas' }).count() === 1, '[F7.1] o catálogo permanece (sem embed inline)');
 
   // A rota standalone renderiza o viewer com o KPI (soma 10+5=15).
-  await page.goto(`${BASE}/consultas/ver?key=${key}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/reports/view?key=${key}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1500);
   check(await page.locator('h1', { hasText: `Consulta Aba ${rid}` }).count() === 1, '[F7.1] rota standalone mostra o nome do relatório');
   check(/\b15\b/.test(await page.locator('body').innerText()), '[F7.1] rota standalone renderiza os dados (KPI soma=15)');
@@ -69,7 +69,7 @@ try {
   // replica a sessão no novo contexto
   const store = await page.evaluate(() => JSON.stringify(window.localStorage));
   await m.addInitScript((s) => { const d = JSON.parse(s); for (const k in d) window.localStorage.setItem(k, d[k]); }, store);
-  await m.goto(`${BASE}/consultas/ver?key=${key}`, { waitUntil: 'networkidle' });
+  await m.goto(`${BASE}/reports/view?key=${key}`, { waitUntil: 'networkidle' });
   await m.waitForTimeout(1500);
   const over = await m.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   check(over <= 1, `[F7.1][mobile] rota standalone sem overflow horizontal (${over}px)`);

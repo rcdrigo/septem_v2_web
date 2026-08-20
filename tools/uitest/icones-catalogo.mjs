@@ -25,7 +25,7 @@ try {
     const page = await ctx.newPage();
     await login(page);
 
-    await page.goto(`${BASE}/processos/editar?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/flows/edit?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
     await page.waitForSelector('[data-element-id="T005"]', { state: 'attached', timeout: 20000 });
     await page.getByRole('button', { name: 'Configurações' }).click();
     await page.waitForTimeout(1200);

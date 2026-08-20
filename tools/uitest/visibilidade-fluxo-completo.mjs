@@ -13,7 +13,7 @@ await page.click('button[type=submit]');
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
 // ── 1. Modelador: matriz — T005: grupo Solicitante OCULTO, grupo Pagamento VISÍVEL ──
-await page.goto('http://localhost:5173/processos/editar?key=teste_condicoes_ui', { waitUntil: 'networkidle' });
+await page.goto('http://localhost:5173/flows/edit?key=teste_condicoes_ui', { waitUntil: 'networkidle' });
 await page.waitForSelector('[data-element-id="T005"]', { timeout: 20000 });
 await page.waitForTimeout(800);
 await page.locator('header button', { hasText: 'Campos' }).click();
@@ -42,7 +42,7 @@ await page.waitForTimeout(2000);
 check(await page.evaluate(() => document.body.innerText.includes('publicad') || document.body.innerText.includes('Publicad')), 'fluxo publicado pela UI');
 
 // ── 3. Iniciar instância pela UI (tela de início) ────────────────────────────
-await page.goto('http://localhost:5173/servico/teste_condicoes_ui', { waitUntil: 'networkidle' });
+await page.goto('http://localhost:5173/services/teste_condicoes_ui', { waitUntil: 'networkidle' });
 await page.waitForSelector('h1', { timeout: 15000 });
 await page.waitForTimeout(1200);
 await page.locator('footer button').first().click(); // "Enviar requisição"
@@ -50,7 +50,7 @@ await page.waitForTimeout(2000);
 check(await page.evaluate(() => document.body.innerText.includes('sucesso')), 'instância iniciada pela UI');
 
 // ── 4. A tela de conclusão auto-navega para a tarefa seguinte (T005) ────────
-await page.waitForURL(/\/tarefa\//, { timeout: 15000 });
+await page.waitForURL(/\/tasks\//, { timeout: 15000 });
 await page.waitForSelector('text=005.', { timeout: 15000 });
 await page.waitForTimeout(1800);
 await page.screenshot({ path: `${OUT}/vis-tarefa.png`, fullPage: true });

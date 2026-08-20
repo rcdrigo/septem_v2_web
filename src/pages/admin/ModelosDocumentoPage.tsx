@@ -16,6 +16,7 @@ import { ApiError } from '@/lib/api';
 import { toast } from '@/stores/toast';
 import { formatWithRelative, formatDuration } from '@/lib/relative-time';
 import { openTab } from '@/lib/nav';
+import { routes } from '@/lib/routes';
 
 /**
  * Preview do modelo em nova aba, somente leitura (:11). Vai pelo PDF, que o navegador
@@ -278,7 +279,7 @@ function CamposDialog({ onClose }: { onClose: () => void }) {
             type="button"
             disabled={!key}
             data-testid="campos-buscar"
-            onClick={() => { openTab(`campos-servico?key=${encodeURIComponent(key)}`); onClose(); }}
+            onClick={() => { openTab(`${routes.serviceFields}?key=${encodeURIComponent(key)}`); onClose(); }}
             className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60"
           >
             Buscar

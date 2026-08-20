@@ -104,6 +104,10 @@ export function Combobox({ value, options, onChange, placeholder, clearLabel, di
       {open && rect && createPortal(
         <div
           ref={panelRef}
+          // A lista abre em PORTAL (fora do contêiner do campo), então não dá para
+          // alcançá-la escopando pelo pai. Como só um combobox fica aberto por vez,
+          // este identificador endereça a lista aberta sem ambiguidade.
+          data-testid="combobox-popover"
           style={{ position: 'fixed', left: rect.left, top: rect.top, width: rect.width, zIndex: 1010 }}
           className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg"
         >

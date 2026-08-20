@@ -105,7 +105,7 @@ const login = async (page) => {
 
 /** Abre a aba Origem do builder e devolve o texto (onde os campos são listados). */
 const textoDaOrigem = async (page) => {
-  await page.goto(`${BASE}/relatorios/editar?key=${rkey}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/reports/edit?key=${rkey}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('text=Origem dos dados', { timeout: 20000 });
   await page.locator('nav button', { hasText: 'Origem' }).click();
   await page.waitForTimeout(800);

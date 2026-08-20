@@ -23,17 +23,17 @@ async function loginFresh(keep) {
   const { ctx, page } = await loginFresh(true);
   // simula expiração corrompendo o access token (o refresh continua válido)
   await page.evaluate(() => localStorage.setItem('septem.accessToken', 'token-expirado-invalido'));
-  await page.goto('http://localhost:5173/admin/usuarios', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:5173/admin/users', { waitUntil: 'networkidle' });
   // Espera o END-STATE real (a página protegida renderizou o conteúdo após o
   // refresh+retry), não um tempo fixo — sob carga o ciclo passa de 1500ms. Se a
   // renovação falhasse, cairia no login e o conteúdo nunca apareceria (check falha).
   await page.waitForFunction(
-    () => location.pathname.includes('/admin/usuarios')
+    () => location.pathname.includes('/admin/users')
       && (document.body.innerText.includes('Usuários') || document.body.innerText.includes('usuário')),
     { timeout: 12000 },
   ).catch(() => {});
   const renovada = await page.evaluate(() => ({
-    naPagina: location.pathname.includes('/admin/usuarios'),
+    naPagina: location.pathname.includes('/admin/users'),
     conteudo: document.body.innerText.includes('Usuários') || document.body.innerText.includes('usuário'),
     tokenNovo: localStorage.getItem('septem.accessToken') !== 'token-expirado-invalido',
   }));
@@ -46,7 +46,7 @@ async function loginFresh(keep) {
 {
   const { ctx, page } = await loginFresh(false);
   await page.evaluate(() => localStorage.setItem('septem.accessToken', 'token-expirado-invalido'));
-  await page.goto('http://localhost:5173/admin/usuarios', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:5173/admin/users', { waitUntil: 'networkidle' });
   // Sem refresh, cai pro login: espera o redirect (sinal real), não um tempo fixo.
   await page.waitForFunction(() => location.pathname.includes('/login'), { timeout: 10000 }).catch(() => {});
   const caiu = await page.evaluate(() => location.pathname.includes('/login'));
@@ -58,7 +58,7 @@ async function loginFresh(keep) {
 {
   const { ctx, page } = await loginFresh(true);
   const tab2 = await ctx.newPage();
-  await tab2.goto('http://localhost:5173/tarefas', { waitUntil: 'networkidle' });
+  await tab2.goto('http://localhost:5173/tasks', { waitUntil: 'networkidle' });
   await tab2.waitForTimeout(1200);
   check(await tab2.evaluate(() => !location.pathname.includes('/login')), 'segunda aba entra logada (localStorage compartilhado)');
   await ctx.close();

@@ -47,7 +47,7 @@ const login = async (page) => {
 };
 
 const abrirFormulario = async (page) => {
-  await page.goto(`${BASE}/processos/editar?key=${key}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/flows/edit?key=${key}`, { waitUntil: 'networkidle' });
   // No mobile o canvas BPMN fica oculto (limitação conhecida): basta o elemento existir.
   await page.waitForSelector('[data-element-id="T005"]', { state: 'attached', timeout: 20000 });
   await page.getByRole('button', { name: 'Formulário', exact: true }).click();

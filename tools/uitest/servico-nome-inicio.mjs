@@ -2,7 +2,7 @@
 // início." Causa: start event sem nome → startTaskName nulo → cabeçalho caía no
 // processo. Fix (backend): startTaskName cai na 1ª tarefa humana quando o início não
 // tem nome. Prova: cria processo com startEvent SEM nome + 1ª tarefa nomeada, publica,
-// abre /servico/:key e confere que o H1 é o nome da TAREFA, não do processo.
+// abre /services/:key e confere que o H1 é o nome da TAREFA, não do processo.
 import { chromium } from 'playwright-core';
 const BASE = 'http://localhost:5173';
 const API = 'http://localhost:5000';
@@ -58,7 +58,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
     await page.fill('input[type=password]', 'admin123');
     await page.click('button[type=submit]');
     await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
-    await page.goto(`${BASE}/servico/${key}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/services/${key}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('h1', { timeout: 15000 });
     await page.waitForTimeout(600);
     const h1 = (await page.locator('h1').first().innerText()).trim();
@@ -79,7 +79,7 @@ for (const vp of [{ n: 'web-task', w: 1280, h: 900 }, { n: 'mobile-task', w: 375
     await page.fill('input[type=password]', 'admin123');
     await page.click('button[type=submit]');
     await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
-    await page.goto(`${BASE}/tarefa/${taskId}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/tasks/${taskId}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('h1', { timeout: 15000 });
 
     check((await page.locator('h1').innerText()).trim() === `ANAL · ${TAREFA} · Análise`, `[${vp.n}] tarefa mostra sigla + nome + setor`);
@@ -92,7 +92,7 @@ for (const vp of [{ n: 'web-task', w: 1280, h: 900 }, { n: 'mobile-task', w: 375
       await numberButton.click();
       const report = await opened;
       await report.waitForLoadState('domcontentloaded');
-      check(report.url().includes(`/solicitacao/${taskDetail.body.executionId}`), '[web-task] número abre relatório da execução');
+      check(report.url().includes(`/requests/${taskDetail.body.executionId}`), '[web-task] número abre relatório da execução');
       await report.close();
       check(await page.getByRole('button', { name: 'Salvar', exact: true }).count() === 1, '[web-task] desktop mantém Salvar visível');
     } else {

@@ -5,20 +5,20 @@ const OUT = process.env.OUT_DIR || '.';
 
 // rota → [rótulo ativo esperado, grupo esperado (null = item de topo)]
 const CASES = [
-  ['/admin/processos', 'Processos', 'Processos'],
+  ['/admin/flows', 'Processos', 'Processos'],
   // categorias de processo viraram modal em Admin › Processos; a rota antiga redireciona
-  ['/admin/processos/categorias', 'Processos', 'Processos'],
-  ['/admin/modelos-email', 'Modelos de e-mails', 'Processos'],
-  ['/admin/modelos-doc', 'Modelos de documentos', 'Processos'],
-  ['/admin/fontes-dados', 'Fontes de dados', 'Processos'],
-  ['/admin/fontes-dados?scope=report', 'Fontes de dados', 'Relatórios e Dashboards'],
-  ['/admin/relatorios', 'Relatórios', 'Relatórios e Dashboards'],
-  ['/admin/relatorios/categorias', 'Relatórios', 'Relatórios e Dashboards'], // redireciona (modal)
+  ['/admin/flows/categories', 'Processos', 'Processos'],
+  ['/admin/email-templates', 'Modelos de e-mails', 'Processos'],
+  ['/admin/document-templates', 'Modelos de documentos', 'Processos'],
+  ['/admin/data-sources', 'Fontes de dados', 'Processos'],
+  ['/admin/data-sources?scope=report', 'Fontes de dados', 'Relatórios e Dashboards'],
+  ['/admin/reports', 'Relatórios', 'Relatórios e Dashboards'],
+  ['/admin/reports/categories', 'Relatórios', 'Relatórios e Dashboards'], // redireciona (modal)
   ['/admin/dashboards', 'Dashboards', 'Relatórios e Dashboards'],
-  ['/admin/usuarios', 'Usuários', 'Configurações'],
-  ['/admin/perfis', 'Perfis de acesso', 'Configurações'],
-  ['/tarefas?status=pendentes', 'Tarefas', null],
-  ['/requisicoes?status=em_andamento&page=1', 'Requisições', null],
+  ['/admin/users', 'Usuários', 'Configurações'],
+  ['/admin/profiles', 'Perfis de acesso', 'Configurações'],
+  ['/tasks?status=pendentes', 'Tarefas', null],
+  ['/requests?status=em_andamento&page=1', 'Requisições', null],
 ];
 
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
@@ -50,7 +50,12 @@ async function actives(route) {
 let failures = 0;
 
 // As rotas antigas devem cair no wildcard, sem redirect ou item de menu.
-for (const route of ['/tarefas-executadas', '/minhas-solicitacoes', '/servicos']) {
+// Rotas que nunca existiram + as ANTIGAS em português, descartadas na Fase 1
+// (resposta 1 do dono: sem redirect). Todas têm de cair no 404 — se alguma ainda
+// responder, sobrou rota velha no router.
+for (const route of ['/tarefas-executadas', '/minhas-solicitacoes', '/servicos',
+  '/tarefas', '/requisicoes', '/consultas', '/organograma', '/processos/editar',
+  '/admin/processos', '/admin/usuarios', '/admin/parametros', '/modelador', '/suporte']) {
   await page.goto(BASE + route, { waitUntil: 'networkidle' });
   const oldMissing = await page.getByText('Página não encontrada').isVisible();
   if (!oldMissing) failures++;
@@ -58,7 +63,7 @@ for (const route of ['/tarefas-executadas', '/minhas-solicitacoes', '/servicos']
 }
 
 // O modo externo preserva os dois índices operacionais.
-await page.goto(BASE + '/tarefas', { waitUntil: 'networkidle' });
+await page.goto(BASE + '/tasks', { waitUntil: 'networkidle' });
 await page.getByRole('button', { name: /Externo/ }).click();
 const externalLabels = await page.locator('aside nav a').allTextContents();
 const externalOk = externalLabels.some((x) => x.includes('Tarefas'))
@@ -78,10 +83,10 @@ for (const [route, label, group] of CASES) {
 
 // Mobile spot-check no caso mais crítico (query string)
 await page.setViewportSize({ width: 375, height: 812 });
-const mob = await actives('/admin/fontes-dados?scope=report');
+const mob = await actives('/admin/data-sources?scope=report');
 const mobOk = mob.length === 1 && mob[0].group === 'Relatórios e Dashboards';
 if (!mobOk) failures++;
-console.log(`${mobOk ? '✓' : '✗ FALHOU'} [mobile] /admin/fontes-dados?scope=report → ${JSON.stringify(mob)}`);
+console.log(`${mobOk ? '✓' : '✗ FALHOU'} [mobile] /admin/data-sources?scope=report → ${JSON.stringify(mob)}`);
 await page.screenshot({ path: `${OUT}/menu-fontes-mobile.png` });
 
 console.log(failures === 0 ? 'PASSOU (todos os casos)' : `FALHOU: ${failures} caso(s)`);

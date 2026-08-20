@@ -45,7 +45,7 @@ try {
   await page.fill('input[type=password]', 'admin123');
   await page.click('button[type=submit]');
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
-  await page.goto(`${BASE}/tarefa/${taskId}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/tasks/${taskId}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('text=Campo Obrigatório', { timeout: 15000 });
   await page.waitForTimeout(500);
 

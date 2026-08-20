@@ -47,7 +47,7 @@ try {
   await page.click('button[type=submit]');
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
-  await page.goto(`${BASE}/processos/editar?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/flows/edit?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-element-id="T005"]', { timeout: 20000 });
   await page.locator('[data-element-id="T005"]').click();
   await page.waitForSelector('section:has(h3:has-text("Rotinas"))', { timeout: 10000 });

@@ -67,7 +67,7 @@ for (const view of [{ name: 'web', width: 1280, height: 900 }, { name: 'mobile',
   const ctx = await browser.newContext({ viewport: { width: view.width, height: view.height }, deviceScaleFactor: 2 });
   const page = await ctx.newPage();
   await login(page);
-  await page.goto(`${BASE}/servico/${key}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/services/${key}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.septem-date-picker', { timeout: 12000 });
 
   // ── Item 4: grupos em ABAS ──
@@ -140,7 +140,7 @@ for (const view of [{ name: 'web', width: 1280, height: 900 }, { name: 'mobile',
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
   await login(page);
-  await page.goto(`${BASE}/processos/editar?key=${rtKey}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/flows/edit?key=${rtKey}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.djs-palette', { timeout: 20000 });
   await page.locator('header button, nav button', { hasText: 'Formulário' }).first().click();
   await page.waitForTimeout(2500);

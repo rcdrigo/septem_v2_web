@@ -70,7 +70,7 @@ try {
     // ── Preenchimento: inicia uma instância nova e abre a tarefa ────────────
     const inst = await api(token, '/api/v1/workflow/instances', 'POST', { key, data: {} });
     const taskId = inst.body.tasks[0].id;
-    await page.goto(`${BASE}/tarefa/${taskId}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/tasks/${taskId}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('input', { timeout: 15000 });
     await page.waitForTimeout(600);
 
@@ -120,7 +120,7 @@ try {
   await login(page);
   try {
     // Processo que já tem formulário com campos de texto (o mesmo das outras suítes).
-    await page.goto(`${BASE}/processos/editar?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/flows/edit?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
     await page.waitForSelector('[data-element-id="T005"]', { timeout: 20000 });
     await page.getByRole('button', { name: 'Formulário', exact: true }).click();
     await page.waitForTimeout(2500);

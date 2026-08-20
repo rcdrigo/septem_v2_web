@@ -115,7 +115,7 @@ const login = async (page) => {
 };
 
 const abrirBuilder = async (page, rkey) => {
-  await page.goto(`${BASE}/relatorios/editar?key=${rkey}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/reports/edit?key=${rkey}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('text=Origem dos dados', { timeout: 20000 });
 };
 
@@ -214,7 +214,7 @@ try {
   // ── 6. costura: o botão "publicar" da LISTA usa outra rota (PATCH status) ──
   // Ela também precisa migrar as chaves e, quando não dá para publicar, dizer ao
   // usuário onde resolver — o diálogo de escolha mora no editor, não aqui.
-  await page.goto(`${BASE}/admin/relatorios`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/admin/reports`, { waitUntil: 'networkidle' });
   await page.fill('input[type=search]', `F5 repetido ${rid}`);
   await page.waitForTimeout(1200);
   const linha = page.locator('tr', { hasText: `F5 repetido ${rid}` }).first();

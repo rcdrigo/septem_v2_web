@@ -20,7 +20,12 @@ export type Profile = {
   photoUrl: string | null;
 };
 
-/** Manda o código de redefinição. Responde 200 mesmo se a conta não existir. */
+/**
+ * Manda o código de redefinição. Responde 200 mesmo se a conta não existir.
+ *
+ * Pode responder **429** com `retryAfterSeconds` quando já houve um envio no último
+ * minuto — a regra é do servidor; a contagem regressiva da tela é só conveniência.
+ */
 export function forgotPassword(identifier: string) {
   return api.post<{ ok: true; maskedEmail: string | null }>(
     '/api/v1/auth/forgot-password',

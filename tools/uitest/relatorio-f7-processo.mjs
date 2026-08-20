@@ -54,7 +54,7 @@ try {
   await page.click('button[type=submit]');
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
-  await page.goto(`${BASE}/consultas/ver?key=${key}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/reports/view?key=${key}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('text=Processos', { timeout: 15000 });
   await page.waitForTimeout(1000);
 

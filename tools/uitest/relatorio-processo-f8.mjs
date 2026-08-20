@@ -113,7 +113,7 @@ try {
   await login(page);
 
   // ── Item 1: editar pelo relatório com o processo EM ANDAMENTO ────────────
-  await page.goto(`${BASE}/solicitacao/${execId}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/requests/${execId}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('h1', { timeout: 15000 });
   await page.waitForTimeout(1200);
 
@@ -206,7 +206,7 @@ try {
   const mob = await browser.newContext({ viewport: { width: 375, height: 812 }, deviceScaleFactor: 2 });
   const m = await mob.newPage();
   await login(m);
-  await m.goto(`${BASE}/solicitacao/${execId}`, { waitUntil: 'networkidle' });
+  await m.goto(`${BASE}/requests/${execId}`, { waitUntil: 'networkidle' });
   await m.waitForSelector('[role=tablist]', { timeout: 15000 });
   await m.waitForTimeout(1200);
   const larguras = await m.locator('[role=tablist]').evaluate((bar) => {

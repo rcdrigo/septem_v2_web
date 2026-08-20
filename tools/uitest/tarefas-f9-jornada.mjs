@@ -94,8 +94,8 @@ try {
   await login(page);
 
   // 1) Catálogo de serviços: achar o serviço e abri-lo (abre em aba nova).
-  await page.goto(`${BASE}/requisicoes`, { waitUntil: 'networkidle' });
-  await page.goto(`${BASE}/servico/${key}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/requests`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/services/${key}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid=iniciar-como-teste]', { timeout: 15000 });
 
   // 2) Iniciar COMO TESTE pelo checkbox.
@@ -111,7 +111,7 @@ try {
   check(inst?.isTest === true, '[jornada] a instância criada está marcada como teste');
 
   // 3) A 1ª tarefa — do analista pelo desenho — está comigo.
-  await page.goto(`${BASE}/tarefas`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/tasks`, { waitUntil: 'networkidle' });
   await page.click('[data-testid=abrir-filtros]');
   await page.fill('[data-testid=filtro-q]', String(rid));
   await page.waitForTimeout(1600);
@@ -162,7 +162,7 @@ try {
   check(Array.isArray(doAnalista.body.items), '[jornada] a lista do requisitante continua respondendo');
 
   // 7) Relatório do processo: concluído, com selo e a tramitação completa.
-  await page.goto(`${BASE}/solicitacao/${inst.id}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/requests/${inst.id}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('h1', { timeout: 15000 });
   await page.waitForTimeout(1500);
   const cabecalho = await page.locator('header').first().innerText();
@@ -181,7 +181,7 @@ try {
   const mobCtx = await browser.newContext({ viewport: { width: 375, height: 812 }, deviceScaleFactor: 2 });
   const m = await mobCtx.newPage();
   await login(m);
-  await m.goto(`${BASE}/servico/${key}`, { waitUntil: 'networkidle' });
+  await m.goto(`${BASE}/services/${key}`, { waitUntil: 'networkidle' });
   await m.waitForSelector('[data-testid=iniciar-como-teste]', { timeout: 15000 });
   await preencher(m, `jornada mobile ${rid}`);
   await m.locator('[data-testid=iniciar-como-teste]').check();
@@ -197,7 +197,7 @@ try {
     .filter((i) => i.processKey === key && i.isTest).sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))[0];
   check(instMob && instMob.id !== inst.id, '[mobile] uma nova instância de teste foi criada pelo celular');
 
-  await m.goto(`${BASE}/tarefas`, { waitUntil: 'networkidle' });
+  await m.goto(`${BASE}/tasks`, { waitUntil: 'networkidle' });
   await m.click('[data-testid=abrir-filtros]');
   await m.fill('[data-testid=filtro-q]', String(rid));
   await m.waitForTimeout(1600);

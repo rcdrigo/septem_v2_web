@@ -60,12 +60,12 @@ try {
   await login(page);
 
   // ══════════ 10b — ADMIN: criar manual (aba própria) + categoria (modal) + HTML source ══════════
-  await page.goto(`${BASE}/admin/manuais`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/admin/manuals`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid=novo-manual]', { timeout: 15000 });
   check(await page.locator('button[aria-pressed]', { hasText: 'Técnico' }).count() > 0, '[10b] aba Técnico aparece para o admin');
 
-  // Item 19: o editor abre em ABA PRÓPRIA (rota /manual/nova), não em modal.
-  await page.goto(`${BASE}/manual/nova`, { waitUntil: 'networkidle' });
+  // Item 19: o editor abre em ABA PRÓPRIA (rota /manuals/nova), não em modal.
+  await page.goto(`${BASE}/manuals/nova`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid=manual-titulo]', { timeout: 10000 });
   check(await page.locator('[data-testid=rich-text-editor]').count() === 1 && await page.locator('h1', { hasText: 'Novo manual' }).count() > 0,
     '[item19] editor de manual abre em página própria (aba), não em modal');
@@ -101,7 +101,7 @@ try {
   check(!!criadoNaApi, '[10b] manual criado pela tela (aba própria) é persistido');
 
   // manuais:10 — imagem e vídeo por URL no editor (nova aba).
-  await page.goto(`${BASE}/manual/nova`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/manuals/nova`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid=rich-text-editor]', { timeout: 10000 });
   await page.locator('[data-testid=rich-text-editor] [contenteditable]').click();
   page.once('dialog', (d) => d.accept(`https://ex.com/img-${rid}.png`));
@@ -115,7 +115,7 @@ try {
   check(/youtube\.com\/embed\/vid/.test(editorHtml), '[10b] botão de vídeo converte o link do YouTube em iframe de embed');
 
   // Público interno mostra as unidades; externo esconde (manuais:12) — nova aba.
-  await page.goto(`${BASE}/manual/nova`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/manuals/nova`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid=manual-publico]', { timeout: 10000 });
   await page.locator('[data-testid=manual-publico]').selectOption('externo');
   await page.waitForTimeout(300);
@@ -130,7 +130,7 @@ try {
   check(await page.locator('[data-testid=manual-categoria]').isDisabled(), '[10b] com artigo-pai a categoria fica bloqueada (herdada)');
 
   // Lista mostra o manual criado + aba Técnico lista os auto-gerados (10d).
-  await page.goto(`${BASE}/admin/manuais`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/admin/manuals`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid=lista-manuais]', { timeout: 15000 });
   check(await page.locator('[data-testid=lista-manuais]').innerText().then((t) => t.includes(tituloNovo)), '[10b] o novo manual aparece na lista');
   await page.locator('button[aria-pressed]', { hasText: 'Técnico' }).click();
@@ -237,10 +237,10 @@ try {
   const mob = await browser.newContext({ viewport: { width: 375, height: 812 }, deviceScaleFactor: 2 });
   const m = await mob.newPage();
   await login(m);
-  await m.goto(`${BASE}/admin/manuais`, { waitUntil: 'networkidle' });
+  await m.goto(`${BASE}/admin/manuals`, { waitUntil: 'networkidle' });
   await m.waitForSelector('[data-testid=novo-manual]', { timeout: 15000 });
   check(await semOverflow(m), '[mobile] lista de manuais sem overflow horizontal');
-  await m.goto(`${BASE}/manual/nova`, { waitUntil: 'networkidle' });
+  await m.goto(`${BASE}/manuals/nova`, { waitUntil: 'networkidle' });
   await m.waitForSelector('[data-testid=manual-titulo]', { timeout: 10000 });
   check(await clipped(m, '[data-testid=manual-titulo], [data-testid=manual-categoria], [data-testid=manual-publico], [data-testid=rich-text-editor] button') === 0, '[mobile] editor de manual (aba própria) sem controles cortados');
   check(await semOverflow(m), '[mobile] editor de manual sem overflow horizontal');

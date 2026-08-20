@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, useLocation, type RouteObject } from 'react-router-dom';
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom';
 import { AppShell } from './layout/AppShell';
 import { LoginPage } from './pages/LoginPage';
 import { ModeladorPage } from './pages/modelador/ModeladorPage';
@@ -31,12 +31,8 @@ import { GuidePage } from './pages/GuidePage';
 import { FonteDadosPage } from './pages/FonteDadosPage';
 import { ManualEditorPage } from './pages/ManualEditorPage';
 import { StubPage } from './pages/StubPage';
-
-/** Redirect que preserva a query string (ex.: /modelador?key=x → /processos/editar?key=x). */
-function RedirectWithSearch({ to }: { to: string }) {
-  const { search } = useLocation();
-  return <Navigate to={to + search} replace />;
-}
+import { SearchX } from 'lucide-react';
+import { childPath, routes } from './lib/routes';
 
 /** Açúcar para registrar uma rota que ainda só tem placeholder. */
 function stub(path: string, title: string, opts?: { phase?: string; hint?: string }): RouteObject {
@@ -45,79 +41,84 @@ function stub(path: string, title: string, opts?: { phase?: string; hint?: strin
 
 export const router = createBrowserRouter(
   [
-    { path: '/login', element: <LoginPage /> },
+    { path: routes.login, element: <LoginPage /> },
     // Guide público (Fase 10) — fora do AppShell, acessível deslogado.
-    { path: '/guide', element: <GuidePage /> },
+    { path: routes.guide, element: <GuidePage /> },
     // Aba limpa (sem menus) para preencher e iniciar um serviço.
-    { path: '/servico/:processKey', element: <ServicoFormPage /> },
+    { path: '/services/:processKey', element: <ServicoFormPage /> },
     // Tarefa pendente em aba própria (sem menus), como a de início.
-    { path: '/tarefa/:taskId', element: <TarefaPage /> },
+    { path: '/tasks/:taskId', element: <TarefaPage /> },
     // Relatório/acompanhamento da solicitação em aba própria (sem menus).
-    { path: '/solicitacao/:instanceId', element: <SolicitacaoPage /> },
+    { path: '/requests/:instanceId', element: <SolicitacaoPage /> },
     // Criar/editar fonte de dados em aba própria (sem menus).
-    { path: '/fonte-dados/:id', element: <FonteDadosPage /> },
+    { path: '/data-sources/:id', element: <FonteDadosPage /> },
     // Criar/editar manual em aba própria (sem menus) — como a fonte de dados.
-    { path: '/manual/:id', element: <ManualEditorPage /> },
+    { path: '/manuals/:id', element: <ManualEditorPage /> },
     // Abrem em aba própria a partir do editor de modelos de documento (Fase 6e).
-    { path: '/campos-servico', element: <CamposServicoPage /> },
-    { path: '/manual-templates', element: <ManualTemplatesPage /> },
+    { path: routes.serviceFields, element: <CamposServicoPage /> },
+    { path: routes.manualTemplates, element: <ManualTemplatesPage /> },
     // Modelador em aba própria (sem menu lateral) — aberto via "Novo/Editar".
-    { path: '/processos/editar', element: <ModeladorPage /> },
+    { path: routes.flowEdit, element: <ModeladorPage /> },
     // Builder de relatórios em aba própria (Admin › Relatórios › Builder).
-    { path: '/relatorios/editar', element: <RelatorioBuilderPage /> },
+    { path: routes.reportEdit, element: <RelatorioBuilderPage /> },
     // Consulta (relatório publicado) em aba própria — aberta do catálogo (F7.1).
-    { path: '/consultas/ver', element: <ConsultaViewPage /> },
+    { path: routes.reportView, element: <ConsultaViewPage /> },
     // Unidade organizacional em aba própria (Fase 3) — imprimível.
-    { path: '/unidade', element: <UnidadePage /> },
+    { path: routes.orgUnit, element: <UnidadePage /> },
     {
       path: '/',
       element: <AppShell />,
       children: [
-        { index: true, element: <Navigate to="/tarefas" replace /> },
+        { index: true, element: <Navigate to={routes.tasks} replace /> },
 
         // --- Geral ---------------------------------------------------------
-        stub('dashboard', 'Dashboard', { phase: 'Fase 7' }),
-        { path: 'tarefas', element: <TarefasPage /> },
-        { path: 'requisicoes', element: <InstanciasPage title="Requisições" lockMine initialStatus="em_andamento" /> },
-        // Consultas = catálogo de relatórios publicados (req. 8).
-        { path: 'consultas', element: <ConsultasPage /> },
-        { path: 'organograma', element: <OrganogramaPage /> },
+        stub(childPath(routes.dashboard), 'Dashboard', { phase: 'Fase 7' }),
+        { path: childPath(routes.tasks), element: <TarefasPage /> },
+        { path: childPath(routes.requests), element: <InstanciasPage title="Requisições" lockMine initialStatus="em_andamento" /> },
+        // /reports = catálogo de consultas (relatórios publicados) (req. 8).
+        { path: childPath(routes.reports), element: <ConsultasPage /> },
+        { path: childPath(routes.orgchart), element: <OrganogramaPage /> },
 
         // --- Admin › Processos --------------------------------------------
-        { path: 'admin/processos', element: <ProcessosPage /> },
-        // O modelador agora abre em aba própria (rota /processos/editar, fora do shell).
-        { path: 'admin/processos/editar', element: <RedirectWithSearch to="/processos/editar" /> },
+        { path: childPath(routes.adminFlows), element: <ProcessosPage /> },
         // Categorias de processos: geridas no modal da tela Admin › Processos.
-        { path: 'admin/processos/categorias', element: <Navigate to="/admin/processos" replace /> },
-        { path: 'admin/modelos-email', element: <ModelosEmailPage /> },
-        { path: 'admin/modelos-doc', element: <ModelosDocumentoPage /> },
-        { path: 'admin/fontes-dados', element: <FontesDadosPage /> },
+        { path: childPath(routes.adminFlowCategories), element: <Navigate to={routes.adminFlows} replace /> },
+        { path: childPath(routes.adminEmailTemplates), element: <ModelosEmailPage /> },
+        { path: childPath(routes.adminDocumentTemplates), element: <ModelosDocumentoPage /> },
+        { path: childPath(routes.adminDataSources), element: <FontesDadosPage /> },
 
         // --- Admin › Relatórios e Dashboards ------------------------------
-        { path: 'admin/relatorios', element: <RelatoriosPage /> },
+        { path: childPath(routes.adminReports), element: <RelatoriosPage /> },
         // Categorias de relatórios: geridas no modal da tela Admin › Relatórios.
-        { path: 'admin/relatorios/categorias', element: <Navigate to="/admin/relatorios" replace /> },
-        stub('admin/dashboards', 'Dashboards', { phase: 'Fase 7' }),
+        { path: childPath(routes.adminReportCategories), element: <Navigate to={routes.adminReports} replace /> },
+        stub(childPath(routes.adminDashboards), 'Dashboards', { phase: 'Fase 7' }),
 
         // --- Admin › Configurações ----------------------------------------
-        { path: 'admin/parametros', element: <ParametrosPage /> },
-        { path: 'admin/manuais', element: <ManuaisPage /> },
-        { path: 'admin/usuarios', element: <UsuariosPage /> },
-        { path: 'admin/unidades', element: <UnidadesPage /> },
-        { path: 'admin/posicoes', element: <PosicoesPage /> },
-        { path: 'admin/perfis', element: <PerfisPage /> },
-        { path: 'admin/logs', element: <LogsPage /> },
+        { path: childPath(routes.adminSettings), element: <ParametrosPage /> },
+        { path: childPath(routes.adminManuals), element: <ManuaisPage /> },
+        { path: childPath(routes.adminUsers), element: <UsuariosPage /> },
+        { path: childPath(routes.adminOrgUnits), element: <UnidadesPage /> },
+        { path: childPath(routes.adminPositions), element: <PosicoesPage /> },
+        { path: childPath(routes.adminProfiles), element: <PerfisPage /> },
+        { path: childPath(routes.adminLogs), element: <LogsPage /> },
 
         // --- Conta / rodapé ------------------------------------------------
-        { path: 'me', element: <MeuDadosPage /> },
-        // Mudar senha virou MODAL dentro de Meus dados (Fase 2) — a rota antiga redireciona.
-        { path: 'me/senha', element: <Navigate to="/me" replace /> },
-        stub('suporte', 'Suporte', { phase: 'Fase 7' }),
+        { path: childPath(routes.me), element: <MeuDadosPage /> },
+        stub(childPath(routes.support), 'Suporte', { phase: 'Fase 7' }),
 
-        // Back-compat: a rota antiga /modelador agora abre o modelador standalone.
-        { path: 'modelador', element: <RedirectWithSearch to="/processos/editar" /> },
-
-        { path: '*', element: <StubPage title="Página não encontrada" hint="O endereço acessado não existe." /> },
+        // Endereço inexistente (inclusive os antigos em português, descartados na
+        // Fase 1): 404 com saída, não beco sem saída.
+        {
+          path: '*',
+          element: (
+            <StubPage
+              title="Página não encontrada"
+              icon={SearchX}
+              hint="Os endereços do sistema mudaram para o inglês. Se você chegou por um link antigo, ele não vale mais."
+              action={{ label: 'Ir para Tarefas pendentes', to: routes.tasks }}
+            />
+          ),
+        },
       ],
     },
   ],

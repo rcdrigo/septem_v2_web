@@ -62,7 +62,7 @@ for (const view of [
   if (mobile) await page.click('button[aria-label="Abrir menu"]');
   await page.getByRole('button', { name: 'Configurações' }).first().click();
   await page.getByRole('link', { name: 'Parâmetros do sistema' }).first().click();
-  await page.waitForURL(/\/admin\/parametros/, { timeout: 10000 });
+  await page.waitForURL(/\/admin\/settings/, { timeout: 10000 });
   await page.waitForSelector('[data-testid=form-geral]', { timeout: 10000 });
   check(true, `[${view.name}] menu Configurações › Parâmetros do sistema abre a página`);
 
@@ -186,7 +186,7 @@ for (const view of [
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
   await login(page);
-  await page.goto(BASE + '/admin/parametros', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/admin/settings', { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid=form-geral]');
   await page.fill('input[name=clienteNome]', ORIG.cliente);
   await page.fill('input[name=ambienteNome]', ORIG.ambiente);

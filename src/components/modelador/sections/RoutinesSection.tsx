@@ -4,6 +4,7 @@ import { useExtensionState } from '@/lib/useExtensionState';
 import { openTab } from '@/lib/nav';
 import { DataSourceSelect } from '../fields/DataSourceSelect';
 import type { Routines } from '@/lib/bpmn-helpers';
+import { routes } from '@/lib/routes';
 
 type Props = {
   modeler: any;
@@ -39,7 +40,7 @@ export function RoutinesSection({ modeler, element }: Props) {
           esconde o seu — showNew={false} — para não repetir o botão 4×). */}
       <button
         type="button"
-        onClick={() => openTab('/fonte-dados/nova?scope=form')}
+        onClick={() => openTab(`${routes.dataSource('nova')}?scope=form`)}
         className="inline-flex w-fit items-center gap-1 rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
       >
         <Plus size={13} /> Nova fonte de dados

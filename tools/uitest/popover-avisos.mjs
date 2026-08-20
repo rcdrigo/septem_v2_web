@@ -21,7 +21,7 @@ try {
   await page.click('button[type=submit]');
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
-  await page.goto(`${BASE}/processos/editar?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/flows/edit?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-element-id="G1"]', { timeout: 20000 });
   await page.waitForTimeout(1000);
 
@@ -82,7 +82,7 @@ try {
   await page.waitForTimeout(200);
 
   // Menu do usuário (SidebarUser) — numa página do AppShell (align=left, fullWidth).
-  await page.goto(BASE + '/admin/usuarios', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/admin/users', { waitUntil: 'networkidle' });
   await page.waitForTimeout(800);
   await page.locator('aside span', { hasText: 'admin@prefeitura-x.local' }).first().click();
   await page.waitForTimeout(300);

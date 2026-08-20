@@ -71,7 +71,7 @@ try {
     // ── 1) Admin liga o 2FA na aba Segurança (pela tela) ────────────────────
     await login(page, 'admin@prefeitura-x.local', 'admin123');
     await page.waitForURL((x) => !x.pathname.includes('login'), { timeout: 15000 });
-    await page.goto(BASE + '/admin/parametros', { waitUntil: 'networkidle' });
+    await page.goto(BASE + '/admin/settings', { waitUntil: 'networkidle' });
     await page.getByRole('tab', { name: 'Segurança' }).click();
     await page.waitForSelector('[data-testid=form-seguranca]');
     await page.selectOption('select[name=twoFactorMode]', 'internal');
@@ -123,8 +123,16 @@ try {
     await page.fill('input[name=photoUrl]', 'https://picsum.photos/id/64/200/200');
     await page.getByRole('button', { name: 'Salvar' }).click();
     await page.waitForSelector('text=Dados salvos.', { timeout: 10000 });
-    await page.reload({ waitUntil: 'networkidle' });
+    // `networkidle` aqui é sorteio sob carga: o teto é 30 s e a máquina pode estar
+    // com outra bateria e2e rodando (foi o que derrubou esta suíte no gate de 18/08).
+    // Esperar o VALOR chegar é determinístico e ainda mais forte — prova que o dado
+    // veio do servidor, e não do render inicial com o formulário em branco.
+    await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-testid=form-meus-dados]');
+    await page.waitForFunction(
+      () => document.querySelector('input[name=name]')?.value === 'Servidor Teste',
+      null, { timeout: 20000 },
+    );
     check(
       (await page.locator('input[name=name]').inputValue()) === 'Servidor Teste' &&
         (await page.locator('input[name=matricula]').inputValue()) === '99887',

@@ -61,7 +61,7 @@ try {
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
   // Abre o processo válido recém-criado (key conhecida → round-trip determinístico).
-  await page.goto(`${BASE}/processos/editar?key=${key}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/flows/edit?key=${key}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.djs-palette', { timeout: 15000 });
   await page.waitForSelector('[data-element-id="T"]', { timeout: 15000 });
   await page.waitForTimeout(1200);

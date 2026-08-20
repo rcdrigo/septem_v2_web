@@ -12,7 +12,7 @@ function check(ok, msg) {
 // ── AUTOSSUFICIÊNCIA ─────────────────────────────────────────────────────────
 // A suíte dependia de já existir um relatório PUBLICADO na categoria "Financeiro".
 // Isso se perdia entre rodadas (as versões viram `inactive`) e, com mais de 100
-// publicados no tenant, /consultas nem carrega tudo (pageSize 100, sem paginação).
+// publicados no tenant, /reports nem carrega tudo (pageSize 100, sem paginação).
 // Agora ela cria e publica o próprio relatório na categoria antes de olhar a tela —
 // e o apaga no fim.
 const rid = Math.floor(Math.random() * 1e9);
@@ -57,7 +57,7 @@ await page.click('button[type=submit]');
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
 // ── 1. Consultas: agrupamento, cores e filtro ────────────────────────────────
-await page.goto(BASE + '/consultas', { waitUntil: 'networkidle' });
+await page.goto(BASE + '/reports', { waitUntil: 'networkidle' });
 await page.waitForTimeout(500);
 await page.screenshot({ path: `${OUT}/consultas-desktop.png` });
 
@@ -88,7 +88,7 @@ await page.screenshot({ path: `${OUT}/consultas-mobile.png` });
 await page.setViewportSize({ width: 1280, height: 900 });
 
 // ── 2. Menu: Categorias sumiu do grupo Relatórios ────────────────────────────
-await page.goto(BASE + '/admin/relatorios', { waitUntil: 'networkidle' });
+await page.goto(BASE + '/admin/reports', { waitUntil: 'networkidle' });
 await page.waitForTimeout(400);
 const menuItems = await page.evaluate(() => {
   const groups = [...document.querySelectorAll('aside li')];

@@ -12,7 +12,7 @@ await page.fill('input[type=password]', 'admin123');
 await page.click('button[type=submit]');
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
-await page.goto('http://localhost:5173/servico/teste_condicoes_ui', { waitUntil: 'networkidle' });
+await page.goto('http://localhost:5173/services/teste_condicoes_ui', { waitUntil: 'networkidle' });
 await page.waitForSelector('h1', { timeout: 15000 });
 await page.waitForTimeout(1000);
 await page.screenshot({ path: `${OUT}/servico-header.png` });

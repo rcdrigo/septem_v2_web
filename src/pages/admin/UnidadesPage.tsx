@@ -19,6 +19,7 @@ import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
 import { slugify } from '@/lib/slugify';
 import { OrgUnitTree } from '@/components/org-units/OrgUnitTree';
+import { routes } from '@/lib/routes';
 
 /**
  * Admin › Configurações › Unidades — IF1.c. Árvore de unidades organizacionais
@@ -87,7 +88,7 @@ export function UnidadesPage() {
             variant="manage"
             cardTestId="unidade-linha"
             ariaLabel="Árvore de unidades organizacionais"
-            onOpen={(node) => openTab(`unidade?id=${node.id}`)}
+            onOpen={(node) => openTab(`${routes.orgUnit}?id=${node.id}`)}
             onAddChild={(node) => setCreateCtx({ parentId: node.id, parentName: node.name })}
             onEdit={setEditUnit}
             onDelete={askDelete}

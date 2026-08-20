@@ -15,7 +15,7 @@ await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 await page.waitForTimeout(1000);
 check(await page.evaluate(() => !!localStorage.getItem('septem.tenant')), 'tenant cacheado no localStorage após o bootstrap');
 
-// Aba STANDALONE (/servico) com /api/tenant/config atrasado 4s. O cabeçalho de
+// Aba STANDALONE (/services) com /api/tenant/config atrasado 4s. O cabeçalho de
 // execução não exibe mais o nome do cliente (decisão de produto — servico-header.mjs
 // exige o header sem a linha de ambiente/cliente), então o que se prova aqui é o
 // efeito que resta do cache: o branding do tenant já está APLICADO antes do fetch
@@ -24,7 +24,7 @@ await page.route('**/api/tenant/config', async (r) => {
   await new Promise((res) => setTimeout(res, 4000));
   await r.continue();
 });
-await page.goto('http://localhost:5173/servico/teste_condicoes_ui', { waitUntil: 'domcontentloaded' });
+await page.goto('http://localhost:5173/services/teste_condicoes_ui', { waitUntil: 'domcontentloaded' });
 await page.waitForTimeout(1200); // bem antes dos 4s do fetch
 const standalone = await page.evaluate(() => ({
   og: document.querySelector('meta[property="og:title"]')?.content ?? '',
@@ -34,7 +34,7 @@ check(standalone.og.includes('Prefeitura X'), `aba standalone aplica o branding 
 check(!/\bSEPTEM\b/.test(standalone.header), 'sem fallback "Septem" no header (fim do flash)');
 
 // LOGIN: painel usa copy fixa — não depende do tenant, logo não pisca.
-// Contexto NOVO em vez de limpar o localStorage: a aba /servico também faz bootstrap
+// Contexto NOVO em vez de limpar o localStorage: a aba /services também faz bootstrap
 // (precisa das permissões do usuário), e a resposta atrasada do /tenant/config regrava
 // o cache logo depois do clear — "sem tenant" só é verdade num contexto que nunca teve.
 const limpo = await browser.newContext({ viewport: { width: 1280, height: 900 } });

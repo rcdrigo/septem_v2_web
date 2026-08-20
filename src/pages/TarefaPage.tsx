@@ -3,7 +3,7 @@ import { TaskView } from './TarefasPage';
 import { Toaster } from '@/components/ui/Toaster';
 
 /**
- * Tarefa pendente em tela cheia (rota /tarefa/:taskId, fora do AppShell — sem
+ * Tarefa pendente em tela cheia (rota /tasks/:taskId, fora do AppShell — sem
  * menus laterais), no mesmo padrão da tarefa de início. Aberta em nova aba.
  *
  * Monta o próprio <Toaster/> — fora do AppShell não há o global, e sem ele o

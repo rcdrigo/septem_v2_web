@@ -63,7 +63,7 @@ try {
   const svc = (await api(token, '/api/v1/document-templates/services')).body?.[0]?.key;
   for (const [nome, url] of [
     ['manual', '/manual-templates'],
-    ['campos', svc ? `/campos-servico?key=${encodeURIComponent(svc)}` : null],
+    ['campos', svc ? `/service-fields?key=${encodeURIComponent(svc)}` : null],
   ]) {
     if (!url) continue;
     const ctx = await browser.newContext({ viewport: { width: 375, height: 812 } });

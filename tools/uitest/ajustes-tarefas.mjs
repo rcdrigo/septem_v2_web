@@ -33,10 +33,10 @@ for (const view of [{ name: 'web', width: 1280, height: 900 }, { name: 'mobile',
   await page.waitForTimeout(800); // deixa o badge inicial buscar
 
   // ── Item 13: focar a página de Tarefas atualiza o summary ──
-  await page.goto(BASE + '/requisicoes', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/requests', { waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
   summaryHits = 0; // zera antes de entrar em Tarefas
-  await page.goto(BASE + '/tarefas', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/tasks', { waitUntil: 'networkidle' });
   await page.waitForTimeout(1200);
   check(summaryHits >= 1, `[${view.name}] entrar em Tarefas dispara refetch do summary (item 13) — ${summaryHits}`);
 

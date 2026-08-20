@@ -20,7 +20,7 @@ try {
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
   // Processo novo → Formulário.
-  await page.goto(`${BASE}/processos/editar`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/flows/edit`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.djs-palette', { timeout: 15000 });
   await page.waitForTimeout(1000);
   await page.locator('header button, nav button', { hasText: 'Formulário' }).first().click();

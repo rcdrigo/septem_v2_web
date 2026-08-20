@@ -8,6 +8,7 @@ import { LoadingSplash } from '@/pages/LoadingSplash';
 import { useSessionStore } from '@/stores/session';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { MENU } from './menu/menu-config';
+import { routes } from '@/lib/routes';
 
 /** Busca recursiva do rótulo do menu que casa com o pathname (p/ título da aba). */
 function findMenuLabel(node: unknown, path: string): string | null {
@@ -48,7 +49,7 @@ export function AppShell() {
   useDocumentTitle(findMenuLabel(MENU, location.pathname));
 
   if (status === 'idle' || status === 'booting') return <LoadingSplash />;
-  if (status === 'unauthenticated') return <Navigate to="/login" replace state={{ from: location }} />;
+  if (status === 'unauthenticated') return <Navigate to={routes.login} replace state={{ from: location }} />;
   if (status === 'error') return <LoadingSplash message="Não foi possível conectar ao backend." />;
 
   return (

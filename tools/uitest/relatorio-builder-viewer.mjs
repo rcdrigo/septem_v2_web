@@ -11,7 +11,7 @@ function check(ok, msg) {
 
 // ── AUTOSSUFICIÊNCIA ─────────────────────────────────────────────────────────
 // A suíte dependia dos 3 relatórios demo do seeder aparecerem no catálogo. Mas
-// /consultas carrega no máximo 100 publicados (useReportsList pageSize:100, sem
+// /reports carrega no máximo 100 publicados (useReportsList pageSize:100, sem
 // paginação): num tenant com mais que isso, os demo simplesmente somem da tela e a
 // suíte quebrava por dado alheio. Agora ela CLONA os 3 demo (mesma fonte, mesma
 // definição, nome com rid) e trabalha nas cópias — que, sendo as mais recentes,
@@ -69,11 +69,11 @@ await page.click('button[type=submit]');
 await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
 // Os cards do catálogo são <article> e o "Abrir" leva o relatório para uma ABA
-// PRÓPRIA (/consultas/ver?key=) — não há mais viewer embutido na página.
+// PRÓPRIA (/reports/view?key=) — não há mais viewer embutido na página.
 const cardDoRelatorio = (nome) => page.locator('section .grid > article', { hasText: nome });
 
 async function abrirRelatorio(nome) {
-  await page.goto(BASE + '/consultas', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/reports', { waitUntil: 'networkidle' });
   const [popup] = await Promise.all([
     ctx.waitForEvent('page', { timeout: 20000 }),
     cardDoRelatorio(nome).locator('button', { hasText: 'Abrir' }).first().click(),
@@ -84,7 +84,7 @@ async function abrirRelatorio(nome) {
 
 // ── 1. Consultas: abrir o painel e conferir blocos ───────────────────────────
 let viewer = await abrirRelatorio(painel.nome);
-check(/\/consultas\/ver\?key=/.test(viewer.url()), `"Abrir" leva o relatório para a aba própria (${new URL(viewer.url()).pathname})`);
+check(/\/reports\/view\?key=/.test(viewer.url()), `"Abrir" leva o relatório para a aba própria (${new URL(viewer.url()).pathname})`);
 await viewer.waitForSelector('text=Total de despesas', { timeout: 20000 });
 await viewer.waitForTimeout(800);
 await viewer.screenshot({ path: `${OUT}/viewer-desktop.png`, fullPage: true });
@@ -177,7 +177,7 @@ await viewer.close();
 const cardsDoGrid = () => page.locator('section', { hasText: 'Componentes do relatório' }).last().locator('[draggable="true"]');
 
 // ── 2. Builder: abrir, ver campos da origem, adicionar bloco, salvar, preview ─
-await page.goto(`${BASE}/relatorios/editar?key=${painel.key}`, { waitUntil: 'networkidle' });
+await page.goto(`${BASE}/reports/edit?key=${painel.key}`, { waitUntil: 'networkidle' });
 await page.waitForSelector('text=Origem dos dados', { timeout: 15000 });
 await page.waitForTimeout(600);
 await page.screenshot({ path: `${OUT}/builder-desktop.png`, fullPage: true });
@@ -229,11 +229,11 @@ check(previewOk, 'preview executa o rascunho com dados reais + timestamp');
 await page.screenshot({ path: `${OUT}/builder-preview.png`, fullPage: true });
 
 // catálogo continua servindo a v1 publicada (rascunho v2 não vazou)
-await page.goto(BASE + '/consultas', { waitUntil: 'networkidle' });
+await page.goto(BASE + '/reports', { waitUntil: 'networkidle' });
 check(await cardDoRelatorio(painel.nome).count() > 0, 'catálogo segue com a versão publicada após criar rascunho v2');
 
 // ── 3. Builder: controles avançados e regras de acesso ──────────────────────
-await page.goto(`${BASE}/relatorios/editar?key=${painel.key}`, { waitUntil: 'networkidle' });
+await page.goto(`${BASE}/reports/edit?key=${painel.key}`, { waitUntil: 'networkidle' });
 await page.waitForSelector('text=Origem dos dados', { timeout: 15000 });
 await page.waitForTimeout(600);
 

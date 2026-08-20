@@ -83,7 +83,7 @@ for (const view of [
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
   // O usuário vai em Tarefas e lê o prazo das duas tarefas.
-  await page.goto(BASE + '/tarefas', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/tasks', { waitUntil: 'networkidle' });
   await page.waitForTimeout(1200);
   await page.screenshot({ path: `${OUT}/prazo-horas-uteis-${view.name}.png`, fullPage: true });
 

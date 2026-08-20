@@ -55,7 +55,7 @@ page.on('console',m=>{if(m.type()==='error')console.log('CONSOLE ERR:',m.text().
 await page.goto(BASE+'/login',{waitUntil:'networkidle'});
 await page.fill('input[name=identifier]','admin@prefeitura-x.local');await page.fill('input[type=password]','admin123');
 await page.click('button[type=submit]');await page.waitForURL(u=>!u.pathname.includes('login'));
-await page.goto(`${BASE}/processos/editar?key=${key}`,{waitUntil:'networkidle'});
+await page.goto(`${BASE}/flows/edit?key=${key}`,{waitUntil:'networkidle'});
 await page.waitForSelector('[data-element-id="T005"]',{state:'attached',timeout:20000});
 await page.getByRole('button',{name:'Formulário',exact:true}).click();
 await page.waitForTimeout(2500);
