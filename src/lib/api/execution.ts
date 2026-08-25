@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { fetchTaskSignatures } from '@/lib/upload';
 
 export type StartedInstance = { executionId: string; status: string; tasks: { id: string; name: string | null }[]; nextTaskForMe?: string | null };
 export type RequestSummary = { label: string; value: string };
@@ -37,6 +38,35 @@ export type TaskDetail = {
 export type CompleteResult = { taskStatus: string; executionStatus: string; pendingTasks: number; executionId?: string; nextTaskForMe?: string | null };
 
 const execKeys = { tasks: ['workflow', 'tasks'] as const, summary: ['workflow', 'tasks', 'summary'] as const, task: (id: string) => ['workflow', 'task', id] as const };
+
+/**
+ * Assinaturas dos anexos da tarefa (Fase 7a/7c). Fica aqui, com react-query, porque DOIS
+ * lugares precisam do mesmo dado — o ícone no anexo (`ReactForm`) e os botões de
+ * conclusão (`TaskView`). Buscar em cada um daria duas requisições e, pior, dois estados
+ * que divergem: o ícone verde com o botão ainda bloqueado.
+ */
+export const signatureKeys = { task: (id: string) => ['workflow', 'signatures', id] as const };
+
+export function useTaskSignatures(taskId: string | null | undefined) {
+  return useQuery({
+    queryKey: signatureKeys.task(taskId ?? ''),
+    queryFn: () => fetchTaskSignatures(taskId!),
+    enabled: !!taskId,
+    // Tarefa sem assinatura configurada responde normalmente (listas vazias); erro real
+    // não vale retry — a tela apenas não mostra assinatura.
+    retry: false,
+  });
+}
+
+/** Assina todos os documentos pendentes da tarefa (Fase 7c). */
+export function useSignAll() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (taskId: string) =>
+      api.post<{ assinados: string[]; total: number }>(`/api/v1/workflow/tasks/${taskId}/sign-all`, {}),
+    onSuccess: (_r, taskId) => qc.invalidateQueries({ queryKey: signatureKeys.task(taskId) }),
+  });
+}
 const TASKS_REFETCH_INTERVAL_MS = 60_000;
 /** Fase 9: a lista de tarefas se atualiza sozinha a cada 5 minutos. */
 export const TASKS_LIST_REFETCH_INTERVAL_MS = 300_000;

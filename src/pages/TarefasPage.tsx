@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
-import { AlertCircle, ArrowDownAZ, ArrowRight, ArrowUpAZ, CheckCircle2, Clock, ExternalLink, Inbox, LayoutGrid, LifeBuoy, RotateCw, SlidersHorizontal, Table as TableIcon, User, X } from 'lucide-react';
-import { useTasks, useTask, useCompleteTask, useSaveTask, type TaskButton, type TaskFilters, type TaskListItem } from '@/lib/api/execution';
+import { AlertCircle, ArrowDownAZ, ArrowRight, ArrowUpAZ, CheckCircle2, Clock, ExternalLink, FileSignature, Inbox, LayoutGrid, LifeBuoy, RotateCw, SlidersHorizontal, Table as TableIcon, User, X } from 'lucide-react';
+import { useTasks, useTask, useCompleteTask, useSaveTask, useTaskSignatures, useSignAll, type TaskButton, type TaskFilters, type TaskListItem } from '@/lib/api/execution';
+import { estaAssinado } from '@/lib/upload';
 import { TestBadge } from '@/components/execution/TestBadge';
 import { ReactForm, FormSkeleton, type ReactFormHandle } from '@/components/form/ReactForm';
 import { openTab, navTo } from '@/lib/nav';
@@ -424,6 +425,15 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
   const task = useTask(taskId);
   const complete = useCompleteTask();
   const save = useSaveTask();
+  const signAll = useSignAll();
+  // ── Assinatura na conclusão (Fase 7c) ────────────────────────────────────
+  // Mesmo cache que o ícone do anexo lê, de propósito: dois fetches dariam dois
+  // estados e o botão poderia continuar bloqueado com tudo já assinado.
+  //
+  // ⚠️ Fica AQUI, junto dos outros hooks: abaixo há um `return` antecipado (tela de
+  // conclusão) e um hook depois dele quebra a ordem — "Rendered fewer hooks than
+  // expected", com a tela inteira caindo assim que a tarefa é concluída.
+  const assinaturas = useTaskSignatures(taskId);
   const fillRef = useRef<ReactFormHandle>(null);
   const [done, setDone] = useState<{ nextTaskForMe?: string | null; executionId?: string } | null>(null);
   // Botão com "Obrigar justificativa": guarda o contexto até o usuário digitar e confirmar.
@@ -468,27 +478,70 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
   if (done) return <CompletionScreen kind="task" next={done.nextTaskForMe} executionId={done.executionId} onClose={onClose} />;
 
   const buttons = task.data?.buttons ?? [];
+
+  const pendentes = (assinaturas.data?.documentos ?? [])
+    .filter((d) => d.fileUrl && !estaAssinado(d))
+    .map((d) => d.fieldKey);
+  const exigeAssinatura = !!assinaturas.data?.required && pendentes.length > 0;
+  const podeLote = !!assinaturas.data?.batch;
+  const avisoAssinatura = 'Assine os documentos para poder concluir esta tarefa.';
+
+  async function assinarLote() {
+    try {
+      await signAll.mutateAsync(taskId);
+      toast.success('Documentos assinados.');
+    } catch {
+      toast.error('Não foi possível assinar os documentos.');
+    }
+  }
+
   const completionActions: ExecutionAction[] = buttons.length === 0
     ? [{
         id: '__complete',
         label: 'Concluir',
         loadingLabel: 'Concluindo…',
         icon: <CheckCircle2 size={15} aria-hidden="true" />,
+        // Sem botões configurados a conclusão VALIDA o formulário (default do
+        // servidor), então o bloqueio vale aqui também.
+        hint: exigeAssinatura ? avisoAssinatura : undefined,
         onClick: () => finish(),
-        disabled: complete.isPending || task.isLoading,
+        disabled: exigeAssinatura || complete.isPending || task.isLoading,
         loading: complete.isPending,
       }]
-    : buttons.map((button) => ({
-        id: button.id,
-        label: button.label,
-        hint: button.hint,
-        icon: button.icon ? <i className={button.icon} aria-hidden="true" /> : undefined,
-        onClick: () => finish(button),
-        disabled: complete.isPending || task.isLoading,
-        loading: complete.isPending,
-        loadingLabel: 'Concluindo…',
-        style: button.primaryColor ? { backgroundColor: button.primaryColor, color: button.textColor ?? '#fff' } : undefined,
-      }));
+    : buttons.map((button) => {
+        // Só os botões que VALIDAM o formulário são bloqueados. Devolução e pedido de
+        // ajuste continuam clicáveis — é o requisito literal, e é o que permite
+        // devolver um documento justamente por não querer assiná-lo.
+        const bloqueado = exigeAssinatura && (button.validateForm ?? true);
+        return {
+          id: button.id,
+          label: button.label,
+          hint: bloqueado ? avisoAssinatura : button.hint,
+          icon: button.icon ? <i className={button.icon} aria-hidden="true" /> : undefined,
+          onClick: () => finish(button),
+          disabled: bloqueado || complete.isPending || task.isLoading,
+          loading: complete.isPending,
+          loadingLabel: 'Concluindo…',
+          style: button.primaryColor ? { backgroundColor: button.primaryColor, color: button.textColor ?? '#fff' } : undefined,
+        };
+      });
+  // "deve ser adicionado um novo botão de conclusão chamado 'Assinar documentos em
+  // lote', ANTES de todos os botões existentes" — requisito literal.
+  if (podeLote) {
+    completionActions.unshift({
+      id: '__sign_all',
+      label: 'Assinar documentos em lote',
+      loadingLabel: 'Assinando…',
+      icon: <FileSignature size={15} aria-hidden="true" />,
+      hint: pendentes.length === 0 ? 'Todos os documentos já estão assinados.' : undefined,
+      onClick: assinarLote,
+      // Assinado tudo, o lote desativa e os demais liberam.
+      disabled: pendentes.length === 0 || signAll.isPending || task.isLoading,
+      loading: signAll.isPending,
+      variant: 'secondary',
+    });
+  }
+
   const utilityActions: ExecutionAction[] = [
     {
       id: '__save',

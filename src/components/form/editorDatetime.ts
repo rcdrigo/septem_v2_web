@@ -18,6 +18,10 @@
  * adicionais por último, então esta versão vence a padrão). Preact é dependência
  * direta e HOISTED do form-js — `h` aqui é a MESMA instância que renderiza o
  * canvas.
+ *
+ * A pintura usa as classes do PRÓPRIO form-js (`fjs-*`), e não o design system do
+ * app: o campo divide a tela com componentes desenhados pela engine, e qualquer
+ * estilo nosso aqui faz a data destoar de todo o resto do formulário.
  */
 import { h } from 'preact';
 import {
@@ -66,18 +70,26 @@ export function SeptemDatetimePreview(props: { field?: Field }) {
   const limite = (field.properties?.septemDateLimit ?? '') as DateLimit;
   const dica = limite ? DATE_LIMIT_HINT[limite] : null;
 
-  return h('div', { class: 'fjs-form-field fjs-form-field-datetime', 'data-septem-date-preview': mode },
+  // ⚠️ Classes do FORM-JS, não Tailwind. Este componente vive DENTRO do canvas do
+  // editor, ao lado de campos pintados pelo próprio form-js: usar o nosso design
+  // system aqui fazia o campo de data ser o único visualmente diferente da tela —
+  // exatamente o estranhamento que o dono relatou. A marcação abaixo é a mesma que o
+  // form-js gera para um `textfield` desabilitado (label + input-group + input).
+  return h('div', {
+    class: 'fjs-form-field fjs-form-field-datetime fjs-disabled',
+    'data-septem-date-preview': mode,
+  },
     nome
-      ? h('label', { class: 'mb-1 block text-sm font-medium text-slate-700' },
+      ? h('label', { class: 'fjs-form-field-label' },
           nome,
           field.validate?.required
-            ? h('span', { class: 'text-rose-500' }, ' *')
-            : h('span', { class: 'ml-1 text-[11px] font-normal text-slate-400' }, '(opcional)'))
+            ? h('span', { 'aria-hidden': 'true', class: 'fjs-asterix' }, '*')
+            : null)
       : null,
-    h('div', { class: 'flex w-full items-center overflow-hidden rounded-md border border-slate-300 bg-white' },
-      h('span', { class: 'h-10 flex-1 truncate px-3 text-sm leading-10 text-slate-400' }, DATE_PLACEHOLDER[mode]),
-      h('span', { class: 'inline-flex h-10 w-10 shrink-0 items-center justify-center text-slate-500' }, icone(mode))),
-    dica ? h('span', { class: 'mt-1 block text-xs text-slate-400' }, dica) : null);
+    h('div', { class: 'fjs-input-group fjs-disabled' },
+      h('input', { type: 'text', disabled: true, class: 'fjs-input', placeholder: DATE_PLACEHOLDER[mode] }),
+      h('span', { class: 'fjs-input-adornment' }, icone(mode))),
+    dica ? h('div', { class: 'fjs-form-field-description' }, dica) : null);
 }
 
 /**

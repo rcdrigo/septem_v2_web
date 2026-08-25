@@ -78,3 +78,68 @@ export async function fetchDataSourceOptions(dataSourceId: string): Promise<{ va
 export function useEmailTemplates() {
   return useQuery({ queryKey: ['catalog', 'email-templates'], queryFn: () => api.get<EmailTemplate[]>('/api/v1/email-templates') });
 }
+
+// ── Central de serviços pública (Fase 8) ────────────────────────────────────
+
+/** Serviço como o visitante ANÔNIMO o enxerga: nome, visual e se exige login. */
+export type PublicService = {
+  key: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  category: string | null;
+  categoryId: number | null;
+  categoryColor: string | null;
+  categoryIcon: string | null;
+  /** `false` só quando o serviço aceita requisição anônima. */
+  requiresLogin: boolean;
+};
+
+/**
+ * Vitrine pública. Sem token: a rota é anônima de propósito, e é o único jeito de
+ * o cidadão ver os serviços antes de ter conta.
+ */
+export function usePublicServices() {
+  return useQuery({
+    queryKey: ['public', 'services'],
+    queryFn: () => api.get<PublicService[]>('/api/v1/public/services'),
+    // Vitrine muda pouco e a rota tem teto de requisições: não vale refazer a
+    // chamada a cada foco de janela.
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
+/** Detalhe público de um serviço — inclui o formulário para preencher. */
+export type PublicServiceDetail = PublicService & { formSchema: string | null };
+
+export function usePublicService(key: string | undefined) {
+  return useQuery({
+    queryKey: ['public', 'service', key ?? ''],
+    queryFn: () => api.get<PublicServiceDetail>(`/api/v1/public/services/${key}`),
+    enabled: !!key,
+    retry: false,
+  });
+}
+
+/** Envio anônimo. Devolve o número do protocolo — é o que o cidadão anota. */
+export function submitPublicService(key: string, data: unknown, turnstileToken: string | null) {
+  return api.post<{ number: number }>(`/api/v1/public/services/${key}/submit`, { data, turnstileToken });
+}
+
+// ── Autocadastro do cidadão (Fase 8) ────────────────────────────────────────
+
+export type CadastroPublico = {
+  name: string; cpf: string; email: string; telefone: string;
+  password: string; turnstileToken: string | null;
+};
+
+/** Cria a conta do cidadão. `jaExiste` = já há conta com o CPF/e-mail informados. */
+export function signupPublico(req: CadastroPublico) {
+  return api.post<{ jaExiste: boolean; detail: string }>('/api/v1/public/signup', req);
+}
+
+/** Confirma o e-mail pelo código. O servidor já devolve sessão. */
+export function confirmarCadastro(email: string, code: string) {
+  return api.post<{ accessToken: string }>('/api/v1/public/signup/confirm', { email, code });
+}

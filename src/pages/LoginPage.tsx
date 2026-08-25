@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Eye, EyeOff, LayoutGrid, Loader2, Lock, Mail, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { useSessionStore } from '@/stores/session';
 import { ApiError } from '@/lib/api';
 import { toast } from '@/stores/toast';
+import { routes } from '@/lib/routes';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { PasswordChecklist, isPasswordValid } from '@/components/PasswordChecklist';
 import { forgotPassword, resetPassword } from '@/lib/api/account';
@@ -224,6 +225,7 @@ export function LoginPage() {
 
   return (
     <div className="login-page">
+      <div className="login-stack">
       <div className="login-card">
         {/* ── Painel institucional (esquerda) ─────────────────────────────── */}
         <aside className="login-hero-panel" data-testid="login-hero"
@@ -475,7 +477,44 @@ export function LoginPage() {
           </p>
         </main>
       </div>
+
+      <CardCentralDeServicos />
+      </div>
     </div>
+  );
+}
+
+/**
+ * Card "Central de serviços" (Fase 8), abaixo do card de login.
+ *
+ * É um <a>, não uma div com onClick: o card inteiro é clicável e precisa
+ * funcionar por teclado, abrir em nova aba pelo meio do mouse e ser lido como
+ * link por leitor de tela. Uma div "clicável" perde as três coisas.
+ */
+function CardCentralDeServicos() {
+  return (
+    <a href={`${import.meta.env.BASE_URL}${routes.externalServices.replace(/^\//, '')}`}
+       className="login-services" data-testid="login-central-servicos">
+      <span className="login-services-icone" aria-hidden="true">
+        <LayoutGrid size={30} />
+      </span>
+      <span className="login-services-texto">
+        <span className="login-services-titulo">Central de serviços</span>
+        <span className="login-services-subtitulo">
+          Clique aqui para acessar os serviços disponibilizados, focados no cidadão,
+          empreendimentos e fornecedores.
+        </span>
+        {/* Convite PERMANENTE: o overlay de hover é enfeite de desktop, e num
+            aparelho sem ponteiro ele nunca aparece. Deixar o "Acessar" só no hover
+            esconderia a única pista de que o card leva a algum lugar. */}
+        <span className="login-services-chip" data-testid="login-central-chip">
+          Acessar <ArrowRight size={14} aria-hidden="true" />
+        </span>
+      </span>
+      <span className="login-services-overlay" data-testid="login-central-overlay">
+        Acessar <ArrowRight size={18} aria-hidden="true" />
+      </span>
+    </a>
   );
 }
 

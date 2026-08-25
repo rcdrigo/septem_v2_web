@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 type Props = {
@@ -8,7 +8,10 @@ type Props = {
 };
 
 /**
- * Tooltip acionado por hover/focus que exibe um aviso acima do elemento.
+ * Tooltip acionado por hover/focus — e por TOQUE, que não é detalhe: num toque não
+ * existe hover, e um botão DESABILITADO não recebe foco nem clique. Sem o caminho de
+ * toque, o aviso que explica por que o botão está bloqueado (Fase 7c) simplesmente
+ * nunca apareceria no celular.
  * Renderiza HTML (rich-text), quebra linhas e limita a largura. Posiciona via
  * portal (fixed) clampado à viewport — não vaza da página nem é clipado por
  * ancestrais com overflow/transform. Usado nas orientações dos botões.
@@ -31,6 +34,17 @@ export function Tooltip({ text, children }: Props) {
     setStyle({ position: 'fixed', left, top, visibility: 'visible' });
   }, [show, text]);
 
+  // Aberto por toque fecha no próximo toque fora — sem isto o aviso ficaria preso na
+  // tela até a pessoa tocar de novo exatamente no mesmo botão.
+  useEffect(() => {
+    if (!show) return;
+    const fechar = (e: PointerEvent) => {
+      if (e.pointerType === 'touch' && !wrapRef.current?.contains(e.target as Node)) setShow(false);
+    };
+    document.addEventListener('pointerdown', fechar);
+    return () => document.removeEventListener('pointerdown', fechar);
+  }, [show]);
+
   if (!text) return <>{children}</>;
 
   return (
@@ -41,6 +55,8 @@ export function Tooltip({ text, children }: Props) {
       onMouseLeave={() => setShow(false)}
       onFocus={() => setShow(true)}
       onBlur={() => setShow(false)}
+      onPointerDown={(e) => { if (e.pointerType === 'touch') setShow((v) => !v); }}
+      data-testid="tooltip-wrap"
     >
       {children}
       {show && createPortal(

@@ -38,6 +38,8 @@ export type Tenant = {
   heroImageUrl?: string | null;
   /** Texto de apresentação exibido na tela de login. */
   systemDescription?: string | null;
+  /** Chave PÚBLICA do Cloudflare Turnstile (Central de serviços, Fase 8). */
+  turnstileSiteKey?: string | null;
   modulos: string[];
 };
 

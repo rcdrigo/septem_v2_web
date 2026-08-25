@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react';
 import { AlertCircle, ArrowRight, Inbox, RotateCw, Search, Tags, Workflow } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
-import { FALLBACK_COLOR, groupByCategory, tintOf } from '@/components/catalog/category-catalog';
+import { FALLBACK_COLOR, groupByCategory, NamedIcon, tintOf } from '@/components/catalog/category-catalog';
 import { useProcessList, type ProcessListItem } from '@/lib/api/process-definitions';
-import { renderIcon } from '@/lib/icon-catalog';
 import { openTab } from '@/lib/nav';
 import { useFavorites, useToggleFavorite } from '@/lib/api/discovery';
 import { FavoriteButton } from '@/components/discovery/FavoriteButton';
@@ -151,12 +150,7 @@ function ServiceCard({ service, favorite, favoritePending, onFavorite, onStart }
   );
 }
 
-function NamedIcon({ name, fallback }: { name?: string | null; fallback: React.ReactNode }) {
-  const catalogIcon = renderIcon(name, 16);
-  if (catalogIcon) return catalogIcon;
-  if (name?.includes('fa-')) return <i className={name} aria-hidden="true" />;
-  return fallback;
-}
+
 
 function ServiceSkeletons() {
   return <div className="grid gap-3 lg:grid-cols-2" aria-label="Carregando serviços">{[0, 1, 2, 3].map((item) => <div key={item} className="h-40 animate-pulse rounded-lg border border-slate-200 p-4"><div className="h-9 w-9 rounded-md bg-slate-100" /><div className="mt-3 h-4 w-2/3 rounded bg-slate-100" /><div className="mt-2 h-9 rounded bg-slate-100" /></div>)}</div>;

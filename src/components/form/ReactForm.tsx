@@ -2,14 +2,21 @@
 // HelpPopover; somamos o que a Fase 6 usa — o ícone e as chamadas de geração de
 // documento. useLayoutEffect/createPortal/HelpCircle/inputTypeForDateMode saíram
 // porque o corpo mesclado não os usa mais.
-import { createContext, forwardRef, Fragment, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Plus, Trash2, Paperclip, X, Loader2, FileText } from 'lucide-react';
+import { createContext, forwardRef, Fragment, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { ChevronDown, Plus, Trash2, Paperclip, X, Loader2, FileText, FileSignature, FileSearch } from 'lucide-react';
 import { HelpPopover } from '@/components/ui/HelpPopover';
+import { routes } from '@/lib/routes';
+import { useQueryClient } from '@tanstack/react-query';
+import { signatureKeys, useTaskSignatures } from '@/lib/api/execution';
 import { api, ApiError } from '@/lib/api';
 import { regexToTemplate, applyMask, isAllDigits } from '@/lib/mask';
 import { maskDocumento, validateDocumento, type DocKind } from '@/lib/documento';
 import { dateModeOfComponent, validateDateClient, type DateMode, type DateLimit } from '@/lib/datafield';
-import { uploadAttachment, parseAttachments, fetchDocumentOptions, generateDocument, type Attachment, type UploadContext } from '@/lib/upload';
+import {
+  uploadAttachment, parseAttachments, fetchDocumentOptions, generateDocument,
+  estaAssinado, fetchSignaturesPreview, abrirBlobEmNovaAba, CANAL_ASSINATURAS,
+  type Attachment, type UploadContext, type SignatureDoc, type TaskSignatures,
+} from '@/lib/upload';
 import { DatePickerField } from './DatePickerField';
 
 /** Mesmo contrato do FormFill (form-js), para ser intercambiável. */
@@ -88,6 +95,8 @@ type Runtime = {
   setDateError: (k: string, message: string | null) => void;
   runEvent: (comp: Component, type: string, event: unknown) => void;
   uploadContext?: UploadContext;
+  /** Assinaturas da tarefa (Fase 7a), buscadas UMA vez e distribuídas por aqui. */
+  assinaturas?: { dados: TaskSignatures | null; recarregar: () => void };
 };
 const RuntimeCtx = createContext<Runtime | null>(null);
 function useRuntime() {
@@ -233,7 +242,34 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
 
     const comps = root.components ?? [];
     const layout = (root as { septemGroupLayout?: string }).septemGroupLayout;
-    const runtime: Runtime = { values, errors, set, dsOptions, readOnly, fieldState, dateErrors, setDateError, runEvent, uploadContext };
+    // Assinaturas da tarefa: MESMO cache que os botões de conclusão usam (Fase 7c).
+    // Ler de dois lugares diferentes deixaria o ícone verde com o botão ainda bloqueado.
+    const taskIdAssinatura = uploadContext?.taskId;
+    const queryAssinaturas = useTaskSignatures(taskIdAssinatura);
+    const qc = useQueryClient();
+    const recarregarAssinaturas = useCallback(() => {
+      if (taskIdAssinatura) void qc.invalidateQueries({ queryKey: signatureKeys.task(taskIdAssinatura) });
+    }, [qc, taskIdAssinatura]);
+
+    // Assinar acontece em OUTRA aba, que avisa por aqui assim que termina. Evento
+    // explícito, e não `focus`/`visibilitychange`: aqueles não disparam de forma
+    // confiável — nem em headless, nem em janela sem foco.
+    useEffect(() => {
+      if (!taskIdAssinatura) return;
+      let canal: BroadcastChannel | null = null;
+      try {
+        canal = new BroadcastChannel(CANAL_ASSINATURAS);
+        canal.onmessage = (ev: MessageEvent<{ taskId?: string }>) => {
+          if (ev.data?.taskId === taskIdAssinatura) recarregarAssinaturas();
+        };
+      } catch { /* sem BroadcastChannel: atualiza no próximo carregamento */ }
+      return () => { canal?.close(); };
+    }, [taskIdAssinatura, recarregarAssinaturas]);
+
+    const runtime: Runtime = {
+      values, errors, set, dsOptions, readOnly, fieldState, dateErrors, setDateError, runEvent, uploadContext,
+      assinaturas: { dados: queryAssinaturas.data ?? null, recarregar: recarregarAssinaturas },
+    };
 
     // Cada grupo de topo vira um card; os cards se distribuem no grid de 16 col
     // (8+8 = lado a lado). Em "abas", a barra fica num card e o conteúdo noutro.
@@ -447,7 +483,7 @@ function Node({ comp }: { comp: Component }) {
  * campo, põe timestamp e a hierarquia no bucket) e o valor guarda [{name,url,size}].
  */
 function FilePickerControl({ comp, value, disabled, onChange }: { comp: Component; value: unknown; disabled?: boolean; onChange: (v: Attachment[]) => void }) {
-  const { uploadContext } = useRuntime();
+  const { uploadContext, assinaturas, values } = useRuntime();
   const anexos = parseAttachments(value);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -503,11 +539,31 @@ function FilePickerControl({ comp, value, disabled, onChange }: { comp: Componen
           setErro(body?.detail ?? `Falha ao enviar ${f.name}.`);
         }
       }
-      if (novos.length) onChange([...anexos, ...novos]);
+      if (novos.length) await trocarComAssinatura([...anexos, ...novos]);
     } finally {
       setEnviando(false);
       if (inputRef.current) inputRef.current.value = '';
     }
+  }
+
+  // O campo é assinável quando a TAREFA o declarou assim (Fase 6). A tela não
+  // decide isso: ela lê o que o servidor respondeu.
+  const assinavel = !!assinaturas?.dados?.assinaveis.includes(comp.key ?? '');
+  const docAssinatura = assinaturas?.dados?.documentos.find((d) => d.fieldKey === comp.key);
+
+  /**
+   * Troca o valor de um campo ASSINÁVEL. Grava o rascunho e relê as assinaturas: sem
+   * isso o servidor continuaria vendo o arquivo antigo e o ícone seguiria VERDE
+   * apontando para um documento que a pessoa nunca assinou.
+   */
+  async function trocarComAssinatura(novos: Attachment[]) {
+    onChange(novos);
+    if (!assinavel || !uploadContext?.taskId) return;
+    try {
+      await api.post(`/api/v1/workflow/tasks/${uploadContext.taskId}/save`,
+        { data: { ...values, [comp.key!]: novos } });
+    } catch { /* falhou salvar: a releitura abaixo mostra o estado real do servidor */ }
+    assinaturas?.recarregar();
   }
 
   return (
@@ -523,8 +579,11 @@ function FilePickerControl({ comp, value, disabled, onChange }: { comp: Componen
               <Paperclip size={14} className="shrink-0 text-slate-400" />
               <a href={a.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-slate-700 hover:underline">{a.name}</a>
               <span className="shrink-0 text-xs text-slate-400">{Math.max(1, Math.round(a.size / 1024))} KB</span>
+              {/* Assinatura (Fase 7a): só no PRIMEIRO anexo do campo — é o documento
+                  que o servidor assina, e a configuração é um documento por campo. */}
+              {i === 0 && assinavel && <BotaoAssinatura taskId={uploadContext?.taskId} fieldKey={comp.key!} doc={docAssinatura} />}
               {!disabled && (
-                <button type="button" onClick={() => onChange(anexos.filter((_, j) => j !== i))} className="shrink-0 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-rose-600" aria-label={`Remover ${a.name}`}>
+                <button type="button" onClick={() => { void trocarComAssinatura(anexos.filter((_, j) => j !== i)); }} className="shrink-0 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-rose-600" aria-label={`Remover ${a.name}`}>
                   <X size={14} />
                 </button>
               )}
@@ -779,6 +838,83 @@ function GroupTabsCards({ groups, extra }: { groups: Component[]; extra?: { lead
         <div role="tabpanel" id={`septem-panel-${tabs[idx].key}`} aria-labelledby={`septem-tab-${tabs[idx].key}`} tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2">
           {tabs[idx].content}
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Ícone de assinatura ao lado do anexo (Fase 7a).
+ *
+ * Vermelho e ATIVO enquanto não assinado; verde e INATIVO depois — exatamente o que a
+ * spec pede, inclusive nos textos do popover. Um terceiro estado existe e não estava na
+ * spec: arquivo trocado depois de assinado. Ele não pode aparecer verde, senão a tela
+ * afirmaria que um documento está assinado quando a assinatura não vale mais para ele.
+ */
+function BotaoAssinatura({ taskId, fieldKey, doc }: { taskId?: string; fieldKey: string; doc?: SignatureDoc }) {
+  const { values } = useRuntime();
+  const [abrindo, setAbrindo] = useState(false);
+  if (!taskId) return null;
+
+  const assinado = estaAssinado(doc);
+  const invalidada = !assinado && (doc?.assinaturas.length ?? 0) > 0;
+
+  const titulo = assinado ? 'Documento assinado'
+    : invalidada ? 'O arquivo mudou depois de assinado. Clique para assinar novamente.'
+    : 'Clique aqui para assinar o documento';
+  const cor = assinado ? 'text-emerald-600' : invalidada ? 'text-amber-600' : 'text-rose-600';
+
+  /**
+   * O upload já pôs o arquivo no storage, mas o VALOR do campo ainda só existe nesta
+   * tela: a página de assinatura lê do servidor e não veria anexo nenhum. Por isso
+   * salvamos o rascunho antes de abrir a aba — sem isso a assinatura só funcionaria
+   * para quem tivesse salvo a tarefa por conta própria.
+   */
+  async function abrirAssinatura() {
+    if (!taskId) return;
+    setAbrindo(true);
+    try {
+      await api.post(`/api/v1/workflow/tasks/${taskId}/save`, { data: values });
+      window.open(
+        `${import.meta.env.BASE_URL}${routes.signDocument(taskId, fieldKey).replace(/^\//, '')}`,
+        '_blank', 'noopener');
+    } catch {
+      /* Falhou salvar: não abre a aba — assinar sem o anexo gravado daria erro pior. */
+    } finally {
+      setAbrindo(false);
+    }
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-1">
+      {assinado ? (
+        <span
+          title={titulo} aria-label={titulo} data-testid="anexo-assinar"
+          data-estado="assinado" aria-disabled="true"
+          className={`rounded p-1 ${cor}`}
+        >
+          <FileSignature size={15} />
+        </span>
+      ) : (
+        <button
+          type="button" onClick={abrirAssinatura} disabled={abrindo}
+          title={titulo} aria-label={titulo} data-testid="anexo-assinar"
+          data-estado={invalidada ? 'invalidada' : 'pendente'}
+          className={`rounded p-1 hover:bg-slate-200 disabled:opacity-50 ${cor}`}
+        >
+          {abrindo ? <Loader2 size={15} className="animate-spin" /> : <FileSignature size={15} />}
+        </button>
+      )}
+      {(doc?.assinaturas.length ?? 0) > 0 && (
+        <button
+          type="button"
+          onClick={() => { void fetchSignaturesPreview(taskId, fieldKey).then(abrirBlobEmNovaAba); }}
+          title="Visualizar assinaturas" aria-label="Visualizar assinaturas"
+          data-testid="anexo-ver-assinaturas"
+          className="rounded p-1 text-slate-500 hover:bg-slate-200"
+        >
+          <FileSearch size={15} />
+        </button>
       )}
     </div>
   );

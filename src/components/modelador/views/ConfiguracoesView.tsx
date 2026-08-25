@@ -169,7 +169,8 @@ export function ConfiguracoesView({ modeler }: Props) {
                     <div className="flex flex-col gap-2">
                       <Switch checked={cfg.allowMessages} onChange={(v) => patch({ allowMessages: v })} label="Permitir inserção de mensagens nas execuções" />
                       <Switch checked={cfg.allowCancel} onChange={(v) => patch({ allowCancel: v })} label="Permitir cancelamento do processo" />
-                      <Switch checked={cfg.allowAnonymous} onChange={(v) => patch({ allowAnonymous: v })} label="Permitir requisições anônimas (portal)" help="Requer formulário aceitando dados sem autenticação." />
+                      <Switch checked={cfg.allowExternal} onChange={(v) => patch({ allowExternal: v })} label="Publicar na Central de serviços (exige login)" help="O serviço aparece na vitrine pública, mas só é possível enviar depois de entrar na conta." />
+                      <Switch checked={cfg.allowAnonymous} onChange={(v) => patch({ allowAnonymous: v })} label="Permitir requisições anônimas (portal)" help="Dispensa login: qualquer visitante envia, com verificação anti-robô. Também publica na Central de serviços." />
                     </div>
                   </div>
                 </div>

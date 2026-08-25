@@ -105,7 +105,12 @@ try {
     // Sufixo único por execução: o DB de dev NÃO reseta entre runs; sem isto, uma
     // run anterior deixa unidade/chave iguais e o create colide, e o combobox de
     // titular acha vários "Titular web" acumulados (a escolha fica ambígua).
-    const uniq = Math.floor(Math.random() * 1e6);
+    // LARGURA FIXA, de propósito: com Math.random()*1e6 sem padding saiu "110" numa
+    // run e "110294" ficou de outra — um é PREFIXO do outro, e a busca do combobox é
+    // por substring. O `.last()` escolheu o usuário errado, e o check pela tela
+    // (.includes) passava enquanto o check pela API (===) falhava. Padronizar em 6
+    // dígitos elimina a relação de prefixo: nenhum id é começo de outro.
+    const uniq = String(Math.floor(Math.random() * 1e6)).padStart(6, '0');
     const titular = await criarUsuario(`Titular ${view.name} ${uniq}`, 'https://picsum.photos/id/1005/200/200');
     const preposto = await criarUsuario(`Preposto ${view.name} ${uniq}`, 'https://picsum.photos/id/1012/200/200');
     const sigla = `SEM${view.name === 'web' ? 'W' : 'M'}${uniq}`;

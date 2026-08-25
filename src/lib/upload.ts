@@ -46,3 +46,114 @@ export function parseAttachments(value: unknown): Attachment[] {
   }
   return [];
 }
+
+// ── Assinatura eletrônica simples (Fase 7a) ─────────────────────────────────
+
+/** Situação da assinatura em relação ao arquivo que está no storage AGORA. */
+export type SignatureState = 'valid' | 'file_changed' | 'file_missing';
+
+export type DocSignature = {
+  id: string;
+  signerName: string;
+  signerCpf: string | null;
+  signedAt: string;
+  type: 'simple' | 'a1';
+  hash: string;
+  state: SignatureState;
+  visualBase64: string | null;
+  /** Só em assinatura por certificado (Fase 7b). */
+  certSubject?: string | null;
+  certIssuer?: string | null;
+};
+
+export type SignatureDoc = {
+  fieldKey: string;
+  fileName: string | null;
+  fileUrl: string | null;
+  assinaturas: DocSignature[];
+};
+
+export type TaskSignatures = {
+  assinaveis: string[];
+  required: boolean;
+  batch: boolean;
+  documentos: SignatureDoc[];
+};
+
+export function fetchTaskSignatures(taskId: string): Promise<TaskSignatures> {
+  return api.get<TaskSignatures>(`/api/v1/workflow/tasks/${taskId}/signatures`);
+}
+
+/** Assina o anexo do campo. O servidor calcula o hash e identifica o signatário. */
+export function signDocument(taskId: string, fieldKey: string): Promise<DocSignature> {
+  return api.post<DocSignature>(
+    `/api/v1/workflow/tasks/${taskId}/fields/${encodeURIComponent(fieldKey)}/sign`, {});
+}
+
+/**
+ * REPRESENTAÇÃO VISUAL (documento + página de assinaturas). Não é o documento assinado
+ * — a própria página diz isso em destaque, por exigência do dono.
+ *
+ * Vem como blob, e não como `<a href>`, porque a rota exige Bearer: um link direto para
+ * `/api/v1/...` sai sem o token e responde 401.
+ */
+export function fetchSignaturesPreview(taskId: string, fieldKey: string): Promise<Blob> {
+  return api.getBlob(
+    `/api/v1/workflow/tasks/${taskId}/fields/${encodeURIComponent(fieldKey)}/signatures/preview`);
+}
+
+/**
+ * URL exibível de um arquivo do storage. Caminho relativo (`/api/v1/files/...`) exige
+ * autenticação, então é baixado com o cliente e vira `blob:`; URL absoluta (S3/CDN) já
+ * é acessível e volta como está. Devolve também o `revoke` — sem ele cada visita
+ * vaza um blob na memória da aba.
+ */
+export async function urlExibivel(url: string): Promise<{ href: string; revoke: () => void }> {
+  if (!url.startsWith('/')) return { href: url, revoke: () => {} };
+  const blob = await api.getBlob(url);
+  const href = URL.createObjectURL(blob);
+  return { href, revoke: () => URL.revokeObjectURL(href) };
+}
+
+/** Abre um blob numa aba nova (usado por "visualizar assinaturas"). */
+export function abrirBlobEmNovaAba(blob: Blob): void {
+  const href = URL.createObjectURL(blob);
+  window.open(href, '_blank', 'noopener');
+  // Revoga depois: revogar na hora invalidaria a URL antes de a aba carregá-la.
+  setTimeout(() => URL.revokeObjectURL(href), 60_000);
+}
+
+/** Um documento está assinado quando tem ao menos uma assinatura VÁLIDA hoje. */
+export function estaAssinado(doc: SignatureDoc | undefined): boolean {
+  return !!doc?.assinaturas.some((a) => a.state === 'valid');
+}
+
+/**
+ * Canal entre a aba da tarefa e a aba de assinatura. A assinatura acontece em OUTRA
+ * aba; sem um aviso explícito, quem volta continua vendo o ícone vermelho de um
+ * documento que acabou de assinar.
+ *
+ * É um sinal explícito de propósito: depender de `focus`/`visibilitychange` fez a tela
+ * ficar desatualizada em janela sem foco — e não dá para provar em teste headless.
+ */
+export const CANAL_ASSINATURAS = 'septem-assinaturas';
+
+export function avisarAssinatura(taskId: string): void {
+  try { new BroadcastChannel(CANAL_ASSINATURAS).postMessage({ taskId }); }
+  catch { /* navegador sem BroadcastChannel: a tela atualiza no próximo carregamento */ }
+}
+
+/**
+ * Assina com certificado ICP-Brasil A1 (Fase 7b). O `.pfx` e a senha vão por HTTPS,
+ * são usados só em memória no servidor e não são gravados em lugar nenhum — nem aqui:
+ * nada de guardar em estado global, storage ou log.
+ */
+export function signWithCertificate(
+  taskId: string, fieldKey: string, pfx: File, senha: string,
+): Promise<DocSignature & { certSubject?: string; certIssuer?: string }> {
+  const form = new FormData();
+  form.append('certificate', pfx);
+  form.append('password', senha);
+  return api.postForm(
+    `/api/v1/workflow/tasks/${taskId}/fields/${encodeURIComponent(fieldKey)}/sign-a1`, form);
+}

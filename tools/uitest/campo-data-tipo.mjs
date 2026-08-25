@@ -142,18 +142,30 @@ try {
       const nodes = [...document.querySelectorAll('.fjs-form-field-datetime')];
       const node = nodes[nodes.length - 1];
       if (!node) return null;
+      const campos = [...node.querySelectorAll('input, select, textarea')];
       return {
-        preenchiveis: node.querySelectorAll('input, select, textarea').length,
+        // A prévia usa a marcação do form-js: UM input desabilitado. O que importa
+        // continua sendo "um controle só, não preenchível".
+        preenchiveis: campos.filter((c) => !c.disabled).length,
+        controles: campos.length,
         modo: node.getAttribute('data-septem-date-preview'),
+        // ⚠️ innerText NÃO enxerga placeholder — e é nele que o formato mora agora.
+        formato: campos[0]?.placeholder ?? '',
+        classeInput: campos[0]?.className ?? '',
         texto: node.innerText.replace(/\s+/g, ' ').trim(),
       };
     });
 
     const inicial = await canvas();
-    check(inicial?.preenchiveis === 0 && /DD\/MM\/YYYY HH:mm/.test(inicial?.texto ?? ''),
-      `[modelador] "data e hora" mostra UM campo só, DD/MM/YYYY HH:mm — ${JSON.stringify(inicial?.texto)}`);
+    check(inicial?.preenchiveis === 0 && inicial?.controles === 1 && /DD\/MM\/YYYY HH:mm/.test(inicial?.formato ?? ''),
+      `[modelador] "data e hora" mostra UM campo só, DD/MM/YYYY HH:mm — ${JSON.stringify(inicial?.formato)}`);
+    // A queixa do dono (24/08): o campo de data era o ÚNICO pintado fora do tema do
+    // form-js. A prévia tem de usar a MESMA classe de input dos vizinhos.
+    check(inicial?.classeInput === 'fjs-input',
+      `[modelador] o campo de data usa a pintura do form-js, como os vizinhos — ${JSON.stringify(inicial?.classeInput)}`);
     check(!/hh:mm --/i.test(inicial?.texto ?? ''), '[modelador] sem o relógio 12h "hh:mm --" do form-js');
-    check(/^Data \*/.test(inicial?.texto ?? ''), '[modelador] nome do campo nasce em português ("Data"), não "Date"');
+    check(/^Data\b/.test((inicial?.texto ?? '').trim()) && !/Date/.test(inicial?.texto ?? ''),
+      `[modelador] nome do campo nasce em português ("Data"), não "Date" — ${JSON.stringify(inicial?.texto)}`);
 
     const tipo = async (v) => {
       await page.locator('aside button', { hasText: 'Aparência' }).first().click();
@@ -163,14 +175,15 @@ try {
       return canvas();
     };
     const soData = await tipo('date');
-    check(soData?.modo === 'date' && /DD\/MM\/YYYY(?! HH)/.test(soData?.texto ?? ''),
-      `[modelador] "somente data" → só DD/MM/YYYY — ${JSON.stringify(soData?.texto)}`);
+    check(soData?.modo === 'date' && /DD\/MM\/YYYY(?! HH)/.test(soData?.formato ?? ''),
+      `[modelador] "somente data" → só DD/MM/YYYY — ${JSON.stringify(soData?.formato)}`);
     const soHora = await tipo('time');
-    check(soHora?.modo === 'time' && /HH:mm/.test(soHora?.texto ?? '') && !/DD\/MM/.test(soHora?.texto ?? ''),
-      `[modelador] "somente hora" → só HH:mm — ${JSON.stringify(soHora?.texto)}`);
+    check(soHora?.modo === 'time' && /HH:mm/.test(soHora?.formato ?? '') && !/DD\/MM/.test(soHora?.formato ?? ''),
+      `[modelador] "somente hora" → só HH:mm — ${JSON.stringify(soHora?.formato)}`);
     const ambos = await tipo('datetime');
-    check(ambos?.modo === 'datetime' && ambos?.preenchiveis === 0 && /DD\/MM\/YYYY HH:mm/.test(ambos?.texto ?? ''),
-      `[modelador] voltar para "data e hora" continua UM campo — ${JSON.stringify(ambos?.texto)}`);
+    check(ambos?.modo === 'datetime' && ambos?.preenchiveis === 0 && ambos?.controles === 1
+      && /DD\/MM\/YYYY HH:mm/.test(ambos?.formato ?? ''),
+      `[modelador] voltar para "data e hora" continua UM campo — ${JSON.stringify(ambos?.formato)}`);
 
     // A restrição escolhida vira efeito visível no canvas.
     await page.locator('aside button', { hasText: 'Validação' }).first().click();
@@ -238,20 +251,24 @@ try {
     const estado = await page.evaluate(() => {
       const nodes = [...document.querySelectorAll('.fjs-form-field-datetime')];
       return {
-        campos: nodes.map((n) => ({
-          modo: n.getAttribute('data-septem-date-preview'),
-          preenchiveis: n.querySelectorAll('input, select, textarea').length,
-          texto: n.innerText.replace(/\s+/g, ' ').trim(),
-        })),
+        campos: nodes.map((n) => {
+          const campos = [...n.querySelectorAll('input, select, textarea')];
+          return {
+            modo: n.getAttribute('data-septem-date-preview'),
+            preenchiveis: campos.filter((c) => !c.disabled).length,
+            formato: campos[0]?.placeholder ?? '',
+            texto: n.innerText.replace(/\s+/g, ' ').trim(),
+          };
+        }),
         flatpickr: document.querySelectorAll('.flatpickr-input').length,
         relogio12h: (document.body.innerText.match(/hh:mm --/gi) || []).length,
       };
     });
     check(estado.campos.length === 3, `[modelador] os 3 campos de data do schema aparecem no canvas — ${estado.campos.length}`);
-    check(estado.campos[0]?.modo === 'date' && /DD\/MM\/YYYY(?! HH)/.test(estado.campos[0]?.texto ?? ''),
-      `[modelador] schema LEGADO (só septemDateMode, sem subtype) é lido como "somente data" — ${JSON.stringify(estado.campos[0]?.texto)}`);
-    check(estado.campos[1]?.modo === 'time' && /HH:mm/.test(estado.campos[1]?.texto ?? ''),
-      `[modelador] campo de data DENTRO DE GRUPO usa a prévia nova — ${JSON.stringify(estado.campos[1]?.texto)}`);
+    check(estado.campos[0]?.modo === 'date' && /DD\/MM\/YYYY(?! HH)/.test(estado.campos[0]?.formato ?? ''),
+      `[modelador] schema LEGADO (só septemDateMode, sem subtype) é lido como "somente data" — ${JSON.stringify(estado.campos[0]?.formato)}`);
+    check(estado.campos[1]?.modo === 'time' && /HH:mm/.test(estado.campos[1]?.formato ?? ''),
+      `[modelador] campo de data DENTRO DE GRUPO usa a prévia nova — ${JSON.stringify(estado.campos[1]?.formato)}`);
     check(estado.campos[2]?.modo === 'datetime' && /Não permite data no futuro\./.test(estado.campos[2]?.texto ?? ''),
       `[modelador] campo DENTRO DE LISTA DINÂMICA mostra a restrição — ${JSON.stringify(estado.campos[2]?.texto)}`);
     check(estado.campos.every((c) => c.preenchiveis === 0) && estado.flatpickr === 0 && estado.relogio12h === 0,

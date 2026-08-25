@@ -8,6 +8,9 @@ import { ProcessosPage } from './pages/processos/ProcessosPage';
 import { UsuariosPage } from './pages/admin/UsuariosPage';
 import { UnidadesPage } from './pages/admin/UnidadesPage';
 import { UnidadePage } from './pages/UnidadePage';
+import { AssinaturaPage } from './pages/AssinaturaPage';
+import { CentralServicosPage } from './pages/CentralServicosPage';
+import { ServicoPublicoPage } from './pages/ServicoPublicoPage';
 import { PosicoesPage } from './pages/admin/PosicoesPage';
 import { PerfisPage } from './pages/admin/PerfisPage';
 import { LogsPage } from './pages/admin/LogsPage';
@@ -44,6 +47,10 @@ export const router = createBrowserRouter(
     { path: routes.login, element: <LoginPage /> },
     // Guide público (Fase 10) — fora do AppShell, acessível deslogado.
     { path: routes.guide, element: <GuidePage /> },
+    // Central de serviços: vitrine PÚBLICA, fora do shell e sem exigir login (Fase 8).
+    { path: routes.externalServices, element: <CentralServicosPage /> },
+    // Formulário público de um serviço — também sem login (Fase 8).
+    { path: '/external-services/:processKey', element: <ServicoPublicoPage /> },
     // Aba limpa (sem menus) para preencher e iniciar um serviço.
     { path: '/services/:processKey', element: <ServicoFormPage /> },
     // Tarefa pendente em aba própria (sem menus), como a de início.
@@ -65,6 +72,8 @@ export const router = createBrowserRouter(
     { path: routes.reportView, element: <ConsultaViewPage /> },
     // Unidade organizacional em aba própria (Fase 3) — imprimível.
     { path: routes.orgUnit, element: <UnidadePage /> },
+    // Assinatura de documento em aba própria (Fase 7a) — aberta pelo ícone do anexo.
+    { path: routes.sign, element: <AssinaturaPage /> },
     {
       path: '/',
       element: <AppShell />,

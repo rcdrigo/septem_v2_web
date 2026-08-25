@@ -39,7 +39,14 @@ try {
   await page.waitForSelector('h2:has-text("Configurações do processo")');
   const configRoot = page.locator('h2:has-text("Configurações do processo")').locator('xpath=ancestor::div[contains(@class,"overflow-y-auto")][1]');
   check(await configRoot.locator('header p').count() === 0, '[processo] cabeçalho mantém somente o título');
-  check(await configRoot.getByRole('switch').count() === 3, '[processo] as três permissões usam switches');
+  // Conta E nomeia: a contagem sozinha quebra a cada opção nova (quebrou quando a
+  // Fase 8 acrescentou "Publicar na Central de serviços") sem dizer o que mudou.
+  const switchesProcesso = await configRoot.getByRole('switch').count();
+  const rotulosProcesso = await configRoot.locator('label, span').allInnerTexts();
+  const temTodos = ['mensagens', 'cancelamento', 'Central de serviços', 'anônimas']
+    .every((r) => rotulosProcesso.some((t) => t.includes(r)));
+  check(switchesProcesso === 4 && temTodos,
+    `[processo] as permissões do processo usam switches (${switchesProcesso}, rótulos esperados: ${temTodos})`);
   check(await configRoot.locator('input[type=text][placeholder], input[type=url][placeholder], textarea[placeholder]').count() === 0, '[processo] campos textuais não usam placeholders instrutivos');
   check(await configRoot.locator('button', { hasText: 'Selecione a unidade' }).count() >= 1, '[processo] placeholder operacional da unidade foi preservado');
 

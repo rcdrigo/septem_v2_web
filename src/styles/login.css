@@ -429,3 +429,106 @@
     transform: none;
   }
 }
+
+/* ── Card "Central de serviços" (Fase 8) ─────────────────────────────────────
+   Fica ABAIXO do card principal, na mesma coluna. O empilhamento vive num
+   wrapper próprio (`.login-stack`) em vez de virar uma segunda linha do grid da
+   página: assim o card principal mantém a largura e a centralização que já
+   tinha, e o novo card herda a mesma medida sem duplicar valor. */
+.login-stack {
+  display: flex;
+  width: min(100%, 61.25rem);
+  flex-direction: column;
+  gap: 0.875rem;
+}
+.login-stack > .login-card { width: 100%; }
+
+.login-services {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: stretch;
+  border: 5px solid var(--color-login-frame);
+  border-radius: 1.375rem;
+  background-color: var(--color-login-paper);
+  box-shadow: var(--shadow-login-card);
+  color: inherit;
+  text-decoration: none;
+}
+
+/* "um ícone ocupando toda a altura do card à esquerda" — daí o `stretch` acima
+   e a faixa ocupar 100% da altura, não um quadrado centralizado.
+
+   ⚠️ A cor de contraste é `--color-ink`, NÃO `--color-login-frame`: apesar do nome,
+   `frame` é o branco 94% da MOLDURA do card. Usá-lo aqui pintava ícone branco sobre
+   fundo branco — o card ficava legível só para quem já sabia que estava lá. */
+.login-services-icone {
+  display: grid;
+  width: 5.5rem;
+  place-items: center;
+  background-color: var(--color-ink);
+  color: var(--color-login-paper);
+}
+
+.login-services-texto {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 1.1rem 1.25rem;
+}
+.login-services-titulo {
+  font-family: var(--font-display, inherit);
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.login-services-subtitulo {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--color-ink) 65%, transparent);
+}
+
+/* Overlay "Acessar →". */
+.login-services-overlay {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: color-mix(in srgb, var(--color-ink) 92%, transparent);
+  color: var(--color-login-paper);
+  font-size: 1.05rem;
+  font-weight: 600;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+/* O convite permanente. Fica SEMPRE visível, em qualquer aparelho: o overlay de
+   hover abaixo é só realce. Depender de `@media (hover)` para mostrar a única pista
+   de navegação do card significa confiar no que o navegador declara sobre o
+   dispositivo — e num emulador (e em alguns híbridos) ele declara errado. */
+.login-services-chip {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.5rem;
+  gap: 0.3rem;
+  color: var(--color-ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.login-services:hover .login-services-overlay,
+.login-services:focus-visible .login-services-overlay { opacity: 1; }
+
+.login-services:focus-visible {
+  outline: 3px solid var(--color-ink);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-services-overlay { transition: none; }
+}

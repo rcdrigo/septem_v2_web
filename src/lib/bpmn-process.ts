@@ -24,6 +24,15 @@ export type ProcessConfig = {
   allowMessages: boolean;
   allowCancel: boolean;
   allowAnonymous: boolean;
+  /**
+   * Aparece na Central de serviços pública EXIGINDO login (Fase 8).
+   *
+   * É uma marcação PRÓPRIA, e não uma regra de acesso, de propósito: a regra `all`
+   * ("Todos os usuários") casa com usuário nulo no `FlowAccessService`, então usá-la
+   * como critério de vitrine pública exporia qualquer processo com essa regra.
+   * Superfície pública se declara, não se infere.
+   */
+  allowExternal: boolean;
   /** Regras de controle de acesso, serializadas como JSON array. */
   accessRules: string;
 };
@@ -39,6 +48,7 @@ export const PROCESS_CONFIG_DEFAULTS: ProcessConfig = {
   allowMessages: true,
   allowCancel: true,
   allowAnonymous: false,
+  allowExternal: false,
   accessRules: '',
 };
 

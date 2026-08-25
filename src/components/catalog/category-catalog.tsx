@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { renderIcon } from '@/lib/icon-catalog';
 
 /**
  * Visual compartilhado dos catálogos agrupados por categoria (Nova requisição
@@ -88,4 +89,20 @@ export function GroupHeader({ name, color, icon, count, fallbackIcon }: { name: 
       <span className="text-xs text-slate-400">{count}</span>
     </div>
   );
+}
+
+
+/**
+ * Ícone nomeado de categoria/serviço, com a mesma cascata em todo lugar:
+ * catálogo do produto → classe Font Awesome de schema legado → fallback.
+ *
+ * Vive aqui, junto do resto do visual compartilhado, porque a Central de serviços
+ * pública (Fase 8) precisa exatamente da mesma regra do modal "Nova requisição" —
+ * duas cópias divergiriam no primeiro ícone novo.
+ */
+export function NamedIcon({ name, fallback }: { name?: string | null; fallback: ReactNode }) {
+  const doCatalogo = renderIcon(name, 16);
+  if (doCatalogo) return doCatalogo;
+  if (name?.includes('fa-')) return <i className={name} aria-hidden="true" />;
+  return fallback;
 }

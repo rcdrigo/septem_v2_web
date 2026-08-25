@@ -555,6 +555,12 @@
           "default": false
         },
         {
+          "name": "allowExternal",
+          "isAttr": true,
+          "type": "Boolean",
+          "default": false
+        },
+        {
           "name": "accessRules",
           "isAttr": true,
           "type": "String"

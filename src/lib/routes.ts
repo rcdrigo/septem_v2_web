@@ -17,6 +17,10 @@ export const routes = {
   login: '/login',
   /** Guia público — acessível deslogado. */
   guide: '/guide',
+  /** Central de serviços — vitrine PÚBLICA, acessível deslogado (Fase 8, resposta 22). */
+  externalServices: '/external-services',
+  /** Formulário público de um serviço (aberto pela Central). */
+  publicService: (processKey: string) => `/external-services/${processKey}`,
   /** Formulário de um serviço, para iniciar uma requisição. */
   service: (processKey: string) => `/services/${processKey}`,
   /** Tarefa pendente em aba própria. */
@@ -37,6 +41,12 @@ export const routes = {
   reportView: '/reports/view',
   /** Unidade organizacional (imprimível) — aba própria. */
   orgUnit: '/org-unit',
+  /** Página de assinatura (aba própria). O caminho fica separado do link porque o
+   *  router casa por caminho e a tela recebe tarefa/campo por query. */
+  sign: '/sign',
+  /** Link para assinar um documento da tarefa — abre em ABA PRÓPRIA (Fase 7a). */
+  signDocument: (taskId: string, fieldKey: string) =>
+    `/sign?task=${encodeURIComponent(taskId)}&field=${encodeURIComponent(fieldKey)}`,
 
   // --- Dentro do shell ------------------------------------------------------
   dashboard: '/dashboard',
