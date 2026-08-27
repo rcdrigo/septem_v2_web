@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { fetchTaskSignatures } from '@/lib/upload';
+import { fetchDocumentCodes, fetchTaskSignatures } from '@/lib/upload';
 
 export type StartedInstance = { executionId: string; status: string; tasks: { id: string; name: string | null }[]; nextTaskForMe?: string | null };
 export type RequestSummary = { label: string; value: string };
@@ -59,6 +59,19 @@ export function useTaskSignatures(taskId: string | null | undefined) {
 }
 
 /** Assina todos os documentos pendentes da tarefa (Fase 7c). */
+/**
+ * Códigos verificadores dos documentos da tarefa (Fase 9). Fica no mesmo cache
+ * compartilhado das assinaturas: os dois são lidos ao lado do anexo.
+ */
+export function useDocumentCodes(taskId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['workflow', 'document-codes', taskId ?? ''],
+    queryFn: () => fetchDocumentCodes(taskId!),
+    enabled: !!taskId,
+    retry: false,
+  });
+}
+
 export function useSignAll() {
   const qc = useQueryClient();
   return useMutation({

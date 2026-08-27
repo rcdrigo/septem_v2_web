@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Lock, Search, Tags, Unlock, Workflow } from 'lucide-react';
 import { FALLBACK_COLOR, groupByCategory, NamedIcon, tintOf } from '@/components/catalog/category-catalog';
 import { usePublicServices, type PublicService } from '@/lib/api/catalog';
@@ -24,6 +24,14 @@ export function CentralServicosPage() {
   // O tenant já vem do bootstrap (é ele que dá logo e nome do cliente), e o
   // bootstrap acontece antes do login — a Central pode contar com ele.
   const tenant = useSessionStore((estado) => estado.tenant);
+  // Rota FORA do AppShell e sem login: precisa disparar o bootstrap por conta
+  // própria. Sem isto o tenant não carrega numa visita DIRETA (logo, nome do órgão
+  // e a chave do captcha ficam vazios) — e só funcionava por acidente, quando a
+  // pessoa vinha da tela de login.
+  const bootstrap = useSessionStore((s) => s.bootstrap);
+  const statusSessao = useSessionStore((s) => s.status);
+  useEffect(() => { if (statusSessao === 'idle') void bootstrap(); }, [statusSessao, bootstrap]);
+
   useDocumentTitle('Central de serviços');
 
   const servicos = data ?? [];

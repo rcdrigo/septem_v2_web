@@ -157,3 +157,10 @@ export function signWithCertificate(
   return api.postForm(
     `/api/v1/workflow/tasks/${taskId}/fields/${encodeURIComponent(fieldKey)}/sign-a1`, form);
 }
+
+/** Código verificador de cada campo de documento da tarefa (Fase 9). */
+export type CodigoDocumento = { fieldKey: string; code: string };
+
+export function fetchDocumentCodes(taskId: string): Promise<CodigoDocumento[]> {
+  return api.get<CodigoDocumento[]>(`/api/v1/workflow/tasks/${taskId}/document-codes`);
+}

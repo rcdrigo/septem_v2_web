@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Loader2, Lock, Send, TriangleAlert } from 'lucide-react';
 import { ReactForm, type ReactFormHandle } from '@/components/form/ReactForm';
@@ -21,6 +21,14 @@ export function ServicoPublicoPage() {
   const { processKey } = useParams<{ processKey: string }>();
   const { data, isLoading, isError } = usePublicService(processKey);
   const tenant = useSessionStore((s) => s.tenant);
+  // Rota FORA do AppShell e sem login: precisa disparar o bootstrap por conta
+  // própria. Sem isto o tenant não carrega numa visita DIRETA (logo, nome do órgão
+  // e a chave do captcha ficam vazios) — e só funcionava por acidente, quando a
+  // pessoa vinha da tela de login.
+  const bootstrap = useSessionStore((s) => s.bootstrap);
+  const statusSessao = useSessionStore((s) => s.status);
+  useEffect(() => { if (statusSessao === 'idle') void bootstrap(); }, [statusSessao, bootstrap]);
+
   const formRef = useRef<ReactFormHandle>(null);
   const [token, setToken] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);

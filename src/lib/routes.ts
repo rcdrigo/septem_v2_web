@@ -19,6 +19,8 @@ export const routes = {
   guide: '/guide',
   /** Central de serviços — vitrine PÚBLICA, acessível deslogado (Fase 8, resposta 22). */
   externalServices: '/external-services',
+  /** Validação pública de documento — sem login (Fase 9, resposta 22/23). */
+  validate: '/validate',
   /** Formulário público de um serviço (aberto pela Central). */
   publicService: (processKey: string) => `/external-services/${processKey}`,
   /** Formulário de um serviço, para iniciar uma requisição. */

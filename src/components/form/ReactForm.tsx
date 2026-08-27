@@ -7,7 +7,7 @@ import { ChevronDown, Plus, Trash2, Paperclip, X, Loader2, FileText, FileSignatu
 import { HelpPopover } from '@/components/ui/HelpPopover';
 import { routes } from '@/lib/routes';
 import { useQueryClient } from '@tanstack/react-query';
-import { signatureKeys, useTaskSignatures } from '@/lib/api/execution';
+import { signatureKeys, useDocumentCodes, useTaskSignatures } from '@/lib/api/execution';
 import { api, ApiError } from '@/lib/api';
 import { regexToTemplate, applyMask, isAllDigits } from '@/lib/mask';
 import { maskDocumento, validateDocumento, type DocKind } from '@/lib/documento';
@@ -97,6 +97,8 @@ type Runtime = {
   uploadContext?: UploadContext;
   /** Assinaturas da tarefa (Fase 7a), buscadas UMA vez e distribuídas por aqui. */
   assinaturas?: { dados: TaskSignatures | null; recarregar: () => void };
+  /** Código verificador por campo de documento (Fase 9). */
+  codigosDeDocumento?: Record<string, string>;
 };
 const RuntimeCtx = createContext<Runtime | null>(null);
 function useRuntime() {
@@ -266,9 +268,28 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
       return () => { canal?.close(); };
     }, [taskIdAssinatura, recarregarAssinaturas]);
 
+    // Códigos verificadores: o operador precisa vê-los para conferir com o papel
+    // que o cidadão traz. Só existem em campo que GERA documento (Fase 9) — e por isso
+    // a consulta só sai quando o formulário tem algum. Buscar em toda tarefa era uma
+    // requisição inútil na maioria delas e, pior, quebrava telas que não esperam essa
+    // chamada (a suíte `execucao-layout-mock` intercepta a API e não a conhecia).
+    // ⚠️ Varre o SCHEMA, não `inputs`: `INPUT_TYPES` não inclui `filepicker` (anexo não
+    // é campo de digitação), então procurar aqui pela lista de inputs nunca acharia nada
+    // — e o código simplesmente não aparecia, sem erro nenhum.
+    const temCampoDeDocumento = useMemo(() => {
+      const varrer = (comps: Component[] | undefined): boolean => (comps ?? []).some(
+        (c) => (c.type === 'filepicker' && c.properties?.septemDocGen === 'yes') || varrer(c.components),
+      );
+      return varrer(root.components);
+    }, [root.components]);
+    const queryCodigos = useDocumentCodes(temCampoDeDocumento ? taskIdAssinatura : null);
+    const codigosDeDocumento = useMemo(() => Object.fromEntries(
+      (queryCodigos.data ?? []).map((c) => [c.fieldKey, c.code])), [queryCodigos.data]);
+
     const runtime: Runtime = {
       values, errors, set, dsOptions, readOnly, fieldState, dateErrors, setDateError, runEvent, uploadContext,
       assinaturas: { dados: queryAssinaturas.data ?? null, recarregar: recarregarAssinaturas },
+      codigosDeDocumento,
     };
 
     // Cada grupo de topo vira um card; os cards se distribuem no grid de 16 col
@@ -483,7 +504,7 @@ function Node({ comp }: { comp: Component }) {
  * campo, põe timestamp e a hierarquia no bucket) e o valor guarda [{name,url,size}].
  */
 function FilePickerControl({ comp, value, disabled, onChange }: { comp: Component; value: unknown; disabled?: boolean; onChange: (v: Attachment[]) => void }) {
-  const { uploadContext, assinaturas, values } = useRuntime();
+  const { uploadContext, assinaturas, values, codigosDeDocumento } = useRuntime();
   const anexos = parseAttachments(value);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -550,6 +571,7 @@ function FilePickerControl({ comp, value, disabled, onChange }: { comp: Componen
   // decide isso: ela lê o que o servidor respondeu.
   const assinavel = !!assinaturas?.dados?.assinaveis.includes(comp.key ?? '');
   const docAssinatura = assinaturas?.dados?.documentos.find((d) => d.fieldKey === comp.key);
+  const codigoDoCampo = codigosDeDocumento?.[comp.key ?? ''];
 
   /**
    * Troca o valor de um campo ASSINÁVEL. Grava o rascunho e relê as assinaturas: sem
@@ -590,6 +612,11 @@ function FilePickerControl({ comp, value, disabled, onChange }: { comp: Componen
             </li>
           ))}
         </ul>
+      )}
+      {codigoDoCampo && anexos.length > 0 && (
+        <p className="text-[11px] text-slate-500" data-testid="anexo-codigo">
+          Código de validação: <strong className="tracking-widest text-slate-700">{codigoDoCampo}</strong>
+        </p>
       )}
       {!disabled && geraDoc && taskId && (
         <div className="flex flex-wrap items-center gap-2" data-testid="anexo-gerar-area">

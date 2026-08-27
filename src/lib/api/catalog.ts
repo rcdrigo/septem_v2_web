@@ -143,3 +143,21 @@ export function signupPublico(req: CadastroPublico) {
 export function confirmarCadastro(email: string, code: string) {
   return api.post<{ accessToken: string }>('/api/v1/public/signup/confirm', { email, code });
 }
+
+// ── Validação pública de documentos (Fase 9) ────────────────────────────────
+
+export type DocumentoValidado = {
+  servico: string | null;
+  numero: number;
+  situacao: string;
+  emitidoEm: string;
+  arquivo: { nome: string | null; url: string };
+};
+
+/**
+ * Consulta pública. Erro e "não encontrado" chegam pelo MESMO caminho de propósito:
+ * o servidor não distingue código errado de processo inexistente.
+ */
+export function validarDocumento(number: number, code: string, turnstileToken: string | null) {
+  return api.post<DocumentoValidado>('/api/v1/public/validate', { number, code, turnstileToken });
+}

@@ -10,6 +10,7 @@ import { UnidadesPage } from './pages/admin/UnidadesPage';
 import { UnidadePage } from './pages/UnidadePage';
 import { AssinaturaPage } from './pages/AssinaturaPage';
 import { CentralServicosPage } from './pages/CentralServicosPage';
+import { ValidacaoPage } from './pages/ValidacaoPage';
 import { ServicoPublicoPage } from './pages/ServicoPublicoPage';
 import { PosicoesPage } from './pages/admin/PosicoesPage';
 import { PerfisPage } from './pages/admin/PerfisPage';
@@ -49,6 +50,8 @@ export const router = createBrowserRouter(
     { path: routes.guide, element: <GuidePage /> },
     // Central de serviços: vitrine PÚBLICA, fora do shell e sem exigir login (Fase 8).
     { path: routes.externalServices, element: <CentralServicosPage /> },
+    // Validação pública de documento — também fora do shell e sem login (Fase 9).
+    { path: routes.validate, element: <ValidacaoPage /> },
     // Formulário público de um serviço — também sem login (Fase 8).
     { path: '/external-services/:processKey', element: <ServicoPublicoPage /> },
     // Aba limpa (sem menus) para preencher e iniciar um serviço.
