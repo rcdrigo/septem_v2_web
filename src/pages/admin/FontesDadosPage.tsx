@@ -21,6 +21,7 @@ import { Field, TextInput, TextArea, Select } from '@/components/ui/Field';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
+import { normalizeSqlQuery } from '@/lib/sql-query';
 import { routes } from '@/lib/routes';
 
 const TYPE_LABEL: Record<DataSourceType, string> = { fixed: 'Fixa', sql: 'SQL', api: 'API (JSON)' };
@@ -128,7 +129,11 @@ export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string
 
   function buildConfig(): unknown {
     if (type === 'fixed') return { items: items.filter((i) => i.value || i.label) };
-    if (type === 'sql') return { query };
+    if (type === 'sql') {
+      const normalized = normalizeSqlQuery(query);
+      setQuery(normalized);
+      return { query: normalized };
+    }
     return { url, method, headers: headers.filter((h) => h.k), body, mapping };
   }
 
@@ -145,7 +150,7 @@ export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string
       if (id) await update.mutateAsync({ id, body }); else await create.mutateAsync(body);
       toast.success(id ? 'Fonte atualizada.' : `Fonte "${name}" criada.`);
       onClose();
-    } catch { toast.error('Não foi possível salvar a fonte.'); }
+    } catch (err) { toast.error(err instanceof ApiError ? (err.detail ?? err.message) : 'Não foi possível salvar a fonte.'); }
   }
 
   const title = id ? 'Editar fonte de dados' : 'Nova fonte de dados';

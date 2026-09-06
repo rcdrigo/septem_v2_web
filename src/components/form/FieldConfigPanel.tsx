@@ -133,8 +133,12 @@ export function FieldConfigPanel({ field, editField, masks }: {
 
   /** Commit do Nome (label) no blur; se a Chave ainda era derivada do nome, sincroniza. */
   function changeLabel(v: string) {
-    const prevAuto = slugify(field.label ?? '');
-    const keyFollows = isInput && (!field.key || field.key === prevAuto);
+    const previousLabel = field.type === 'datetime' ? dateFieldLabel(field) : (field.label ?? '');
+    const prevAuto = slugify(previousLabel);
+    const generatedKey = typeof field.key === 'string' && field.key.startsWith(`${field.type}_`)
+      && /^[a-z0-9]+$/.test(field.key.slice(field.type.length + 1));
+    const keyFollows = isInput && props.septemKeyMode !== 'manual'
+      && (props.septemKeyMode === 'auto' || !field.key || field.key === prevAuto || generatedKey);
     editField(field, ['label'], v);
     // O canvas do form-js exibe o nome do campo de data por `dateLabel`/`timeLabel`
     // (não por `label`). Grava os três para o nome mudar no editor E no runtime (ReactForm).
@@ -143,9 +147,11 @@ export function FieldConfigPanel({ field, editField, masks }: {
       editField(field, ['timeLabel'], v);
     }
     if (keyFollows) {
+      merge('properties', { septemKeyMode: 'auto' });
       const nextKey = slugify(v);
       if (nextKey && nextKey !== field.key) {
-        try { editField(field, ['key'], nextKey); setDraftKey(nextKey); } catch { /* unicidade — ignora */ }
+        try { editField(field, ['key'], nextKey); setDraftKey(nextKey); }
+        catch { setDraftKey(field.key); toast.error('Já existe um campo com essa chave. Use outro nome ou personalize a chave.'); }
       }
     }
     force((n) => n + 1);
@@ -154,8 +160,15 @@ export function FieldConfigPanel({ field, editField, masks }: {
   /** Commit da Chave no blur (slug). form-js valida unicidade. */
   function changeKey(v: string) {
     const slug = slugify(v);
-    setDraftKey(slug);
-    try { editField(field, ['key'], slug); } catch { /* dup — ignora */ }
+    if (slug === field.key) { setDraftKey(slug); return; }
+    try {
+      editField(field, ['key'], slug);
+      merge('properties', { septemKeyMode: 'manual' });
+      setDraftKey(slug);
+    } catch {
+      setDraftKey(field.key);
+      toast.error('Chave inválida ou já utilizada por outro campo.');
+    }
     force((n) => n + 1);
   }
 
@@ -197,7 +210,7 @@ export function FieldConfigPanel({ field, editField, masks }: {
             {field.type === 'image' && <Text label="Texto alternativo" value={field.alt ?? ''} onChange={(v) => set(['alt'], v)} />}
 
             {!NO_LABEL.has(field.type) && <Text label="Nome" value={draftLabel} onChange={setDraftLabel} onBlur={() => changeLabel(draftLabel)} />}
-            {isInput && <Text label="Chave (identificador)" value={draftKey} onChange={setDraftKey} onBlur={() => changeKey(draftKey)} hint="Sincroniza com o nome; pode ser editada." />}
+            {isInput && <Text label="Chave (identificador)" value={draftKey} onChange={setDraftKey} onBlur={() => changeKey(draftKey)} hint="Acompanha o nome até ser personalizada manualmente." />}
 
             {isContainer && (
               <>

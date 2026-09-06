@@ -9,6 +9,7 @@ export const DND_TYPE = 'application/x-septem-field';
 /** Campos novos de entrada nascem obrigatórios por padrão (têm `key`). */
 function applyNewFieldDefaults(editor: any, field: any) {
   if (!field?.key) return; // apresentação/container não têm chave
+  editor.get('modeling').editFormField(field, ['properties'], { ...(field.properties || {}), septemKeyMode: 'auto' });
   try { editor.get('modeling').editFormField(field, ['validate'], { ...(field.validate || {}), required: true }); }
   catch { /* ignora se o tipo não aceitar validate */ }
   // O form-js cria datetime como "somente data". A paleta Septem oferece

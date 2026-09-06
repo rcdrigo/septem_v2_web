@@ -43,6 +43,37 @@ try {
  await page.evaluate(s=>window.loadXml(s),schema('recente'));await ready();resolveSlow();
  await page.evaluate(()=>window.flush());assert.equal((await page.evaluate(()=>window.readSchema())).components[0].key,'recente','carga antiga não vence a nova');
  assert.equal(await page.locator('[data-septem-date-preview]').innerText(),'recente');
+
+ // Campos criados pela paleta têm chave aleatória: renomear deve convertê-la.
+ await page.getByRole('button',{name:'Texto',exact:true}).click();
+ const nameInput=page.locator('aside input').first();
+ const keyInput=page.locator('aside input').nth(1);
+ const rename=async name=>{await nameInput.fill(name);await nameInput.blur();await page.evaluate(()=>window.flush());};
+ await rename('Número do Contrato');
+ assert.equal(await keyInput.inputValue(),'numero_do_contrato');
+ await rename('Tipo de Contratação');
+ assert.equal(await keyInput.inputValue(),'tipo_de_contratacao');
+ // Blur sem alteração na chave não desliga a sincronização.
+ await keyInput.focus();await keyInput.blur();await rename('Órgão Solicitante');
+ assert.equal(await keyInput.inputValue(),'orgao_solicitante');
+ await keyInput.fill('Código Externo');await keyInput.blur();await rename('Novo Nome');
+ assert.equal(await keyInput.inputValue(),'codigo_externo','preserva chave personalizada');
+ await page.getByRole('button',{name:'Data / Hora',exact:true}).click();
+ await rename('Data de Assinatura');assert.equal(await keyInput.inputValue(),'data_de_assinatura');
+ let stored=await page.evaluate(()=>window.readSchema());
+ assert.equal(stored.components.at(-1).dateLabel,'Data de Assinatura');
+ assert.equal(stored.components.at(-1).timeLabel,'Data de Assinatura');
+ // Chave duplicada mantém a chave real e o painel coerentes.
+ await keyInput.fill('codigo_externo');await keyInput.blur();
+ assert.equal(await keyInput.inputValue(),'data_de_assinatura');
+ // Reimportar conserva a opção manual e o comportamento automático.
+ await page.evaluate(s=>window.loadXml(s),stored);await ready();
+ await page.locator('[data-septem-date-preview]').last().click();
+ await rename('Data de Publicação');assert.equal(await keyInput.inputValue(),'data_de_publicacao');
+ // Formulários antigos também tinham chaves aleatórias sem a marca auto.
+ await page.evaluate(s=>window.loadXml({...s,components:s.components.map(c=>({...c,label:'Data',dateLabel:'Data',timeLabel:'Data'}))}),schema('datetime_abc123'));await ready();
+ await page.locator('[data-septem-date-preview]').click();
+ await rename('Data do Contrato');assert.equal(await keyInput.inputValue(),'data_do_contrato');
  await page.evaluate(()=>window.loadXml('{invalido'));await page.getByRole('alert').waitFor();assert.equal(await page.evaluate(()=>window.flush().then(()=>false,()=>true)),true,'erro impede salvar schema anterior');
- assert.deepEqual(errors,[]);console.log('PASSOU: cache isolado, prontidão, três modos, flush imediato, restrição, carga concorrente e falha de importação.');
+ assert.deepEqual(errors,[]);console.log('PASSOU: cache isolado, prontidão, três modos, flush imediato, restrição, carga concorrente e falha de importação, snake_case, datas, persistência e colisão de chaves.');
 } finally {await browser.close();}
