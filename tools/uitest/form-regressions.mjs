@@ -52,6 +52,19 @@ try {
     check('HTML renderizado',await page.locator('#root b').innerText(),'Conteúdo configurado');check('imagem renderizada',await page.locator('img').count(),1);check('script removido',await page.locator('#root script').count(),0);
     await mount([field('nome')],{nome:'A'});await page.locator('input').fill('rascunho');await mount([field('nome')],{nome:'refetch'},false);check('refetch preserva edição',await page.evaluate(()=>window.data()),{nome:'rascunho'});
     await mount([field('nome')],{nome:'B'});check('nova identidade descarta edição antiga',await page.evaluate(()=>window.data()),{nome:'B'});
+
+    const help='<a href="#orientacao">Orientação</a>';
+    await mount([field('primeiro'),{type:'group',label:'Grupo',properties:{septemHelpType:'popover',septemHelpText:help},components:[field('segundo',{properties:{septemHelpType:'popover',septemHelpText:help}}),field('terceiro',{properties:{septemHelpType:'inline',septemHelpText:help}}),{type:'checkbox',key:'aceite',label:'Aceite',properties:{septemHelpType:'popover',septemHelpText:help}}]},field('ultimo')]);
+    const controls=page.locator('#root input');
+    await controls.first().focus();
+    for(let i=1;i<5;i++){await page.keyboard.press('Tab');check('Tab ignora ajuda antes do campo '+i,await controls.nth(i).evaluate(el=>el===document.activeElement),true);}
+    for(let i=3;i>=0;i--){await page.keyboard.press('Shift+Tab');check('Shift+Tab ignora ajuda antes do campo '+i,await controls.nth(i).evaluate(el=>el===document.activeElement),true);}
+    const helper=page.getByRole('button',{name:'Ajuda',exact:true}).first();
+    await helper.hover();await page.getByRole('tooltip').waitFor({state:'visible'});
+    check('ajuda continua disponível no hover',await page.getByRole('tooltip').innerText(),'Orientação');
+    check('links das ajudas fora do Tab',await page.locator('a[href="#orientacao"]').evaluateAll(links=>links.every(a=>a.tabIndex===-1)),true);
+    check('ícones das ajudas fora do Tab',await page.getByRole('button',{name:'Ajuda',exact:true}).evaluateAll(icons=>icons.every(el=>el.tabIndex===-1)),true);
+    await controls.first().focus();await page.keyboard.press('Tab');check('Tab ignora ajuda aberta',await controls.nth(1).evaluate(el=>el===document.activeElement),true);
     await page.clock.install({time:new Date('2026-09-05T12:34:30')});
     for (const mode of ['date','time','datetime']) {
       await mount([{type:'datetime',key:'data',subtype:mode,properties:{septemDateLimit:'noPast'}}]);

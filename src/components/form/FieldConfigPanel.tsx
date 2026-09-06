@@ -133,12 +133,10 @@ export function FieldConfigPanel({ field, editField, masks }: {
 
   /** Commit do Nome (label) no blur; se a Chave ainda era derivada do nome, sincroniza. */
   function changeLabel(v: string) {
-    const previousLabel = field.type === 'datetime' ? dateFieldLabel(field) : (field.label ?? '');
-    const prevAuto = slugify(previousLabel);
-    const generatedKey = typeof field.key === 'string' && field.key.startsWith(`${field.type}_`)
-      && /^[a-z0-9]+$/.test(field.key.slice(field.type.length + 1));
-    const keyFollows = isInput && props.septemKeyMode !== 'manual'
-      && (props.septemKeyMode === 'auto' || !field.key || field.key === prevAuto || generatedKey);
+    // O formato da chave antiga não informa se ela é automática (schemas
+    // importados e campos cujo tipo mudou podem usar qualquer identificador).
+    // Só uma personalização explícita desliga o acompanhamento do nome.
+    const keyFollows = isInput && props.septemKeyMode !== 'manual';
     editField(field, ['label'], v);
     // O canvas do form-js exibe o nome do campo de data por `dateLabel`/`timeLabel`
     // (não por `label`). Grava os três para o nome mudar no editor E no runtime (ReactForm).

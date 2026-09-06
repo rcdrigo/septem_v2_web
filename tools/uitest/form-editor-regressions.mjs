@@ -7,6 +7,9 @@ import { join, resolve } from 'node:path';
 const dir=await mkdtemp(join(tmpdir(),'septem-editor-regressions-')),root=resolve(import.meta.dirname,'../..');
 await build({stdin:{contents:`
 import React from 'react';import {createRoot} from 'react-dom/client';import {flushSync} from 'react-dom';import {QueryClient,QueryClientProvider} from '@tanstack/react-query';import {MemoryRouter} from 'react-router-dom';import {FormularioView} from './src/components/modelador/views/FormularioView';import {useModeladorStore} from './src/stores/modelador';
+import {FormEditor} from '@bpmn-io/form-js';
+const originalImport=FormEditor.prototype.importSchema;FormEditor.prototype.importSchema=function(...args){window.formEditor=this;return originalImport.apply(this,args);};
+window.selectField=id=>window.formEditor.get('selection').set(window.formEditor.get('formFieldRegistry').get(id));
 const events={};const bo={};const shape={businessObject:bo};
 const modeler={get:(key)=>({canvas:{getRootElement:()=>shape},eventBus:{on:(e,fn)=>{(events[e]??=[]).push(fn)},off:(e,fn)=>{events[e]=(events[e]??[]).filter(f=>f!==fn)}},moddle:{create:(type,props)=>({$type:type,...props})},modeling:{updateProperties:(_,props)=>Object.assign(bo,props)}}[key])};
 window.readSchema=()=>JSON.parse(bo.extensionElements?.values?.find(v=>v.$type==='septem:FormSchema')?.json??'null');
@@ -74,6 +77,24 @@ try {
  await page.evaluate(s=>window.loadXml({...s,components:s.components.map(c=>({...c,label:'Data',dateLabel:'Data',timeLabel:'Data'}))}),schema('datetime_abc123'));await ready();
  await page.locator('[data-septem-date-preview]').click();
  await rename('Data do Contrato');assert.equal(await keyInput.inputValue(),'data_do_contrato');
+
+ // Todos os tipos de entrada: paleta, esquema antigo, persistência e chave manual.
+ for(const [type,label] of [['radio','Opções (radio)'],['textfield','Texto'],['textarea','Área de texto'],['number','Número'],['datetime','Data / Hora'],['filepicker','Upload de arquivo'],['select','Lista (dropdown)'],['checkbox','Caixa de seleção'],['checklist','Múltipla escolha'],['taglist','Tags']]){
+   await page.getByRole('button',{name:label,exact:true}).click();
+   await rename('Nome '+type);assert.equal(await keyInput.inputValue(),'nome_'+type,'paleta '+type);
+   const fresh=await page.evaluate(()=>window.readSchema());
+   const field={...fresh.components.at(-1),key:'campo_antigo_'+type,label:'Rótulo anterior',properties:{}};
+   if(type==='datetime'){field.dateLabel='Rótulo anterior';field.timeLabel='Rótulo anterior';}
+   const legacy={type:'default',id:'form_legacy_'+type,schemaVersion:17,components:[field]};
+   await page.evaluate(s=>window.loadXml(s),legacy);await ready();await page.evaluate(id=>window.selectField(id),field.id);
+   await rename('Opção de Contratação '+type);assert.equal(await keyInput.inputValue(),'opcao_de_contratacao_'+type,'legado '+type);
+   const persisted=await page.evaluate(()=>window.readSchema());assert.equal(persisted.components[0].key,'opcao_de_contratacao_'+type);
+   await page.evaluate(s=>window.loadXml(s),persisted);await ready();await page.evaluate(id=>window.selectField(id),field.id);
+   await rename('Nome Atualizado '+type);assert.equal(await keyInput.inputValue(),'nome_atualizado_'+type,'reabertura '+type);
+   await keyInput.fill('Chave Manual '+type);await keyInput.blur();await rename('Outro Nome '+type);
+   assert.equal(await keyInput.inputValue(),'chave_manual_'+type,'manual '+type);
+   console.log('PASSOU: chave automática e manual — '+type);
+ }
  await page.evaluate(()=>window.loadXml('{invalido'));await page.getByRole('alert').waitFor();assert.equal(await page.evaluate(()=>window.flush().then(()=>false,()=>true)),true,'erro impede salvar schema anterior');
  assert.deepEqual(errors,[]);console.log('PASSOU: cache isolado, prontidão, três modos, flush imediato, restrição, carga concorrente e falha de importação, snake_case, datas, persistência e colisão de chaves.');
 } finally {await browser.close();}

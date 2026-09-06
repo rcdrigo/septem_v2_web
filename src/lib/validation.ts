@@ -224,6 +224,7 @@ function isExecutable(type: string): boolean {
   return (
     type === 'bpmn:UserTask' ||
     type === 'bpmn:ServiceTask' ||
+    type === 'bpmn:ScriptTask' ||
     type === 'bpmn:CallActivity' ||
     type === 'bpmn:IntermediateThrowEvent' ||
     type === 'bpmn:IntermediateCatchEvent'
@@ -239,6 +240,8 @@ function labelOf(e: Element): string {
       return 'Fim';
     case 'bpmn:UserTask':
       return 'Tarefa humana';
+    case 'bpmn:ScriptTask':
+      return 'Tarefa de script';
     case 'bpmn:ServiceTask':
       return 'Atividade de serviço';
     case 'bpmn:CallActivity':

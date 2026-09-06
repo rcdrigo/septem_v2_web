@@ -140,6 +140,9 @@ export class SeptemPaletteProvider {
         'bpmn-icon-user-task',
         'Tarefa humana',
       ),
+      'create.script-task': createEntry(
+        'bpmn:ScriptTask', 'activity', 'bpmn-icon-script-task', 'Tarefa de script',
+      ),
       'create.service-task': createEntry(
         'bpmn:ServiceTask',
         'activity',

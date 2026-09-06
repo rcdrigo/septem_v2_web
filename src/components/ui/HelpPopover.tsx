@@ -7,6 +7,18 @@ type Props = {
   ariaLabel?: string;
 };
 
+/** Ajuda pode conter links, mas não participa da navegação sequencial dos campos. */
+function removeHelpTabStops(root: HTMLElement | null) {
+  root?.querySelectorAll<HTMLElement>('a[href], area[href], button, input, select, textarea, summary, iframe, audio[controls], video[controls], [tabindex], [contenteditable]')
+    .forEach(element => { element.tabIndex = -1; });
+}
+
+export function HelpContent({ html, className }: { html: string; className?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => { removeHelpTabStops(ref.current); });
+  return <span ref={ref} className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
 /**
  * Helper compartilhado exibido por hover ou foco. O conteúdo sai do fluxo em
  * um portal para não ser recortado por painéis com overflow.
@@ -45,6 +57,10 @@ export function HelpPopover({ html, ariaLabel = 'Ajuda' }: Props) {
     clearTimer(closeTimerRef);
   }, []);
 
+  // O innerHTML pode ser reaplicado ao reposicionar o portal. Reaplica a
+  // exclusão do Tab em cada render, inclusive quando só o estilo muda.
+  useLayoutEffect(() => { removeHelpTabStops(popRef.current); });
+
   useLayoutEffect(() => {
     if (!open || !triggerRef.current || !popRef.current) return;
 
@@ -73,7 +89,7 @@ export function HelpPopover({ html, ariaLabel = 'Ajuda' }: Props) {
     <span
       ref={triggerRef}
       role="button"
-      tabIndex={0}
+      tabIndex={-1}
       aria-label={ariaLabel}
       aria-describedby={open ? id : undefined}
       className="inline-flex shrink-0 rounded-sm text-slate-400 outline-none hover:text-slate-600 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 active:text-slate-800"

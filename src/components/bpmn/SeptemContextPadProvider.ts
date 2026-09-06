@@ -71,6 +71,7 @@ export class SeptemContextPadProvider {
 
     return {
       'append.user-task': this.appendAction('bpmn:UserTask', 'bpmn-icon-user-task', 'Tarefa humana'),
+      'append.script-task': this.appendAction('bpmn:ScriptTask', 'bpmn-icon-script-task', 'Tarefa de script'),
       'append.service-task': this.appendAction('bpmn:ServiceTask', 'bpmn-icon-service-task', 'Tarefa de sistema'),
       'append.exclusive-gateway': this.appendAction('bpmn:ExclusiveGateway', 'bpmn-icon-gateway-xor', 'Desvio condicional'),
       'append.end-event': this.appendAction('bpmn:EndEvent', 'bpmn-icon-end-event-none', 'Fim'),

@@ -5,7 +5,7 @@ import { validateForm, fieldPath, INPUT_TYPES, type FormComponent as Component, 
 // porque o corpo mesclado não os usa mais.
 import { createContext, forwardRef, Fragment, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Plus, Trash2, Paperclip, X, Loader2, FileText, FileSignature, FileSearch } from 'lucide-react';
-import { HelpPopover } from '@/components/ui/HelpPopover';
+import { HelpContent, HelpPopover } from '@/components/ui/HelpPopover';
 import { routes } from '@/lib/routes';
 import { useQueryClient } from '@tanstack/react-query';
 import { signatureKeys, useDocumentCodes, useTaskSignatures } from '@/lib/api/execution';
@@ -463,7 +463,7 @@ function Node({ comp }: { comp: Component }) {
       <div className="flex min-h-[1lh] items-start justify-between gap-2">
         <div className="min-w-0">
           {err && <span className="text-xs text-rose-600">{err}</span>}
-          {!err && inlineHelp && <span className="text-xs text-slate-400" dangerouslySetInnerHTML={{ __html: inlineHelp }} />}
+          {!err && inlineHelp && <HelpContent className="text-xs text-slate-400" html={inlineHelp} />}
           {!err && !inlineHelp && comp.description && <span className="text-xs text-slate-400">{comp.description}</span>}
         </div>
         {showCounter && (
@@ -784,7 +784,7 @@ function GroupHelp({ comp }: { comp: Component }) {
   const txt = comp.properties?.septemHelpText;
   if (!txt) return null;
   if (t === 'popover') return <HelpPopover html={txt} />;
-  return <span className="text-xs font-normal text-slate-400" dangerouslySetInnerHTML={{ __html: txt }} />;
+  return <HelpContent className="text-xs font-normal text-slate-400" html={txt} />;
 }
 
 /** Conta campos obrigatórios não preenchidos dentro de um grupo (pill de pendências). */

@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
+    "test:script-task": "node tools/uitest/script-task-modeler.mjs",
     "test:session": "node tools/uitest/session-renewal.mjs",
     "test:forms": "node tools/uitest/form-regressions.mjs && node tools/uitest/form-editor-regressions.mjs && node tools/uitest/modelador-startup.mjs && node tools/uitest/form-publication.mjs && node tools/uitest/data-source-sql.mjs"
   },
