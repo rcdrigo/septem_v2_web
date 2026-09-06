@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
-    "test:forms": "node tools/uitest/form-regressions.mjs && node tools/uitest/form-editor-regressions.mjs && node tools/uitest/modelador-startup.mjs"
+    "test:forms": "node tools/uitest/form-regressions.mjs && node tools/uitest/form-editor-regressions.mjs && node tools/uitest/modelador-startup.mjs && node tools/uitest/form-publication.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

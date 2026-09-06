@@ -106,6 +106,8 @@ export type StartForm = {
 export function useProcessForm(key: string | null, homologation = false) {
   return useQuery({
     queryKey: ['workflow', 'process-form', key, homologation],
+    // Uma nova abertura deve conferir publicações feitas em outra aba/sessão.
+    staleTime: 0,
     queryFn: () => api.get<StartForm>(
       `/api/v1/workflow/process-definitions/${key}/form${homologation ? '?homologation=true' : ''}`),
     enabled: !!key,
@@ -116,6 +118,7 @@ export function useProcessForm(key: string | null, homologation = false) {
 export function useHasHomologation(key: string | null, enabled: boolean) {
   return useQuery({
     queryKey: ['workflow', 'process-form', key, 'has-homologation'],
+    staleTime: 0,
     queryFn: () => api.get<StartForm>(`/api/v1/workflow/process-definitions/${key}/form?homologation=true`)
       .then((r) => !!r.formSchema)
       .catch(() => false),

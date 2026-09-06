@@ -750,15 +750,29 @@ export function FormSkeleton() {
  * Em telas pequenas colapsa para 1 coluna (cada campo vira uma linha) — regra
  * `.septem-form-grid` em globals.css. */
 function LayoutGrid({ components, render }: { components: Component[]; render: (c: Component) => React.ReactNode }) {
+  // O form-js agrupa por layout.row, na ordem da primeira ocorrência.
+  // Sem essa informação, campos de linhas distintas acabavam lado a lado.
+  const rows = new Map<string, Component[]>();
+  components.forEach((c, i) => {
+    const key = c.layout?.row ? `row:${c.layout.row}` : `field:${i}`;
+    rows.set(key, [...(rows.get(key) ?? []), c]);
+  });
   return (
-    <div className="septem-form-grid grid gap-3">
-      {components.map((c, i) => {
-        const span = colSpan(c);
-        return (
-          <div key={c.id ?? i} style={{ gridColumn: `span ${span} / span ${span}` }}>
-            {render(c)}
-          </div>
-        );
+    <div className="flex flex-col gap-3">
+      {[...rows].map(([key, fields]) => {
+        const fixed = fields.filter(c => (c.layout?.columns ?? 0) > 0);
+        const automatic = fields.length - fixed.length;
+        const remaining = Math.max(automatic, GRID_COLS - fixed.reduce((sum, c) => sum + colSpan(c), 0));
+        let autoIndex = 0;
+        return <div key={key} className="septem-form-grid grid gap-3">
+          {fields.map((c, i) => {
+            const span = (c.layout?.columns ?? 0) > 0 ? colSpan(c)
+              : Math.floor(remaining / automatic) + (autoIndex++ < remaining % automatic ? 1 : 0);
+            return <div key={c.id ?? i} style={{ gridColumn: `span ${span} / span ${span}` }}>
+              {render(c)}
+            </div>;
+          })}
+        </div>;
       })}
     </div>
   );

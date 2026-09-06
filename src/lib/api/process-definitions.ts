@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 /** draft = rascunho, published = publicado, inactive = inativo (soft-delete). */
@@ -75,6 +75,14 @@ const processKeys = {
   diagnostics: (key: string) => ['process-definitions', 'diagnostics', key] as const,
 };
 
+/** O modelador e a execução usam caches distintos para a mesma definição. */
+async function invalidateProcess(qc: QueryClient, key: string) {
+  await Promise.all([
+    qc.invalidateQueries({ queryKey: processKeys.all }),
+    qc.invalidateQueries({ queryKey: ['workflow', 'process-form', key] }),
+  ]);
+}
+
 function toQuery(params: ProcessListParams): string {
   const qs = new URLSearchParams();
   if (params.q) qs.set('q', params.q);
@@ -115,7 +123,7 @@ export function useSaveProcess() {
   return useMutation({
     mutationFn: (body: { bpmnXml: string; key?: string; commitMessage?: string }) =>
       api.post<SavedProcess>(`${BASE}/`, body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: processKeys.all }),
+    onSuccess: (result) => invalidateProcess(qc, result.key),
   });
 }
 
@@ -125,7 +133,7 @@ export function useUpdateProcess() {
   return useMutation({
     mutationFn: ({ key, bpmnXml }: { key: string; bpmnXml: string }) =>
       api.put<SavedProcess>(`${BASE}/${key}`, { bpmnXml }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: processKeys.all }),
+    onSuccess: (result) => invalidateProcess(qc, result.key),
   });
 }
 
@@ -137,7 +145,7 @@ export function usePatchProcessStatus() {
         `${BASE}/${key}/status`,
         { status },
       ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: processKeys.all }),
+    onSuccess: (result) => invalidateProcess(qc, result.key),
   });
 }
 

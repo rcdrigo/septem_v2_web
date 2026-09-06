@@ -9,7 +9,7 @@ export type FormComponent = {
   appearance?: { prefixAdorner?: string; suffixAdorner?: string };
   values?: { label: string; value: string }[];
   validate?: { required?: boolean; minLength?: number; maxLength?: number; min?: number; max?: number };
-  components?: FormComponent[]; layout?: { columns?: number | null };
+  components?: FormComponent[]; layout?: { columns?: number | null; row?: string };
   properties?: Record<string, string>;
 };
 export type FieldState = Record<string, { hidden?: boolean; disabled?: boolean }>;
