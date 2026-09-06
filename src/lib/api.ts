@@ -67,13 +67,13 @@ type ApiOptions = RequestInit & {
 
 /** Hooks para o session store; setados pelo store no boot. Evita ciclo de import. */
 let tokenProvider: () => string | null = () => null;
-let refreshHandler: () => Promise<string | null> = async () => null;
-let logoutHandler: () => Promise<void> = async () => {};
+let refreshHandler: (rejectedToken?: string | null) => Promise<string | null> = async () => null;
+let logoutHandler: (rejectedToken?: string | null) => Promise<void> = async () => {};
 
 export function configureApi(opts: {
   getAccessToken: () => string | null;
-  refresh: () => Promise<string | null>;
-  logout: () => Promise<void>;
+  refresh: (rejectedToken?: string | null) => Promise<string | null>;
+  logout: (rejectedToken?: string | null) => Promise<void>;
 }) {
   tokenProvider = opts.getAccessToken;
   refreshHandler = opts.refresh;
@@ -112,15 +112,17 @@ export async function apiFetch<T = unknown>(path: string, options: ApiOptions = 
   const resp = await fetch(`${BASE_URL}${path}`, { ...rest, headers: finalHeaders });
 
   if (resp.status === 401 && !anonymous && !skipRefresh) {
-    const newToken = await refreshHandler();
+    const rejectedToken = finalHeaders.get('Authorization')?.replace(/^Bearer /, '') ?? null;
+    const newToken = await refreshHandler(rejectedToken);
     if (newToken) {
       finalHeaders.set('Authorization', `Bearer ${newToken}`);
       const retry = await fetch(`${BASE_URL}${path}`, { ...rest, headers: finalHeaders });
       if (!retry.ok) throw await readError(retry);
       return (await buildResponse(retry)) as T;
     }
-    // refresh falhou → desloga e sobe erro original
-    await logoutHandler();
+    // Só ausência/rejeição definitiva do refresh retorna null. Falhas transitórias
+    // são propagadas sem encerrar a sessão. A expiração não revoga outra sessão.
+    await logoutHandler(rejectedToken);
     throw await readError(resp);
   }
 

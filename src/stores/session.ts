@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { applyTenantMeta } from '@/lib/tenant-meta';
-import { api, configureApi } from '@/lib/api';
+import { api, ApiError, configureApi } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
 
 /**
@@ -67,7 +67,7 @@ type SessionState = {
   completeTwoFactor: (identifier: string, code: string, trustDevice: boolean, keepConnected?: boolean) => Promise<void>;
   impersonate: (userId: string) => Promise<void>;
   stopImpersonation: () => Promise<void>;
-  refresh: () => Promise<string | null>;
+  refresh: (rejectedToken?: string | null) => Promise<string | null>;
   logout: () => Promise<void>;
   setAccessMode: (mode: AccessMode) => void;
   effectiveMode: () => AccessMode;
@@ -79,6 +79,9 @@ const REFRESH_KEY = 'septem.refreshToken';
 const TENANT_KEY = 'septem.tenant';
 /** Dispositivo confiável (2FA): enviado no login para pular o desafio. */
 const DEVICE_KEY = 'septem.deviceToken';
+
+// Uma renovação por aba; Web Locks coordena também as abas standalone.
+let refreshInFlight: Promise<string | null> | null = null;
 
 export type LoginOutcome = { kind: 'ok' } | { kind: 'two-factor'; maskedEmail: string };
 type TwoFactorChallenge = { twoFactorRequired: true; identifier: string; maskedEmail: string };
@@ -168,7 +171,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     } catch (err) {
       // Token expirado / inválido sem refresh válido → cai pra unauthenticated.
       const tenant = get().tenant;
-      set({ status: tenant ? 'unauthenticated' : 'error', error: (err as Error).message });
+      set({ status: !get().accessToken && tenant ? 'unauthenticated' : 'error', error: (err as Error).message });
     }
   },
 
@@ -230,31 +233,53 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     queryClient.clear();
   },
 
-  refresh: async () => {
-    const refreshToken = get().refreshToken;
-    if (!refreshToken) return null;
-    try {
-      const tokens = await api.post<TokenResponse>('/api/v1/auth/refresh', { refreshToken }, { anonymous: true, skipRefresh: true });
-      localStorage.setItem(ACCESS_KEY, tokens.accessToken);
-      localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
-      set({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
-      return tokens.accessToken;
-    } catch {
-      return null;
-    }
+  refresh: (rejectedToken = get().accessToken) => {
+    if (refreshInFlight) return refreshInFlight;
+    const renew = async (): Promise<string | null> => {
+      // Outra aba pode ter renovado enquanto esta estava aberta ou aguardava o lock.
+      const accessToken = localStorage.getItem(ACCESS_KEY);
+      const refreshToken = localStorage.getItem(REFRESH_KEY);
+      set({ accessToken, refreshToken });
+      if (accessToken && accessToken !== rejectedToken) return accessToken;
+      if (!refreshToken) return null;
+      try {
+        const tokens = await api.post<TokenResponse>('/api/v1/auth/refresh', { refreshToken }, { anonymous: true, skipRefresh: true });
+        // Sair, entrar ou personificar durante a requisição invalida esta resposta.
+        if (localStorage.getItem(REFRESH_KEY) !== refreshToken)
+          return localStorage.getItem(ACCESS_KEY);
+        localStorage.setItem(ACCESS_KEY, tokens.accessToken);
+        localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
+        set({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
+        return tokens.accessToken;
+      } catch (err) {
+        // Rede, 429 e 5xx não comprovam sessão inválida: permitem tentar novamente.
+        if (!(err instanceof ApiError) || err.status !== 401) throw err;
+        // Fallback para ambientes sem Web Locks: aceita a renovação de outra aba.
+        const latest = localStorage.getItem(ACCESS_KEY);
+        if (latest && latest !== accessToken) {
+          set({ accessToken: latest, refreshToken: localStorage.getItem(REFRESH_KEY) });
+          return latest;
+        }
+        return null;
+      }
+    };
+    refreshInFlight = (navigator.locks
+      ? navigator.locks.request('septem.session.refresh', renew)
+      : renew()).finally(() => { refreshInFlight = null; });
+    return refreshInFlight;
   },
 
   logout: async () => {
-    const refreshToken = get().refreshToken;
-    try {
-      if (refreshToken)
-        await api.post('/api/v1/auth/logout', { refreshToken }, { anonymous: true, skipRefresh: true });
-    } catch {
-      // best-effort
-    }
+    const refreshToken = localStorage.getItem(REFRESH_KEY);
+    // Limpa antes da chamada de rede para uma renovação pendente não reabrir a sessão.
     localStorage.removeItem(ACCESS_KEY);
     localStorage.removeItem(REFRESH_KEY);
     set({ accessToken: null, refreshToken: null, user: null, status: 'unauthenticated', isImpersonating: false });
+    queryClient.clear();
+    try {
+      if (refreshToken)
+        await api.post('/api/v1/auth/logout', { refreshToken }, { anonymous: true, skipRefresh: true });
+    } catch { /* revogação best-effort */ }
   },
 
   setAccessMode: (mode) => set({ accessMode: mode }),
@@ -269,8 +294,16 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 // Liga o api.ts à store para token + refresh + logout (quebra ciclo de import).
 configureApi({
   getAccessToken: () => useSessionStore.getState().accessToken,
-  refresh: () => useSessionStore.getState().refresh(),
-  logout: () => useSessionStore.getState().logout(),
+  refresh: (rejectedToken) => useSessionStore.getState().refresh(rejectedToken),
+  logout: async (rejectedToken) => {
+    const current = localStorage.getItem(ACCESS_KEY);
+    if (current && current !== rejectedToken) return;
+    // Expiração local: não chama /logout e não revoga tokens recém-renovados.
+    localStorage.removeItem(ACCESS_KEY);
+    localStorage.removeItem(REFRESH_KEY);
+    useSessionStore.setState({ accessToken: null, refreshToken: null, user: null, status: 'unauthenticated', isImpersonating: false });
+    queryClient.clear();
+  },
 });
 
 /** Para componentes que ainda precisam do tipo legado (compatibilidade). */
