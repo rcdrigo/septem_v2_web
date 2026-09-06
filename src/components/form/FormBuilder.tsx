@@ -67,6 +67,7 @@ type FormBuilderProps = {
 export const FormBuilder = forwardRef<FormBuilderHandle, FormBuilderProps>(({ onSelect }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<FormEditor | null>(null);
+  const readyRef = useRef<Promise<unknown>>(Promise.resolve());
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
 
@@ -102,9 +103,8 @@ export const FormBuilder = forwardRef<FormBuilderHandle, FormBuilderProps>(({ on
     el.addEventListener('dragover', onDragOver);
     el.addEventListener('drop', onDrop);
 
-    editor
-      .importSchema(emptySchema)
-      .catch((err: unknown) => console.error('Falha ao importar form inicial:', err));
+    readyRef.current = editor.importSchema(emptySchema);
+    void readyRef.current.catch((err: unknown) => console.error('Falha ao importar form inicial:', err));
 
     return () => {
       bus.off('selection.changed', onSel);
@@ -119,7 +119,8 @@ export const FormBuilder = forwardRef<FormBuilderHandle, FormBuilderProps>(({ on
     ref,
     () => ({
       async importSchema(schema: unknown) {
-        if (!editorRef.current) return;
+        await readyRef.current;
+        if (!editorRef.current) throw new Error('Editor indisponível.');
         await editorRef.current.importSchema(schema);
       },
       saveSchema() {
@@ -127,7 +128,8 @@ export const FormBuilder = forwardRef<FormBuilderHandle, FormBuilderProps>(({ on
         return editorRef.current.saveSchema();
       },
       async reset() {
-        if (!editorRef.current) return;
+        await readyRef.current;
+        if (!editorRef.current) throw new Error('Editor indisponível.');
         await editorRef.current.importSchema(emptySchema);
       },
       addField(type: string) {

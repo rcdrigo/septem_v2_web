@@ -57,6 +57,7 @@ export function ModeladorPage() {
   const saveMut = useSaveProcess();     // POST = nova versão (Versionar)
   const updateMut = useUpdateProcess(); // PUT  = salva no lugar (Salvar)
   const patchMut = usePatchProcessStatus();
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const loadedKeyRef = useRef<string | null>(null);
   // Status/versão da definição carregada. Vem do backend e é atualizado a cada save —
   // é o que o selo "Em homologação" mostra (Fase 5).
@@ -81,7 +82,12 @@ export function ModeladorPage() {
     if (loadedKeyRef.current === key) return;
     loadedKeyRef.current = key;
     suppressDirty.current = true;
-    void modelerHandleRef.current?.importXML(detail.data.bpmnXml).finally(() => {
+    void modelerHandleRef.current?.importXML(detail.data.bpmnXml).then(() => {
+      setLoadedKey(key);
+    }).catch(() => {
+      loadedKeyRef.current = null;
+      toast.error('Não foi possível carregar o processo.');
+    }).finally(() => {
       setDirty(false);
       setTimeout(() => { suppressDirty.current = false; }, 0);
     });
@@ -90,7 +96,10 @@ export function ModeladorPage() {
   async function currentXml(): Promise<string | null> {
     // O schema do formulário entra no BPMN por polling (600ms). Sem empurrar agora, um
     // Salvar logo após uma alteração gravaria o processo SEM ela — perda silenciosa.
-    useModeladorStore.getState().flushForm?.();
+    if (key && loadedKey !== key) throw new Error('Aguarde o carregamento do processo.');
+    const flush = useModeladorStore.getState().flushForm;
+    if (!flush) throw new Error('Formulário indisponível.');
+    await flush();
     if (!modeler) return null;
     const { xml } = await modeler.saveXML({ format: true });
     return xml as string;
@@ -101,6 +110,7 @@ export function ModeladorPage() {
     setStatusAtual(r.status ?? null);
     setVersaoAtual(r.version ?? null);
     if (key !== r.key) {
+      setLoadedKey(r.key);
       loadedKeyRef.current = r.key; // não re-importar o que acabamos de salvar
       setSearchParams({ key: r.key }, { replace: true });
     }
@@ -170,9 +180,9 @@ export function ModeladorPage() {
       const r = key
         ? await updateMut.mutateAsync({ key, bpmnXml: xml })
         : await saveMut.mutateAsync({ bpmnXml: xml });
-      await patchMut.mutateAsync({ key: r.key, status: 'published' });
-      toast.success(`Publicado v${r.version}.`);
-      afterPersist(r);
+      const published = await patchMut.mutateAsync({ key: r.key, status: 'published' });
+      toast.success(`Publicado v${published.version}.`);
+      afterPersist({ ...r, status: published.status, version: published.version });
     } catch (err) { handleError(err); }
     finally { setPendingAction(null); }
   }
@@ -207,6 +217,7 @@ export function ModeladorPage() {
     },
     onExport: async () => {
       try {
+        await currentXml();
         await exportBpmn(modeler, processName);
         toast.success('Fluxo exportado.');
       } catch (err) {
@@ -247,7 +258,7 @@ export function ModeladorPage() {
         */}
         <div className={currentView === 'formulario' ? 'flex flex-1 overflow-hidden' : 'hidden flex-1'}>
           <ErrorBoundary context="o editor de formulário">
-            <FormularioView modeler={modeler} />
+            <FormularioView modeler={modeler} processReady={!key || loadedKey === key} />
           </ErrorBoundary>
         </div>
         {currentView === 'tarefasXcampos' && (

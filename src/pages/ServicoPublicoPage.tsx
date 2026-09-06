@@ -147,7 +147,7 @@ export function ServicoPublicoPage() {
 
       {schema ? (
         <div className="mt-5">
-          <ReactForm ref={formRef} schema={schema} />
+          <ReactForm key={processKey} ref={formRef} schema={schema} />
         </div>
       ) : (
         <p className="mt-5 text-sm text-slate-500">Este serviço não tem formulário publicado.</p>

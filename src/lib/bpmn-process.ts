@@ -89,7 +89,7 @@ export function setProcessConfig(modeler: AnyModeler, patch: Partial<ProcessConf
 // ─── Form schema embutido no BPMN ─────────────────────────────────────────────
 
 /** Lê o schema do formulário (JSON serializado) guardado em `septem:FormSchema`. */
-export function getEmbeddedFormSchema(modeler: AnyModeler): unknown | null {
+export function getEmbeddedFormSchema(modeler: AnyModeler, strict = false): unknown | null {
   const proc = getProcessShape(modeler);
   // `businessObject` pode faltar enquanto o diagrama ainda não importou (ou se o XML
   // veio sem DI) — sem esta guarda a página quebrava com
@@ -102,6 +102,7 @@ export function getEmbeddedFormSchema(modeler: AnyModeler): unknown | null {
   try {
     return JSON.parse(node.json);
   } catch {
+    if (strict) throw new Error('Schema do formulário inválido.');
     return null;
   }
 }

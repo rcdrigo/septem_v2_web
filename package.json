@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "test:forms": "node tools/uitest/form-regressions.mjs && node tools/uitest/form-editor-regressions.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

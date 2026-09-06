@@ -167,7 +167,7 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
     const nextDisplay = displayFromIso(value, mode);
     setDisplay(nextDisplay);
     setLocalError(undefined);
-    const time = mode === 'time' ? nextDisplay : / (\d{2}):(\d{2})$/.exec(nextDisplay)?.slice(1);
+    const time = mode === 'time' ? nextDisplay.split(':') : / (\d{2}):(\d{2})$/.exec(nextDisplay)?.slice(1);
     const fallback = currentTime().split(':');
     setHourDraft(time?.[0] ?? fallback[0]);
     setMinuteDraft(time?.[1] ?? fallback[1]);
@@ -180,6 +180,13 @@ export function DatePickerField({ value, mode = 'datetime', limit = '', error, a
     }
     validityCallback.current?.(null);
   }, [value, mode]);
+
+  useEffect(() => {
+    const result = inspect(display, mode, limit);
+    const message = !display || result.valid ? null : reasonText[result.reason ?? 'invalid'];
+    setLocalError(display && result.complete && !result.valid ? result.reason : undefined);
+    validityCallback.current?.(message);
+  }, [limit, mode, display]);
 
   const selectedDate = useMemo(() => mode === 'time' ? undefined : dateFromDisplay(display), [display, mode]);
   const today = useMemo(() => {

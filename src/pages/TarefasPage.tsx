@@ -574,7 +574,7 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
 
       {/* Cada grupo renderiza seu próprio card (sem container único). */}
       <main className="flex-1 overflow-auto p-4 sm:p-6">
-        {task.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={task.data?.formSchema} data={task.data?.data as Record<string, unknown> | undefined} optionsByField={task.data?.fieldOptions} uploadContext={{ taskId }} extraTabs={messageExtra ? { trailing: [messageExtra] } : undefined} />}
+        {task.isLoading ? <FormSkeleton /> : <ReactForm key={taskId} ref={fillRef} schema={task.data?.formSchema} data={task.data?.data as Record<string, unknown> | undefined} optionsByField={task.data?.fieldOptions} uploadContext={{ taskId }} extraTabs={messageExtra ? { trailing: [messageExtra] } : undefined} />}
       </main>
 
       <TaskActionFooter completionActions={completionActions} utilityActions={utilityActions} loading={task.isLoading} compactDesktop />

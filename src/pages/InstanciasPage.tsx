@@ -172,6 +172,7 @@ export function InstanceReport({ id, messageAccess }: { id: string; messageAcces
           barra de abas. Editável quando "editing"; senão só-leitura. Sem schema (legado) → fallback. */}
       {d.formSchema ? (
         <ReactForm
+          key={`${id}:${editing}`}
           ref={formRef}
           schema={d.formSchema}
           data={data}

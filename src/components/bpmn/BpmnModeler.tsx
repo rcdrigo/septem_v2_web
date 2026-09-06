@@ -22,19 +22,18 @@ const AUTOSAVE_DEBOUNCE_MS = 500;
 export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, ref) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<any>(null);
+  const importQueue = useRef<Promise<void>>(Promise.resolve());
   const setXml = useModeladorStore((s) => s.setXml);
   const setSelectedElementId = useModeladorStore((s) => s.setSelectedElementId);
 
-  async function loadDiagram(modeler: any, xml: string) {
-    try {
+  function loadDiagram(modeler: any, xml: string): Promise<void> {
+    const pending = importQueue.current.catch(() => {}).then(async () => {
+      if (modelerRef.current !== modeler) throw new Error('Modelador indisponível.');
       await modeler.importXML(xml);
-      if (modelerRef.current !== modeler) return;
-      modeler.get('canvas').zoom('fit-viewport', 'auto');
-    } catch (err) {
-      if (modelerRef.current === modeler) {
-        console.error('Falha ao carregar diagrama BPMN:', err);
-      }
-    }
+      if (modelerRef.current === modeler) modeler.get('canvas').zoom('fit-viewport', 'auto');
+    });
+    importQueue.current = pending;
+    return pending;
   }
 
   useEffect(() => {
@@ -53,7 +52,7 @@ export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, re
     // (via ?key=), e "Novo processo" (sem key) fica em branco. NÃO restauramos do
     // localStorage aqui — o rascunho era global e, como o auto-save gravava qualquer
     // diagrama aberto, "Novo" acabava restaurando o último processo editado.
-    void loadDiagram(modeler, emptyDiagram);
+    void loadDiagram(modeler, emptyDiagram).catch(() => {});
     window.localStorage.removeItem(STORAGE_KEY); // limpa rascunho global legado (contaminado)
 
     // Espelha o XML no store (consumido por outras views), com debounce.

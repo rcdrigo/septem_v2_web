@@ -104,7 +104,7 @@ export function ServicoFormPage() {
           {/* Cada grupo renderiza seu próprio card (sem container único). */}
           <main className="flex-1 overflow-auto p-4 sm:p-6">
             {formEscolhido.data?.documentationUrl && <DocBanner url={formEscolhido.data.documentationUrl} />}
-            {formEscolhido.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={formEscolhido.data?.formSchema} data={formEscolhido.data?.data ?? undefined} optionsByField={formEscolhido.data?.fieldOptions} uploadContext={{ processKey: processKey ?? undefined }} />}
+            {formEscolhido.isLoading ? <FormSkeleton /> : <ReactForm key={`${processKey}:${isTest && usarHomologacao ? 'homologation' : 'published'}`} ref={fillRef} schema={formEscolhido.data?.formSchema} data={formEscolhido.data?.data ?? undefined} optionsByField={formEscolhido.data?.fieldOptions} uploadContext={{ processKey: processKey ?? undefined }} />}
           </main>
           <TaskActionFooter
             completionActions={completionActions}

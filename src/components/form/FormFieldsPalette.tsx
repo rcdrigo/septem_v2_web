@@ -1,6 +1,6 @@
 import {
   AlignLeft, Calendar, CheckSquare, ChevronDownSquare, CircleDot, Code2, Hash, Image as ImageIcon,
-  ListChecks, Minus, MoveVertical, Table as TableIcon, Tags, Text as TextIcon, Type, Upload,
+  ListChecks, Minus, MoveVertical, Tags, Text as TextIcon, Type, Upload,
   Group as GroupIcon, Rows3,
 } from 'lucide-react';
 import { DND_TYPE } from './FormBuilder';
@@ -46,7 +46,6 @@ const CATEGORIES: { title: string; items: Item[] }[] = [
       { type: 'text', label: 'Texto estático', icon: TextIcon },
       { type: 'html', label: 'HTML', icon: Code2 },
       { type: 'image', label: 'Imagem', icon: ImageIcon },
-      { type: 'table', label: 'Tabela', icon: TableIcon },
       { type: 'separator', label: 'Separador', icon: Minus },
       { type: 'spacer', label: 'Espaçador', icon: MoveVertical },
     ],

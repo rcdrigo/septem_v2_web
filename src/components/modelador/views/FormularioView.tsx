@@ -18,7 +18,7 @@ import { useFormMasks } from '@/lib/api/forms';
 import { getEmbeddedFormSchema, setEmbeddedFormSchema } from '@/lib/bpmn-process';
 import { fetchDataSourceOptions } from '@/lib/api/catalog';
 
-type Props = { modeler: any | null };
+type Props = { modeler: any | null; processReady?: boolean };
 
 /**
  * O editor do form-js só renderiza no canvas os `values` estáticos do componente —
@@ -57,7 +57,7 @@ const POLL_MS = 600;
  * no schema (`septemGroupLayout`), injetada na persistência e removida antes de
  * importar no editor (o form-js não precisa conhecê-la).
  */
-export function FormularioView({ modeler }: Props) {
+export function FormularioView({ modeler, processReady = true }: Props) {
   const builderRef = useRef<FormBuilderHandle>(null);
   const setFields = useFormStore((s) => s.setFields);
   const masks = useFormMasks();
@@ -73,100 +73,132 @@ export function FormularioView({ modeler }: Props) {
   const layoutRef = useRef<GroupLayout>('stacked');
   layoutRef.current = groupLayout;
   const lastSerialized = useRef<string>('');
-  const loadingRef = useRef(false);
+  const loadingRef = useRef(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadGeneration = useRef(0);
+  const loadPromise = useRef<Promise<void>>(Promise.resolve());
+  const importQueue = useRef<Promise<void>>(Promise.resolve());
+  const errorRef = useRef<string | null>(null);
 
   const maskOptions = useMemo(
     () => (masks.data ?? []).map((m) => ({ value: m.id, label: m.name, regex: m.regex, template: m.template, shouldValidate: m.shouldValidate })),
     [masks.data],
   );
 
-  // 1) Carrega o schema persistido (prefere o XML; cai pra localStorage); extrai a flag.
-  //    IMPORTANTE: quando o processo é aberto por ?key=, o XML chega DEPOIS deste
-  //    mount (fetch assíncrono + importXML). Por isso recarregamos em todo
-  //    `import.done` do modeler — sem isso o builder ficava com o schema vazio e o
-  //    polling sobrescrevia o formSchema real do XML (perda do formulário).
+  // O XML do processo é a única fonte persistida. Nunca restaurar cache global.
   useEffect(() => {
-    if (!builderRef.current) return;
-    let cancelled = false;
-    async function load() {
-      // Pausa o polling ENQUANTO recarrega. O ref é síncrono: fecha a janela em
-      // que um tick disparado entre o import.done e o clear do interval poderia
-      // propagar o schema velho/vazio por cima do recém-importado.
+    const bus = modeler?.get?.('eventBus');
+    function pause() {
+      ++loadGeneration.current;
       loadingRef.current = true;
       setReady(false);
-      const fromXml = modeler ? getEmbeddedFormSchema(modeler) : null;
-      // Fallback pro localStorage SÓ ao editar um processo existente (?key=). Num
-      // processo NOVO (sem key) o localStorage tem o form do processo anterior — usá-lo
-      // faria o novo herdar o formulário antigo. Sem key → começa vazio.
-      const fromLs = params.get('key') ? readFormFromLocalStorage() : null;
-      const initial = (fromXml ?? fromLs) as any;
-      const clean = stripLayout(initial);
-      const layout = initial?.septemGroupLayout;
-      if (layout === 'tabs' || layout === 'stacked') {
-        setGroupLayout(layout);
+      setSelectedField(null);
+      setFields([]);
+    }
+    function load(event?: { error?: unknown }) {
+      pause();
+      const generation = loadGeneration.current;
+      errorRef.current = null;
+      setLoadError(null);
+      if (!processReady || !modeler) return;
+      const current = () => generation === loadGeneration.current;
+      const pending = (async () => {
+        if (event?.error) throw event.error;
+        const initial = getEmbeddedFormSchema(modeler, true) as any;
+        const layout: GroupLayout = initial?.septemGroupLayout === 'tabs' ? 'tabs' : 'stacked';
+        const clean = stripLayout(initial);
+        const enriched = clean ? await enrichDataSourceOptions(clean) : null;
+        if (!current()) return;
+        // Serializa importações, inclusive se a anterior já entrou na engine.
+        const importing = importQueue.current.catch(() => {}).then(async () => {
+          if (!current()) return;
+          if (!builderRef.current) throw new Error('Editor indisponível.');
+          if (enriched) await builderRef.current.importSchema(enriched);
+          else await builderRef.current.reset();
+        });
+        importQueue.current = importing;
+        await importing;
+        if (!current()) return;
+        const schema = builderRef.current!.saveSchema();
+        lastSerialized.current = JSON.stringify(schema);
+        setFields(extractFields(schema as any));
         layoutRef.current = layout;
-      }
-      // Enriquece com as opções das fontes p/ o canvas exibi-las (não só "Value").
-      const enriched = clean ? await enrichDataSourceOptions(clean) : clean;
-      if (enriched && !cancelled) {
-        try { await builderRef.current!.importSchema(enriched); }
-        catch (err) { console.warn('Falha ao carregar schema persistido do form:', err); }
-        if (!cancelled && fromXml) setFields(extractFields(enriched));
-      } else if (!cancelled) {
-        // Sem schema (processo NOVO): esvazia o builder e o store — a instância do
-        // form-js persiste entre navegações e mostraria o form do processo anterior.
-        try { await builderRef.current!.reset(); } catch { /* editor ainda montando */ }
-        setFields([]);
-      }
-      if (!cancelled) {
-        lastSerialized.current = JSON.stringify(enriched ?? {});
+        setGroupLayout(layout);
         loadingRef.current = false;
         setReady(true);
-      }
+      })().catch(() => {
+        if (!current()) return;
+        errorRef.current = 'Não foi possível carregar o formulário. Reabra o processo antes de salvar.';
+        setLoadError(errorRef.current);
+      });
+      loadPromise.current = pending;
     }
-    void load();
-    const bus = modeler?.get?.('eventBus');
-    const onImportDone = () => { void load(); };
-    bus?.on('import.done', onImportDone);
+    load();
+    bus?.on('import.parse.start', pause);
+    bus?.on('import.done', load);
     return () => {
-      cancelled = true;
-      bus?.off('import.done', onImportDone);
+      ++loadGeneration.current;
+      loadingRef.current = true;
+      bus?.off('import.parse.start', pause);
+      bus?.off('import.done', load);
     };
-  }, [modeler]);
+  }, [modeler, processReady, setFields]);
 
-  // 2) Polling: detecta mudanças no schema do editor e propaga (form-js não emite "changed" confiável).
   useEffect(() => {
-    if (!ready) return;
-    // Expõe um flush para o Salvar: propaga na hora, sem esperar o próximo tick.
-    const flush = () => {
-      if (loadingRef.current || !builderRef.current) return;
-      try {
-        const schema = builderRef.current.saveSchema();
-        const serialized = JSON.stringify(schema ?? {});
-        if (serialized === lastSerialized.current) return;
-        lastSerialized.current = serialized;
-        propagate(schema, modeler, setFields, layoutRef.current);
-      } catch { /* editor ainda montando */ }
+    const flush = async () => {
+      let pending: Promise<void>;
+      do { pending = loadPromise.current; await pending; } while (pending !== loadPromise.current);
+      if (useModeladorStore.getState().flushForm !== flush || loadingRef.current || !processReady || !builderRef.current)
+        throw new Error(errorRef.current ?? 'Aguarde o carregamento do formulário.');
+      const schema = builderRef.current.saveSchema();
+      const serialized = JSON.stringify(schema);
+      if (serialized === lastSerialized.current) return;
+      propagate(schema, modeler, setFields, layoutRef.current);
+      lastSerialized.current = serialized;
     };
     useModeladorStore.getState().setFlushForm(flush);
-
     const interval = window.setInterval(() => {
-      try {
-        if (loadingRef.current) return; // (re)carga em andamento — não propagar
-        const schema = builderRef.current?.saveSchema();
-        if (!schema) return;
-        const serialized = JSON.stringify(schema);
-        if (serialized === lastSerialized.current) return;
-        lastSerialized.current = serialized;
-        propagate(schema, modeler, setFields, layoutRef.current);
-      } catch (err) {
-        void err; // saveSchema lança se o editor não estiver pronto — ignora
-      }
+      if (!loadingRef.current) void flush().catch(() => {});
     }, POLL_MS);
-    return () => window.clearInterval(interval);
-  }, [ready, modeler, setFields]);
+    return () => {
+      window.clearInterval(interval);
+      if (useModeladorStore.getState().flushForm === flush)
+        useModeladorStore.getState().setFlushForm(null);
+    };
+  }, [modeler, processReady, setFields]);
+
+  async function importForm(schema: unknown) {
+    if (loadingRef.current) throw new Error('Aguarde o carregamento.');
+    const generation = ++loadGeneration.current;
+    loadingRef.current = true;
+    setReady(false);
+    setSelectedField(null);
+    const pending = importQueue.current.catch(() => {}).then(async () => {
+      if (generation !== loadGeneration.current) return;
+      await builderRef.current!.importSchema(stripLayout(schema));
+      if (generation !== loadGeneration.current) return;
+      const imported = builderRef.current!.saveSchema();
+      const layout = (schema as { septemGroupLayout?: string })?.septemGroupLayout;
+      if (layout === 'tabs' || layout === 'stacked') {
+        layoutRef.current = layout;
+        setGroupLayout(layout);
+      }
+      propagate(imported, modeler, setFields, layoutRef.current);
+      lastSerialized.current = JSON.stringify(imported);
+      loadingRef.current = false;
+      setReady(true);
+    });
+    importQueue.current = pending;
+    loadPromise.current = pending.catch(() => {
+      if (generation !== loadGeneration.current) return;
+      errorRef.current = 'Não foi possível importar o formulário. Reabra o processo antes de salvar.';
+      setLoadError(errorRef.current);
+    });
+    await pending;
+  }
 
   function changeLayout(l: GroupLayout) {
+    if (loadingRef.current) return;
     setGroupLayout(l);
     layoutRef.current = l;
     const schema = builderRef.current?.saveSchema();
@@ -195,20 +227,21 @@ export function FormularioView({ modeler }: Props) {
               <Columns3 size={13} /> Abas
             </button>
           </div>
-          <IconButton onClick={() => setPreview({ ...((builderRef.current?.saveSchema() ?? { type: 'default', components: [], schemaVersion: 17 }) as object), septemGroupLayout: groupLayout })}><Eye size={14} /> Pré-visualizar</IconButton>
+          <IconButton disabled={!ready} onClick={() => setPreview({ ...((builderRef.current?.saveSchema() ?? { type: 'default', components: [], schemaVersion: 17 }) as object), septemGroupLayout: groupLayout })}><Eye size={14} /> Pré-visualizar</IconButton>
           <IconButton onClick={() => setMasksOpen(true)}><Regex size={14} /> Máscaras</IconButton>
           {hasInstances ? (
             <Tooltip text="Este processo já tem instâncias iniciadas. Importar sobrescreveria o formulário e quebraria os dados já preenchidos.">
               <span data-testid="import-btn-disabled" className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-300"><FileUp size={14} /> Importar</span>
             </Tooltip>
           ) : (
-            <IconButton onClick={() => setImportOpen(true)}><FileUp size={14} /> Importar</IconButton>
+            <IconButton disabled={!ready} onClick={() => setImportOpen(true)}><FileUp size={14} /> Importar</IconButton>
           )}
           {/* "Limpar formulário" e "Modelo com agrupamento" removidos a pedido do
               dono (2026-07-10): destrutivo/raramente úteis. */}
         </div>
       </header>
-      <div className="septem-cockpit flex flex-1 overflow-hidden">
+      {!ready && <p role={loadError ? 'alert' : 'status'} className="px-5 py-3 text-sm">{loadError ?? 'Carregando formulário…'}</p>}
+      <div inert={!ready} className={`septem-cockpit flex flex-1 overflow-hidden ${!ready ? 'invisible' : ''}`}>
         <FormFieldsPalette onAdd={(t) => builderRef.current?.addField(t)} />
         {/* Canvas ocupa todo o meio entre a paleta e o painel de config. */}
         <div className="flex flex-1 flex-col overflow-hidden bg-slate-100 p-3">
@@ -226,7 +259,7 @@ export function FormularioView({ modeler }: Props) {
       {importOpen && (
         <ImportFormDialog
           onClose={() => setImportOpen(false)}
-          onApply={(schema) => { void builderRef.current?.importSchema(schema); }}
+          onApply={importForm}
         />
       )}
       {preview != null && (
@@ -240,7 +273,6 @@ export function FormularioView({ modeler }: Props) {
 }
 
 // ─── persistência auxiliar ──────────────────────────────────────────────────
-const FORM_LS_KEY = 'septem.modelador.form';
 
 function stripLayout(schema: any): any {
   if (!schema || typeof schema !== 'object') return schema;
@@ -248,18 +280,8 @@ function stripLayout(schema: any): any {
   return clean;
 }
 
-function readFormFromLocalStorage(): unknown | null {
-  try { const raw = window.localStorage.getItem(FORM_LS_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
-}
-function persistFormToLocalStorage(schema: unknown | null) {
-  try {
-    if (schema == null) window.localStorage.removeItem(FORM_LS_KEY);
-    else window.localStorage.setItem(FORM_LS_KEY, JSON.stringify(schema));
-  } catch { /* storage cheio / safari privado — ignora */ }
-}
 function propagate(schema: unknown, modeler: any | null, setFields: (fs: ReturnType<typeof extractFields>) => void, layout: GroupLayout) {
   const stored = { ...(schema as object), septemGroupLayout: layout };
   setFields(extractFields(schema as any));
-  persistFormToLocalStorage(stored);
   if (modeler) setEmbeddedFormSchema(modeler, stored);
 }

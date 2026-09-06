@@ -11,7 +11,7 @@ type ImportError = { row: number; message: string };
  * preenchida e — se válida — SOBRESCREVER o formulário do editor. Os erros da
  * planilha inteira são listados de uma vez (o servidor valida antes de gerar).
  */
-export function ImportFormDialog({ onClose, onApply }: { onClose: () => void; onApply: (schema: unknown) => void }) {
+export function ImportFormDialog({ onClose, onApply }: { onClose: () => void; onApply: (schema: unknown) => void | Promise<void> }) {
   const [erros, setErros] = useState<ImportError[] | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [baixando, setBaixando] = useState(false);
@@ -36,7 +36,7 @@ export function ImportFormDialog({ onClose, onApply }: { onClose: () => void; on
       const form = new FormData();
       form.append('file', file);
       const schema = await api.postForm<unknown>('/api/v1/workflow/form-import', form);
-      onApply(schema);
+      await onApply(schema);
       toast.success('Formulário importado. Revise e salve o processo.');
       onClose();
     } catch (e) {
