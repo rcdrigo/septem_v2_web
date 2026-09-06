@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import Modeler from 'bpmn-js/lib/Modeler';
 import emptyDiagram from '@/assets/empty-diagram.bpmn?raw';
 import { SeptemPaletteModule } from './SeptemPaletteProvider';
@@ -20,6 +20,7 @@ const STORAGE_KEY = 'septem.modelador.xml';
 const AUTOSAVE_DEBOUNCE_MS = 500;
 
 export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, ref) => {
+  const [initializationError, setInitializationError] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<any>(null);
   const importQueue = useRef<Promise<void>>(Promise.resolve());
@@ -46,13 +47,21 @@ export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, re
       // keyboard.bindTo foi removido no diagram-js atual (bind agora é implícito).
     });
     modelerRef.current = modeler;
-    onReady?.(modeler);
+    setInitializationError(false);
 
     // Começa SEMPRE em branco: um processo existente é importado por ModeladorPage
     // (via ?key=), e "Novo processo" (sem key) fica em branco. NÃO restauramos do
     // localStorage aqui — o rascunho era global e, como o auto-save gravava qualquer
     // diagrama aberto, "Novo" acabava restaurando o último processo editado.
-    void loadDiagram(modeler, emptyDiagram).catch(() => {});
+    // Só expõe a instância depois de existir uma raiz BPMN com businessObject.
+    // Antes disso canvas.getRootElement() pode devolver uma raiz implícita vazia.
+    void loadDiagram(modeler, emptyDiagram).then(() => {
+      if (modelerRef.current === modeler) onReady?.(modeler);
+    }).catch((err: unknown) => {
+      if (modelerRef.current !== modeler) return;
+      console.error('Falha ao iniciar o modelador:', err);
+      setInitializationError(true);
+    });
     window.localStorage.removeItem(STORAGE_KEY); // limpa rascunho global legado (contaminado)
 
     // Espelha o XML no store (consumido por outras views), com debounce.
@@ -111,7 +120,10 @@ export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, re
     [],
   );
 
-  return <div ref={canvasRef} className="flex-1 bg-white" />;
+  return <>
+    {initializationError && <p role="alert" className="p-4 text-sm text-rose-600">Não foi possível iniciar o modelador. Reabra o processo para tentar novamente.</p>}
+    <div ref={canvasRef} className="flex-1 bg-white" />
+  </>;
 });
 
 BpmnModeler.displayName = 'BpmnModeler';

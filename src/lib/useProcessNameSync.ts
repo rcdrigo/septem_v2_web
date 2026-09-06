@@ -10,7 +10,7 @@ import { getProcessName, setProcessName as writeProcessName } from './bpmn-proce
  *
  * Direção Zustand → XML: ao usuário renomear pela navbar, escreve em
  * `bpmn:Process` via `modeling.updateProperties`. O auto-save propaga para
- * localStorage automaticamente.
+ * o store do XML automaticamente.
  *
  * O hook evita loop: usa uma `ref` para o último valor sincronizado e só
  * propaga quando há divergência real.
@@ -25,10 +25,9 @@ export function useProcessNameSync(modeler: any | null) {
     if (!modeler) return;
     function pullFromXml() {
       const xmlName = getProcessName(modeler);
-      if (xmlName && xmlName !== lastSynced.current && xmlName !== processName) {
-        lastSynced.current = xmlName;
-        setProcessNameStore(xmlName);
-      }
+      if (!xmlName) return;
+      lastSynced.current = xmlName;
+      if (xmlName !== useModeladorStore.getState().processName) setProcessNameStore(xmlName);
     }
     // ao montar (após import inicial)
     pullFromXml();
@@ -42,6 +41,9 @@ export function useProcessNameSync(modeler: any | null) {
   // store → XML
   useEffect(() => {
     if (!modeler) return;
+    // O efeito XML → store pode ter atualizado o nome neste mesmo commit.
+    // Não escreva o snapshot antigo do render por cima do processo importado.
+    if (processName !== useModeladorStore.getState().processName) return;
     if (processName === lastSynced.current) return;
     const xmlName = getProcessName(modeler);
     if (xmlName === processName) {

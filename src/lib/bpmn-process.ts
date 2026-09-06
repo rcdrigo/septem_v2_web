@@ -57,7 +57,9 @@ export function getProcessShape(modeler: AnyModeler): any | null {
   if (!modeler) return null;
   try {
     const root = modeler.get('canvas').getRootElement();
-    return root ?? null;
+    // O canvas pode criar uma raiz implícita antes de importar o BPMN.
+    // Ela não pode receber comandos de modeling (não tem businessObject).
+    return root?.businessObject ? root : null;
   } catch {
     return null;
   }
