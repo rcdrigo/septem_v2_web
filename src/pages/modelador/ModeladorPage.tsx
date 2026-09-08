@@ -38,6 +38,12 @@ export function ModeladorPage() {
   // Roda em aba própria (sem AppShell). Compartilha o token via localStorage com
   // a aba principal; sem sessão → volta para o login.
   const token = useSessionStore((s) => s.accessToken);
+  const sessionStatus = useSessionStore((s) => s.status);
+  const bootstrap = useSessionStore((s) => s.bootstrap);
+  // O token é compartilhado entre abas; usuário e permissões precisam ser carregados nesta aba.
+  useEffect(() => {
+    if (sessionStatus === 'idle') void bootstrap();
+  }, [sessionStatus, bootstrap]);
 
   const currentView = useModeladorStore((s) => s.currentView);
   const processName = useModeladorStore((s) => s.processName);
