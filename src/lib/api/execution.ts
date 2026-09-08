@@ -1,3 +1,4 @@
+import type { AutomationSource } from '@/lib/form-automation/runtime';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { fetchDocumentCodes, fetchTaskSignatures } from '@/lib/upload';
@@ -32,7 +33,7 @@ export type TaskDetail = {
   process?: string | null; processNumber?: number | null; isTest?: boolean;
   alias?: string | null; sector?: string | null;
   documentationUrl?: string | null;
-  formSchema: unknown; data: unknown; buttons: TaskButton[]; fieldOptions?: FieldOptions;
+  automationScripts?: AutomationSource[]; formSchema: unknown; data: unknown; buttons: TaskButton[]; fieldOptions?: FieldOptions;
   messages?: { count: number; canPost: boolean };
 };
 export type CompleteResult = { taskStatus: string; executionStatus: string; pendingTasks: number; executionId?: string; nextTaskForMe?: string | null };
@@ -86,7 +87,7 @@ export const TASKS_LIST_REFETCH_INTERVAL_MS = 300_000;
 
 /** Schema form-js do processo (formulário inicial de "Iniciar"). */
 export type StartForm = {
-  formSchema: unknown;
+  automationScripts?: AutomationSource[]; formSchema: unknown;
   buttons: TaskButton[];
   fieldOptions?: FieldOptions;
   /** Valores iniciais vindos das fontes por campo da tarefa de início. */
@@ -217,7 +218,7 @@ export type ActionOptions = {
   reassignCandidates: { id: string; name: string }[];
   reassignSource: string | null;
 };
-export type InstanceDetail = { id: string; number?: number; process: string | null; category?: string | null; flowKey?: string | null; requester?: string | null; status: string; isTest?: boolean; startedAt: string; endedAt: string | null; data: unknown; formSchema?: unknown; inboxHtml?: string | null; activeTask?: ActiveTask | null; tasks: InstanceTask[]; actions?: InstanceAction[]; canEdit?: boolean; canCancel?: boolean; canDelete?: boolean; canReopen?: boolean; canReturn?: boolean; canForward?: boolean; canReassign?: boolean; messages?: { count: number; canPost: boolean } };
+export type InstanceDetail = { id: string; number?: number; process: string | null; category?: string | null; flowKey?: string | null; requester?: string | null; status: string; isTest?: boolean; startedAt: string; endedAt: string | null; data: unknown; automationScripts?: AutomationSource[]; formSchema?: unknown; inboxHtml?: string | null; activeTask?: ActiveTask | null; tasks: InstanceTask[]; actions?: InstanceAction[]; canEdit?: boolean; canCancel?: boolean; canDelete?: boolean; canReopen?: boolean; canReturn?: boolean; canForward?: boolean; canReassign?: boolean; messages?: { count: number; canPost: boolean } };
 export type InstancesParams = { q?: string; status?: string; mine?: boolean; page?: number; pageSize?: number };
 
 export function useInstances(params: InstancesParams) {

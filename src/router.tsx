@@ -1,3 +1,4 @@
+import { FormAutomationPage } from './pages/FormAutomationPage';
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom';
 import { AppShell } from './layout/AppShell';
 import { LoginPage } from './pages/LoginPage';
@@ -91,6 +92,7 @@ export const router = createBrowserRouter(
         { path: childPath(routes.reports), element: <ConsultasPage /> },
         { path: childPath(routes.orgchart), element: <OrganogramaPage /> },
 
+        { path: "admin/form-javascript", element: <FormAutomationPage /> },
         // --- Admin › Processos --------------------------------------------
         { path: childPath(routes.adminFlows), element: <ProcessosPage /> },
         // Categorias de processos: geridas no modal da tela Admin › Processos.

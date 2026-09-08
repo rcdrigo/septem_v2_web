@@ -53,7 +53,7 @@ export function ServicoPublicoPage() {
 
   async function enviar() {
     if (!processKey) return;
-    const { data: valores, errors } = formRef.current?.submit() ?? { data: {}, errors: {} };
+    const { data: valores, errors } = await formRef.current?.submit() ?? { data: {}, errors: {} };
     if (Object.keys(errors).length) { setErro('Preencha os campos obrigatórios.'); return; }
 
     setEnviando(true); setErro(null);
@@ -147,7 +147,7 @@ export function ServicoPublicoPage() {
 
       {schema ? (
         <div className="mt-5">
-          <ReactForm key={processKey} ref={formRef} schema={schema} />
+          <ReactForm key={processKey} ref={formRef} automationScripts={data?.automationScripts} schema={schema} />
         </div>
       ) : (
         <p className="mt-5 text-sm text-slate-500">Este serviço não tem formulário publicado.</p>

@@ -114,7 +114,7 @@ export function InstanceReport({ id, messageAccess }: { id: string; messageAcces
   const messageExtra = showMessages ? processMessagesExtra({ executionId: id, originType: 'report', messageAccess }) : null;
 
   async function doSave() {
-    const res = formRef.current?.submit();
+    const res = await formRef.current?.submit();
     if (!res) return;
     if (Object.keys(res.errors).length > 0) { toast.error('Corrija os campos destacados antes de salvar.'); return; }
     try { await update.mutateAsync({ id, data: res.data }); toast.success('Alterações salvas.'); setEditing(false); }
@@ -174,7 +174,7 @@ export function InstanceReport({ id, messageAccess }: { id: string; messageAcces
         <ReactForm
           key={`${id}:${editing}`}
           ref={formRef}
-          schema={d.formSchema}
+          automationScripts={d.automationScripts} schema={d.formSchema}
           data={data}
           readOnly={!editing}
           extraTabs={{

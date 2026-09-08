@@ -49,8 +49,8 @@ export function ServicoFormPage() {
   if (!token) return <Navigate to={routes.login} replace />;
 
   async function submit(button?: TaskButton) {
-    const { data, errors } = fillRef.current?.submit() ?? { data: {}, errors: {} };
-    if ((button?.validateForm ?? true) && Object.keys(errors).length) { toast.error('Preencha os campos obrigatórios.'); return; }
+    const { data, errors } = await fillRef.current?.submit() ?? { data: {}, errors: {} };
+    if (errors._automation || ((button?.validateForm ?? true) && Object.keys(errors).length)) { toast.error(errors._automation ? 'O envio foi bloqueado pela automação.' : 'Preencha os campos obrigatórios.'); return; }
     try {
       const r = await start.mutateAsync({
         key: processKey!, data,
@@ -104,7 +104,7 @@ export function ServicoFormPage() {
           {/* Cada grupo renderiza seu próprio card (sem container único). */}
           <main className="flex-1 overflow-auto p-4 sm:p-6">
             {formEscolhido.data?.documentationUrl && <DocBanner url={formEscolhido.data.documentationUrl} />}
-            {formEscolhido.isLoading ? <FormSkeleton /> : <ReactForm key={`${processKey}:${isTest && usarHomologacao ? 'homologation' : 'published'}`} ref={fillRef} schema={formEscolhido.data?.formSchema} data={formEscolhido.data?.data ?? undefined} optionsByField={formEscolhido.data?.fieldOptions} uploadContext={{ processKey: processKey ?? undefined }} />}
+            {formEscolhido.isLoading ? <FormSkeleton /> : <ReactForm key={`${processKey}:${isTest && usarHomologacao ? 'homologation' : 'published'}`} ref={fillRef} automationScripts={formEscolhido.data?.automationScripts} schema={formEscolhido.data?.formSchema} data={formEscolhido.data?.data ?? undefined} optionsByField={formEscolhido.data?.fieldOptions} uploadContext={{ processKey: processKey ?? undefined }} />}
           </main>
           <TaskActionFooter
             completionActions={completionActions}

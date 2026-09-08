@@ -1,3 +1,4 @@
+import type { AutomationSource } from '@/lib/form-automation/runtime';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
@@ -111,7 +112,7 @@ export function usePublicServices() {
 }
 
 /** Detalhe público de um serviço — inclui o formulário para preencher. */
-export type PublicServiceDetail = PublicService & { formSchema: string | null };
+export type PublicServiceDetail = PublicService & { automationScripts?: AutomationSource[]; formSchema: string | null };
 
 export function usePublicService(key: string | undefined) {
   return useQuery({

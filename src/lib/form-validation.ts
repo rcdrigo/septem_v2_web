@@ -4,7 +4,7 @@ import { validateDocumento, type DocKind } from './documento';
 export type FormComponent = {
   id?: string; type?: string; subtype?: string; key?: string; label?: string;
   dateLabel?: string; timeLabel?: string; description?: string; text?: string;
-  content?: string; source?: string; alt?: string; disabled?: boolean;
+  automationHidden?: boolean; content?: string; source?: string; alt?: string; disabled?: boolean;
   prefixAdorner?: string; suffixAdorner?: string;
   appearance?: { prefixAdorner?: string; suffixAdorner?: string };
   values?: { label: string; value: string }[];
@@ -21,7 +21,7 @@ export function validateForm(components: FormComponent[], values: Record<string,
   function walk(comps: FormComponent[], data: Record<string, unknown>, prefix = '') {
     for (const c of comps) {
       const path = fieldPath(prefix, c.key ?? '');
-      if (c.disabled || states[path]?.disabled || states[path]?.hidden) continue;
+      if (c.automationHidden || c.disabled || states[path]?.disabled || states[path]?.hidden) continue;
       if (c.type === 'dynamiclist' && c.key) {
         const rows = data[c.key];
         if (c.validate?.required && (!Array.isArray(rows) || !rows.length)) errors[path] = 'Campo obrigatório.';

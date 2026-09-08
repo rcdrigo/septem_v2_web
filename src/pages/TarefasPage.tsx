@@ -441,9 +441,9 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
   useDocumentTitle(task.data?.name ?? 'Tarefa');
 
   async function finish(button?: TaskButton) {
-    const { data, errors } = fillRef.current?.submit() ?? { data: {}, errors: {} };
-    if ((button?.validateForm ?? true) && Object.keys(errors).length) {
-      toast.error('Preencha os campos obrigatórios.');
+    const { data, errors } = await fillRef.current?.submit() ?? { data: {}, errors: {} };
+    if (errors._automation || ((button?.validateForm ?? true) && Object.keys(errors).length)) {
+      toast.error(errors._automation ? 'O envio foi bloqueado pela automação.' : 'Preencha os campos obrigatórios.');
       return;
     }
     if (button?.requireJustification) { setJustify({ button, data }); return; }
@@ -452,6 +452,7 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
 
   async function doComplete(data: unknown, action?: string, justification?: string) {
     try {
+      await fillRef.current?.checkAutomation();
       const r = await complete.mutateAsync({ id: taskId, data, action, justification });
       setJustify(null);
       setDone({ nextTaskForMe: r.nextTaskForMe, executionId: r.executionId });
@@ -574,7 +575,7 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
 
       {/* Cada grupo renderiza seu próprio card (sem container único). */}
       <main className="flex-1 overflow-auto p-4 sm:p-6">
-        {task.isLoading ? <FormSkeleton /> : <ReactForm key={taskId} ref={fillRef} schema={task.data?.formSchema} data={task.data?.data as Record<string, unknown> | undefined} optionsByField={task.data?.fieldOptions} uploadContext={{ taskId }} extraTabs={messageExtra ? { trailing: [messageExtra] } : undefined} />}
+        {task.isLoading ? <FormSkeleton /> : <ReactForm key={taskId} ref={fillRef} automationScripts={task.data?.automationScripts} schema={task.data?.formSchema} data={task.data?.data as Record<string, unknown> | undefined} optionsByField={task.data?.fieldOptions} uploadContext={{ taskId }} extraTabs={messageExtra ? { trailing: [messageExtra] } : undefined} />}
       </main>
 
       <TaskActionFooter completionActions={completionActions} utilityActions={utilityActions} loading={task.isLoading} compactDesktop />

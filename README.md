@@ -50,3 +50,7 @@ src/
 ## Estado atual
 
 Fase 1 do roadmap: editores funcionam **standalone** (import/export de arquivo local). Integração com backend chega na Fase 3.
+
+## Customização JavaScript
+
+Editor, chat OpenRouter, publicação e histórico: veja [a documentação de automação](docs/form-automation.md).

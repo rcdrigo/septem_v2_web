@@ -1,3 +1,5 @@
+import { useSessionStore } from '@/stores/session';
+import { AutomationEditor } from '@/components/form/AutomationEditor';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Rows3, Columns3, Regex, Eye, FileUp } from 'lucide-react';
@@ -62,6 +64,8 @@ export function FormularioView({ modeler, processReady = true }: Props) {
   const setFields = useFormStore((s) => s.setFields);
   const masks = useFormMasks();
   const [ready, setReady] = useState(false);
+  const canCustomize = useSessionStore(s => s.can('forms:javascript'));
+  const [automationOpen, setAutomationOpen] = useState(false);
   const [masksOpen, setMasksOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [params] = useSearchParams();
@@ -228,6 +232,7 @@ export function FormularioView({ modeler, processReady = true }: Props) {
             </button>
           </div>
           <IconButton disabled={!ready} onClick={() => setPreview({ ...((builderRef.current?.saveSchema() ?? { type: 'default', components: [], schemaVersion: 17 }) as object), septemGroupLayout: groupLayout })}><Eye size={14} /> Pré-visualizar</IconButton>
+          {canCustomize && <IconButton disabled={!params.get('key')} onClick={() => setAutomationOpen(true)}>JavaScript</IconButton>}
           <IconButton onClick={() => setMasksOpen(true)}><Regex size={14} /> Máscaras</IconButton>
           {hasInstances ? (
             <Tooltip text="Este processo já tem instâncias iniciadas. Importar sobrescreveria o formulário e quebraria os dados já preenchidos.">
@@ -255,6 +260,7 @@ export function FormularioView({ modeler, processReady = true }: Props) {
           masks={maskOptions}
         />
       </div>
+      {automationOpen && params.get('key') && <Dialog open title="Customização JavaScript" width="2xl" onClose={() => { if (window.confirm('Fechar a customização? Alterações não salvas serão descartadas.')) setAutomationOpen(false); }}><AutomationEditor processKey={params.get('key')!} /></Dialog>}
       {masksOpen && <MasksDialog onClose={() => setMasksOpen(false)} />}
       {importOpen && (
         <ImportFormDialog

@@ -1,3 +1,4 @@
+import { createFormAutomation, type AutomationSource, type AutomationSchema } from '@/lib/form-automation/runtime';
 import { validateForm, fieldPath, INPUT_TYPES, type FormComponent as Component, type FieldState } from '@/lib/form-validation';
 // Merge: base é a reformulação do date picker (DatePickerField/normalizeDateMode) e do
 // HelpPopover; somamos o que a Fase 6 usa — o ícone e as chamadas de geração de
@@ -20,13 +21,14 @@ import {
 } from '@/lib/upload';
 import { DatePickerField } from './DatePickerField';
 
-/** Mesmo contrato do FormFill (form-js), para ser intercambiável. */
+/** Resultado de preenchimento; submit aguarda as automações assíncronas. */
 export type FormFillResult = { data: Record<string, unknown>; errors: Record<string, unknown> };
 export type ReactFormHandle = {
-  submit: () => FormFillResult;
+  submit: () => Promise<FormFillResult>;
   /** Lê os valores atuais SEM validar nem pintar erros — para salvar rascunho
    *  (salvar não deve exigir preenchimento de campos obrigatórios). */
   getData: () => Record<string, unknown>;
+  checkAutomation: () => Promise<void>;
   /** Injeta erros vindos do servidor (422) no formulário, pintando os campos. */
   setServerErrors: (errs: Record<string, string>) => void;
 };
@@ -93,10 +95,16 @@ function useRuntime() {
  */
 export type ExtraTab = { id: string; label: string; icon?: React.ReactNode; render: () => React.ReactNode };
 
-export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: Record<string, unknown>; readOnly?: boolean; optionsByField?: OptionsMap; uploadContext?: UploadContext; extraTabs?: { leading?: ExtraTab[]; trailing?: ExtraTab[] } }>(
-  ({ schema, data, readOnly, optionsByField, uploadContext, extraTabs }, ref) => {
-    const root = (schema ?? {}) as { components?: Component[] };
-    const inputs = useMemo(() => collectInputs(root.components, []), [schema]);
+export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: Record<string, unknown>; readOnly?: boolean; optionsByField?: OptionsMap; automationScripts?: AutomationSource[]; uploadContext?: UploadContext; extraTabs?: { leading?: ExtraTab[]; trailing?: ExtraTab[] } }>(
+  ({ schema, data, readOnly, optionsByField, automationScripts, uploadContext, extraTabs }, ref) => {
+    const [runtimeSchema, setRuntimeSchema] = useState(() => structuredClone((schema ?? {}) as AutomationSchema));
+    const schemaRef = useRef(runtimeSchema);
+    const root = runtimeSchema;
+    const automationRoot = useRef<HTMLDivElement>(null);
+    const automation = useRef<ReturnType<typeof createFormAutomation> | null>(null);
+    const automationError = useRef<string | null>(null);
+    const [automationMessage, setAutomationMessage] = useState<string | null>(null);
+    const inputs = useMemo(() => collectInputs(root.components, []), [runtimeSchema]);
 
     const [values, setValues] = useState<Record<string, unknown>>(() => ({ ...(data ?? {}) }));
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -189,6 +197,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
     }
 
     function runEvent(comp: Component, type: string, event: unknown, scope = '') {
+      automation.current?.emit(type, { key: fieldPath(scope, comp.key ?? ''), value: scopeData(scope)[comp.key ?? ''], event });
       const evs = parseEvents(comp.properties?.septemEvents).filter((e) => e.type === type && e.action?.trim());
       const get = (k: string) => scopeData(scope)[k];
       const updateState = (k: string, patch: { hidden?: boolean; disabled?: boolean }) => {
@@ -201,21 +210,53 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
           fn(get(comp.key ?? ''), get, (k: string, v: unknown) => setScoped(scope, k, v),
             (k: string) => updateState(k, { hidden: false }), (k: string) => updateState(k, { hidden: true }),
             (k: string, disabled: boolean) => updateState(k, { disabled: !!disabled }), comp.key, event);
-        } catch (err) { console.warn('Evento do formulário falhou:', err); }
+        } catch (err) { automationError.current = (err as Error).message; setAutomationMessage(automationError.current); }
       }
     }
 
+    useEffect(() => {
+      if (dsLoading || !automationRoot.current || automation.current) return;
+      automationError.current = null;
+      setAutomationMessage(null);
+      const runtime = createFormAutomation({
+        root: automationRoot.current,
+        getData: () => valuesRef.current,
+        set,
+        getSchema: () => schemaRef.current,
+        setSchema: (next) => { schemaRef.current = next; setRuntimeSchema(next); },
+        setOptions: (key, options) => setDsOptions(prev => ({ ...prev, [key]: options })),
+        dataSource: (id, parameters) => api.post('/api/v1/workflow/field-options', { dataSourceId: id, parameters }),
+        onError: (message) => { automationError.current = message; setAutomationMessage(message); },
+      }, readOnly ? [] : automationScripts ?? []);
+      automation.current = runtime;
+    }, [automationScripts, readOnly, dsLoading]);
+    useEffect(() => () => { automation.current?.dispose(); automation.current = null; }, []);
+
     useImperativeHandle(ref, () => ({
-      submit: () => {
-        const errs = validateForm(root.components ?? [], valuesRef.current, fieldState, dateErrors);
+      submit: async () => {
+        try {
+          if (dsLoading || !automation.current) throw new Error('Aguarde o carregamento do formulário.');
+          await automation.current.beforeSubmit();
+          if (automationError.current) throw new Error(automationError.current);
+        } catch (error) {
+          const message = (error as Error).message;
+          setAutomationMessage(message);
+          return { data: valuesRef.current, errors: { _automation: message } };
+        }
+        setAutomationMessage(null);
+        const errs = validateForm(schemaRef.current.components ?? [], valuesRef.current, fieldState, dateErrors);
         setErrors(errs);
         return { data: valuesRef.current, errors: errs };
       },
+      checkAutomation: async () => {
+        await automation.current?.beforeSubmit(false);
+        if (automationError.current) throw new Error(automationError.current);
+      },
       getData: () => valuesRef.current,
       setServerErrors: (errs) => setErrors(errs),
-    }), [values, inputs, fieldState, dateErrors]);
+    }), [values, inputs, fieldState, dateErrors, dsLoading]);
 
-    const comps = root.components ?? [];
+    const comps = (root.components ?? []).filter(c => !c.automationHidden);
     const layout = (root as { septemGroupLayout?: string }).septemGroupLayout;
     // Assinaturas da tarefa: MESMO cache que os botões de conclusão usam (Fase 7c).
     // Ler de dois lugares diferentes deixaria o ícone verde com o botão ainda bloqueado.
@@ -288,8 +329,8 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
       );
     }
 
-    if (dsLoading) return <FormSkeleton />;
-    return <RuntimeCtx.Provider value={runtime}>{errors._form && <p role="alert" className="text-sm text-rose-600">{errors._form}</p>}{body}</RuntimeCtx.Provider>;
+    if (dsLoading && !automation.current) return <FormSkeleton />;
+    return <div ref={automationRoot}><RuntimeCtx.Provider value={runtime}>{automationMessage && <p role="alert" className="mb-3 text-sm text-rose-700">Envio bloqueado: {automationMessage}</p>}{errors._form && <p role="alert" className="text-sm text-rose-600">{errors._form}</p>}{body}</RuntimeCtx.Provider></div>;
   },
 );
 ReactForm.displayName = 'ReactForm';
@@ -753,7 +794,7 @@ function LayoutGrid({ components, render }: { components: Component[]; render: (
   // O form-js agrupa por layout.row, na ordem da primeira ocorrência.
   // Sem essa informação, campos de linhas distintas acabavam lado a lado.
   const rows = new Map<string, Component[]>();
-  components.forEach((c, i) => {
+  components.filter(c => !c.automationHidden).forEach((c, i) => {
     const key = c.layout?.row ? `row:${c.layout.row}` : `field:${i}`;
     rows.set(key, [...(rows.get(key) ?? []), c]);
   });
@@ -768,7 +809,7 @@ function LayoutGrid({ components, render }: { components: Component[]; render: (
           {fields.map((c, i) => {
             const span = (c.layout?.columns ?? 0) > 0 ? colSpan(c)
               : Math.floor(remaining / automatic) + (autoIndex++ < remaining % automatic ? 1 : 0);
-            return <div key={c.id ?? i} style={{ gridColumn: `span ${span} / span ${span}` }}>
+            return <div key={c.id ?? i} data-form-id={c.id} data-form-key={c.key} style={{ gridColumn: `span ${span} / span ${span}` }}>
               {render(c)}
             </div>;
           })}
