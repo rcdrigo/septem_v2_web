@@ -19,16 +19,11 @@ Conflitos retornam HTTP 409: o editor preserva a edição e mostra a versão do 
 
 As mudanças correspondentes estão no repositório irmão `septem_v2`. A migração `AddFormAutomation` cria as tabelas de workspaces, revisões, scripts por escopo e conversas e registra a permissão. Aplique-a pelo fluxo normal de migrações do projeto antes de disponibilizar o front-end.
 
-O chat usa o endpoint OpenRouter `https://openrouter.ai/api/v1/chat/completions` no servidor. Configure:
+O chat usa o endpoint OpenRouter `https://openrouter.ai/api/v1/chat/completions` no servidor. Configure em **Parâmetros do sistema → OpenRouter** (permissão `admin:settings`): chave da API, identificador do modelo, URL do site opcional e limite de tokens (padrão 16000).
 
-```text
-OpenRouter__ApiKey=<chave do OpenRouter, apenas no servidor>
-OpenRouter__Model=<slug do modelo escolhido no OpenRouter>
-OpenRouter__SiteUrl=https://sua-aplicacao.example
-OpenRouter__MaxTokens=16000
-```
+A chave é cifrada com Data Protection por tenant e nunca é devolvida pela API. Deixar o campo vazio mantém a chave; marcar “Remover a chave salva” e salvar desativa o agente. Alterações entram em vigor na próxima solicitação, sem reiniciar a API. Aplique a migration `AddOpenRouterSettings` antes de usar a aba.
 
-Não use variáveis `VITE_` para credenciais. Troque `OpenRouter__Model` para mudar a LLM. Variáveis de ambiente requerem reiniciar o back-end; configuração com reload suportado é lida via `IOptionsMonitor`. Não há modelo fixo no código. Sem chave ou modelo configurado, o chat informa indisponibilidade; edição manual e versionamento continuam disponíveis.
+Para compatibilidade, as variáveis `OpenRouter__ApiKey`, `OpenRouter__Model`, `OpenRouter__SiteUrl` e `OpenRouter__MaxTokens` ainda são usadas enquanto o tenant nunca salvou essa seção. Após o primeiro salvamento, prevalece integralmente a configuração da página, inclusive se a chave for removida. Não use variáveis `VITE_` para credenciais. Sem chave ou modelo, edição manual e versionamento continuam disponíveis.
 
 O modelo/provedor precisa suportar `response_format: json_schema`. A integração usa `strict: true` e `provider.require_parameters: true`, conforme as [recomendações de respostas estruturadas](https://openrouter.ai/docs/guides/features/structured-outputs) e a [integração HTTP oficial](https://openrouter.ai/docs/quickstart). Respostas recusadas, truncadas ou inválidas não são aplicadas. O histórico registra o modelo retornado pelo OpenRouter.
 

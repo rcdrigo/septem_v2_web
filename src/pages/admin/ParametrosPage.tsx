@@ -6,6 +6,8 @@ import { useSessionStore } from '@/stores/session';
 import { ApiError } from '@/lib/api';
 import {
   useSettings,
+  useSaveOpenRouter,
+  type SettingsOpenRouter,
   useSaveGeneral,
   useSaveEmail,
   useTestEmail,
@@ -22,12 +24,13 @@ import {
   type SettingsSecurity,
 } from '@/lib/api/settings';
 
-type TabKey = 'geral' | 'email' | 'arquivos' | 'seguranca';
+type TabKey = 'geral' | 'email' | 'arquivos' | 'seguranca' | 'openrouter';
 
 const TABS: Array<{ key: TabKey; label: string; icon: typeof Building2 }> = [
   { key: 'geral', label: 'Informações gerais', icon: Building2 },
   { key: 'email', label: 'E-mail', icon: Mail },
   { key: 'arquivos', label: 'Arquivos', icon: HardDrive },
+  { key: 'openrouter', label: 'OpenRouter', icon: PlugZap },
   { key: 'seguranca', label: 'Segurança', icon: ShieldCheck },
 ];
 
@@ -45,7 +48,7 @@ export function ParametrosPage() {
     <div className="flex h-full flex-col">
       <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
         <h1 className="text-lg font-semibold text-slate-900">Parâmetros do sistema</h1>
-        <p className="mt-0.5 text-sm text-slate-500">Identidade, expediente, e-mail e armazenamento de arquivos.</p>
+        <p className="mt-0.5 text-sm text-slate-500">Identidade, expediente, e-mail, arquivos, segurança e agente de IA.</p>
         <nav className="-mb-4 mt-3 flex gap-1 overflow-x-auto" role="tablist" aria-label="Seções de parâmetros">
           {TABS.map((t) => {
             const Icon = t.icon;
@@ -79,6 +82,7 @@ export function ParametrosPage() {
         {data && tab === 'geral' && <GeralTab data={data.general} />}
         {data && tab === 'email' && <EmailTab data={data.email} />}
         {data && tab === 'arquivos' && <ArquivosTab data={data.storage} />}
+        {data && tab === 'openrouter' && <OpenRouterTab data={data.openRouter} />}
         {data && tab === 'seguranca' && <SegurancaTab data={data.security} />}
       </div>
     </div>
@@ -688,4 +692,59 @@ function pick(d: GeneralPayload): GeneralPayload {
     businessHourEnd: d.businessHourEnd,
     businessDays: d.businessDays,
   };
+}
+
+function OpenRouterTab({ data }: { data: SettingsOpenRouter }) {
+  const save = useSaveOpenRouter();
+  const [form, setForm] = useState(data);
+  const [apiKey, setApiKey] = useState('');
+  const [clearKey, setClearKey] = useState(false);
+  useEffect(() => { setForm(data); setApiKey(''); setClearKey(false); }, [data]);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      await save.mutateAsync({ model: form.model, siteUrl: form.siteUrl, maxTokens: form.maxTokens,
+        apiKey: clearKey ? '' : apiKey || null });
+      setApiKey('');
+      setClearKey(false);
+      toast.success('OpenRouter salvo. As próximas solicitações usarão esta configuração.');
+    } catch (err) {
+      toast.error(detalhe(err) ?? 'Não foi possível salvar a configuração do OpenRouter.');
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="max-w-3xl space-y-5" data-testid="form-openrouter">
+      <Card title="Agente de IA — OpenRouter" hint="Configuração deste ambiente para gerar JavaScript no chat dos formulários. As alterações valem na próxima solicitação, sem reiniciar a aplicação.">
+        <fieldset disabled={save.isPending} className="grid gap-4 sm:grid-cols-2">
+          <Field label={data.apiKeySet ? 'Chave da API (configurada)' : 'Chave da API'}>
+            <input type="password" name="openRouterApiKey" autoComplete="new-password" maxLength={4096}
+              value={apiKey} disabled={clearKey} onChange={(e) => setApiKey(e.target.value)} className={inputCls}
+              placeholder={data.apiKeySet ? '•••••••• (em branco mantém a atual)' : 'Chave do OpenRouter'} />
+          </Field>
+          <Field label="Modelo" required>
+            <input required name="openRouterModel" maxLength={200} value={form.model ?? ''}
+              onChange={(e) => setForm({ ...form, model: e.target.value })} className={inputCls} placeholder="provedor/modelo" />
+          </Field>
+          <Field label="URL do site (opcional)">
+            <input type="url" name="openRouterSiteUrl" maxLength={2048} value={form.siteUrl ?? ''}
+              onChange={(e) => setForm({ ...form, siteUrl: e.target.value || null })} className={inputCls} placeholder="https://seu-site.com.br" />
+          </Field>
+          <Field label="Limite de tokens da resposta" required>
+            <input required type="number" name="openRouterMaxTokens" min={1} max={1000000} step={1} value={form.maxTokens}
+              onChange={(e) => setForm({ ...form, maxTokens: Number(e.target.value) })} className={inputCls} />
+          </Field>
+          {data.apiKeySet && <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2">
+            <input type="checkbox" checked={clearKey} onChange={(e) => { setClearKey(e.target.checked); setApiKey(''); }} />
+            Remover a chave salva ao salvar (desativa o agente)
+          </label>}
+        </fieldset>
+        <p className="mt-4 text-xs text-slate-500">A chave é armazenada cifrada e não é devolvida ao navegador. Use o identificador do modelo no OpenRouter, com suporte a respostas estruturadas (JSON Schema).</p>
+      </Card>
+      <button type="submit" disabled={save.isPending} className="flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60">
+        {save.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Salvar
+      </button>
+    </form>
+  );
 }
