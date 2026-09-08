@@ -104,6 +104,10 @@ export function AutomationEditor({ processKey, onClose }: { processKey: string; 
   if (!can) return <p role="alert">Você não tem permissão para customizar JavaScript.</p>;
   if (!state) return <p role={error ? 'alert' : 'status'}>{error || 'Carregando customização…'}</p>;
   const label = (id: string) => id ? state.tasks.find(t => t.id === id)?.name ?? `${id} (tarefa removida)` : 'Código comum';
+  const tasks = [...state.tasks,
+    ...scripts.filter(s => s.taskId && !state.tasks.some(t => t.id === s.taskId))
+      .map(s => ({ id: s.taskId, name: label(s.taskId) })),
+  ].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id, 'pt-BR'));
   return <div className="space-y-4" data-testid="automation-editor">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><h2 className="text-lg font-semibold">JavaScript do formulário</h2><p className="text-xs text-slate-500">{processKey} · Rascunho v{state.head} · {state.publishedVersion ? `Publicado v${state.publishedVersion}` : 'Ainda não publicado'}</p></div>
@@ -125,8 +129,7 @@ export function AutomationEditor({ processKey, onClose }: { processKey: string; 
       <section className="min-w-0 space-y-3">
         <label className="block text-sm font-medium">Escopo<select aria-label="Escopo do código" className="mt-1 w-full rounded border p-2" value={selected} disabled={busy} onChange={e => { setSelected(e.target.value); setScripts(prev => prev.some(s => s.taskId === e.target.value) ? prev : [...prev, { taskId: e.target.value, code: '' }]); }}>
           <option value="">Código comum (todas as tarefas)</option>
-          {state.tasks.map(t => <option key={t.id} value={t.id}>{t.name} · {t.id}</option>)}
-          {scripts.filter(s => s.taskId && !state.tasks.some(t => t.id === s.taskId)).map(s => <option key={s.taskId} value={s.taskId}>{label(s.taskId)}</option>)}
+          {tasks.map(t => <option key={t.id} value={t.id}>{t.name} · {t.id}</option>)}
         </select></label>
         {selected && <button className={button} disabled={busy} onClick={() => { setScripts(prev => prev.filter(s => s.taskId !== selected)); setSelected(''); }}>Remover código desta tarefa do rascunho</button>}
         <div className="flex gap-2"><button className={button} onClick={() => setTab('code')}><Code2 size={14} className="inline" /> Código</button><button className={button} onClick={() => setTab('diff')}>Diferenças</button><button className={button} onClick={() => setTab('history')}><History size={14} className="inline" /> Histórico</button></div>

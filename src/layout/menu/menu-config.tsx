@@ -54,7 +54,6 @@ export const MENU: MenuByMode = {
       {
         label: 'Admin',
         items: [
-          { kind: 'link', label: 'JavaScript dos formulários', to: '/admin/form-javascript', perm: 'forms:javascript', icon: Workflow },
           {
             kind: 'group',
             label: 'Processos',

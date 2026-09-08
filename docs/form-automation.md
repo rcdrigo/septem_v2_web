@@ -1,6 +1,6 @@
 # Customização JavaScript dos formulários
 
-Acesso: **Admin → JavaScript dos formulários**, ou **JavaScript** na aba Formulário do modelador. A permissão `forms:javascript` permite editar, conversar com o agente, salvar, publicar e restaurar. O administrador (`*`) tem acesso. A página dedicada funciona sem `workflow:read` ou `workflow:write`.
+Acesso: botão **JavaScript** na visão **Formulário** do modelador, ao lado de Máscaras e Importar. Abre uma nova aba exclusiva do formulário salvo, sem lista geral. Os escopos exibem Código comum primeiro e as tarefas em ordem alfabética. A permissão `forms:javascript` permite editar, conversar com o agente, salvar, publicar e restaurar; o administrador (`*`) tem acesso.
 
 ## Fluxo
 

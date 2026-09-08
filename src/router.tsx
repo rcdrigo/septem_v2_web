@@ -70,6 +70,7 @@ export const router = createBrowserRouter(
     { path: routes.manualTemplates, element: <ManualTemplatesPage /> },
     // Modelador em aba própria (sem menu lateral) — aberto via "Novo/Editar".
     { path: routes.flowEdit, element: <ModeladorPage /> },
+    { path: "/forms/:processKey/javascript", element: <FormAutomationPage /> },
     // Builder de relatórios em aba própria (Admin › Relatórios › Builder).
     { path: routes.reportEdit, element: <RelatorioBuilderPage /> },
     // Consulta (relatório publicado) em aba própria — aberta do catálogo (F7.1).
@@ -92,7 +93,6 @@ export const router = createBrowserRouter(
         { path: childPath(routes.reports), element: <ConsultasPage /> },
         { path: childPath(routes.orgchart), element: <OrganogramaPage /> },
 
-        { path: "admin/form-javascript", element: <FormAutomationPage /> },
         // --- Admin › Processos --------------------------------------------
         { path: childPath(routes.adminFlows), element: <ProcessosPage /> },
         // Categorias de processos: geridas no modal da tela Admin › Processos.
