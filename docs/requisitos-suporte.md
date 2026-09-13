@@ -1,6 +1,8 @@
 # Módulo de suporte
 
-Status: levantamento em andamento; decisões pendentes não autorizam implementação por suposição.
+Status: levantamento consolidado, aguardando confirmação do entendimento pelo usuário antes da implementação.
+
+Especificações para desenvolvimento: [docs/specs/suporte](specs/suporte/README.md). O pacote detalha regras, contratos propostos e critérios de aceite sem implementar o módulo.
 
 ## Requisitos confirmados
 
@@ -30,18 +32,17 @@ Status: levantamento em andamento; decisões pendentes não autorizam implementa
 - Transferências exigem conclusão, cancelamento ou reatribuição de tarefas abertas da equipe anterior, preservando o trabalho registrado.
 - A validação da solução antes da implementação é exigida quando o responsável sinaliza essa necessidade.
 - O chamado só pode ser marcado como resolvido quando todas as tarefas estiverem concluídas ou canceladas.
-- O requisitante pode cancelar o chamado. Os efeitos sobre tarefas em execução e reabertura ainda precisam ser definidos.
-- O histórico deve ser preservado. A política detalhada de correção e remoção ainda precisa ser confirmada.
+- O requisitante pode cancelar o chamado com motivo. O cancelamento interrompe tarefas abertas, exige registro do trabalho já realizado e preserva a regra de cobrança das horas. Chamados cancelados só reabrem por ação explícita do requisitante com justificativa; uma mensagem isolada não os reabre.
+- O histórico deve ser preservado: mensagens corrigidas mantêm versões anteriores; ajustes de horas exigem justificativa e registram autor e data. Correções são feitas pelo autor. Anexos podem ser removidos pelo autor ou administrador, deixando registro de quem removeu e quando, sem manter o arquivo disponível. O histórico respeita as mesmas restrições de acesso do conteúdo original.
+- Chamados resolvidos são encerrados automaticamente após 30 dias corridos sem resposta do requisitante, com aviso e possibilidade de reabertura por nova mensagem.
+- Quando uma aprovação inicial ou complementar é solicitada, o trabalho abrangido deve aguardar aprovação. Solicitar aprovação complementar por aumento de horas continua sendo opcional; uma vez solicitada, deve-se aguardar a resposta.
 - Anexos permitidos: imagens, PDF, documentos, planilhas, TXT, ZIP e vídeos MP4, até 25 MB por arquivo e 10 arquivos por envio.
 - O requisitante vê andamento geral, mensagens públicas, propostas e atividades concluídas com suas horas. Tarefas em preparação ou execução ficam visíveis apenas à equipe de atendimento.
 - Exemplo de percurso apresentado pelo usuário: requisição → triagem → analista de requisitos → desenvolvedor → analista de requisitos → desenvolvedor → solução → aprovação → implementação → conclusão.
 
-## Decisões em aberto
+## Confirmação final
 
-- Encerramento por ausência de resposta do requisitante.
-- Efeitos do cancelamento sobre tarefas, horas e reabertura.
-- Política detalhada de correção e remoção com preservação do histórico.
-- Efeito de uma solicitação de aprovação pendente sobre o trabalho abrangido.
+As rodadas de levantamento foram concluídas. A implementação depende da confirmação do usuário sobre este entendimento consolidado.
 
 ## Contexto técnico verificado
 

@@ -17,7 +17,6 @@ export function ActionButtonsSection({ modeler, element, defaultLabel }: Props) 
   return (
     <Section
       title="Botões de ação"
-      help="Botões disponíveis ao usuário ao finalizar esta tarefa."
       headerAction={(
         <ContextHelp
           manual="modelador-processos"

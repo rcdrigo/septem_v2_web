@@ -1,5 +1,21 @@
 # Domínio Septem
 
+## Linguagem — Clientes e ambientes
+
+**Cliente**:
+Organização contratante que pode possuir um ou mais ambientes.
+_Evitar_: Ambiente como sinônimo de cliente.
+
+**Ambiente**:
+Instância de uso de um cliente, com URL, dados, módulos e configuração próprios, como produção ou homologação.
+_Evitar_: Cliente como sinônimo de ambiente.
+
+**Nome do ambiente**:
+Nome exibido na aplicação daquele ambiente, como Septem (padrão) ou SGI.
+
+**Área administrativa da plataforma**:
+Área exclusiva da equipe interna para administrar clientes e criar seus ambientes.
+
 ## Linguagem — Suporte
 
 **Chamado**:
