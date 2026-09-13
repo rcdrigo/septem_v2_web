@@ -1,0 +1,332 @@
+/* Hallmark · components: guide search + article index · genre: editorial · theme: existing Slate
+ * states: default · hover · focus · active · expanded · selected · empty
+ * contrast: pass (40–41) · mobile: source-pass (34, 49–57)
+ */
+/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V4 */
+@import "../../../tokens.css";
+
+.guide-search,
+.guide-search *,
+.guide-toc,
+.guide-toc * {
+  box-sizing: border-box;
+}
+
+.guide-search {
+  position: relative;
+  width: min(100%, 32rem);
+  min-width: 0;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+.guide-search-icon {
+  position: absolute;
+  z-index: var(--z-raised, 10);
+  inset-block-start: 50%;
+  inset-inline-start: 0.875rem;
+  color: var(--color-muted);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.guide-search input {
+  width: 100%;
+  min-height: 2.75rem;
+  padding-block: 0.625rem;
+  padding-inline: 2.625rem 7.25rem;
+  border: var(--rule-thin) solid var(--color-rule-strong);
+  border-radius: var(--radius-md);
+  outline: 2px solid transparent;
+  outline-offset: 1px;
+  color: var(--color-ink);
+  background-color: var(--color-paper);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.25rem;
+}
+
+.guide-search input::placeholder {
+  color: var(--color-muted);
+  opacity: 1;
+}
+
+.guide-search input:focus-visible {
+  border-color: var(--color-focus);
+  outline-color: var(--color-focus);
+}
+
+.guide-search > kbd {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 0.625rem;
+  max-width: 6.25rem;
+  overflow: hidden;
+  padding: 0.1875rem 0.375rem;
+  border: var(--rule-thin) solid var(--color-rule);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  background-color: var(--color-paper-subtle);
+  font-family: var(--font-body);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.guide-search-popover {
+  position: absolute;
+  z-index: var(--z-dropdown, 100);
+  inset-block-start: calc(100% + var(--space-sm));
+  inset-inline: 0;
+  max-height: min(26rem, calc(100dvh - 8rem));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: var(--rule-thin) solid var(--color-rule-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-ink);
+  background-color: var(--color-paper);
+  box-shadow: 0 0.75rem 2.25rem color-mix(in oklch, var(--color-ink) 14%, transparent);
+}
+
+.guide-search-count {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-block-end: var(--rule-thin) solid var(--color-rule);
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.guide-search-popover ul {
+  margin: 0;
+  padding: var(--space-sm) 0;
+  list-style: none;
+}
+
+.guide-search-popover [role="option"] {
+  display: grid;
+  min-height: 2.75rem;
+  padding: 0.625rem var(--space-md);
+  cursor: pointer;
+}
+
+.guide-search-popover [role="option"][aria-selected="true"] {
+  background-color: var(--color-paper-subtle);
+  box-shadow: inset 0.1875rem 0 var(--color-accent);
+}
+
+.guide-search-popover [role="option"]:active {
+  transform: translateY(1px);
+}
+
+.guide-search-title,
+.guide-search-category,
+.guide-search-snippet {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.guide-search-title {
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.25rem;
+  white-space: nowrap;
+}
+
+.guide-search-category {
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  white-space: nowrap;
+}
+
+.guide-search-snippet {
+  display: -webkit-box;
+  margin-block-start: var(--space-sm);
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.guide-search mark {
+  border-radius: 0.125rem;
+  color: inherit;
+  background-color: color-mix(in oklch, var(--color-accent) 14%, var(--color-paper));
+}
+
+.guide-toc {
+  grid-area: toc;
+  min-width: 0;
+  padding-inline: var(--space-md);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+.guide-toc details {
+  border-block: var(--rule-thin) solid var(--color-rule);
+}
+
+.guide-toc summary {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding-block: var(--space-sm);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.25rem;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.guide-toc summary::-webkit-details-marker {
+  display: none;
+}
+
+.guide-toc summary svg {
+  flex: none;
+  transition: transform var(--dur-normal) var(--ease-in-out);
+}
+
+.guide-toc details[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.guide-toc summary:focus-visible,
+.guide-toc a:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.guide-toc nav {
+  max-height: min(18rem, 35dvh);
+  overflow-y: auto;
+  display: grid;
+  gap: 0.125rem;
+  padding-block: var(--space-sm) var(--space-md);
+}
+
+.guide-toc a {
+  position: relative;
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  min-width: 0;
+  padding-block: 0.5rem;
+  padding-inline: var(--space-md) var(--space-sm);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: 1.25rem;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.guide-toc a::before {
+  position: absolute;
+  inset-block: 0.5rem;
+  inset-inline-start: 0;
+  width: 0.125rem;
+  border-radius: var(--radius-sm);
+  background-color: transparent;
+  content: "";
+}
+
+.guide-toc a[aria-current="location"] {
+  color: var(--color-ink);
+  background-color: var(--color-paper-subtle);
+  font-weight: 700;
+}
+
+.guide-toc a[aria-current="location"]::before {
+  background-color: var(--color-accent);
+}
+
+.guide-toc-level-3 {
+  margin-inline-start: var(--space-sm);
+}
+
+.guide-toc-level-4 {
+  margin-inline-start: var(--space-md);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .guide-search input:hover {
+    background-color: var(--color-paper-subtle);
+  }
+
+  .guide-search-popover [role="option"]:hover,
+  .guide-toc a:hover {
+    color: var(--color-ink);
+    background-color: var(--color-paper-subtle);
+  }
+}
+
+@media (max-width: 29.999rem) {
+  .guide-search input {
+    padding-inline-end: 2.625rem;
+  }
+
+  .guide-search > kbd {
+    display: none;
+  }
+}
+
+@media (min-width: 80rem) {
+  .guide-toc {
+    min-height: 0;
+    overflow-y: auto;
+    padding-block-start: 2.5rem;
+    padding-inline: var(--space-lg) var(--space-md);
+  }
+
+  .guide-toc details {
+    position: sticky;
+    inset-block-start: var(--space-lg);
+    max-height: 100%;
+    overflow-y: auto;
+    border-block: 0;
+  }
+
+  .guide-toc summary {
+    min-height: auto;
+    padding-block: 0 var(--space-sm);
+    cursor: default;
+  }
+
+  .guide-toc summary svg {
+    display: none;
+  }
+
+  .guide-toc nav {
+    max-height: none;
+    display: grid !important;
+    padding-block: 0;
+  }
+
+  .guide-toc a {
+    min-height: 2.25rem;
+    padding-block: 0.375rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-search-popover [role="option"]:active {
+    transform: none;
+  }
+
+  .guide-toc summary svg {
+    transition-duration: 1ms;
+  }
+}

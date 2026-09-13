@@ -208,18 +208,22 @@ type SectionProps = {
   title: string;
   description?: string;
   help?: string;
+  headerAction?: ReactNode;
   children: ReactNode;
 };
 
-export function Section({ title, description, help, children }: SectionProps) {
+export function Section({ title, description, help, headerAction, children }: SectionProps) {
   return (
     <section className="border-b border-slate-200 px-4 py-4">
-      <header className="mb-3">
-        <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-900">
-          {title}
-          {help && <HelpPopover html={help} ariaLabel={`Ajuda: ${title}`} />}
-        </h3>
-        {description && <p className="text-xs text-slate-500">{description}</p>}
+      <header className="mb-3 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+            {title}
+            {help && <HelpPopover html={help} ariaLabel={`Ajuda: ${title}`} />}
+          </h3>
+          {description && <p className="text-xs text-slate-500">{description}</p>}
+        </div>
+        {headerAction}
       </header>
       <div className="flex flex-col gap-3">{children}</div>
     </section>

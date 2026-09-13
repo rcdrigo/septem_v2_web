@@ -8,23 +8,32 @@ const dir=await mkdtemp(join(tmpdir(),'septem-editor-regressions-')),root=resolv
 await build({stdin:{contents:`
 import React from 'react';import {createRoot} from 'react-dom/client';import {flushSync} from 'react-dom';import {QueryClient,QueryClientProvider} from '@tanstack/react-query';import {MemoryRouter} from 'react-router-dom';import {FormularioView} from './src/components/modelador/views/FormularioView';import {useModeladorStore} from './src/stores/modelador';
 import {FormEditor} from '@bpmn-io/form-js';
-const originalImport=FormEditor.prototype.importSchema;FormEditor.prototype.importSchema=function(...args){window.formEditor=this;return originalImport.apply(this,args);};
+const originalImport=FormEditor.prototype.importSchema;
+window.holdImport=key=>{window.heldKey=key;window.importEntered=false;window.importGate=new Promise(resolve=>{window.releaseImport=resolve;});};
+FormEditor.prototype.importSchema=async function(...args){
+ window.formEditor=this;
+ if(args[0]?.components?.[0]?.key===window.heldKey){window.heldKey=null;window.importEntered=true;await window.importGate;}
+ return originalImport.apply(this,args);
+};
 window.selectField=id=>window.formEditor.get('selection').set(window.formEditor.get('formFieldRegistry').get(id));
 const events={};const bo={};const shape={businessObject:bo};
 const modeler={get:(key)=>({canvas:{getRootElement:()=>shape},eventBus:{on:(e,fn)=>{(events[e]??=[]).push(fn)},off:(e,fn)=>{events[e]=(events[e]??[]).filter(f=>f!==fn)}},moddle:{create:(type,props)=>({$type:type,...props})},modeling:{updateProperties:(_,props)=>Object.assign(bo,props)}}[key])};
 window.readSchema=()=>JSON.parse(bo.extensionElements?.values?.find(v=>v.$type==='septem:FormSchema')?.json??'null');
 window.loadXml=(schema)=>{(events['import.parse.start']??[]).forEach(f=>f());bo.extensionElements={values:schema?[{$type:'septem:FormSchema',json:typeof schema==='string'?schema:JSON.stringify(schema)}]:[]};(events['import.done']??[]).forEach(f=>f());};
 window.flush=()=>useModeladorStore.getState().flushForm();
+window.captureFlush=()=>{window.oldFlush=useModeladorStore.getState().flushForm;};
 localStorage.setItem('septem.modelador.form',JSON.stringify({type:'default',id:'form_a',schemaVersion:17,components:[{type:'textfield',id:'field_a',key:'a',label:'Campo A'}]}));
 const app=createRoot(document.getElementById('root')),client=new QueryClient({defaultOptions:{queries:{retry:false}}});
-window.render=(ready)=>flushSync(()=>app.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/flows/edit?key=B']}><FormularioView modeler={modeler} processReady={ready}/></MemoryRouter></QueryClientProvider>));window.render(false);
+window.render=(ready)=>flushSync(()=>app.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/flows/edit?key=B']}><FormularioView modeler={modeler} processReady={ready}/></MemoryRouter></QueryClientProvider>));window.unmount=()=>flushSync(()=>app.render(null));window.render(false);
 `,resolveDir:root,loader:'tsx'},bundle:true,outfile:join(dir,'editor.js'),format:'iife',platform:'browser',tsconfig:join(root,'tsconfig.app.json'),define:{'import.meta.env':'{}'}});
 const browser=await chromium.launch({executablePath:process.env.CHROME_BIN??'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
 try {
  const page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ let importedSchema;
  let resolveSlow, slowRequested;const requested=new Promise(r=>{slowRequested=r});const slow=new Promise(r=>{resolveSlow=r});
  await page.route('http://audit.local/**',async r=>{
    const url=r.request().url();
+   if(url.endsWith('/workflow/form-import'))return r.fulfill({json:importedSchema});
    if(url.includes('/field-options')) {if(r.request().postDataJSON().dataSourceId==='slow'){slowRequested();await slow;}return r.fulfill({contentType:'application/json',body:'{"options":[{"value":"1","label":"Um"}]}'});}
    return r.fulfill({contentType:url.includes('/api/')?'application/json':'text/html',body:url.includes('/api/')?(url.includes('process-definitions')?'{"key":"B","hasInstances":false}':'[]'):'<div id="root"></div>'});
  });
@@ -95,6 +104,30 @@ try {
    assert.equal(await keyInput.inputValue(),'chave_manual_'+type,'manual '+type);
    console.log('PASSOU: chave automática e manual — '+type);
  }
+ // Manual import uses the same lifecycle, while preserving explicit or current layout.
+ await page.getByRole('button',{name:'Abas',exact:true}).click();
+ for(const layout of [undefined,'stacked','tabs']) {
+   importedSchema={...schema('planilha'),...(layout?{septemGroupLayout:layout}:{})};
+   await page.getByRole('button',{name:'Importar',exact:true}).click();
+   await page.getByTestId('import-input').setInputFiles({name:'fixture.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:Buffer.from('mocked server parses fixture')});
+   await page.getByRole('dialog').waitFor({state:'hidden'});await ready();
+   await page.evaluate(()=>window.flush());
+   const persisted=await page.evaluate(()=>window.readSchema());
+   assert.equal(persisted.components[0].key,'planilha');assert.equal(persisted.septemGroupLayout,layout??'tabs');
+ }
+ // Hold an import already handed to the engine; a flush must wait for the newest load.
+ await page.evaluate(s=>{window.holdImport('engine_lento');window.loadXml(s);},schema('engine_lento'));
+ await page.waitForFunction(()=>window.importEntered);
+ await page.evaluate(s=>{window.loadXml({...s,septemGroupLayout:'tabs'});window.flushDone=false;window.pendingFlush=window.flush().then(()=>{window.flushDone=true;});},schema('engine_recente'));
+ assert.equal(await page.evaluate(()=>window.flushDone),false);
+ await page.evaluate(()=>window.releaseImport());await page.evaluate(()=>window.pendingFlush);await ready();
+ const latest=await page.evaluate(()=>window.readSchema());assert.equal(latest.components[0].key,'engine_recente');assert.equal(latest.septemGroupLayout,'tabs');
+ assert.equal(await page.locator('[data-septem-date-preview]').innerText(),'engine_recente');
+ // A former editor cannot flush or unregister its replacement.
+ await page.evaluate(()=>{window.captureFlush();window.unmount();window.render(true);});await ready();
+ assert.equal(await page.evaluate(()=>window.oldFlush().then(()=>false,()=>true)),true,'flush antigo rejeita após remontagem');
+ await page.evaluate(()=>window.flush());assert.equal((await page.evaluate(()=>window.readSchema())).components[0].key,'engine_recente');
+ console.log('PASSOU: importação manual, layout, fila da engine, flush aguardando carga e remontagem.');
  await page.evaluate(()=>window.loadXml('{invalido'));await page.getByRole('alert').waitFor();assert.equal(await page.evaluate(()=>window.flush().then(()=>false,()=>true)),true,'erro impede salvar schema anterior');
  assert.deepEqual(errors,[]);console.log('PASSOU: cache isolado, prontidão, três modos, flush imediato, restrição, carga concorrente e falha de importação, snake_case, datas, persistência e colisão de chaves.');
 } finally {await browser.close();}

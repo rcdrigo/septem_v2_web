@@ -1,0 +1,189 @@
+/* Hallmark · macrostructure: Long Document · tone: editorial · anchor hue: slate
+ * theme: studied-DNA structure with existing Septem tokens · pre-emit critique: P4 H5 E4 S5 R5 V4 */
+@import "../../../tokens.css";
+
+.guide-page {
+  font-family: var(--font-body);
+}
+
+.guide-content-grid {
+  background: var(--color-paper);
+  display: grid;
+  grid-template-areas:
+    "toc"
+    "main";
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.guide-main {
+  grid-area: main;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.guide-mobile-dialog {
+  width: min(88vw, 20rem);
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0 auto 0 0;
+  padding: 0;
+  border: 0;
+  color: var(--color-ink);
+  background: var(--color-paper);
+}
+
+.guide-mobile-dialog::backdrop {
+  background: color-mix(in oklch, var(--color-ink) 42%, transparent);
+}
+
+.guide-mobile-dialog-panel {
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.guide-prose {
+  overflow-wrap: anywhere;
+}
+
+.guide-prose :where(h2, h3, h4) {
+  min-width: 0;
+  color: var(--color-ink);
+  font-style: normal;
+  line-height: 1.25;
+  scroll-margin-top: var(--space-xl);
+  overflow-wrap: anywhere;
+}
+
+.guide-prose h2 {
+  margin-block: 2.5rem var(--space-md);
+  padding-top: var(--space-sm);
+  border-top: var(--rule-thin) solid var(--color-rule);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.guide-prose h3 {
+  margin-block: var(--space-xl) 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 650;
+}
+
+.guide-prose h4 {
+  margin-block: var(--space-lg) var(--space-sm);
+  font-size: var(--text-lg);
+  font-weight: 650;
+}
+
+.guide-prose :where(p, ul, ol, blockquote, pre, .guide-table-scroll, iframe, img) {
+  margin-block: var(--space-md);
+}
+
+.guide-prose :where(ul, ol) {
+  padding-inline-start: var(--space-lg);
+}
+
+.guide-prose ul {
+  list-style: disc;
+}
+
+.guide-prose ol {
+  list-style: decimal;
+}
+
+.guide-prose li + li {
+  margin-top: var(--space-sm);
+}
+
+.guide-prose a {
+  color: var(--color-accent);
+  font-weight: 550;
+  text-decoration: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.18em;
+}
+
+.guide-prose a:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.guide-prose blockquote {
+  border-left: 3px solid var(--color-rule-strong);
+  padding-left: var(--space-md);
+  color: var(--color-muted);
+}
+
+.guide-prose :where(img, video, iframe) {
+  display: block;
+  max-width: 100%;
+}
+
+.guide-prose iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: var(--rule-thin) solid var(--color-rule);
+}
+
+.guide-prose pre,
+.guide-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.guide-prose pre {
+  padding: var(--space-md);
+  border: var(--rule-thin) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-subtle);
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.guide-prose code {
+  font-size: 0.875em;
+}
+
+.guide-prose table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  overflow-wrap: normal;
+}
+
+.guide-prose :where(th, td) {
+  padding: 0.625rem 0.75rem;
+  border-bottom: var(--rule-thin) solid var(--color-rule);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.guide-prose th {
+  color: var(--color-ink);
+  background: var(--color-paper-subtle);
+  font-weight: 650;
+}
+
+@media (min-width: 80rem) {
+  .guide-content-grid {
+    grid-template-areas: "main toc";
+    grid-template-columns: minmax(0, 1fr) 16rem;
+    grid-template-rows: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-page *,
+  .guide-page *::before,
+  .guide-page *::after {
+    animation-duration: 150ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 150ms !important;
+  }
+}

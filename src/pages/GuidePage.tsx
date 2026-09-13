@@ -1,334 +1,591 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, ChevronLeft, LifeBuoy, Search } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  LifeBuoy,
+  Menu,
+  X,
+} from 'lucide-react';
+import { GuideMenu } from '@/components/guide/GuideMenu';
+import { GuideSearch } from '@/components/guide/GuideSearch';
+import { GuideToc } from '@/components/guide/GuideToc';
 import { useGuide, type GuideManual } from '@/lib/api/manuals';
 import { useSessionStore } from '@/stores/session';
 import { useDocumentTitle } from '@/lib/use-document-title';
+import '@/components/guide/guide.css';
 
 const WELCOME_ID = 'comece-aqui';
 type TabKey = 'interno' | 'externo' | 'tecnico';
+type CopyStatus = 'idle' | 'copied' | 'error';
+
+const TECHNICAL_MANUAL_TITLES: Record<string, string> = {
+  'modelador-processos': 'Modelador de processos',
+  'modelador-formularios': 'Modelador de formulários',
+};
+
+const SECTION_TITLES: Record<string, string[]> = {
+  'responsaveis-prazos': ['Responsáveis e prazos'],
+  'botoes-acao': ['Botões de ação'],
+  'salvar-publicar': ['Salvando, testando e publicando', 'Salvar e publicar'],
+};
 
 /**
- * Guide público (Fase 10) — rota /guide, fora do AppShell (sem menus do app). Header
- * com logo + busca central, navbar Interno/Externo (só p/ interno logado) + Técnico
- * (por permissão), menu à esquerda, conteúdo ao centro com anterior/próximo e TOC à
- * direita. Abre por um botão no login. O conteúdo já vem sanitizado do backend.
+ * Guia público, fora do AppShell. A aba e o manual selecionados vivem na URL para
+ * que recarregar, compartilhar e usar voltar/avançar preserve o contexto de leitura.
  */
 export function GuidePage() {
   const navigate = useNavigate();
-  const status = useSessionStore((s) => s.status);
-  const bootstrap = useSessionStore((s) => s.bootstrap);
-  // Rota fora do AppShell: bootstrap próprio p/ saber se há usuário interno logado
-  // (a resposta do /guide muda conforme isso — abas Interno/Técnico).
-  useEffect(() => { if (status === 'idle') void bootstrap(); }, [status, bootstrap]);
+  const location = useLocation();
+  const status = useSessionStore((state) => state.status);
+  const bootstrap = useSessionStore((state) => state.bootstrap);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle');
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (status === 'idle') void bootstrap();
+  }, [status, bootstrap]);
 
   const guide = useGuide();
-  const d = guide.data;
+  const data = guide.data;
   useDocumentTitle('Guia');
 
   const tabs = useMemo<{ key: TabKey; label: string; items: GuideManual[] }[]>(() => {
-    if (!d) return [];
-    const out: { key: TabKey; label: string; items: GuideManual[] }[] = [];
-    if (d.isInternal) out.push({ key: 'interno', label: 'Interno', items: d.internal });
-    out.push({ key: 'externo', label: 'Externo', items: d.external });
-    if (d.canTechnical) out.push({ key: 'tecnico', label: 'Técnico', items: d.technical });
-    return out;
-  }, [d]);
+    if (!data) return [];
+    const available: { key: TabKey; label: string; items: GuideManual[] }[] = [];
+    if (data.isInternal) available.push({ key: 'interno', label: 'Interno', items: data.internal });
+    available.push({ key: 'externo', label: 'Externo', items: data.external });
+    if (data.canTechnical) available.push({ key: 'tecnico', label: 'Técnico', items: data.technical });
+    return available;
+  }, [data]);
 
-  const [tab, setTab] = useState<TabKey>('externo');
-  useEffect(() => { if (tabs.length && !tabs.some((t) => t.key === tab)) setTab(tabs[0].key); }, [tabs, tab]);
-  const [activeId, setActiveId] = useState<string>(WELCOME_ID);
-  const [query, setQuery] = useState('');
-
-  const current = tabs.find((t) => t.key === tab);
+  const params = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const requestedTab = params.get('tab');
+  const defaultTab = tabs.find((item) => item.key === 'externo')?.key ?? tabs[0]?.key ?? 'externo';
+  const tab = tabs.some((item) => item.key === requestedTab)
+    ? requestedTab as TabKey
+    : defaultTab;
+  const current = tabs.find((item) => item.key === tab);
   const items = current?.items ?? [];
 
-  // Sequência linear (por categoria/ordem) para o anterior/próximo e para o menu.
-  const ordered = useMemo(() => [...items].sort((a, b) =>
-    a.categoryOrder - b.categoryOrder || a.categoryName.localeCompare(b.categoryName, 'pt-BR') || a.order - b.order || a.title.localeCompare(b.title, 'pt-BR')
+  const ordered = useMemo(() => [...items].sort((left, right) =>
+    left.categoryOrder - right.categoryOrder
+      || left.categoryName.localeCompare(right.categoryName, 'pt-BR')
+      || left.order - right.order
+      || left.title.localeCompare(right.title, 'pt-BR')
   ), [items]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return ordered;
-    return ordered.filter((m) => m.title.toLowerCase().includes(q) || stripHtml(m.contentHtml).toLowerCase().includes(q));
-  }, [ordered, query]);
-
-  const active = ordered.find((m) => m.id === activeId) ?? null;
-  const activeIndex = ordered.findIndex((m) => m.id === activeId);
-  const prev = activeIndex > 0 ? ordered[activeIndex - 1] : null;
+  const requestedManual = params.get('manual');
+  const requestedManualKey = params.get('manualKey');
+  const manualFromKey = tab === 'tecnico' && requestedManualKey
+    ? resolveTechnicalManual(ordered, requestedManualKey)
+    : null;
+  const requestedManualExists = requestedManual === WELCOME_ID || ordered.some((manual) => manual.id === requestedManual);
+  const activeId: string = requestedManualExists
+    ? requestedManual!
+    : manualFromKey?.id ?? WELCOME_ID;
+  const active = ordered.find((manual) => manual.id === activeId) ?? null;
+  const activeIndex = ordered.findIndex((manual) => manual.id === activeId);
+  const previous = activeIndex > 0 ? ordered[activeIndex - 1] : null;
   const next = activeIndex >= 0 && activeIndex < ordered.length - 1 ? ordered[activeIndex + 1] : null;
+  const { html: activeHtml, toc } = useMemo(() => buildContent(active?.contentHtml ?? ''), [active?.contentHtml]);
+  const trail = useMemo(() => active ? getManualTrail(active, ordered) : [], [active, ordered]);
 
-  // TOC + injeção de ids nos títulos do conteúdo ativo + destaque do termo buscado.
-  const { html: activeHtml, toc } = useMemo(() => buildContent(active?.contentHtml ?? '', query), [active?.contentHtml, query]);
-
-  const openCategoryFirst = (firstManualId: string) => { setActiveId(firstManualId); scrollTop(); };
-  const openManual = (mId: string) => { setActiveId(mId); scrollTop(); };
-
-  // Ao trocar de aba, volta ao "Comece aqui".
-  useEffect(() => { setActiveId(WELCOME_ID); }, [tab]);
-
-  // Menu por categoria (SEM filtro de busca — a busca agora abre um popover de resultados).
-  const byCategory = useMemo(() => {
-    const map = new Map<string, { name: string; order: number; items: GuideManual[] }>();
-    for (const m of ordered) {
-      const g = map.get(m.categoryId) ?? { name: m.categoryName, order: m.categoryOrder, items: [] };
-      g.items.push(m); map.set(m.categoryId, g);
-    }
-    return [...map.values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, 'pt-BR'));
-  }, [ordered]);
-
-  // "Comece aqui": categorias APENAS da aba ativa (item 24). ordered já vem ordenado,
-  // então o 1º manual de cada categoria é o firstManualId.
   const welcomeCategories = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; order: number; firstManualId: string }>();
-    for (const m of ordered) {
-      if (!map.has(m.categoryId)) map.set(m.categoryId, { id: m.categoryId, name: m.categoryName, order: m.categoryOrder, firstManualId: m.id });
+    const categories = new Map<string, { id: string; name: string; order: number; firstManualId: string }>();
+    for (const manual of ordered) {
+      if (!categories.has(manual.categoryId)) {
+        categories.set(manual.categoryId, {
+          id: manual.categoryId,
+          name: manual.categoryName,
+          order: manual.categoryOrder,
+          firstManualId: manual.id,
+        });
+      }
     }
-    return [...map.values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, 'pt-BR'));
+    return [...categories.values()].sort((left, right) =>
+      left.order - right.order || left.name.localeCompare(right.name, 'pt-BR')
+    );
   }, [ordered]);
+
+  // Corrige URLs incompletas ou que apontem para uma aba sem permissão sem criar
+  // uma entrada extra no histórico.
+  useEffect(() => {
+    if (!tabs.length) return;
+    const resolvedContextLink = !requestedManual && manualFromKey?.id === activeId;
+    if (requestedTab === tab && (requestedManual === activeId || resolvedContextLink)) return;
+    navigate({
+      pathname: location.pathname,
+      search: selectionSearch(params, tab, activeId),
+      hash: requestedManual === activeId ? location.hash : '',
+    }, { replace: true });
+  }, [activeId, location.hash, location.pathname, manualFromKey?.id, navigate, params, requestedManual, requestedTab, tab, tabs.length]);
+
+  useEffect(() => {
+    setCopyStatus('idle');
+    if (guide.isLoading) return;
+    const frame = requestAnimationFrame(() => {
+      const root = document.getElementById('guide-scroll');
+      let id = '';
+      try { id = decodeURIComponent(location.hash.slice(1)); } catch { /* URL malformada: abre o início do artigo. */ }
+      const requestedSection = params.get('section');
+      const sectionId = !id && requestedSection ? resolveSectionId(toc, requestedSection) : '';
+      const target = document.getElementById(id || sectionId);
+      if (target && root?.contains(target)) target.scrollIntoView({ block: 'start' });
+      else scrollTop();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeId, activeHtml, guide.isLoading, location.hash, params, tab, toc]);
+
+  const select = (nextTab: TabKey, manualId: string) => {
+    navigate({
+      pathname: location.pathname,
+      search: selectionSearch(params, nextTab, manualId),
+      hash: '',
+    });
+  };
+
+  const openManual = (manualId: string) => select(tab, manualId);
+  const selectHeading = (id: string) => {
+    const hash = `#${encodeURIComponent(id)}`;
+    if (hash === location.hash) {
+      document.getElementById(id)?.scrollIntoView({ block: 'start' });
+    } else {
+      navigate({ pathname: location.pathname, search: location.search, hash });
+    }
+  };
+  const openFromDrawer = (manualId: string) => {
+    openManual(manualId);
+    setMenuOpen(false);
+  };
+
+  const copyLink = async () => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard indisponível');
+      await navigator.clipboard.writeText(window.location.href);
+      setCopyStatus('copied');
+    } catch {
+      setCopyStatus('error');
+    }
+  };
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-slate-50">
-      {/* Header: logo · busca · ações */}
-      <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
-        <div className="flex min-w-0 items-center gap-2">
-          {d?.logoUrl ? <img src={d.logoUrl} alt={d.tenantName} className="h-8 w-auto" /> : <LifeBuoy className="text-slate-700" />}
-          <span className="truncate text-base font-semibold text-slate-900">{d?.tenantName ?? 'Guia'}</span>
-        </div>
-        <div className="order-last w-full min-w-0 flex-1 sm:order-none">
-          {/* Busca centralizada (não ocupa a largura toda) com popover flutuante de resultados. */}
-          <div className="relative mx-auto w-full max-w-md">
-            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type="search" data-testid="guide-busca" value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Escape') setQuery(''); }}
-              placeholder="Buscar nos manuais…"
-              className="min-h-10 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm focus:border-slate-500 focus:outline-none" />
-            {query.trim() && (
-              <div data-testid="guide-busca-resultados" className="absolute left-0 right-0 top-full z-50 mt-1 max-h-80 overflow-y-auto rounded-md border border-slate-200 bg-white py-1 text-left shadow-xl">
-                {filtered.length === 0 ? (
-                  <p className="px-3 py-2 text-sm text-slate-400">Nada encontrado para "{query}".</p>
-                ) : filtered.slice(0, 20).map((m) => (
-                  <button key={m.id} type="button" data-testid="guide-busca-resultado"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => { openManual(m.id); setQuery(''); }}
-                    className="flex w-full flex-col items-start gap-0.5 px-3 py-2 hover:bg-slate-50">
-                    <span className="flex items-center gap-1.5 text-sm font-medium text-slate-800">{m.icon && <i className={m.icon} aria-hidden="true" />}{highlight(m.title, query)}</span>
-                    <span className="text-xs text-slate-400">{m.categoryName}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+    <div className="guide-page flex h-[100dvh] min-w-0 flex-col bg-slate-50 text-slate-900">
+      <header className="guide-header shrink-0 border-b border-slate-200 bg-white">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 sm:px-6 lg:grid-cols-[minmax(12rem,1fr)_minmax(18rem,32rem)_minmax(12rem,1fr)]">
+          <div className="flex min-w-0 items-center gap-2.5">
+            {data?.logoUrl
+              ? <img src={data.logoUrl} alt={data.tenantName} className="h-8 max-w-36 shrink-0 object-contain sm:max-w-52" />
+              : <LifeBuoy className="shrink-0 text-slate-700" aria-hidden="true" />}
+            <span className="truncate text-base font-semibold text-slate-900">{data?.tenantName ?? 'Guia'}</span>
           </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button type="button" data-testid="guide-voltar-login" onClick={() => navigate('/login')}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm text-slate-700 hover:bg-slate-50">
-            <ChevronLeft size={15} /> Voltar ao login
-          </button>
-          <button type="button" data-testid="guide-ajuda" onClick={() => navigate('/login')}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-slate-900 px-3 text-sm font-semibold text-white hover:bg-slate-700">
-            <LifeBuoy size={15} /> Ainda precisa de ajuda?
-          </button>
+
+          <div className="col-span-full row-start-2 min-w-0 lg:col-span-1 lg:col-start-2 lg:row-start-1">
+            <GuideSearch items={ordered} onOpen={openManual} />
+          </div>
+
+          <div className="col-start-2 row-start-1 flex shrink-0 items-center justify-end gap-1.5 lg:col-start-3 lg:row-start-1">
+            <button
+              type="button"
+              data-testid="guide-voltar-login"
+              aria-label="Voltar ao login"
+              onClick={() => navigate('/login')}
+              className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-slate-300 px-2.5 text-sm text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 active:bg-slate-100 sm:px-3"
+            >
+              <ChevronLeft size={15} aria-hidden="true" />
+              <span className="hidden xl:inline">Voltar ao login</span>
+            </button>
+            <button
+              type="button"
+              data-testid="guide-ajuda"
+              aria-label="Ainda precisa de ajuda?"
+              onClick={() => navigate('/login')}
+              className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-slate-900 px-2.5 text-sm font-semibold text-white outline-none hover:bg-slate-700 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 active:bg-slate-800 sm:px-3"
+            >
+              <LifeBuoy size={15} aria-hidden="true" />
+              <span className="hidden xl:inline">Ainda precisa de ajuda?</span>
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Navbar de abas (Interno/Externo/Técnico) */}
-      {tabs.length > 1 && (
-        <nav className="flex shrink-0 border-b border-slate-200 bg-white px-4 py-2 sm:px-6" data-testid="guide-navbar">
-          {tabs.map((t) => (
-            <button key={t.key} type="button" aria-pressed={tab === t.key} data-testid={`guide-tab-${t.key}`} onClick={() => setTab(t.key)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === t.key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{t.label}</button>
-          ))}
-        </nav>
-      )}
+      <div className={`flex shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 sm:px-6 ${tabs.length <= 1 ? 'lg:hidden' : ''}`}>
+        <button
+          ref={menuTriggerRef}
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen(true)}
+          className="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 active:bg-slate-100 lg:hidden"
+        >
+          <Menu size={16} aria-hidden="true" /> Menu
+        </button>
 
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        {/* Menu à esquerda */}
-        <aside className="shrink-0 overflow-y-auto border-b border-slate-200 bg-white p-3 lg:w-64 lg:border-b-0 lg:border-r" data-testid="guide-menu">
-          <button type="button" onClick={() => openManual(WELCOME_ID)}
-            className={`mb-2 block w-full rounded-md px-3 py-2 text-left text-sm font-semibold ${activeId === WELCOME_ID ? 'bg-slate-100 text-slate-900' : 'text-slate-700 hover:bg-slate-50'}`}>
-            Comece aqui
-          </button>
-          {byCategory.map((cat) => (
-            <div key={cat.name} className="mb-3">
-              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{cat.name}</p>
-              {groupByParent(cat.items).map((node) => (
-                <div key={node.manual.id}>
-                  <MenuLink m={node.manual} activeId={activeId} onClick={openManual} />
-                  {node.children.map((child) => (
-                    <div key={child.id} className="pl-3"><MenuLink m={child} activeId={activeId} onClick={openManual} /></div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          ))}
-          {byCategory.length === 0 && <p className="px-3 py-2 text-xs text-slate-400">Nenhum manual disponível.</p>}
+        {tabs.length > 1 && (
+          <nav className="flex min-w-0 gap-1 overflow-x-auto" data-testid="guide-navbar" aria-label="Áreas do guia">
+            {tabs.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                aria-pressed={tab === item.key}
+                data-testid={`guide-tab-${item.key}`}
+                onClick={() => select(item.key, WELCOME_ID)}
+                className={`min-h-9 shrink-0 whitespace-nowrap rounded-md px-3 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 ${
+                  tab === item.key
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        )}
+      </div>
+
+      <div className="flex min-h-0 min-w-0 flex-1">
+        <aside className="hidden w-72 shrink-0 overflow-y-auto border-r border-slate-200 bg-slate-50 lg:block" data-testid="guide-menu">
+          <GuideMenu items={ordered} activeId={activeId} onOpen={openManual} welcomeId={WELCOME_ID} />
         </aside>
 
-        {/* TOC "Nesta página" — entre o menu e o conteúdo, sem background (item 25) */}
-        {activeId !== WELCOME_ID && toc.length > 0 && (
-          <aside className="hidden shrink-0 overflow-y-auto p-4 xl:block xl:w-52" data-testid="guide-toc">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Nesta página</p>
-            <ul className="space-y-1 text-sm">
-              {toc.map((h) => (
-                <li key={h.id} style={{ paddingLeft: (h.level - 2) * 10 }}>
-                  <a href={`#${h.id}`} onClick={(e) => { e.preventDefault(); document.getElementById(h.id)?.scrollIntoView({ behavior: 'smooth' }); }}
-                    className="block truncate text-slate-600 hover:text-slate-900">{h.text}</a>
-                </li>
-              ))}
-            </ul>
-          </aside>
-        )}
+        <div className="guide-content-grid min-h-0 min-w-0 flex-1">
+          {activeId !== WELCOME_ID && <GuideToc toc={toc} contentKey={`${tab}:${activeId}`} onSelect={selectHeading} />}
 
-        {/* Conteúdo ao centro */}
-        <main id="guide-scroll" className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8">
-          {guide.isLoading ? (
-            <p className="text-sm text-slate-400">Carregando…</p>
-          ) : activeId === WELCOME_ID ? (
-            <Welcome welcome={d?.welcome ? { title: d.welcome.title, description: d.welcome.description, categories: welcomeCategories } : undefined} onOpenCategory={openCategoryFirst} />
-          ) : active ? (
-            <article className="mx-auto max-w-3xl">
-              <h1 className="text-2xl font-bold text-slate-900">{active.title}</h1>
-              <div
-                data-testid="guide-conteudo"
-                className="prose-guide mt-4 max-w-none text-slate-700 [&_a]:text-sky-600 [&_a]:underline [&_h2]:mt-6 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:mt-4 [&_h3]:font-semibold [&_iframe]:my-3 [&_iframe]:aspect-video [&_iframe]:w-full [&_img]:my-3 [&_img]:max-w-full [&_li]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_p]:my-3"
-                dangerouslySetInnerHTML={{ __html: activeHtml }}
+          <main id="guide-scroll" className="guide-main min-h-0 min-w-0 overflow-y-auto px-4 py-6 sm:px-8 lg:px-10 lg:py-10">
+            {guide.isLoading ? (
+              <p className="mx-auto max-w-3xl text-sm text-slate-500" role="status">Carregando…</p>
+            ) : guide.isError ? (
+              <div className="mx-auto max-w-3xl" role="alert">
+                <h1 className="text-2xl font-semibold text-slate-900">Não foi possível carregar o guia</h1>
+                <p className="mt-2 text-slate-600">Atualize a página para tentar novamente.</p>
+              </div>
+            ) : activeId === WELCOME_ID ? (
+              <Welcome
+                welcome={data?.welcome ? {
+                  title: data.welcome.title,
+                  description: data.welcome.description,
+                  categories: welcomeCategories,
+                } : undefined}
+                onOpenCategory={openManual}
               />
-              <nav className="mt-10 flex items-center justify-between gap-3 border-t border-slate-200 pt-5">
-                {prev ? (
-                  <button type="button" data-testid="guide-anterior" onClick={() => openManual(prev.id)}
-                    className="inline-flex min-w-0 items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                    <ArrowLeft size={15} className="shrink-0" /><span className="truncate">{prev.title}</span>
+            ) : active ? (
+              <article className="mx-auto w-full max-w-3xl min-w-0 pb-8">
+                <div className="flex min-w-0 items-center gap-3 border-b border-slate-200 pb-5">
+                  <Breadcrumbs
+                    active={active}
+                    trail={trail}
+                    categoryFirstId={ordered.find((manual) => manual.categoryId === active.categoryId)?.id}
+                    onOpen={openManual}
+                  />
+                  <button
+                    type="button"
+                    data-testid="guide-copiar-link"
+                    onClick={() => void copyLink()}
+                    className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-slate-300 px-2.5 text-xs font-medium text-slate-600 outline-none hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 active:bg-slate-100 sm:px-3 sm:text-sm"
+                  >
+                    {copyStatus === 'copied' ? <Check size={15} aria-hidden="true" /> : copyStatus === 'error' ? <AlertCircle size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+                    <span aria-live="polite">{copyStatus === 'copied' ? 'Link copiado' : copyStatus === 'error' ? 'Falha ao copiar' : 'Copiar link'}</span>
                   </button>
-                ) : <span />}
-                {next ? (
-                  <button type="button" data-testid="guide-proximo" onClick={() => openManual(next.id)}
-                    className="inline-flex min-w-0 items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                    <span className="truncate">{next.title}</span><ArrowRight size={15} className="shrink-0" />
-                  </button>
-                ) : <span />}
-              </nav>
-            </article>
-          ) : (
-            <p className="text-sm text-slate-400">Selecione um manual no menu.</p>
-          )}
-        </main>
+                </div>
 
+                <h1 className="mt-8 min-w-0 break-words text-3xl font-bold tracking-tight text-slate-950 [overflow-wrap:anywhere] sm:text-4xl">
+                  {active.title}
+                </h1>
+                <div
+                  data-testid="guide-conteudo"
+                  className="guide-prose mt-7 min-w-0 max-w-none text-base leading-7 text-slate-700"
+                  dangerouslySetInnerHTML={{ __html: activeHtml }}
+                />
+
+                <nav className="mt-12 grid min-w-0 gap-3 border-t border-slate-200 pt-6 sm:grid-cols-2" aria-label="Artigos adjacentes">
+                  {previous ? (
+                    <button
+                      type="button"
+                      data-testid="guide-anterior"
+                      onClick={() => openManual(previous.id)}
+                      className="group flex min-w-0 items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-left outline-none hover:border-slate-300 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 active:bg-slate-100"
+                    >
+                      <ArrowLeft size={17} className="shrink-0 text-slate-400 group-hover:text-slate-700" aria-hidden="true" />
+                      <span className="min-w-0">
+                        <span className="block text-xs font-medium text-slate-500">Anterior</span>
+                        <span className="block truncate whitespace-nowrap text-sm font-semibold text-slate-800">{previous.title}</span>
+                      </span>
+                    </button>
+                  ) : <span />}
+                  {next ? (
+                    <button
+                      type="button"
+                      data-testid="guide-proximo"
+                      onClick={() => openManual(next.id)}
+                      className="group flex min-w-0 items-center justify-end gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-right outline-none hover:border-slate-300 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 active:bg-slate-100 sm:col-start-2"
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-xs font-medium text-slate-500">Próximo</span>
+                        <span className="block truncate whitespace-nowrap text-sm font-semibold text-slate-800">{next.title}</span>
+                      </span>
+                      <ArrowRight size={17} className="shrink-0 text-slate-400 group-hover:text-slate-700" aria-hidden="true" />
+                    </button>
+                  ) : <span />}
+                </nav>
+              </article>
+            ) : (
+              <p className="mx-auto max-w-3xl text-sm text-slate-500">Selecione um manual no menu.</p>
+            )}
+          </main>
+        </div>
       </div>
+
+      <MobileGuideMenu
+        open={menuOpen}
+        triggerRef={menuTriggerRef}
+        items={ordered}
+        activeId={activeId}
+        onOpen={openFromDrawer}
+        onClose={() => setMenuOpen(false)}
+      />
     </div>
   );
 }
 
-function MenuLink({ m, activeId, onClick }: { m: GuideManual; activeId: string; onClick: (id: string) => void }) {
+function MobileGuideMenu({
+  open,
+  triggerRef,
+  items,
+  activeId,
+  onOpen,
+  onClose,
+}: {
+  open: boolean;
+  triggerRef: RefObject<HTMLButtonElement | null>;
+  items: GuideManual[];
+  activeId: string;
+  onOpen: (id: string) => void;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const wasOpen = useRef(false);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    if (open) {
+      if (!dialog.open) dialog.showModal();
+      wasOpen.current = true;
+      return;
+    }
+
+    if (dialog.open) dialog.close();
+    if (wasOpen.current) {
+      wasOpen.current = false;
+      requestAnimationFrame(() => triggerRef.current?.focus());
+    }
+  }, [open, triggerRef]);
+
   return (
-    <button type="button" data-testid="guide-menu-item" onClick={() => onClick(m.id)}
-      className={`flex w-full items-center gap-1.5 rounded-md px-3 py-1.5 text-left text-sm ${activeId === m.id ? 'bg-slate-100 font-semibold text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}>
-      {m.icon && <i className={`${m.icon} shrink-0 text-slate-400`} aria-hidden="true" />}
-      <span className="truncate">{m.title}</span>
-    </button>
+    <dialog
+      ref={dialogRef}
+      className="guide-mobile-dialog"
+      aria-labelledby="guide-mobile-menu-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="guide-mobile-dialog-panel">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-3">
+          <h2 id="guide-mobile-menu-title" className="text-base font-semibold text-slate-900">Menu</h2>
+          <button
+            type="button"
+            autoFocus
+            aria-label="Fechar menu"
+            onClick={onClose}
+            className="inline-flex size-9 items-center justify-center rounded-md text-slate-500 outline-none hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 active:bg-slate-200"
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto" data-testid="guide-menu-mobile">
+          <GuideMenu items={items} activeId={activeId} onOpen={onOpen} welcomeId={WELCOME_ID} />
+        </div>
+      </div>
+    </dialog>
   );
 }
 
-function Welcome({ welcome, onOpenCategory }: { welcome?: { title: string; description: string; categories: { id: string; name: string; firstManualId: string }[] }; onOpenCategory: (firstManualId: string) => void }) {
+function Breadcrumbs({
+  active,
+  trail,
+  categoryFirstId,
+  onOpen,
+}: {
+  active: GuideManual;
+  trail: GuideManual[];
+  categoryFirstId?: string;
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <nav className="min-w-0 flex-1 overflow-x-auto" aria-label="Caminho do artigo">
+      <ol className="flex w-max min-w-full items-center gap-1.5 text-xs text-slate-500 sm:text-sm">
+        <li>
+          <button type="button" onClick={() => onOpen(WELCOME_ID)} className="whitespace-nowrap rounded px-1 py-1 outline-none hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-slate-500">Guia</button>
+        </li>
+        <BreadcrumbSeparator />
+        <li>
+          <button type="button" onClick={() => categoryFirstId && onOpen(categoryFirstId)} disabled={!categoryFirstId} className="max-w-44 truncate whitespace-nowrap rounded px-1 py-1 outline-none hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-slate-500 disabled:cursor-default">
+            {active.categoryName}
+          </button>
+        </li>
+        {trail.map((manual, index) => (
+          <FragmentBreadcrumb key={manual.id} manual={manual} current={index === trail.length - 1} onOpen={onOpen} />
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
+function FragmentBreadcrumb({ manual, current, onOpen }: { manual: GuideManual; current: boolean; onOpen: (id: string) => void }) {
+  return (
+    <>
+      <BreadcrumbSeparator />
+      <li>
+        {current
+          ? <span aria-current="page" className="block max-w-48 truncate whitespace-nowrap px-1 py-1 font-medium text-slate-800">{manual.title}</span>
+          : (
+            <button type="button" onClick={() => onOpen(manual.id)} className="block max-w-44 truncate whitespace-nowrap rounded px-1 py-1 outline-none hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-slate-500">
+              {manual.title}
+            </button>
+          )}
+      </li>
+    </>
+  );
+}
+
+function BreadcrumbSeparator() {
+  return <li aria-hidden="true"><ChevronRight size={13} /></li>;
+}
+
+function Welcome({
+  welcome,
+  onOpenCategory,
+}: {
+  welcome?: {
+    title: string;
+    description: string;
+    categories: { id: string; name: string; firstManualId: string }[];
+  };
+  onOpenCategory: (firstManualId: string) => void;
+}) {
   if (!welcome) return null;
   return (
-    <div className="mx-auto max-w-3xl" data-testid="guide-welcome">
-      <h1 className="text-2xl font-bold text-slate-900">{welcome.title}</h1>
-      <p className="mt-3 text-slate-600">{welcome.description}</p>
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
-        {welcome.categories.map((c) => (
-          <button key={c.id} type="button" data-testid="guide-welcome-categoria" onClick={() => onOpenCategory(c.firstManualId)}
-            className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm hover:border-slate-300 hover:bg-slate-50">
-            <span className="font-semibold text-slate-800">{c.name}</span>
-            <span className="mt-1 block text-sm text-slate-500">Ver manuais desta categoria →</span>
+    <div className="mx-auto w-full max-w-3xl min-w-0 pb-8" data-testid="guide-welcome">
+      <p className="text-sm font-medium text-slate-500">Guia</p>
+      <h1 className="mt-3 min-w-0 break-words text-3xl font-bold tracking-tight text-slate-950 [overflow-wrap:anywhere] sm:text-4xl">{welcome.title}</h1>
+      <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">{welcome.description}</p>
+      <div className="mt-9 divide-y divide-slate-200 border-y border-slate-200">
+        {welcome.categories.map((category) => (
+          <button
+            key={category.id}
+            type="button"
+            data-testid="guide-welcome-categoria"
+            onClick={() => onOpenCategory(category.firstManualId)}
+            className="group flex min-h-16 w-full min-w-0 items-center justify-between gap-4 px-1 py-3 text-left outline-none hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 active:bg-slate-200 sm:px-3"
+          >
+            <span className="min-w-0 truncate whitespace-nowrap font-semibold text-slate-800">{category.name}</span>
+            <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-sm text-slate-500 group-hover:text-slate-900">
+              Abrir <ArrowRight size={15} aria-hidden="true" />
+            </span>
           </button>
         ))}
-        {welcome.categories.length === 0 && <p className="text-sm text-slate-400">Nenhum manual publicado ainda.</p>}
+        {welcome.categories.length === 0 && <p className="py-5 text-sm text-slate-500">Nenhum manual publicado ainda.</p>}
       </div>
     </div>
   );
 }
 
-// ── helpers ────────────────────────────────────────────────────────────────
-function scrollTop() { document.getElementById('guide-scroll')?.scrollTo({ top: 0 }); }
-
-function stripHtml(html: string | null): string {
-  if (!html) return '';
-  const el = document.createElement('div'); el.innerHTML = html; return el.textContent ?? '';
+function selectionSearch(current: URLSearchParams, tab: TabKey, manualId: string): string {
+  const next = new URLSearchParams(current);
+  next.set('tab', tab);
+  next.set('manual', manualId);
+  next.delete('manualKey');
+  next.delete('section');
+  return `?${next.toString()}`;
 }
 
-/**
- * Injeta ids nos títulos (h2–h4) do conteúdo, monta o TOC e — quando há busca ativa —
- * destaca o termo no CORPO do manual (só em nós de texto do HTML já sanitizado, então
- * não quebra tags nem re-introduz HTML do usuário). O `<mark>` usa a mesma cor do menu.
- */
-function buildContent(html: string, query = ''): { html: string; toc: { id: string; text: string; level: number }[] } {
+function normalizeKey(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function resolveTechnicalManual(items: GuideManual[], key: string): GuideManual | null {
+  const expectedTitle = TECHNICAL_MANUAL_TITLES[key];
+  if (!expectedTitle) return null;
+  const expected = normalizeKey(expectedTitle);
+  return items.find((manual) => normalizeKey(manual.title) === expected) ?? null;
+}
+
+function resolveSectionId(toc: { id: string; text: string }[], key: string): string {
+  const titles = SECTION_TITLES[key] ?? [key];
+  const normalizedTitles = new Set(titles.map(normalizeKey));
+  return toc.find((heading) => normalizedTitles.has(normalizeKey(heading.text)))?.id ?? '';
+}
+
+function scrollTop() {
+  document.getElementById('guide-scroll')?.scrollTo({ top: 0 });
+}
+
+function getManualTrail(active: GuideManual, items: GuideManual[]): GuideManual[] {
+  const byId = new Map(items.map((manual) => [manual.id, manual]));
+  const trail: GuideManual[] = [];
+  const seen = new Set<string>();
+  let current: GuideManual | undefined = active;
+
+  while (current && !seen.has(current.id)) {
+    seen.add(current.id);
+    trail.unshift(current);
+    current = current.parentId ? byId.get(current.parentId) : undefined;
+  }
+
+  return trail;
+}
+
+/** Adds stable section ids and local scroll wrappers to sanitized backend HTML. */
+function buildContent(html: string): { html: string; toc: { id: string; text: string; level: number }[] } {
   if (!html) return { html: '', toc: [] };
-  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const documentNode = new DOMParser().parseFromString(html, 'text/html');
   const toc: { id: string; text: string; level: number }[] = [];
-  doc.querySelectorAll('h2, h3, h4').forEach((h, i) => {
-    const level = Number(h.tagName[1]);
-    const text = h.textContent?.trim() ?? '';
+
+  documentNode.querySelectorAll('h2, h3, h4').forEach((heading, index) => {
+    const level = Number(heading.tagName[1]);
+    const text = heading.textContent?.trim() ?? '';
     if (!text) return;
-    const id = `sec-${i}-${text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)}`;
-    h.id = id;
+    const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const slug = normalized.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+    const id = `sec-${index}-${slug || 'secao'}`;
+    heading.id = id;
     toc.push({ id, text, level });
   });
-  const term = query.trim();
-  if (term) highlightTextNodes(doc.body, term);
-  return { html: doc.body.innerHTML, toc };
-}
 
-/** Envolve as ocorrências de `term` (case-insensitive) em &lt;mark&gt;, só em text nodes. */
-function highlightTextNodes(root: HTMLElement, term: string) {
-  const lower = term.toLowerCase();
-  const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  const targets: Text[] = [];
-  let node: Node | null;
-  // Coleta primeiro (mutar durante o walk invalidaria o cursor).
-  while ((node = walker.nextNode())) {
-    if (node.nodeValue && node.nodeValue.toLowerCase().includes(lower)) targets.push(node as Text);
-  }
-  for (const text of targets) {
-    const value = text.nodeValue ?? '';
-    const frag = root.ownerDocument.createDocumentFragment();
-    let i = 0;
-    for (let idx = value.toLowerCase().indexOf(lower); idx >= 0; idx = value.toLowerCase().indexOf(lower, i)) {
-      if (idx > i) frag.appendChild(root.ownerDocument.createTextNode(value.slice(i, idx)));
-      const mark = root.ownerDocument.createElement('mark');
-      mark.className = 'rounded bg-amber-200 px-0.5';
-      mark.textContent = value.slice(idx, idx + term.length);
-      frag.appendChild(mark);
-      i = idx + term.length;
-    }
-    if (i < value.length) frag.appendChild(root.ownerDocument.createTextNode(value.slice(i)));
-    text.parentNode?.replaceChild(frag, text);
-  }
-}
+  documentNode.querySelectorAll('table').forEach((table) => {
+    if (table.parentElement?.classList.contains('guide-table-scroll')) return;
+    const wrapper = documentNode.createElement('div');
+    wrapper.className = 'guide-table-scroll';
+    table.parentNode?.insertBefore(wrapper, table);
+    wrapper.appendChild(table);
+  });
 
-function groupByParent(items: GuideManual[]): { manual: GuideManual; children: GuideManual[] }[] {
-  const byId = new Map(items.map((m) => [m.id, m]));
-  const roots: GuideManual[] = [];
-  const childrenOf = new Map<string, GuideManual[]>();
-  for (const m of items) {
-    if (m.parentId && byId.has(m.parentId)) {
-      const arr = childrenOf.get(m.parentId) ?? []; arr.push(m); childrenOf.set(m.parentId, arr);
-    } else roots.push(m);
-  }
-  return roots.map((manual) => ({ manual, children: (childrenOf.get(manual.id) ?? []).sort((a, b) => a.order - b.order) }));
-}
-
-/** Destaca o termo buscado no texto (case-insensitive), sem usar innerHTML. */
-function highlight(text: string, query: string) {
-  const q = query.trim();
-  if (!q) return text;
-  const idx = text.toLowerCase().indexOf(q.toLowerCase());
-  if (idx < 0) return text;
-  return (<>
-    {text.slice(0, idx)}
-    <mark className="rounded bg-amber-200 px-0.5">{text.slice(idx, idx + q.length)}</mark>
-    {text.slice(idx + q.length)}
-  </>);
+  return { html: documentNode.body.innerHTML, toc };
 }
