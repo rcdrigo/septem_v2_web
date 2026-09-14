@@ -28,7 +28,7 @@ window.mount = (kind = 'tags', mode = 'interno', internal = true, url = '/') => 
     {kind === 'task' ? <TaskView taskId="task-1" onClose={()=>window.taskClosed=true}/> : kind === 'tasks' ? <TarefasPage/> : kind === 'history' ? <ProcessTagHistory processKey="compras"/> : <>
       <TagsButton executionId="exec-1"/>
       <div role="link" style={{maxWidth:320}} onClick={()=>window.cardOpened=true} onKeyDown={()=>window.cardOpened=true}>
-        <TagPills tags={kind==='overflow' ? Array.from({length:15},(_,i)=>({id:'tag-'+i,name:'Classificação '+i,addedBy:{id:'actor',name:'Ana'},addedAt:'2026-09-14T10:00:00Z'})) : [{id:'tag-1',name:'Urgente',addedBy:{id:'actor',name:'Ana'},addedAt:'2026-09-14T10:00:00Z'}]}/>
+        <TagPills tags={kind==='light' ? [{id:'tag-1',name:'Urgente',color:'#ffffff',addedBy:{id:'actor',name:'Ana'},addedAt:'2026-09-14T10:00:00Z'}] : kind==='overflow' ? Array.from({length:15},(_,i)=>({id:'tag-'+i,name:'Classificação '+i,addedBy:{id:'actor',name:'Ana'},addedAt:'2026-09-14T10:00:00Z'})) : [{id:'tag-1',name:'Urgente',color:'#000000',addedBy:{id:'actor',name:'Ana'},addedAt:'2026-09-14T10:00:00Z'}]}/>
       </div>
     </>}
     <ConfirmDialogHost/>
@@ -36,8 +36,8 @@ window.mount = (kind = 'tags', mode = 'interno', internal = true, url = '/') => 
 };
 `, resolveDir: root, loader: 'tsx' }, bundle: true, outfile: join(dir, 'bundle.js'), format: 'iife', platform: 'browser', tsconfig: join(root, 'tsconfig.app.json'), loader: {'.css':'empty'}, define: {'import.meta.env':'{}'} });
 
-const snapshot = () => ({executionRevision:0,catalogRevision:0,flowKey:'compras',catalog:[{id:'tag-1',name:'Urgente'},{id:'tag-2',name:'Financeiro'}],tags:[{id:'tag-1',name:'Urgente',addedBy:{id:'actor',name:'Ana'},addedAt:'2026-09-14T10:00:00Z'}]});
-const history = {items:[{id:'event-2',action:'renamed',tagId:'tag-1',tagName:'Urgente',previousName:'Prioritário',occurredAt:'2026-09-14T11:00:00Z',actor:{id:'actor',name:'Ana'},operator:{id:'op',name:'Operador'}},{id:'event-1',action:'created',tagId:'tag-1',tagName:'Prioritário',occurredAt:'2026-09-14T09:00:00Z',actor:{id:'actor',name:'Ana'}}]};
+const snapshot = () => ({executionRevision:0,catalogRevision:0,flowKey:'compras',catalog:[{id:'tag-1',name:'Urgente',color:'#000000'},{id:'tag-2',name:'Financeiro',color:'#0ea5e9'}],tags:[{id:'tag-1',name:'Urgente',color:'#000000',addedBy:{id:'actor',name:'Ana'},addedAt:'2026-09-14T10:00:00Z'}]});
+const history = {items:[{id:'event-3',action:'recolored',tagId:'tag-1',tagName:'Urgente',previousColor:'#ffffff',color:'#000000',occurredAt:'2026-09-14T12:00:00Z',actor:{id:'actor',name:'Ana'}},{id:'event-2',action:'renamed',tagId:'tag-1',tagName:'Urgente',previousName:'Prioritário',occurredAt:'2026-09-14T11:00:00Z',actor:{id:'actor',name:'Ana'},operator:{id:'op',name:'Operador'}},{id:'event-1',action:'created',tagId:'tag-1',tagName:'Prioritário',occurredAt:'2026-09-14T09:00:00Z',actor:{id:'actor',name:'Ana'}}]};
 const browser = await chromium.launch({executablePath:process.env.CHROME_BIN ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
 const results=[];
 try {
@@ -91,7 +91,7 @@ try {
   await editor().getByRole('button',{name:'Adicionar',exact:true}).click();
   await editor().getByRole('button',{name:'Salvar tags',exact:true}).click();
   await editor().waitFor({state:'hidden'});
-  check('nome existente reutiliza tag',writes().at(-1).body.createNames,[]);
+  check('nome existente reutiliza tag',writes().at(-1).body.createTags,[]);
   check('associação salva em lote',writes().at(-1).body.selectedTagIds.sort(),['tag-1','tag-2']);
 
   await openEditor();
@@ -107,7 +107,30 @@ try {
   check('Escape do histórico preserva editor',await editor().count(),1);
   check('histórico preserva alterações pendentes',await editor().getByRole('listitem').filter({hasText:'Revisão'}).count(),1);
   await editor().getByRole('button',{name:'Salvar tags',exact:true}).click();await editor().waitFor({state:'hidden'});
-  check('nova tag enviada no lote',writes().at(-1).body.createNames,['Revisão']);
+  check('nova tag enviada no lote',writes().at(-1).body.createTags,[{name:'Revisão',color:'#0ea5e9'}]);
+
+  await openEditor();
+  await page.getByLabel('Código da cor da tag urgente',{exact:true}).fill('#ff0000');
+  check('aviso de cor explica alcance global',(await editor().innerText()).includes('todas as execuções'),true);
+  const beforeColorCancel=writes().length;
+  await editor().getByRole('button',{name:'Cancelar',exact:true}).click();
+  check('cancelar alteração de cor não grava',writes().length,beforeColorCancel);
+  await openEditor();
+  check('cancelar restaura cor persistida',await page.getByLabel('Código da cor da tag urgente',{exact:true}).inputValue(),'#000000');
+  await page.getByLabel('Código da cor da tag urgente',{exact:true}).fill('inválida');
+  check('cor inválida bloqueia salvar',await editor().getByRole('button',{name:'Salvar tags',exact:true}).isDisabled(),true);
+  await page.getByLabel('Código da cor da tag urgente',{exact:true}).fill('#ff0000');
+  await editor().getByRole('button',{name:'Salvar tags',exact:true}).click();
+  await editor().waitFor({state:'hidden'});
+  check('cor existente salva em lote',writes().at(-1).body.colorUpdates,[{id:'tag-1',color:'#ff0000'}]);
+  check('alteração de cor não renomeia tag',writes().at(-1).body.renames,[]);
+  await openEditor();
+  await page.getByLabel('Nome da tag',{exact:true}).fill('Colorida');
+  await page.getByLabel('Código da cor da nova tag',{exact:true}).fill('#ffffff');
+  await editor().getByRole('button',{name:'Adicionar',exact:true}).click();
+  await editor().getByRole('button',{name:'Salvar tags',exact:true}).click();
+  await editor().waitFor({state:'hidden'});
+  check('nova tag mantém cor escolhida',writes().at(-1).body.createTags,[{name:'Colorida',color:'#ffffff'}]);
 
   await openEditor();
   await editor().getByRole('button',{name:'Excluir tag do processo: Urgente',exact:true}).click();
@@ -134,15 +157,21 @@ try {
 
   await mount('tags');
   const pill=page.getByRole('button',{name:/Urgente\. Adicionado por Ana/});
+  check('pill escura usa texto branco',await pill.evaluate(el=>getComputedStyle(el).color),'rgb(255, 255, 255)');
   await pill.focus();await page.keyboard.press('Enter');
   check('teclado na pill não abre execução',await page.evaluate(()=>!!window.cardOpened),false);
   await page.getByRole('tooltip').waitFor({state:'visible'});
   check('popover identifica adição',(await page.getByRole('tooltip').innerText()).includes('Adicionado por Ana em'),true);
 
+  await mount('light');
+  check('pill clara usa texto preto',await page.getByRole('button',{name:/Urgente\. Adicionado por Ana/}).evaluate(el=>getComputedStyle(el).color),'rgb(0, 0, 0)');
+
   await mount('history');
   await page.getByRole('listitem').first().waitFor();
-  check('histórico exibe renomeação anterior',(await page.getByRole('listitem').first().innerText()).includes('renomeou “Prioritário” para “Urgente”'),true);
-  check('histórico identifica personificação',(await page.getByRole('listitem').first().innerText()).includes('Operado por Operador'),true);
+  const colorHistory=await page.getByRole('listitem').first().innerText();
+  check('histórico preserva cores anterior e nova',colorHistory.toLowerCase().includes('#ffffff') && colorHistory.toLowerCase().includes('#000000'),true);
+  check('histórico exibe renomeação anterior',(await page.getByRole('listitem').nth(1).innerText()).includes('renomeou “Prioritário” para “Urgente”'),true);
+  check('histórico identifica personificação',(await page.getByRole('listitem').nth(1).innerText()).includes('Operado por Operador'),true);
 
   await mount('tasks','interno',true,'/?process=removido&tagNames=Urgente&tagNames=Financeiro');
   await page.getByRole('alert').waitFor();

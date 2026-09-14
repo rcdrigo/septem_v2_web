@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tooltip } from '@/components/ui/Tooltip';
 import type { TagActor } from '@/lib/api/tags';
 import { useTagsAccess } from '@/lib/api/tags';
+import { tagColorStyle } from './tagColor';
 
 export type TagPillItem = {
   id: string | number;
   name: string;
+  color?: string | null;
   addedBy?: TagActor | null;
   /** Compatibility with projections that flatten the actor. */
   addedByName?: string | null;
@@ -16,6 +18,7 @@ export type TagPillItem = {
 export type TagPillsProps = {
   tags?: readonly TagPillItem[];
   className?: string;
+  leadingPills?: ReactNode;
 };
 
 function escapeHtml(value: string): string {
@@ -47,8 +50,10 @@ function tooltipHtml(tag: TagPillItem): string {
   return escapeHtml(tooltipText(tag));
 }
 
-export function TagPills({ tags = [], className = '' }: TagPillsProps) {
+export function TagPills({ tags = [], className = '', leadingPills }: TagPillsProps) {
   const hasAccess = useTagsAccess();
+  const visibleTags = hasAccess ? tags : [];
+  const hasContent = !!leadingPills || visibleTags.length > 0;
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -68,16 +73,16 @@ export function TagPills({ tags = [], className = '' }: TagPillsProps) {
     observer?.observe(element);
     Array.from(element.children).forEach((child) => observer?.observe(child));
     return () => observer?.disconnect();
-  }, [tags, updateArrows]);
+  }, [tags, hasAccess, leadingPills, hasContent, updateArrows]);
 
-  if (!hasAccess || tags.length === 0) return null;
+  if (!hasContent) return null;
 
   function scrollBy(direction: -1 | 1) {
     scrollerRef.current?.scrollBy({ left: direction * 180, behavior: 'smooth' });
   }
 
   return (
-    <div className={`relative flex min-w-0 items-center ${className}`} aria-label="Tags associadas">
+    <div className={`relative flex min-w-0 items-center ${className}`} aria-label={leadingPills ? 'Indicadores e tags' : 'Tags associadas'} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
       {canScrollLeft && (
         <button
           type="button"
@@ -94,15 +99,17 @@ export function TagPills({ tags = [], className = '' }: TagPillsProps) {
         ref={scrollerRef}
         onScroll={updateArrows}
         onPointerDown={(event) => event.stopPropagation()}
-        className="flex min-w-0 flex-1 touch-pan-x gap-1.5 overflow-x-auto overscroll-x-contain py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>[data-testid=tooltip-wrap]]:shrink-0"
+        className="flex min-w-0 flex-1 touch-pan-x items-center gap-1.5 overflow-x-auto overscroll-x-contain py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>[data-testid=tooltip-wrap]]:shrink-0"
       >
-        {tags.map((tag) => (
+        {leadingPills}
+        {visibleTags.map((tag) => (
           <Tooltip key={tag.id} text={tooltipHtml(tag)}>
             <button
               type="button"
               onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}
               onKeyDown={(event) => event.stopPropagation()}
               className="inline-flex min-h-7 max-w-48 shrink-0 items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-slate-700"
+              style={tagColorStyle(tag.color)}
               aria-label={`${tag.name}. ${tooltipText(tag)}`}
             >
               <span className="truncate">{tag.name}</span>

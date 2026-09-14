@@ -8,7 +8,10 @@ export type StartedInstance = { executionId: string; status: string; tasks: { id
 export type RequestSummary = { label: string; value: string };
 export type ProcessMetadata = { process?: string | null; processKey?: string | null; processIcon?: string | null; categoryName?: string | null; categoryColor?: string | null; inboxText?: string | null; processNumber?: number; requester?: string | null };
 /** isTest: instância iniciada em modo simulação (todas as tarefas ficam com o requisitante). */
-export type MyTask = ProcessMetadata & { id: string; name: string | null; executionId: string; createdAt: string; startedAt?: string; dueAt: string | null; completedAt?: string | null; action?: string | null; isTest?: boolean; summary?: RequestSummary[]; tags?: ExecutionTag[] };
+export type MyTask = ProcessMetadata & { id: string; name: string | null; executionId: string; createdAt: string; startedAt?: string; dueAt: string | null; completedAt?: string | null; action?: string | null; isTest?: boolean; summary?: RequestSummary[]; tags?: ExecutionTag[];
+  /** Projeção opcional a ser fornecida pela API para tarefas recebidas por substituição. */
+  absentUserName?: string | null;
+};
 export type ExecutedTask = MyTask & { completedAt: string | null; action: string | null };
 export type TaskListItem = MyTask | ExecutedTask;
 /** Faceta de um botão de processo: nome + quantas tarefas ele tem nos filtros atuais. */

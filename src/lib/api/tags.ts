@@ -10,6 +10,7 @@ export type TagActor = {
 export type TagCatalogItem = {
   id: string;
   name: string;
+  color?: string | null;
 };
 
 export type ExecutionTag = TagCatalogItem & {
@@ -35,12 +36,14 @@ export type SaveExecutionTagsInput = {
   catalogRevision: number;
   selectedTagIds: string[];
   createNames: string[];
+  createTags: { name: string; color: string }[];
+  colorUpdates: { id: string; color: string }[];
   renames: RenameTagInput[];
   deleteTagIds: string[];
 };
 
-export type ExecutionTagHistoryAction = 'added' | 'removed' | 'renamed' | 'deleted';
-export type ProcessTagHistoryAction = 'created' | 'renamed' | 'deleted';
+export type ExecutionTagHistoryAction = 'added' | 'removed' | 'renamed' | 'recolored' | 'deleted';
+export type ProcessTagHistoryAction = 'created' | 'renamed' | 'recolored' | 'deleted';
 
 export type TagHistoryItem<TAction extends string = ExecutionTagHistoryAction> = {
   id: string;
@@ -48,6 +51,8 @@ export type TagHistoryItem<TAction extends string = ExecutionTagHistoryAction> =
   tagId: string;
   tagName: string;
   previousName?: string | null;
+  previousColor?: string | null;
+  color?: string | null;
   occurredAt: string;
   actor: TagActor;
   operator?: TagActor | null;

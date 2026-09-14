@@ -38,6 +38,10 @@ Escolha a visualização de cartões ou tabela. Em telas menores a interface uti
 | **Prazo** | Mostra vencimento, atraso ou tempo decorrido. |
 | **Teste** | Indica que a execução é uma simulação. |
 
+Nos cartões, o processo aparece no canto superior esquerdo e o número da requisição é um botão discreto à direita. O nome da tarefa fica em negrito, seguido do resumo com até três linhas. Requisitante e prazo ficam abaixo, à esquerda e à direita, respectivamente.
+
+O rodapé reúne o indicador de teste, quando aplicável, e as tags disponíveis no modo interno. Quando o conteúdo excede a largura, use as setas ou deslize horizontalmente. Ao passar o mouse sobre o cartão, a indicação **Acessar →** aparece sobre um gradiente. O número abre o acompanhamento da requisição; o cartão abre a tarefa ou seu histórico, conforme a lista selecionada.
+
 ## Usando os filtros
 
 Clique em **Filtros** para abrir os critérios avançados.
@@ -178,6 +182,8 @@ Acesse **Requisições** para ver processos iniciados por você. Filtre por:
 - **Todos**.
 
 A busca localiza pelo processo. A paginação exibe vinte itens por página e a visualização pode alternar entre cartões e tabela.
+
+Os cartões mantêm processo e número no topo, status em destaque e resumo com até três linhas. Abaixo ficam as datas de início e conclusão; os indicadores e tags ficam no rodapé. Essa listagem apresenta a execução como um todo, sem acrescentar nomes ou prazos de tarefas ativas. Nas tabelas, as mesmas informações são agrupadas em colunas, com o número acessível por um botão próprio.
 
 ## Entendendo o detalhamento
 

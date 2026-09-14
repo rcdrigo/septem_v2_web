@@ -8,6 +8,43 @@
   font-family: var(--font-body);
 }
 
+.task-card {
+  --card-surface: var(--color-paper);
+  background-color: var(--card-surface);
+}
+
+.task-card-deadline {
+  max-width: 60%;
+}
+
+.task-card-access {
+  pointer-events: none;
+  position: absolute;
+  inset: 0 -1rem 0 auto;
+  display: flex;
+  width: 65%;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.375rem;
+  padding-right: 1rem;
+  color: var(--color-ink);
+  background: linear-gradient(to left, var(--card-surface) 35%, transparent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.task-card:hover .task-card-access,
+.task-card:focus-visible .task-card-access {
+  opacity: 1;
+}
+
+/* Secondary controls remain unobscured while navigating with the keyboard. */
+.task-card:has(button:focus-visible) .task-card-access {
+  opacity: 0;
+}
+
 .task-index-root button:active,
 .task-index-root [role="link"]:active {
   transform: translateY(1px);
@@ -26,6 +63,15 @@
 
 @media (hover: none), (pointer: coarse) {
   .task-index-root .task-access {
+    opacity: 1;
+  }
+
+  .task-card-access {
+    position: static;
+    width: auto;
+    margin-top: 0.5rem;
+    padding: 0;
+    background: none;
     opacity: 1;
   }
 }

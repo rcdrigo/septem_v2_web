@@ -1,5 +1,6 @@
 import { History, RefreshCw } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
+import { normalizeTagColor } from './tagColor';
 import {
   useExecutionTagHistory,
   useProcessTagHistory,
@@ -30,6 +31,8 @@ function eventDescription(item: TagHistoryItem<string>): string {
       return item.previousName
         ? `renomeou “${item.previousName}” para “${item.tagName}”`
         : `renomeou a tag para “${item.tagName}”`;
+    case 'recolored':
+      return `alterou a cor da tag “${item.tagName}” de ${item.previousColor ?? 'não informada'} para ${item.color ?? 'não informada'}`;
     case 'deleted':
       return `excluiu a tag “${item.tagName}” do processo`;
     default:
@@ -77,7 +80,7 @@ function HistoryList({
         new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime()
       )).map((item) => (
         <li key={item.id} className="flex gap-3 py-3 first:pt-0 last:pb-0">
-          <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-slate-400" aria-hidden="true" />
+          <div className="mt-1 h-2 w-2 shrink-0 rounded-full border border-slate-200 bg-slate-400" style={{ backgroundColor: normalizeTagColor(item.color ?? '') ?? undefined }} aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <p className="text-sm text-slate-700">
               <span className="font-medium text-slate-900">{item.actor.name}</span>{' '}
@@ -148,7 +151,7 @@ export function ProcessTagHistory({
         <History size={17} className="text-slate-500" aria-hidden="true" />
         <div>
           <h3 className="text-sm font-semibold text-slate-900">Histórico geral de tags</h3>
-          <p className="text-xs text-slate-500">Criações, renomeações e exclusões do catálogo deste processo.</p>
+          <p className="text-xs text-slate-500">Criações, renomeações, alterações de cor e exclusões do catálogo deste processo.</p>
         </div>
       </div>
       <HistoryList

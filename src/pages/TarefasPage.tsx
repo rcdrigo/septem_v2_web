@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { AlertCircle, ArrowDownAZ, ArrowRight, ArrowUpAZ, CheckCircle2, Clock, ExternalLink, FileSignature, Inbox, LayoutGrid, LifeBuoy, RotateCw, SlidersHorizontal, Table as TableIcon, User, X } from 'lucide-react';
 import { useTasks, useTask, useCompleteTask, useSaveTask, useTaskSignatures, useSignAll, type TagNameFacet, type TaskButton, type TaskFilters, type TaskListItem } from '@/lib/api/execution';
 import { estaAssinado } from '@/lib/upload';
-import { TestBadge } from '@/components/execution/TestBadge';
+import { CardAccess, ExecutionIndicators, ExecutionNumber } from '@/components/execution/ExecutionListParts';
 import { ReactForm, FormSkeleton, type ReactFormHandle } from '@/components/form/ReactForm';
 import { openTab, navTo } from '@/lib/nav';
 import { useDocumentTitle } from '@/lib/use-document-title';
@@ -19,7 +19,7 @@ import { queryClient } from '@/lib/queryClient';
 import '@/styles/task-index.css';
 import { routes } from '@/lib/routes';
 import { ContextHelp } from '@/components/guide/ContextHelp';
-import { TagPills, TagsButton, useTagsAccess } from '@/components/tags';
+import { TagsButton, useTagsAccess } from '@/components/tags';
 
 type TaskStatusFilter = 'pendentes' | 'concluidas';
 const ALL_PROCESSES = 'todos';
@@ -372,23 +372,32 @@ function TaskCards({ tasks, onOpen, status }: { tasks: TaskListItem[]; onOpen: (
 
 function TaskCard({ task, onOpen, status }: { task: TaskListItem; onOpen: () => void; status: TaskStatusFilter }) {
   return (
-    <article role="link" tabIndex={0} onClick={onOpen} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen(); } }} className="group relative flex min-w-0 cursor-pointer flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700">
-      <div className="flex min-w-0 items-start justify-between gap-3"><ProcessPill task={task} />{task.processNumber != null && <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-500">#{task.processNumber}</span>}</div>
-      {task.isTest && <div className="mt-2"><TestBadge compact /></div>}
-      <h2 title={task.name || 'Tarefa'} className="mt-3 truncate text-sm font-bold text-slate-900">{task.name || 'Tarefa'}</h2>
-      <p title={task.inboxText || undefined} className="mt-1 line-clamp-2 min-h-10 overflow-hidden text-sm leading-5 text-slate-500">{task.inboxText || 'Sem resumo disponível.'}</p>
-      {!!task.tags?.length && <div className="mt-3 min-w-0" onClick={(event) => event.stopPropagation()}><TagPills tags={task.tags} /></div>}
-      <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-        <DuePill dueAt={task.dueAt} createdAt={task.createdAt} completedAt={task.completedAt} completed={status === 'concluidas'} />
-        <span title={task.requester || undefined} className="inline-flex min-w-0 items-center gap-1 truncate text-xs text-slate-500"><User size={12} className="shrink-0" />{task.requester || 'Requisitante não informado'}</span>
-        <span className="task-access ml-auto inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-slate-700 md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:group-focus-within:opacity-100">Acessar <ArrowRight size={14} /></span>
+    <article role="link" aria-label={task.name || 'Tarefa'} tabIndex={0} onClick={onOpen} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onOpen(); } }} className="task-card group relative flex min-w-0 cursor-pointer flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-slate-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700">
+      <div className="flex min-w-0 items-start justify-between gap-3"><div className="min-w-0"><ProcessPill task={task} /></div><ExecutionNumber executionId={task.executionId} number={task.processNumber} /></div>
+      <div className="task-card-main relative mt-3 flex-1">
+        <h2 title={task.name || 'Tarefa'} className="truncate text-sm font-bold text-slate-900">{task.name || 'Tarefa'}</h2>
+        <p title={task.inboxText || undefined} className="mt-1 line-clamp-3 min-h-12 text-xs leading-4 text-slate-500">{task.inboxText || 'Sem resumo disponível.'}</p>
+        <CardAccess />
       </div>
+      <div className="mt-4 flex min-w-0 items-center justify-between gap-3 text-xs">
+        <span title={task.requester || undefined} className="flex min-w-0 items-center gap-1 text-slate-500"><User size={12} className="shrink-0" /><span className="truncate">{task.requester || 'Requisitante não informado'}</span></span>
+        <div className="task-card-deadline min-w-0 shrink-0 text-right"><DuePill plain dueAt={task.dueAt} createdAt={task.createdAt} completedAt={task.completedAt} completed={status === 'concluidas'} /></div>
+      </div>
+      <ExecutionIndicators isTest={task.isTest} absentUserName={task.absentUserName} tags={task.tags} className="mt-3 border-t border-slate-100 pt-2" />
     </article>
   );
 }
 
 function TaskTable({ tasks, onOpen, status }: { tasks: TaskListItem[]; onOpen: (task: TaskListItem) => void; status: TaskStatusFilter }) {
-  return <div className="overflow-visible rounded-lg border border-slate-200 bg-white"><table className="w-full table-fixed text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="w-[24%] px-4 py-3 text-left">Processo</th><th className="w-[27%] px-4 py-3 text-left">Tarefa</th><th className="w-[21%] px-4 py-3 text-left">Requisitante</th><th className="w-[20%] px-4 py-3 text-left">Prazo</th><th className="w-[8%] px-4 py-3" /></tr></thead><tbody>{tasks.map((task) => <tr key={task.id} tabIndex={0} onClick={() => onOpen(task)} onKeyDown={(event) => { if (event.key === 'Enter') onOpen(task); }} className="group cursor-pointer border-t border-slate-100 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-slate-700"><td className="px-4 py-3"><div className="min-w-0"><ProcessPill task={task} />{task.isTest && <div className="mt-1"><TestBadge compact /></div>}<p className="mt-1 text-xs tabular-nums text-slate-500">{task.processNumber != null ? `#${task.processNumber}` : 'Sem número'}</p></div></td><td className="px-4 py-3"><div className="min-w-0"><p title={task.name || undefined} className="truncate font-bold text-slate-900">{task.name || 'Tarefa'}</p><p title={task.inboxText || undefined} className="mt-1 truncate text-xs text-slate-500">{task.inboxText || 'Sem resumo disponível.'}</p>{!!task.tags?.length && <div className="mt-2 min-w-0" onClick={(event) => event.stopPropagation()}><TagPills tags={task.tags} /></div>}</div></td><td title={task.requester || undefined} className="truncate px-4 py-3 text-slate-500">{task.requester || '—'}</td><td className="px-4 py-3"><DuePill dueAt={task.dueAt} createdAt={task.createdAt} completedAt={task.completedAt} completed={status === 'concluidas'} /></td><td className="px-4 py-3 text-right"><span className="task-access inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold text-slate-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100">Acessar <ArrowRight size={14} /></span></td></tr>)}</tbody></table></div>;
+  return <div className="rounded-lg border border-slate-200 bg-white"><table className="w-full table-fixed text-sm">
+    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="w-[24%] px-4 py-3 text-left">Processo / Nº</th><th className="w-[34%] px-4 py-3 text-left">Tarefa / Resumo</th><th className="w-[18%] px-4 py-3 text-left">Requisitante</th><th className="w-[24%] px-4 py-3 text-left">Prazo</th></tr></thead>
+    <tbody>{tasks.map((task) => <tr key={task.id} tabIndex={0} onClick={() => onOpen(task)} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onOpen(task); } }} className="group cursor-pointer border-t border-slate-100 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-slate-700">
+      <td className="px-4 py-3 align-top"><ProcessPill task={task} /><div className="mt-2"><ExecutionNumber executionId={task.executionId} number={task.processNumber} /></div></td>
+      <td className="px-4 py-3 align-top"><p title={task.name || undefined} className="truncate font-bold text-slate-900">{task.name || 'Tarefa'}</p><p title={task.inboxText || undefined} className="mt-1 line-clamp-3 text-xs leading-4 text-slate-500">{task.inboxText || 'Sem resumo disponível.'}</p><ExecutionIndicators isTest={task.isTest} absentUserName={task.absentUserName} tags={task.tags} className="mt-2" /></td>
+      <td title={task.requester || undefined} className="truncate px-4 py-3 align-top text-xs text-slate-500">{task.requester || '—'}</td>
+      <td className="px-4 py-3 align-top"><DuePill plain dueAt={task.dueAt} createdAt={task.createdAt} completedAt={task.completedAt} completed={status === 'concluidas'} /><span className="task-access mt-2 flex items-center gap-1 text-xs font-semibold text-slate-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">Acessar <ArrowRight size={14} /></span></td>
+    </tr>)}</tbody>
+  </table></div>;
 }
 
 function useNow() {
@@ -414,7 +423,7 @@ export function deadlineState(dueAt: string | null, completedAt: string | null |
     : { label: `Prazo: ${days} ${days === 1 ? 'dia' : 'dias'}`, cls: diff <= 72 * 3_600_000 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700' };
 }
 
-export function DuePill({ dueAt, createdAt, completedAt, completed = false }: { dueAt: string | null; createdAt?: string | null; completedAt?: string | null; completed?: boolean }) {
+export function DuePill({ dueAt, createdAt, completedAt, completed = false, plain = false }: { plain?: boolean; dueAt: string | null; createdAt?: string | null; completedAt?: string | null; completed?: boolean }) {
   const now = useNow();
   const state = deadlineState(dueAt, completedAt, completed, now);
   const id = useMemo(() => `deadline-${Math.random().toString(36).slice(2)}`, []);
@@ -451,7 +460,7 @@ export function DuePill({ dueAt, createdAt, completedAt, completed = false }: { 
       onFocus={openNow}
       onBlur={close}
     >
-      <button ref={btnRef} type="button" aria-describedby={id} className={`inline-flex min-h-7 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 ${state.cls}`}><Clock size={12} />{state.label}</button>
+      <button ref={btnRef} type="button" aria-describedby={id} className={`inline-flex min-h-7 items-center gap-1 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 ${plain ? `text-left ${state.cls.split(' ').filter((name) => name.startsWith('text-')).join(' ')}` : `whitespace-nowrap rounded-full px-2.5 py-1 ${state.cls}`}`}><Clock size={12} className="shrink-0" /><span>{state.label}</span></button>
       {pos && createPortal(
         <span
           id={id}

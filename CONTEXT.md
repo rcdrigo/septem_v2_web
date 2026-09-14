@@ -9,6 +9,9 @@ _Evitar_: Processo quando a distinção entre definição e execução for relev
 **Tarefa de processo**:
 Etapa de trabalho de uma requisição, distinta da tarefa de atendimento de um chamado.
 
+**Substituição por ausência temporária**:
+Recebimento de uma tarefa em lugar de seu responsável original durante a ausência temporária dele. O usuário ausente é o responsável original, não o requisitante da requisição.
+
 **Tag de processo**:
 Classificação interna pertencente a um processo modelado e reutilizável em suas requisições, inclusive entre versões do processo no mesmo ambiente. Tags de processos diferentes são independentes, mesmo quando possuem o mesmo nome.
 

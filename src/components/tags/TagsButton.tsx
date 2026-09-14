@@ -13,11 +13,14 @@ import {
 } from '@/lib/api/tags';
 import { toast } from '@/stores/toast';
 import { ExecutionTagHistoryDialog } from './TagHistory';
+import { DEFAULT_TAG_COLOR, normalizeTagColor, tagColorStyle } from './tagColor';
 
 type DraftTag = {
   id: string;
   name: string;
   originalName: string;
+  color: string;
+  originalColor: string;
   selected: boolean;
   originallySelected: boolean;
   isNew: boolean;
@@ -31,6 +34,8 @@ function draftFromSnapshot(snapshot: TagSnapshot): DraftTag[] {
     id: tag.id,
     name: tag.name,
     originalName: tag.name,
+    color: tag.color ?? DEFAULT_TAG_COLOR,
+    originalColor: tag.color ?? DEFAULT_TAG_COLOR,
     selected: selectedIds.has(tag.id),
     originallySelected: selectedIds.has(tag.id),
     isNew: false,
@@ -43,6 +48,7 @@ function validationError(tags: readonly DraftTag[]): string | null {
   const seen = new Set<string>();
   for (const tag of tags) {
     if (tag.deleted) continue;
+    if (!normalizeTagColor(tag.color)) return 'Informe uma cor hexadecimal válida, como #0ea5e9.';
     const name = tag.name.trim();
     if (!name) return 'O nome da tag não pode ficar vazio.';
     if (name.length > 50) return 'O nome da tag deve ter no máximo 50 caracteres.';
@@ -59,7 +65,25 @@ function hasDraftChanges(tags: readonly DraftTag[]): boolean {
     || tag.deleted
     || tag.selected !== tag.originallySelected
     || tag.name.trim() !== tag.originalName
+    || normalizeTagColor(tag.color) !== normalizeTagColor(tag.originalColor)
   ));
+}
+
+function TagColorField({ label, value, onChange, disabled }: {
+  label: string; value: string; onChange: (value: string) => void; disabled: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs font-medium text-slate-500">Cor</span>
+      <input type="color" aria-label={label} value={normalizeTagColor(value) ?? DEFAULT_TAG_COLOR}
+        disabled={disabled} onChange={(event) => onChange(event.target.value)}
+        className="h-9 w-10 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-0.5" />
+      <TextInput aria-label={`Código da ${label.toLowerCase()}`} value={value} disabled={disabled}
+        aria-invalid={!normalizeTagColor(value) || undefined} maxLength={7}
+        onChange={(event) => onChange(event.target.value)} placeholder={DEFAULT_TAG_COLOR}
+        className="w-28 min-w-0 font-mono" />
+    </div>
+  );
 }
 
 function TagsEditorDialog({
@@ -74,6 +98,7 @@ function TagsEditorDialog({
   const [baseline, setBaseline] = useState<TagSnapshot | null>(null);
   const [draft, setDraft] = useState<DraftTag[]>([]);
   const [newName, setNewName] = useState('');
+  const [newColor, setNewColor] = useState(DEFAULT_TAG_COLOR);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [conflictNeedsReview, setConflictNeedsReview] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -116,10 +141,17 @@ function TagsEditorDialog({
       setNewName('');
       return;
     }
+    const color = normalizeTagColor(newColor);
+    if (!color) {
+      toast.error('Informe uma cor hexadecimal válida, como #0ea5e9.');
+      return;
+    }
     setDraft((current) => [...current, {
       id: `new:${crypto.randomUUID()}`,
       name,
       originalName: name,
+      color,
+      originalColor: color,
       selected: true,
       originallySelected: false,
       isNew: true,
@@ -182,9 +214,13 @@ function TagsEditorDialog({
         selectedTagIds: draft
           .filter((tag) => tag.selected && !tag.deleted && !tag.isNew)
           .map((tag) => tag.id),
-        createNames: draft
+        createNames: [],
+        createTags: draft
           .filter((tag) => tag.isNew && tag.selected && !tag.deleted)
-          .map((tag) => tag.name.trim()),
+          .map((tag) => ({ name: tag.name.trim(), color: normalizeTagColor(tag.color)! })),
+        colorUpdates: draft
+          .filter((tag) => !tag.isNew && !tag.deleted && normalizeTagColor(tag.color) !== normalizeTagColor(tag.originalColor))
+          .map((tag) => ({ id: tag.id, color: normalizeTagColor(tag.color)! })),
         renames: draft
           .filter((tag) => !tag.isNew && !tag.deleted && tag.name.trim() !== tag.originalName)
           .map((tag) => ({ id: tag.id, name: tag.name.trim() })),
@@ -311,7 +347,8 @@ function TagsEditorDialog({
                 <Plus size={15} aria-hidden="true" /> Adicionar
               </button>
             </div>
-            <p className="mt-1 text-xs text-slate-500">Até 50 caracteres. Nomes iguais ignoram maiúsculas e espaços nas extremidades.</p>
+            <div className="mt-2"><TagColorField label="Cor da nova tag" value={newColor} onChange={setNewColor} disabled={saveMutation.isPending} /></div>
+            <p className="mt-1 text-xs text-slate-500">Até 50 caracteres. Nomes iguais ignoram maiúsculas e espaços nas extremidades. Ao reutilizar uma tag, sua cor atual é mantida.</p>
           </div>
 
           {draft.length === 0 ? (
@@ -323,7 +360,7 @@ function TagsEditorDialog({
               {draft.map((tag) => (
                 <li key={tag.id} className={`rounded-md border p-3 ${tag.deleted ? 'border-rose-200 bg-rose-50/50' : 'border-slate-200 bg-white'}`}>
                   <div className="flex min-w-0 items-center gap-2">
-                    <Tag size={15} className={tag.deleted ? 'text-rose-400' : 'text-slate-400'} aria-hidden="true" />
+                    <Tag size={15} style={{ color: normalizeTagColor(tag.color) ?? DEFAULT_TAG_COLOR }} className={tag.deleted ? 'text-rose-400' : 'text-slate-400'} aria-hidden="true" />
                     {tag.editing ? (
                       <TextInput
                         autoFocus
@@ -346,7 +383,7 @@ function TagsEditorDialog({
                         className="min-w-0 flex-1"
                       />
                     ) : (
-                      <span className={`min-w-0 flex-1 truncate text-sm font-medium ${tag.deleted ? 'text-rose-700 line-through' : 'text-slate-800'}`}>
+                      <span style={tag.deleted ? undefined : tagColorStyle(tag.color)} className={`min-w-0 flex-1 truncate rounded-full px-2.5 py-1 text-sm font-medium ${tag.deleted ? 'text-rose-700 line-through' : 'text-slate-800'}`}>
                         {tag.name}
                       </span>
                     )}
@@ -386,9 +423,13 @@ function TagsEditorDialog({
                     )}
                   </div>
 
-                  {!tag.deleted && !tag.isNew && tag.name.trim() !== tag.originalName && (
+                  {!tag.deleted && (
+                    <div className="mt-2"><TagColorField label={`Cor da tag ${tag.name}`} value={tag.color} disabled={saveMutation.isPending} onChange={(color) => setDraft((current) => current.map((item) => item.id === tag.id ? { ...item, color } : item))} /></div>
+                  )}
+
+                  {!tag.deleted && !tag.isNew && (tag.name.trim() !== tag.originalName || normalizeTagColor(tag.color) !== normalizeTagColor(tag.originalColor)) && (
                     <p className="mt-2 rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
-                      Renomear altera esta tag em todas as execuções do processo, inclusive encerradas e aquelas às quais você não tem acesso.
+                      Alterar o nome ou a cor modifica esta tag em todas as execuções do processo, inclusive encerradas e aquelas às quais você não tem acesso.
                     </p>
                   )}
 

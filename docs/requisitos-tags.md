@@ -18,7 +18,7 @@ Status: entendimento confirmado pelo usuário; implementação local concluída 
 - Muitas tags devem ficar em uma linha com overflow oculto e seta para rolagem horizontal.
 - Tags pertencem ao processo modelado e são compartilhadas entre suas requisições. Processos diferentes possuem tags independentes, mesmo com nomes iguais.
 - As tags são compartilhadas entre versões do mesmo processo, dentro do mesmo ambiente.
-- Renomear uma tag afeta todas as requisições daquele processo associadas a ela, inclusive encerradas. Esse impacto deve ficar claro ao usuário.
+- Renomear ou alterar a cor de uma tag afeta todas as requisições daquele processo associadas a ela, inclusive encerradas. Esse impacto deve ficar claro ao usuário.
 - O usuário pode renomear uma tag mesmo quando não tem acesso a todas as requisições afetadas. O aviso informa o alcance global, sem revelar dados de requisições sem acesso.
 - É possível remover somente a associação da tag com uma execução e também excluir a tag do processo. Ao solicitar a exclusão global, o usuário deve ser avisado de que ela será removida de todas as execuções associadas daquele processo.
 - “Excluir tag do processo” fica no modal da tarefa, separada de “Remover desta execução” e disponível aos mesmos usuários que podem renomear. Antes de salvar, uma confirmação informa que a exclusão afeta também execuções encerradas e sem acesso pelo usuário, sem revelar seus dados.
@@ -28,8 +28,8 @@ Status: entendimento confirmado pelo usuário; implementação local concluída 
 - Na página de configuração do processo (`flows/edit`), a área de configurações recebe uma aba com o histórico geral do catálogo de tags: criação, edição e exclusão, com autor e data/hora. Essa aba não lista associações ou remoções por execução.
 - A aba de histórico geral segue a permissão existente de acesso às configurações e exige usuário interno em modo interno. Reúne alterações do catálogo entre todas as versões do processo no ambiente.
 - Na tela do relatório da execução, um botão abre o mesmo modal de histórico por execução utilizado nas tarefas. Exportação desse histórico fica fora desta entrega.
-- O popover preserva quem adicionou a tag à execução e quando, mesmo após renomeações. Remover e adicionar novamente exibe a nova adição. Cada evento de histórico identifica seu próprio autor e, em personificações, também quem operou em nome dele.
-- Tags possuem apenas nome, com limite de 50 caracteres e pills de aparência uniforme. Nomes são únicos por processo, ignorando maiúsculas/minúsculas e espaços nas extremidades. Adicionar nome existente reutiliza a tag; renomear para nome existente é bloqueado.
+- O popover preserva quem adicionou a tag à execução e quando, mesmo após renomeações ou alterações de cor. Remover e adicionar novamente exibe a nova adição. Cada evento de histórico identifica seu próprio autor e, em personificações, também quem operou em nome dele.
+- Tags possuem nome, com limite de 50 caracteres, e cor definida pelo mesmo seletor utilizado nas categorias de processos. A cor é compartilhada pelo catálogo do processo e aplicada às pills, com contraste de texto automático. Tags existentes sem cor usam o padrão `#0ea5e9`. Alterações de cor ficam registradas com o valor anterior e o novo, autor e data/hora, no histórico geral e nas execuções associadas. Nomes são únicos por processo, ignorando maiúsculas/minúsculas e espaços nas extremidades. Adicionar nome existente reutiliza a tag; renomear para nome existente é bloqueado.
 - Filtros de tag e processo são independentes e seus critérios são combinados com todos os demais filtros aplicados. Não é obrigatório selecionar um processo para filtrar por tag.
 - O filtro de tags busca pelo nome em todos os processos, mesmo que as tags sejam entidades independentes. Selecionar “Urgente” encontra execuções com essa tag em qualquer processo permitido pelos demais critérios.
 - Ao selecionar um filtro, os demais filtros ajustam suas opções para exibir apenas opções válidas para a seleção.
@@ -42,4 +42,4 @@ Status: entendimento confirmado pelo usuário; implementação local concluída 
 
 As decisões levantadas na entrevista foram respondidas e o entendimento consolidado foi confirmado pelo usuário, que autorizou a implementação com subagentes.
 
-A implementação foi validada com build de produção, 35 verificações de interface desktop/mobile e seis testes novos de integração de tags. Na execução combinada com as regressões existentes de execuções, passaram 20 de 21 testes; a única falha, relativa à criação/listagem por usuário externo, foi reproduzida no código original sem as alterações de tags.
+A implementação foi validada com build de produção, 45 verificações de interface desktop/mobile, quatro verificações de abertura direta da tarefa e sete testes de integração de tags, incluindo cores. Na validação anterior à adição de cores, a execução combinada com as regressões existentes de execuções, passaram 20 de 21 testes; a única falha, relativa à criação/listagem por usuário externo, foi reproduzida no código original sem as alterações de tags.
