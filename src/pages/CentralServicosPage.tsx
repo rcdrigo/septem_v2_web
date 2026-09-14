@@ -5,6 +5,7 @@ import { usePublicServices, type PublicService } from '@/lib/api/catalog';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { useSessionStore } from '@/stores/session';
 import { routes } from '@/lib/routes';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 /** Busca sem acento e sem caixa — "creche" acha "Creche" e "Crèche". */
 function normalizar(texto: string): string {
@@ -48,7 +49,10 @@ export function CentralServicosPage() {
           <div className="flex min-w-0 items-center gap-3">
             {tenant?.logoUrl && <img src={tenant.logoUrl} alt="" className="h-9 w-auto shrink-0" />}
             <div className="min-w-0">
-              <h1 className="truncate text-2xl font-bold text-slate-900 sm:text-3xl">Central de serviços</h1>
+              <div className="flex min-w-0 items-center gap-1">
+                <h1 className="truncate text-2xl font-bold text-slate-900 sm:text-3xl">Central de serviços</h1>
+                <ContextHelp manual="jornada-solicitante-externo" section="localizar-servico" label="Abrir manual da jornada do solicitante externo" />
+              </div>
               <p className="truncate text-sm text-slate-500">{tenant?.clienteNome ?? 'Serviços disponíveis'}</p>
             </div>
           </div>

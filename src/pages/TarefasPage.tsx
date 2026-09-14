@@ -18,6 +18,7 @@ import { renderIcon } from '@/lib/icon-catalog';
 import { queryClient } from '@/lib/queryClient';
 import '@/styles/task-index.css';
 import { routes } from '@/lib/routes';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 type TaskStatusFilter = 'pendentes' | 'concluidas';
 const ALL_PROCESSES = 'todos';
@@ -92,7 +93,13 @@ export function TarefasPage() {
   return (
     <div className="task-index-root flex h-full min-w-0 flex-col">
       <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
-        <div className="min-w-0"><h1 className="text-lg font-semibold text-slate-900">Tarefas</h1><p className="mt-0.5 truncate text-sm text-slate-500">Itens que aguardam sua ação e histórico concluído.</p></div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-lg font-semibold text-slate-900">Tarefas</h1>
+            <ContextHelp manual="operacao-tarefas-requisicoes" section="localizar-tarefas" label="Ajuda sobre tarefas" />
+          </div>
+          <p className="mt-0.5 truncate text-sm text-slate-500">Itens que aguardam sua ação e histórico concluído.</p>
+        </div>
         <ViewToggle view={view} setView={setView} />
       </header>
       <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6">

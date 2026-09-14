@@ -3,6 +3,7 @@ import { useOrgUnitsTree, useOrgUnitsFlat } from '@/lib/api/org-units';
 import { openTab } from '@/lib/nav';
 import { OrgUnitTree } from '@/components/org-units/OrgUnitTree';
 import { routes } from '@/lib/routes';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 /**
  * Organograma — visão somente-leitura da hierarquia de unidades organizacionais.
@@ -19,7 +20,10 @@ export function OrganogramaPage() {
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="text-lg font-semibold text-slate-900">Organograma</h1>
+        <div className="flex items-center gap-1">
+          <h1 className="text-lg font-semibold text-slate-900">Organograma</h1>
+          <ContextHelp manual="estrutura-organizacional" section="consultar-organograma" label="Abrir manual do organograma" />
+        </div>
       </header>
 
       <div className="min-w-0 flex-1 overflow-y-auto p-6">

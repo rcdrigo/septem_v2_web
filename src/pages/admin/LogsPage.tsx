@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, ScrollText } from 'lucide-react';
 import { useAuditLogs, type AuditEntry } from '@/lib/api/audit-logs';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 /**
  * Admin › Configurações › Logs — IF1.e. Visualizador da trilha de auditoria
@@ -32,7 +33,10 @@ export function LogsPage() {
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="text-lg font-semibold text-slate-900">Logs de auditoria</h1>
+        <div className="flex items-center gap-1">
+          <h1 className="text-lg font-semibold text-slate-900">Logs de auditoria</h1>
+          <ContextHelp manual="auditoria-rastreabilidade" section="consultar-auditoria" label="Abrir manual de auditoria" />
+        </div>
       </header>
 
       <div className="flex flex-wrap items-end gap-3 border-b border-slate-200 bg-white px-6 py-3">

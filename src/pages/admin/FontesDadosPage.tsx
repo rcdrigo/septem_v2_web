@@ -23,6 +23,7 @@ import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
 import { normalizeSqlQuery } from '@/lib/sql-query';
 import { routes } from '@/lib/routes';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 const TYPE_LABEL: Record<DataSourceType, string> = { fixed: 'Fixa', sql: 'SQL', api: 'API (JSON)' };
 
@@ -49,9 +50,12 @@ export function FontesDadosPage() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="text-lg font-semibold text-slate-900">
-          Fontes de dados <span className="text-sm font-normal text-slate-400">· {scope === 'report' ? 'Relatórios' : 'Processos'}</span>
-        </h1>
+        <div className="flex min-w-0 items-center gap-1">
+          <h1 className="truncate text-lg font-semibold text-slate-900">
+            Fontes de dados <span className="text-sm font-normal text-slate-400">· {scope === 'report' ? 'Relatórios' : 'Processos'}</span>
+          </h1>
+          <ContextHelp manual="fontes-dados-integracoes" section="configurar-fonte" label="Abrir manual de fontes de dados" />
+        </div>
         <div className="flex gap-2">
           <button type="button" onClick={() => openEditor()} className="flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-700">
             <Plus size={16} /> Nova fonte
@@ -374,4 +378,3 @@ function PlaceholderHelp() {
     </div>
   );
 }
-

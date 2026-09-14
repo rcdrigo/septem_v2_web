@@ -8,6 +8,7 @@ import { ReactForm, type ReactFormHandle } from './ReactForm';
 import { Dialog } from '@/components/ui/Dialog';
 import { ApiError } from '@/lib/api';
 import { useSessionStore } from '@/stores/session';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 const button = 'rounded-md border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-40 hover:bg-slate-50';
 const primary = `${button} bg-slate-900 text-white hover:bg-slate-700`;
@@ -110,7 +111,13 @@ export function AutomationEditor({ processKey, onClose }: { processKey: string; 
   ].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id, 'pt-BR'));
   return <div className="space-y-4" data-testid="automation-editor">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><h2 className="text-lg font-semibold">JavaScript do formulário</h2><p className="text-xs text-slate-500">{processKey} · Rascunho v{state.head} · {state.publishedVersion ? `Publicado v${state.publishedVersion}` : 'Ainda não publicado'}</p></div>
+      <div>
+        <div className="flex items-center gap-1">
+          <h2 className="text-lg font-semibold">JavaScript do formulário</h2>
+          <ContextHelp manual="automacao-formularios" section="editor-automacao" label="Abrir manual de automação de formulários" />
+        </div>
+        <p className="text-xs text-slate-500">{processKey} · Rascunho v{state.head} · {state.publishedVersion ? `Publicado v${state.publishedVersion}` : 'Ainda não publicado'}</p>
+      </div>
       <div className="flex flex-wrap gap-2">
         <button className={button} disabled={busy || invalid} onClick={() => { setPreview(scripts.filter(s => !s.taskId || s.taskId === selected)); setPreviewResult(''); }}><Play size={14} className="inline" /> Testar prévia</button>
         <button className={button} disabled={busy || invalid || !!remote} onClick={save}><Save size={14} className="inline" /> Salvar rascunho</button>

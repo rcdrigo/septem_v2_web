@@ -14,6 +14,7 @@ import { Field, TextInput, TextArea } from '@/components/ui/Field';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 /** Rótulos amigáveis para os prefixos de permission (parte antes do `:`). */
 const GROUP_LABELS: Record<string, string> = {
@@ -58,7 +59,10 @@ export function PerfisPage() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="text-lg font-semibold text-slate-900">Perfis de acesso</h1>
+        <div className="flex items-center gap-1">
+          <h1 className="text-lg font-semibold text-slate-900">Perfis de acesso</h1>
+          <ContextHelp manual="usuarios-perfis-permissoes" section="configurar-perfis" label="Abrir manual de perfis e permissões" />
+        </div>
         <button
           type="button"
           onClick={() => setCreateOpen(true)}

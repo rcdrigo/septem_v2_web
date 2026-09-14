@@ -3,7 +3,25 @@ import { routes } from '@/lib/routes';
 import { appHref } from '@/lib/nav';
 import { useSessionStore } from '@/stores/session';
 
-type TechnicalManualKey = 'modelador-processos' | 'modelador-formularios';
+type TechnicalManualKey =
+  | 'modelador-processos'
+  | 'modelador-formularios'
+  | 'operacao-tarefas-requisicoes'
+  | 'simulacao-homologacao'
+  | 'consultas-relatorios'
+  | 'criacao-relatorios'
+  | 'administracao-manuais-guide'
+  | 'fontes-dados-integracoes'
+  | 'documentos-assinaturas'
+  | 'usuarios-perfis-permissoes'
+  | 'modelos-email-notificacoes'
+  | 'jornada-solicitante-externo'
+  | 'estrutura-organizacional'
+  | 'auditoria-rastreabilidade'
+  | 'parametros-seguranca'
+  | 'automacao-formularios'
+  | 'validacao-documentos'
+  | 'categorias-catalogos';
 
 type Props = {
   manual: TechnicalManualKey;

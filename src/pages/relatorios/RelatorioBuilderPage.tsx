@@ -24,6 +24,7 @@ import { useAccessProfiles } from '@/lib/api/access-profiles';
 import { useOrgUnitsFlat } from '@/lib/api/org-units';
 import { useUsersList } from '@/lib/api/users';
 import { routes } from '@/lib/routes';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 /**
  * Builder do relatório (aba própria — /reports/edit?key=): staging de
@@ -175,7 +176,10 @@ export function RelatorioBuilderPage() {
           <ArrowLeft size={18} />
         </button>
         <div className="min-w-0">
-          <h1 className="truncate text-base font-semibold text-slate-900">{detail.data?.name ?? '…'}</h1>
+          <div className="flex min-w-0 items-center gap-1">
+            <h1 className="truncate text-base font-semibold text-slate-900">{detail.data?.name ?? '…'}</h1>
+            <ContextHelp manual="criacao-relatorios" section="editor-relatorios" label="Ajuda sobre o editor de relatórios" />
+          </div>
           <p className="text-xs text-slate-400">v{detail.data?.version} · {detail.data?.status === 'published' ? 'publicado (editar cria novo rascunho)' : detail.data?.status}</p>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">

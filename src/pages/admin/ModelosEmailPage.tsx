@@ -13,6 +13,7 @@ import { Field, TextInput, TextArea, Select } from '@/components/ui/Field';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 const TYPE_OPTIONS = [
   { value: 'requester', label: 'Requisitante' },
@@ -41,7 +42,10 @@ export function ModelosEmailPage() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="text-lg font-semibold text-slate-900">Modelos de e-mail</h1>
+        <div className="flex items-center gap-1">
+          <h1 className="text-lg font-semibold text-slate-900">Modelos de e-mail</h1>
+          <ContextHelp manual="modelos-email-notificacoes" section="criar-modelo-email" label="Abrir manual de modelos de e-mail" />
+        </div>
         <button type="button" onClick={() => setCreating(true)} className="flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-700"><Plus size={16} /> Novo modelo</button>
       </header>
 

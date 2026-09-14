@@ -14,6 +14,7 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
 import { slugify } from '@/lib/slugify';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 /**
  * Admin › Configurações › Posições — IF1.c. Escolhe uma unidade e lista/gerencia
@@ -51,7 +52,10 @@ export function PosicoesPage() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="text-lg font-semibold text-slate-900">Posições</h1>
+        <div className="flex items-center gap-1">
+          <h1 className="text-lg font-semibold text-slate-900">Posições</h1>
+          <ContextHelp manual="estrutura-organizacional" section="configurar-posicoes" label="Abrir manual de unidades e posições" />
+        </div>
         <button
           type="button"
           disabled={!orgUnitId}

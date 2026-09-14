@@ -20,6 +20,7 @@ import { ApiError } from '@/lib/api';
 import { slugify } from '@/lib/slugify';
 import { OrgUnitTree } from '@/components/org-units/OrgUnitTree';
 import { routes } from '@/lib/routes';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 /**
  * Admin › Configurações › Unidades — IF1.c. Árvore de unidades organizacionais
@@ -57,7 +58,10 @@ export function UnidadesPage() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="text-lg font-semibold text-slate-900">Unidades organizacionais</h1>
+        <div className="flex items-center gap-1">
+          <h1 className="text-lg font-semibold text-slate-900">Unidades organizacionais</h1>
+          <ContextHelp manual="estrutura-organizacional" section="configurar-unidades" label="Abrir manual de estrutura organizacional" />
+        </div>
         <button
           type="button"
           aria-label="Nova unidade raiz"

@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
-import { Download, FileSpreadsheet, Upload, AlertTriangle, LoaderCircle } from 'lucide-react';
+import { Download, Upload, AlertTriangle, LoaderCircle } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { api, ApiError } from '@/lib/api';
 import { toast } from '@/stores/toast';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 type ImportError = { row: number; message: string };
 
@@ -66,10 +67,11 @@ export function ImportFormDialog({ onClose, onApply }: { onClose: () => void; on
             className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60">
             {baixando ? <LoaderCircle size={15} className="animate-spin" /> : <Download size={15} />} {baixando ? 'Baixando…' : 'Baixar modelo (.xlsx)'}
           </button>
-          <a href="https://septem.app/docs/importar-formulario" target="_blank" rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900">
-            <FileSpreadsheet size={15} /> Manual técnico
-          </a>
+          <ContextHelp
+            manual="modelador-formularios"
+            section="importar-formulario"
+            label="Abrir manual de importação de formulários"
+          />
         </div>
 
         <label className={`flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed px-4 py-6 text-center ${enviando ? 'opacity-60' : 'border-slate-300 hover:border-slate-400'}`}>

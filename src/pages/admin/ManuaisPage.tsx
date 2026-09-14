@@ -16,6 +16,7 @@ import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
 import { openTab } from '@/lib/nav';
 import { routes } from '@/lib/routes';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 const AUDIENCE_OPTIONS = [
   { value: 'externo', label: 'Externo (público)' },
@@ -47,7 +48,10 @@ export function ManuaisPage() {
     <div className="flex h-full min-w-0 flex-col">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
         <div className="min-w-0">
-          <h1 className="text-lg font-semibold text-slate-900">Manuais</h1>
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-lg font-semibold text-slate-900">Manuais</h1>
+            <ContextHelp manual="administracao-manuais-guide" section="criar-manual" label="Ajuda sobre administração de manuais" />
+          </div>
           <p className="mt-0.5 text-sm text-slate-500">Conteúdo do guia (Guide) por categoria, público e unidade.</p>
         </div>
         <button type="button" data-testid="novo-manual" onClick={() => openTab(`${routes.manual('nova')}${tab === 'tecnico' ? '?tecnico=1' : ''}`)}

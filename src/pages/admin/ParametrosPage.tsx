@@ -23,6 +23,7 @@ import {
   type SettingsStorage,
   type SettingsSecurity,
 } from '@/lib/api/settings';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 type TabKey = 'geral' | 'email' | 'arquivos' | 'seguranca' | 'openrouter';
 
@@ -47,7 +48,10 @@ export function ParametrosPage() {
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
-        <h1 className="text-lg font-semibold text-slate-900">Parâmetros do sistema</h1>
+        <div className="flex items-center gap-1">
+          <h1 className="text-lg font-semibold text-slate-900">Parâmetros do sistema</h1>
+          <ContextHelp manual="parametros-seguranca" section="configurar-parametros" label="Abrir manual de parâmetros e segurança" />
+        </div>
         <p className="mt-0.5 text-sm text-slate-500">Identidade, expediente, e-mail, arquivos, segurança e agente de IA.</p>
         <nav className="-mb-4 mt-3 flex gap-1 overflow-x-auto" role="tablist" aria-label="Seções de parâmetros">
           {TABS.map((t) => {

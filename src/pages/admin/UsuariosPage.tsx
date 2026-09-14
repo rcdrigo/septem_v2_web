@@ -20,6 +20,7 @@ import { Field, TextInput } from '@/components/ui/Field';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 /**
  * Admin › Configurações › Usuários — IF1.b. Lista com busca + status + paginação,
@@ -61,7 +62,10 @@ export function UsuariosPage() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="text-lg font-semibold text-slate-900">Usuários</h1>
+        <div className="flex items-center gap-1">
+          <h1 className="text-lg font-semibold text-slate-900">Usuários</h1>
+          <ContextHelp manual="usuarios-perfis-permissoes" section="configurar-usuarios" label="Abrir manual de usuários e permissões" />
+        </div>
         <button
           type="button"
           onClick={() => setCreateOpen(true)}

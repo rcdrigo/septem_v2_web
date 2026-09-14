@@ -12,6 +12,7 @@ import { useViewMode, ViewToggle } from './TarefasPage';
 import { ProcessMessages, processMessagesExtra } from '@/components/execution/ProcessMessages';
 import { routes } from '@/lib/routes';
 import { AcoesDoProcesso } from '@/components/execution/AcoesDoProcesso';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 const STATUS = { em_andamento: { label: 'Em andamento', cls: 'bg-sky-100 text-sky-700' }, concluido: { label: 'Concluído', cls: 'bg-emerald-100 text-emerald-700' }, cancelado: { label: 'Cancelado', cls: 'bg-rose-100 text-rose-700' } } as Record<string, { label: string; cls: string }>;
 const TASK_STATUS = { pendente: 'bg-amber-100 text-amber-700', concluida: 'bg-emerald-100 text-emerald-700' } as Record<string, string>;
@@ -56,7 +57,16 @@ export function InstanciasPage({ title = 'Requisições', initialStatus = 'em_an
 
   return (
     <div className="task-index-root flex h-full min-w-0 flex-col">
-      <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 sm:px-6"><div className="min-w-0"><h1 className="text-lg font-semibold text-slate-900">{title}</h1><p className="mt-0.5 truncate text-sm text-slate-500">Processos iniciados por você.</p></div><ViewToggle view={view} setView={setView} /></header>
+      <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
+            <ContextHelp manual="operacao-tarefas-requisicoes" section="acompanhar-requisicoes" label="Ajuda sobre requisições" />
+          </div>
+          <p className="mt-0.5 truncate text-sm text-slate-500">Processos iniciados por você.</p>
+        </div>
+        <ViewToggle view={view} setView={setView} />
+      </header>
       <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
         <div className="flex flex-wrap" aria-label="Status das requisições">{([['em_andamento', 'Em andamento'], ['concluido', 'Concluídos'], ['cancelado', 'Cancelados'], ['todos', 'Todos']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={status === value} onClick={() => update({ status: value, page: '1' })} className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 ${status === value ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}>{label}</button>)}</div>
         <label className="relative mt-3 block max-w-xl"><span className="sr-only">Buscar requisições</span><Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="search" placeholder="Buscar por processo..." value={q} onChange={(event) => update({ q: event.target.value || null, page: '1' })} className="h-11 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm outline-2 outline-transparent hover:bg-slate-50 focus-visible:outline-slate-700" /></label>

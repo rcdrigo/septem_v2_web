@@ -6,6 +6,7 @@ import { validarDocumento, type DocumentoValidado } from '@/lib/api/catalog';
 import { ApiError } from '@/lib/api';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { useSessionStore } from '@/stores/session';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 const SITUACOES: Record<string, string> = {
   em_andamento: 'Em andamento',
@@ -57,7 +58,10 @@ export function ValidacaoPage() {
         <div className="mb-5 flex items-center gap-3">
           {tenant?.logoUrl && <img src={tenant.logoUrl} alt="" className="h-9 w-auto shrink-0" />}
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Validar documento</h1>
+            <div className="flex min-w-0 items-center gap-1">
+              <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Validar documento</h1>
+              <ContextHelp manual="validacao-documentos" section="validar-documento" label="Abrir manual de validação de documentos" />
+            </div>
             <p className="text-sm text-slate-500">
               Confira a autenticidade de um documento emitido {tenant?.clienteNome ? `por ${tenant.clienteNome}` : 'por este órgão'}.
             </p>

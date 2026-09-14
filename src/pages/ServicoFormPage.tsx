@@ -12,6 +12,7 @@ import { toast } from '@/stores/toast';
 import { ExecutionHeader } from '@/components/execution/ExecutionHeader';
 import { TaskActionFooter, type ExecutionAction } from '@/components/execution/TaskActionFooter';
 import { routes } from '@/lib/routes';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 /**
  * Aba standalone (sem menus) para preencher e iniciar um serviço (req. 7). O
@@ -110,36 +111,39 @@ export function ServicoFormPage() {
             completionActions={completionActions}
             loading={formEscolhido.isLoading}
             notice={canSimulate ? (
-              <label className="inline-flex items-start gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  data-testid="iniciar-como-teste"
-                  checked={isTest}
-                  onChange={(event) => setIsTest(event.target.checked)}
-                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
-                />
-                <span>
-                  Iniciar como <strong>teste</strong>
-                  <span className="block text-xs text-slate-500">O processo é marcado como teste e todas as tarefas ficam com você.</span>
-                  {isTest && temHomologacao.data === true && (
-                    <span className="mt-2 block rounded-md border border-orange-200 bg-orange-50 px-2.5 py-2">
-                      <span className="block text-xs font-semibold text-orange-900">Qual versão testar?</span>
-                      <span className="mt-1 flex flex-wrap gap-3">
-                        <label className="inline-flex items-center gap-1.5 text-xs text-slate-700">
-                          <input type="radio" name="versao-teste" data-testid="versao-producao"
-                            checked={!usarHomologacao} onChange={() => setUsarHomologacao(false)} />
-                          Produção (publicada)
-                        </label>
-                        <label className="inline-flex items-center gap-1.5 text-xs text-slate-700">
-                          <input type="radio" name="versao-teste" data-testid="versao-homologacao"
-                            checked={usarHomologacao} onChange={() => setUsarHomologacao(true)} />
-                          Em homologação
-                        </label>
+              <div className="flex items-start gap-1">
+                <label className="inline-flex items-start gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    data-testid="iniciar-como-teste"
+                    checked={isTest}
+                    onChange={(event) => setIsTest(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+                  />
+                  <span>
+                    Iniciar como <strong>teste</strong>
+                    <span className="block text-xs text-slate-500">O processo é marcado como teste e todas as tarefas ficam com você.</span>
+                    {isTest && temHomologacao.data === true && (
+                      <span className="mt-2 block rounded-md border border-orange-200 bg-orange-50 px-2.5 py-2">
+                        <span className="block text-xs font-semibold text-orange-900">Qual versão testar?</span>
+                        <span className="mt-1 flex flex-wrap gap-3">
+                          <label className="inline-flex items-center gap-1.5 text-xs text-slate-700">
+                            <input type="radio" name="versao-teste" data-testid="versao-producao"
+                              checked={!usarHomologacao} onChange={() => setUsarHomologacao(false)} />
+                            Produção (publicada)
+                          </label>
+                          <label className="inline-flex items-center gap-1.5 text-xs text-slate-700">
+                            <input type="radio" name="versao-teste" data-testid="versao-homologacao"
+                              checked={usarHomologacao} onChange={() => setUsarHomologacao(true)} />
+                            Em homologação
+                          </label>
+                        </span>
                       </span>
-                    </span>
-                  )}
-                </span>
-              </label>
+                    )}
+                  </span>
+                </label>
+                <ContextHelp manual="simulacao-homologacao" section="iniciar-simulacao" label="Ajuda sobre simulação e homologação" />
+              </div>
             ) : undefined}
           />
         </>
