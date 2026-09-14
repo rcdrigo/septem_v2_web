@@ -274,7 +274,7 @@ export function ModeladorPage() {
         )}
         {currentView === 'configuracoes' && (
           <ErrorBoundary context="as configurações do processo">
-            <ConfiguracoesView modeler={modeler} />
+            <ConfiguracoesView modeler={modeler} processKey={key} />
           </ErrorBoundary>
         )}
       </div>

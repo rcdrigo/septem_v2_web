@@ -18,9 +18,12 @@ import { slugify } from '@/lib/slugify';
 import { useAccessProfiles } from '@/lib/api/access-profiles';
 import { useUsersList } from '@/lib/api/users';
 import { usePositions } from '@/lib/api/positions';
+import { ProcessTagHistory, useTagsAccess } from '@/components/tags';
+import { useSessionStore } from '@/stores/session';
 
 type Props = {
   modeler: any | null;
+  processKey?: string | null;
 };
 
 const STATUS_OPTIONS: ReadonlyArray<{ value: ProcessStatus; label: string; help?: string }> = [
@@ -42,7 +45,10 @@ const STATUS_OPTIONS: ReadonlyArray<{ value: ProcessStatus; label: string; help?
  * Categorias e áreas são fixas por ora; quando o backend chegar (Fase 6) serão
  * combos populadas via `/api/categories` e `/api/areas`.
  */
-export function ConfiguracoesView({ modeler }: Props) {
+export function ConfiguracoesView({ modeler, processKey }: Props) {
+  const tagsAccess = useTagsAccess();
+  const canReadWorkflow = useSessionStore((s) => s.can('workflow:read'));
+  const canReadTagHistory = tagsAccess && canReadWorkflow;
   const processName = useModeladorStore((s) => s.processName);
   const setProcessName = useModeladorStore((s) => s.setProcessName);
 
@@ -54,7 +60,7 @@ export function ConfiguracoesView({ modeler }: Props) {
     ...(categories.data ?? []).map((c) => ({ value: slugify(c.name), label: c.name })),
   ];
   const [draftName, setDraftName] = useState(processName);
-  const [tab, setTab] = useState<'geral' | 'acesso'>('geral');
+  const [tab, setTab] = useState<'geral' | 'acesso' | 'tags'>('geral');
 
   useEffect(() => {
     if (!modeler) return;
@@ -91,14 +97,24 @@ export function ConfiguracoesView({ modeler }: Props) {
         </header>
 
         {/* Abas */}
-        <div className="flex gap-1 border-b border-slate-200 px-6 pt-2">
+        <div className="flex gap-1 overflow-x-auto border-b border-slate-200 px-6 pt-2">
           {([['geral', 'Informações gerais'], ['acesso', 'Controle de acesso']] as const).map(([k, label]) => (
             <button key={k} type="button" onClick={() => setTab(k)}
               className={`border-b-2 px-3 py-2 text-sm font-medium ${tab === k ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
               {label}
             </button>
           ))}
+          {canReadTagHistory && <button type="button" onClick={() => setTab('tags')}
+            className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${tab === 'tags' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+            Histórico de tags
+          </button>}
         </div>
+
+        {tab === 'tags' && canReadTagHistory && (
+          <Section title="Histórico de tags" help="Criação, edição e exclusão das tags deste processo, em todas as versões. Alterações de associações podem ser consultadas na tarefa ou no relatório da execução.">
+            {processKey ? <ProcessTagHistory processKey={processKey} /> : <p className="text-sm text-slate-500">Salve o processo para consultar seu histórico de tags.</p>}
+          </Section>
+        )}
 
         {tab === 'geral' && (
           <>
