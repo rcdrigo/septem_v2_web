@@ -1,3 +1,5 @@
+> Decisão revista em 23/09/2026: preservar e converter os registros antigos. As menções anteriores à limpeza/reinício estão substituídas pelo [procedimento de migração](formularios-nativos-migracao.md).
+
 # E7 — Integração, limpeza e retirada do legado
 
 Status em 20/09/2026: dependências form-js removidas, integrações adicionais implementadas e procedimento manual de limpeza entregue. A substituição completa ainda exige as verificações finais listadas abaixo; CA25 não está declarado concluído.
@@ -36,3 +38,7 @@ O procedimento inventaria dependências e respostas, verifica o alvo, exige conf
 - Demonstrar a jornada CA22 com navegador e API real após o reinício escolhido pelo operador. As suítes isoladas não são apresentadas como essa jornada.
 
 Esses limites impedem declarar E7 e todos os critérios CA01–CA25 concluídos.
+
+## Migração com preservação — 23/09/2026
+
+O comando de limpeza foi desativado. `migrate-native-forms.py` fornece plano e aplicação transacional com backup, preservando os registros. Na cópia descartável do schema real, foram convertidos 8 snapshots mantendo 6 requisições, vínculos e conteúdo das demais tabelas. Plano desatualizado foi rejeitado com rollback e a reexecução não reconverteu snapshots nativos. Há testes de contrato para IDs, configurações, respostas, bloqueios e XML. Nenhum banco operacional foi migrado. Casos incompatíveis são bloqueados e estão documentados no guia, sem promessa de conversão automática universal.

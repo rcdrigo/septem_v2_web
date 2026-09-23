@@ -104,3 +104,9 @@ Usa React real com APIs/modeler simulados, seguindo o harness de E2. `modelador-
 ### E7 — integração e limpeza manual
 
 `npm run test:forms` inclui o harness corrigido de publicação nativa e passou integralmente. `native-form-references.mjs` verifica usos, referências literais e remapeamento do estado de células. `tools/uitest/native-reset.py` executa SQL real somente quando `PGDATABASE` começa com `native_cleanup_test_`; exige banco descartável com schema Septem. Nunca apontar este teste para ambiente operacional. Consulte `docs/specs/formularios-nativos-limpeza.md` para os comandos manuais de plano/aplicação.
+
+### Migração — 23/09/2026
+
+A limpeza foi desativada. `python3 tools/uitest/native-migration.py` verifica conversão conservadora, identidade, respostas e XML. O guia operacional vigente é `docs/specs/formularios-nativos-migracao.md`.
+
+`npm run test:native-migration` inclui validação pelo parser nativo real. `native-migration-postgres.py` altera fixtures e aplica a migração: executar exclusivamente em cópia descartável do banco de integração, com `PGDATABASE` iniciado por `native_migration_test_`. O teste não deve ser usado no banco do operador.

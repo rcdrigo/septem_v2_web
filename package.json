@@ -17,7 +17,8 @@
     "test:native-forms": "node tools/uitest/native-form-contracts.mjs && node tools/uitest/native-form-editor-contracts.mjs && node tools/uitest/native-form-references.mjs && node tools/uitest/native-task-field-identity.mjs",
     "test:native-editor": "npm run build && node tools/uitest/native-form-editor.mjs && node tools/uitest/native-field-lifecycle.mjs && node tools/uitest/native-form-structure.mjs",
     "test:native-task-fields": "node tools/uitest/native-form-task-fields.mjs",
-    "test:native-runtime": "node tools/uitest/native-form-runtime.mjs"
+    "test:native-runtime": "node tools/uitest/native-form-runtime.mjs",
+    "test:native-migration": "node tools/uitest/native-migration-contract.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

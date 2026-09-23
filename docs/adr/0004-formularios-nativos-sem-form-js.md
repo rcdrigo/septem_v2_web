@@ -1,3 +1,5 @@
+> A decisão de descarte/reinício abaixo foi substituída em 23/09/2026 pelo [ADR 0005 — conversão com preservação](0005-conversao-preservando-formularios-antigos.md). A adoção do formato nativo continua vigente.
+
 # Formulários nativos sem form-js
 
 Para implementar a hierarquia Formulário → Aba → Agrupamento → Campo e o fluxo de criação guiada, adotamos editor, renderização e formato de definição próprios, permitindo bibliotecas auxiliares de interface, validação e reposicionamento. A decisão remove o form-js ao custo de assumir a manutenção dessas responsabilidades; componentes nativos existentes podem ser reaproveitados.

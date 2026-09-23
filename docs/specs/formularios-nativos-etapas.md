@@ -1,3 +1,5 @@
+> Atualização de 23/09/2026: a conversão com preservação substitui todas as referências históricas abaixo a limpeza/reinício do ambiente.
+
 # Formulários nativos — requisitos de desenvolvimento por etapas
 
 Status em 20/09/2026: E1–E4 implementadas. E5–E7 receberam validação de referências/publicação, autorização e persistência de automações, prévia por versão, integração de fontes/documentos e remoção da dependência form-js. Build, suíte de formulários/automação e 69 testes backend passaram. O usuário optou por executar a limpeza manualmente; o procedimento foi entregue e testado em banco descartável. A conclusão integral permanece condicionada aos limites registrados em [E7](formularios-nativos-e7.md). Consulte também [E5](formularios-nativos-e5.md), [E6](formularios-nativos-e6.md) e o [guia de limpeza](formularios-nativos-limpeza.md).
@@ -8,7 +10,7 @@ Fontes: [decisões do desenho](formularios-nativos.md), [ADR 0004](../adr/0004-f
 
 Substituir completamente o form-js por editor, renderização e definição de formulário próprios. Bibliotecas auxiliares são permitidas. Reaproveitar o runtime React existente quando compatível com os requisitos. A primeira versão completa inclui todas as etapas abaixo; a divisão não autoriza retirar capacidades acordadas da entrega final.
 
-O ambiente começará do zero: formulários antigos e todas as requisições serão removidos, com suas dependências identificadas antes da limpeza. Não implementar migração de respostas nem leitura compatível com schemas antigos. A limpeza deve delimitar os registros atingidos, sem inferir que reiniciar os formulários autoriza eliminar usuários, credenciais ou cadastros alheios ao escopo.
+Decisão revista em 23/09/2026: preservar e converter formulários antigos, mantendo requisições, respostas, versões, histórico e anexos. A migração não transfere requisições para outra versão. Casos sem representação equivalente devem bloquear a conversão com diagnóstico, sem perda silenciosa. Consulte o [procedimento de migração](formularios-nativos-migracao.md).
 
 Não fazem parte desta entrega: ação de duplicar campos, migração de requisições entre versões ou seleção automática de revisões de automação por compatibilidade. Automações continuam publicadas independentemente do formulário.
 
@@ -142,14 +144,14 @@ Cada etapa inclui frontend, backend quando necessário e verificação do compor
 ### Requisitos
 
 - **RF31:** integrar todos os pontos de entrada: modelador, prévia, preenchimento público/autenticado, tarefas, anexos, fontes, automações e consumidores de campos inventariados. Não considerar a entrega concluída apenas porque o editor principal foi substituído.
-- **RF32:** preparar e executar a limpeza do ambiente a partir do inventário de E1, removendo os formulários antigos, todas as requisições e as dependências necessárias para não deixar referências órfãs. Identificar o ambiente alvo e os registros atingidos no procedimento. A execução ocorre nesta etapa de implantação, não durante a produção desta documentação.
+- **RF32 (revisto em 23/09/2026):** converter snapshots antigos para a estrutura nativa com backup, plano revisável e transação, preservando requisições, respostas, vínculos, versões, histórico e anexos. Rejeitar casos incompatíveis antes da escrita. O operador escolhe o ambiente e executa a migração manualmente.
 - **RF33:** remover dependências diretas e usos transitivos evitáveis de form-js, wrappers antigos, imports, estilos, contratos exclusivos do legado e dados de exemplo incompatíveis. Verificar o lockfile e os caminhos realmente usados; excluir um import isolado não comprova a retirada completa.
 - **RF34:** atualizar manuais e documentação de automações, formato nativo, publicação, tabelas e persistência de campos dinâmicos. Concluir o inventário de E1 com a situação final de cada consumidor.
 
 ### Critérios de aceite
 
 - **CA22:** em ambiente reiniciado, criar processo → montar duas abas com grupo e tabela → configurar tarefa → publicar → abrir requisição → preencher manualmente e por script → salvar/reabrir → concluir tarefa funciona de ponta a ponta.
-- **CA23:** o inventário da limpeza demonstra ausência das requisições e formulários antigos e de referências órfãs nos dados abrangidos. Novos processos recebem a estrutura inicial nativa.
+- **CA23 (revisto):** o inventário demonstra conversão dos snapshots compatíveis e preservação das requisições, respostas, versões, vínculos e histórico; bloqueios incompatíveis são explícitos. Reexecutar o plano após migração não reconverte snapshots nativos.
 - **CA24:** instalação e build funcionam sem form-js; análise das dependências, imports e estilos não encontra uso operacional remanescente. Prévia e preenchimento funcionam em todos os pontos de entrada encontrados.
 - **CA25:** todos os critérios CA01–CA24 estão verificados; limitações e integrações simuladas estão identificadas, sem confundir mocks com persistência ou autorização implementadas.
 

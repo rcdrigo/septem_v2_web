@@ -1,3 +1,5 @@
+> Decisão revista em 23/09/2026: preservar e converter os registros antigos. As menções anteriores à limpeza/reinício estão substituídas pelo [procedimento de migração](formularios-nativos-migracao.md).
+
 # Formulários nativos — decisões de desenho
 
 Desenho confirmado pelo usuário em 18/09/2026, após as rodadas Q1–Q24. Execução organizada em [requisitos de desenvolvimento por etapas](formularios-nativos-etapas.md). Decisões arquiteturais e escopo de substituição: [ADR 0004](../adr/0004-formularios-nativos-sem-form-js.md). Requisitos de interação de origem: SGI-V2-Redesenho-Formulario-Passo-a-Passo-2.md, fornecido pelo usuário.
