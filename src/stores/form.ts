@@ -5,17 +5,21 @@ import { create } from 'zustand';
  * do modelador que precisam listar campos (matriz de visibilidade, fonte de dados,
  * combobox de prazo dinâmico etc.).
  *
- * O esquema bate com o formato exportado pelo @bpmn-io/form-js (`fieldGroup`
- * em cada campo). A Fase 5 vai popular esta store a partir do FormBuilder.
- *
- * Por enquanto vem vazia → componentes mostram empty-state pedindo
- * configurar o formulário primeiro.
+ * Compartilhado pela definição nativa e pelos consumidores legados durante
+ * a transição. Identidade estrutural é independente da chave de resposta.
  */
 export type FormFieldDescriptor = {
   id: string;
   label: string;
   type: string;
   group: string;
+  /** Chave de resposta em `id`; identidade permanente do campo em `fieldId`. */
+  fieldId?: string;
+  groupId?: string;
+  tabId?: string;
+  tabLabel?: string;
+  tableKey?: string;
+  path?: string;
 };
 
 type FormState = {
@@ -28,12 +32,14 @@ export const useFormStore = create<FormState>((set) => ({
   setFields: (fields) => set({ fields }),
 }));
 
-export function selectFieldGroups(fields: FormFieldDescriptor[]): { group: string; fields: FormFieldDescriptor[] }[] {
-  const map = new Map<string, FormFieldDescriptor[]>();
+export function selectFieldGroups(fields: FormFieldDescriptor[]): { id: string; group: string; fields: FormFieldDescriptor[] }[] {
+  const map = new Map<string, { id: string; group: string; fields: FormFieldDescriptor[] }>();
   for (const f of fields) {
-    const g = f.group || 'Geral';
-    if (!map.has(g)) map.set(g, []);
-    map.get(g)!.push(f);
+    const label = f.group || 'Geral';
+    const id = f.groupId ? `native:${f.groupId}` : `legacy:${label}`;
+    const group = f.tabId ? `${f.tabLabel || 'Aba'} / ${label}${f.tableKey ? ' (Tabela)' : ''}` : label;
+    if (!map.has(id)) map.set(id, { id, group, fields: [] });
+    map.get(id)!.fields.push(f);
   }
-  return Array.from(map.entries()).map(([group, fields]) => ({ group, fields }));
+  return Array.from(map.values());
 }

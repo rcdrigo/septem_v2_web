@@ -81,3 +81,26 @@ Copie uma suíte existente e mantenha SEMPRE:
 3. `check()` objetivo por caso + diagnóstico de overflow/`clipped`;
 4. screenshots dos dois tamanhos;
 5. dados de teste idempotentes (criar e limpar no próprio script).
+
+## Formulários nativos — E2
+
+- `npm run test:native-forms`: contratos nativos E1 e operações do editor E2, sem navegador.
+- `npm run test:native-editor`: build e testes da interface nativa, usando Chrome do sistema em perfil isolado. APIs e modeler são simulados; não altera dados do ambiente. Capturas em `.impeccable/review/native-editor-*.png`.
+- `node tools/uitest/modelador-startup.mjs`: modelador BPMN real, API simulada; criar/abrir/renomear/salvar inclui definição nativa no XML.
+
+O teste legado `form-editor-regressions.mjs` foi retirado em E7; `test:forms` executa `native-form-editor.mjs` e `native-form-structure.mjs`. O runtime legado e suas regressões permanecem até as etapas E4–E7. A falha preexistente em `form-publication.mjs`, registrada em `docs/specs/formularios-nativos-e1.md`, continua fora da entrega E2.
+
+
+### Formulários nativos — E3
+
+`node tools/uitest/native-form-structure.mjs` verifica CA07–CA09: criação guiada, quantidade inválida, cabeçalhos, adição/tipo/reordenação de colunas, arraste real entre abas, bloqueio de arraste para tabela, transferência explícita entre tabelas, conversão com destino novo para apresentação, cancelamento e reabertura. Incluído em `npm run test:native-editor` e `test:forms`.
+
+Usa React real com APIs/modeler simulados, seguindo o harness de E2. `modelador-startup.mjs` cobre o XML salvo com bpmn-js real; estes testes não comprovam publicação operacional ou migração de respostas. Contratos de movimentação/conversão ficam em `native-form-editor-contracts.mjs`, incluído em `test:native-forms`. Capturas: `.impeccable/review/native-e3-desktop.png` e `native-e3-mobile.png`.
+
+### E4 — preenchimento nativo
+
+`npm run test:native-runtime` executa `native-form-runtime.mjs` com React real em desktop/mobile. Verifica CA10–CA14, fontes de opções simuladas, estados por célula, navegação com data parcial, alterações de regras antes do envio e serialização de respostas. Execute `npm run build` antes para atualizar o CSS das capturas. O script está incluído em `test:forms`. Persistência real e uploads são verificados por `NativeFormsTests` no backend; a suíte de navegador não substitui essa verificação.
+
+### E7 — integração e limpeza manual
+
+`npm run test:forms` inclui o harness corrigido de publicação nativa e passou integralmente. `native-form-references.mjs` verifica usos, referências literais e remapeamento do estado de células. `tools/uitest/native-reset.py` executa SQL real somente quando `PGDATABASE` começa com `native_cleanup_test_`; exige banco descartável com schema Septem. Nunca apontar este teste para ambiente operacional. Consulte `docs/specs/formularios-nativos-limpeza.md` para os comandos manuais de plano/aplicação.

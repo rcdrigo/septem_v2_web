@@ -7,6 +7,7 @@ import { useDataSources } from '@/lib/api/catalog';
 import { selectFieldGroups, useFormStore, type FormFieldDescriptor } from '@/stores/form';
 import {
   getFormFieldEntries,
+  findFieldEntry,
   setFormFieldEntries,
   upsertFieldEntry,
   type FieldVisibility,
@@ -30,7 +31,7 @@ const STATES: ReadonlyArray<{ value: FieldVisibility; icon: typeof Eye; label: s
  *
  * Lê o schema do formulário do `formStore` (Zustand). Enquanto o form não foi
  * configurado, mostra empty-state. Quando configurado, exibe os campos
- * agrupados por `fieldGroup` (formato form-js) com um toggle 3-estados por campo
+ * agrupados por identidade (ou rótulo no legado) com um toggle 3-estados por campo
  * e um input opcional de fonte de dados.
  */
 export function FieldVisibilityEditor({ modeler, element }: Props) {
@@ -54,25 +55,25 @@ export function FieldVisibilityEditor({ modeler, element }: Props) {
   const groups = selectFieldGroups(formFields);
 
   function setVisibility(fieldRef: string, visibility: FieldVisibility) {
-    const next = upsertFieldEntry(entries, fieldRef, { visibility });
+    const next = upsertFieldEntry(entries, fieldRef, { visibility }, formFields);
     setEntries(next);
     setFormFieldEntries(modeler, element, next);
   }
 
   function setDataSource(fieldRef: string, dataSourceRef: string) {
-    const next = upsertFieldEntry(entries, fieldRef, { dataSourceRef: dataSourceRef || undefined });
+    const next = upsertFieldEntry(entries, fieldRef, { dataSourceRef: dataSourceRef || undefined }, formFields);
     setEntries(next);
     setFormFieldEntries(modeler, element, next);
   }
 
   function entryFor(fieldRef: string): FormFieldEntry {
-    return entries.find((e) => e.fieldRef === fieldRef) ?? { fieldRef, visibility: 'visible' };
+    return findFieldEntry(entries, fieldRef, formFields) ?? { fieldRef, visibility: 'visible' };
   }
 
   return (
     <div className="flex flex-col gap-3">
-      {groups.map(({ group, fields }) => (
-        <div key={group} className="rounded-md border border-slate-200 bg-white">
+      {groups.map(({ id, group, fields }) => (
+        <div key={id} className="rounded-md border border-slate-200 bg-white">
           <header className="border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
             {group}
           </header>

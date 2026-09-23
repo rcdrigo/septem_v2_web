@@ -2,6 +2,7 @@ import { dateModeOfComponent, validateDateClient, type DateLimit } from './dataf
 import { validateDocumento, type DocKind } from './documento';
 
 export type FormComponent = {
+  icon?: string; nativeGroup?: boolean; nativeTab?: boolean; nativeTable?: boolean; nativeField?: boolean;
   id?: string; type?: string; subtype?: string; key?: string; label?: string;
   dateLabel?: string; timeLabel?: string; description?: string; text?: string;
   automationHidden?: boolean; content?: string; source?: string; alt?: string; disabled?: boolean;
@@ -12,7 +13,7 @@ export type FormComponent = {
   components?: FormComponent[]; layout?: { columns?: number | null; row?: string };
   properties?: Record<string, string>;
 };
-export type FieldState = Record<string, { hidden?: boolean; disabled?: boolean }>;
+export type FieldState = Record<string, { hidden?: boolean; disabled?: boolean; required?: boolean }>;
 export const INPUT_TYPES = new Set(['textfield', 'textarea', 'number', 'checkbox', 'select', 'email', 'datetime', 'radio', 'password', 'filepicker', 'checklist', 'taglist']);
 export const fieldPath = (prefix: string, key: string) => prefix ? `${prefix}.${key}` : key;
 
@@ -21,9 +22,11 @@ export function validateForm(components: FormComponent[], values: Record<string,
   function walk(comps: FormComponent[], data: Record<string, unknown>, prefix = '') {
     for (const c of comps) {
       const path = fieldPath(prefix, c.key ?? '');
-      if (c.automationHidden || c.disabled || states[path]?.disabled || states[path]?.hidden) continue;
+      if ((states[path]?.hidden ?? c.automationHidden) || (states[path]?.disabled ?? c.disabled)) continue;
       if (c.type === 'dynamiclist' && c.key) {
-        const rows = data[c.key];
+        let rows = data[c.key];
+        if (c.nativeTable && (rows == null || (Array.isArray(rows) && !rows.length))) rows = [{}];
+        if (c.nativeTable && !Array.isArray(rows)) { errors[path] = 'Tabela inválida.'; continue; }
         if (c.validate?.required && (!Array.isArray(rows) || !rows.length)) errors[path] = 'Campo obrigatório.';
         if (Array.isArray(rows)) rows.forEach((row, i) => {
           if (row && typeof row === 'object' && !Array.isArray(row)) walk(c.components ?? [], row as Record<string, unknown>, `${path}.${i}`);
@@ -35,11 +38,28 @@ export function validateForm(components: FormComponent[], values: Record<string,
       if (!c.key || !INPUT_TYPES.has(c.type ?? '')) continue;
       const value = data[c.key];
       if (dateErrors[path]) { errors[path] = dateErrors[path]; continue; }
-      let empty = value == null || value === '' || (Array.isArray(value) && !value.length) || (c.type === 'checkbox' && value === false);
+      let empty = value == null || value === '' || (Array.isArray(value) && !value.length) || (!c.nativeField && c.type === 'checkbox' && value === false);
       if (c.type === 'filepicker' && typeof value === 'string') {
         try { const files = JSON.parse(value); empty = Array.isArray(files) && !files.length; } catch { /* formato tratado no servidor */ }
       }
-      if (empty) { if (c.validate?.required) errors[path] = 'Campo obrigatório.'; continue; }
+      if (empty) { if (states[path]?.required ?? c.validate?.required) errors[path] = 'Campo obrigatório.'; continue; }
+      if (c.nativeField) {
+        if (['checklist', 'taglist', 'filepicker'].includes(c.type ?? '')) {
+          let list = value;
+          if (c.type === 'filepicker' && typeof value === 'string') {
+            try { list = JSON.parse(value); } catch { list = null; }
+          }
+          if (!Array.isArray(list)) errors[path] = 'Lista inválida.';
+          continue;
+        }
+        if (c.type === 'checkbox') {
+          if (typeof value !== 'boolean') errors[path] = 'Valor inválido.';
+          continue;
+        }
+        if (c.type === 'number' ? !['number', 'string'].includes(typeof value) || (typeof value === 'string' && !value.trim()) : typeof value !== 'string') {
+          errors[path] = c.type === 'number' ? 'Número inválido.' : 'Valor inválido.'; continue;
+        }
+      }
       if (typeof value === 'string') {
         const kind = c.type === 'textfield' ? c.properties?.septemDocKind as DocKind | undefined : undefined;
         if (kind) { const message = validateDocumento(value, kind); if (message) errors[path] = message; }

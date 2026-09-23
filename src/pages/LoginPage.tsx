@@ -4,6 +4,8 @@ import { ArrowLeft, ArrowRight, Eye, EyeOff, LayoutGrid, Loader2, Lock, Mail, Sh
 import { useSessionStore } from '@/stores/session';
 import { ApiError } from '@/lib/api';
 import { toast } from '@/stores/toast';
+import { Toaster } from '@/components/ui/Toaster';
+import { Dialog } from '@/components/ui/Dialog';
 import { routes } from '@/lib/routes';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { PasswordChecklist, isPasswordValid } from '@/components/PasswordChecklist';
@@ -39,6 +41,7 @@ export function LoginPage() {
     if (status === 'idle') void bootstrap();
   }, [status, bootstrap]);
 
+  const [consultationOpen, setConsultationOpen] = useState(false);
   const [step, setStep] = useState<Step>('credenciais');
   const [identifier, setIdentifier] = useState('');   // e-mail OU CPF
   const [password, setPassword] = useState('');
@@ -263,7 +266,7 @@ export function LoginPage() {
               <strong>Precisa de ajuda?</strong>
               <span>Domine a plataforma com nosso guia.</span>
             </button>
-            <button type="button" className="login-hero-action login-hero-action--wide">
+            <button type="button" className="login-hero-action login-hero-action--wide" onClick={() => setConsultationOpen(true)}>
               <strong>Consultar processo</strong>
               <span>Valide seu protocolo ou os documentos emitidos ao final dos processos.</span>
             </button>
@@ -333,7 +336,7 @@ export function LoginPage() {
                       setAviso(null);
                       setStep('esqueci');
                     }}
-                    className="text-sm text-slate-400 hover:text-slate-600"
+                    className="rounded text-sm text-slate-600 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
                   >
                     Esqueci minha senha
                   </button>
@@ -478,6 +481,20 @@ export function LoginPage() {
         </main>
       </div>
 
+      <Toaster />
+      <Dialog open={consultationOpen} onClose={() => setConsultationOpen(false)} title="Consultar processo">
+        <p className="mb-4 text-sm text-slate-600">Escolha o que você precisa consultar.</p>
+        <div className="flex flex-col gap-3">
+          <button type="button" onClick={() => { setConsultationOpen(false); navigate(`${routes.login}?returnUrl=${encodeURIComponent(routes.requests)}`); }} className="rounded-md border border-slate-300 px-4 py-3 text-left text-sm text-slate-800 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-slate-700">
+            <strong className="block">Acompanhar minhas requisições</strong>
+            <span>Entre na sua conta para consultar o andamento.</span>
+          </button>
+          <button type="button" onClick={() => navigate(routes.validate)} className="rounded-md border border-slate-300 px-4 py-3 text-left text-sm text-slate-800 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-slate-700">
+            <strong className="block">Validar documento</strong>
+            <span>Confira a autenticidade com o número do processo e o código verificador.</span>
+          </button>
+        </div>
+      </Dialog>
       <CardCentralDeServicos />
       </div>
     </div>

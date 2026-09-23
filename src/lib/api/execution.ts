@@ -136,7 +136,7 @@ export function useHasHomologation(key: string | null, enabled: boolean) {
 export function useStartInstance() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { key: string; data?: unknown; isTest?: boolean; useHomologation?: boolean }) => api.post<StartedInstance>('/api/v1/workflow/instances', body),
+    mutationFn: (body: { key: string; data?: unknown; formState?: unknown; isTest?: boolean; useHomologation?: boolean }) => api.post<StartedInstance>('/api/v1/workflow/instances', body),
     onSuccess: () => qc.invalidateQueries({ queryKey: execKeys.tasks }),
   });
 }
@@ -202,8 +202,8 @@ export function useTask(id: string | null) {
 export function useCompleteTask() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data, action, justification }: { id: string; data?: unknown; action?: string; justification?: string }) =>
-      api.post<CompleteResult>(`/api/v1/workflow/tasks/${id}/complete`, { data, action, justification }),
+    mutationFn: ({ id, data, action, justification, formState }: { id: string; data?: unknown; action?: string; justification?: string; formState?: unknown }) =>
+      api.post<CompleteResult>(`/api/v1/workflow/tasks/${id}/complete`, { data, action, justification, formState }),
     onSuccess: () => qc.invalidateQueries({ queryKey: execKeys.tasks }),
   });
 }

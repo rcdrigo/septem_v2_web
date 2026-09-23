@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { diffLines } from 'diff';
 import { Code2, History, MessageSquare, Play, Save, Upload } from 'lucide-react';
 import { automationApi, type AutomationState, type Conversation, type Revision } from '@/lib/form-automation/api';
-import { validateAutomation } from '@/lib/form-automation/validation';
+import { nativeFields, parseNativeForm } from '@/lib/native-form';
+import { automationReferences, validateAutomation } from '@/lib/form-automation/validation';
 import type { AutomationSource } from '@/lib/form-automation/runtime';
 import { ReactForm, type ReactFormHandle } from './ReactForm';
 import { Dialog } from '@/components/ui/Dialog';
@@ -40,6 +41,7 @@ export function AutomationEditor({ processKey, onClose }: { processKey: string; 
   const [revision, setRevision] = useState<Revision | null>(null);
   const [preview, setPreview] = useState<AutomationSource[] | null>(null);
   const [previewResult, setPreviewResult] = useState('');
+  const [formVersion, setFormVersion] = useState('current');
   const previewRef = useRef<ReactFormHandle>(null);
   const current = codeOf(scripts, selected);
   const dirty = !!state && JSON.stringify(scripts) !== JSON.stringify(state.scripts);
@@ -47,6 +49,14 @@ export function AutomationEditor({ processKey, onClose }: { processKey: string; 
     const result = validateAutomation(s.code);
     return [...result.errors.map(text => ({ scope: s.taskId || 'Comum', text, error: true })), ...result.warnings.map(text => ({ scope: s.taskId || 'Comum', text, error: false }))];
   }), [scripts]);
+  const compatibility = useMemo(() => (state?.formVersions ?? []).flatMap(version => {
+    try {
+      const definition = parseNativeForm(version.schema);
+      const keys = new Set(definition.tabs.flatMap(t => [t.id, ...t.groups.flatMap(g => [g.id, ...(g.type === 'table' ? [g.key] : [])])]).concat(nativeFields(definition).flatMap(f => [f.field.id, f.field.key])));
+      return scripts.flatMap(s => automationReferences(s.code).filter(key => !keys.has(key)).map(key => `Formulário v${version.version} · ${s.taskId || 'Comum'}: “${key}” não existe. Use form.has e teste esta versão.`));
+    } catch { return []; }
+  }), [scripts, state?.formVersions]);
+  const previewSchema = formVersion === 'current' ? state?.schema : state?.formVersions?.find(v => String(v.version) === formVersion)?.schema;
   const invalid = diagnostics.some(d => d.error);
   useEffect(() => {
     if (!can) return;
@@ -126,6 +136,7 @@ export function AutomationEditor({ processKey, onClose }: { processKey: string; 
       </div>
     </div>
     {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
+    {compatibility.length > 0 && <section aria-label="Compatibilidade das versões" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><h3 className="font-semibold">Referências a revisar</h3><ul className="list-disc pl-5">{compatibility.map((text, i) => <li key={i} className="break-words">{text}</li>)}</ul><p className="mt-2">A análise de referências literais não garante compatibilidade de JavaScript livre. Campos criados pelo próprio script também podem aparecer aqui.</p></section>}
     {message && <p role="status" className="text-sm text-emerald-700">{message}</p>}
     {remote && <div className="space-y-2 rounded border border-amber-400 p-3"><p>Existe uma versão mais recente (v{remote.head}). Seu código foi preservado. Compare antes de continuar.</p>
       {[...new Set([...remote.scripts, ...scripts].map(s => s.taskId))].map(id => <div key={id}><h3>{label(id)}</h3><CodeDiff before={codeOf(remote.scripts, id)} after={codeOf(scripts, id)} /></div>)}
@@ -158,7 +169,7 @@ export function AutomationEditor({ processKey, onClose }: { processKey: string; 
         </div>}
       </section>
     </div>
-    {preview && <Dialog open title={`Prévia · ${label(selected)}`} width="2xl" onClose={() => setPreview(null)}><ReactForm ref={previewRef} schema={state.schema} automationScripts={preview} /><button className={`${button} mt-4`} onClick={async () => { const result = await previewRef.current?.submit(); setPreviewResult(result && !Object.keys(result.errors).length ? 'Validação concluída. Nenhum dado foi enviado.' : JSON.stringify(result?.errors)); }}>Simular envio</button><p role="status" className="mt-2 text-sm">{previewResult}</p></Dialog>}
+    {preview && <Dialog open title={`Prévia · ${label(selected)}`} width="2xl" onClose={() => setPreview(null)}><label className="mb-4 block text-sm font-medium">Versão do formulário<select aria-label="Versão do formulário" className="mt-1 w-full rounded border p-2" value={formVersion} onChange={e => { setFormVersion(e.target.value); setPreviewResult(''); }}><option value="current">Rascunho atual</option>{state.formVersions?.map(v => <option key={v.version} value={v.version}>Versão {v.version} · {v.status}</option>)}</select></label><ReactForm key={formVersion} ref={previewRef} schema={previewSchema} automationScripts={preview} /><button className={`${button} mt-4`} onClick={async () => { const result = await previewRef.current?.submit(); setPreviewResult(result && !Object.keys(result.errors).length ? 'Validação concluída. Nenhum dado foi enviado.' : JSON.stringify(result?.errors)); }}>Simular envio</button><p role="status" className="mt-2 text-sm">{previewResult}</p></Dialog>}
     {revision && <Dialog open title={`Versão ${revision.version} · diferenças e conversas`} width="2xl" onClose={() => setRevision(null)}><div className="space-y-4">{[...new Set([...scripts, ...revision.scripts].map(s => s.taskId))].map(id => <div key={id}><h3>{label(id)}</h3><CodeDiff before={codeOf(scripts, id)} after={codeOf(revision.scripts, id)} /></div>)}{revision.conversations.map((c, i) => <div key={i}><h3 className="font-medium">Solicitado por {c.requesterName}</h3>{c.messages.map((m, j) => <div key={j} className="my-2 rounded border p-2 text-sm"><p>{m.role} · {new Date(m.createdAt).toLocaleString()} · {m.model}</p><p className="whitespace-pre-wrap">{m.content}</p>{m.code != null && <pre className="overflow-auto text-xs">{m.code}</pre>}</div>)}</div>)}</div></Dialog>}
   </div>;
 }

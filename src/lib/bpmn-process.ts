@@ -1,3 +1,5 @@
+import { syncTaskFieldEntries } from './bpmn-form-fields';
+import { extractFields } from './form-schema';
 /**
  * Helpers para acessar o elemento `bpmn:Process` raiz do diagrama atual e
  * sua configuração `septem:ProcessConfig`.
@@ -8,6 +10,7 @@
  */
 
 import { getExtensionConfig, setExtensionConfig } from './bpmn-helpers';
+import { parseNativeForm, type NativeFormDefinition } from './native-form';
 
 type AnyModeler = any;
 
@@ -107,6 +110,18 @@ export function getEmbeddedFormSchema(modeler: AnyModeler, strict = false): unkn
     if (strict) throw new Error('Schema do formulário inválido.');
     return null;
   }
+}
+
+/** E1 transport for the native editor: same process persistence, validated native contract. */
+export function getEmbeddedNativeForm(modeler: AnyModeler): NativeFormDefinition | null {
+  const schema = getEmbeddedFormSchema(modeler, true);
+  return schema === null ? null : parseNativeForm(schema);
+}
+
+export function setEmbeddedNativeForm(modeler: AnyModeler, definition: NativeFormDefinition) {
+  const valid = parseNativeForm(definition);
+  syncTaskFieldEntries(modeler, extractFields(getEmbeddedFormSchema(modeler)), extractFields(valid));
+  setEmbeddedFormSchema(modeler, valid);
 }
 
 export function setEmbeddedFormSchema(modeler: AnyModeler, schema: unknown) {

@@ -32,24 +32,24 @@ try {
  for(const query of ['', '?key=existente', '?strict=1', '?key=existente&strict=1']) {
   const page=await browser.newPage({viewport:{width:1280,height:900}}); const errors=[]; let receiveSave; const saved=new Promise(r=>{receiveSave=r});
   page.on('pageerror', e=>errors.push(e.stack??e.message));
-  await page.route('http://startup.local/**', async r=>{
+  await page.route('http://localhost/**', async r=>{
     const url=r.request().url();
     if(!url.includes('/api/')) return r.fulfill({contentType:'text/html',body:'<div id="root"></div>'});
     if(['POST','PUT'].includes(r.request().method()) && url.includes('/process-definitions/')) receiveSave({method:r.request().method(),body:r.request().postDataJSON()});
     const body=url.includes('/api/v1/me')?{id:'test',name:'Admin',email:'admin@local',isInternal:true,perms:['*'],accessProfiles:[]}:url.includes('/api/tenant/config')?{tenantId:'test'}:url.includes('/process-definitions/')?{key:'existente',name:'Processo existente',version:1,status:'draft',bpmnXml:xml.replace('id="Process_1" isExecutable','id="Process_1" name="Processo existente" isExecutable'),hasInstances:false}:[];
     return r.fulfill({contentType:'application/json',body:JSON.stringify(body)});
   });
-  await page.goto('http://startup.local/flows/edit'+query);await page.addScriptTag({path:join(dir,'app.js')});
-  await page.waitForFunction(()=>document.body.innerText.includes('Unexpected Application Error')||!!document.querySelector('.septem-cockpit:not([inert])'),null,{timeout:15000});
+  await page.goto('http://localhost/flows/edit'+query);await page.addScriptTag({path:join(dir,'app.js')});
+  await page.waitForFunction(()=>document.body.innerText.includes('Unexpected Application Error')||!!document.querySelector('[data-native-editor]'),null,{timeout:15000});
   const body=await page.locator('body').innerText();
   assert.ok(!body.includes('Unexpected Application Error'),body);
-  await page.getByRole('button',{name:'JavaScript',exact:true,includeHidden:true}).waitFor({state:'attached'});
+  await page.getByRole('button',{name:'Importar JSON',exact:true,includeHidden:true}).waitFor({state:'attached'});
   assert.deepEqual(errors,[]);
   if(query.includes('key=')) assert.equal(await page.evaluate(()=>window.modeler.get('canvas').getRootElement().businessObject.name),'Processo existente');
   await page.evaluate(()=>window.rename('Nome alterado'));
   await page.waitForFunction(()=>window.modeler.get('canvas').getRootElement().businessObject.name==='Nome alterado');
   await page.getByRole('button',{name:'Salvar',exact:true}).click();
-  const request=await saved;assert.equal(request.method,query.includes('key=')?'PUT':'POST');assert.ok(request.body.bpmnXml.includes('name="Nome alterado"'));
+  const request=await saved;assert.equal(request.method,query.includes('key=')?'PUT':'POST');assert.ok(request.body.bpmnXml.includes('name="Nome alterado"'));assert.ok(request.body.bpmnXml.includes('septem-native'),'persiste definição nativa pelo BPMN real');
   assert.deepEqual(errors,[]);console.log(`PASSOU: criar/abrir, renomear e salvar ${query||'novo'}`);await page.close();
  }
 } finally {await browser.close();}

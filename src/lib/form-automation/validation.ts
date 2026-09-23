@@ -21,3 +21,24 @@ export function validateAutomation(code: string): { errors: string[]; warnings: 
   } catch (e) { errors.push((e as Error).message); }
   return { errors: [...new Set(errors)], warnings: [...new Set(warnings)] };
 }
+
+/** Literal calls are hints, not a proof of compatibility for unrestricted JavaScript. */
+export function automationReferences(code: string): string[] {
+  const references = new Set<string>();
+  try {
+    const ast = parse(`async function automation(form){\n${code}\n}`, { ecmaVersion: 2022 });
+    simple(ast, { CallExpression(node) {
+      const callee = node.callee;
+      if (callee.type !== 'MemberExpression' || callee.object.type !== 'Identifier' || callee.object.name !== 'form') return;
+      const method = callee.property.type === 'Identifier' ? callee.property.name : callee.property.type === 'Literal' ? callee.property.value : undefined;
+      if (!['get', 'set', 'field', 'show', 'hide', 'remove', 'setRequired', 'setDisabled', 'setOptions', 'cell'].includes(String(method))) return;
+      const first = node.arguments[0];
+      if (first?.type === 'Literal' && typeof first.value === 'string') references.add(first.value);
+      if (method === 'cell') {
+        const column = node.arguments[2];
+        if (column?.type === 'Literal' && typeof column.value === 'string') references.add(column.value);
+      }
+    } });
+  } catch { /* syntax diagnostics are produced by validateAutomation */ }
+  return [...references];
+}

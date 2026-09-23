@@ -1,10 +1,10 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Eye, EyeOff, Pencil } from 'lucide-react';
 import { selectFieldGroups, useFormStore } from '@/stores/form';
-import { extractFields } from '@/lib/form-schema';
-import { getEmbeddedFormSchema } from '@/lib/bpmn-process';
+import { useEnsureFormFields } from '@/lib/use-ensure-form-fields';
 import {
   getFormFieldEntries,
+  findFieldEntry,
   setFormFieldEntries,
   upsertFieldEntry,
   type FieldVisibility,
@@ -25,7 +25,7 @@ const HUMAN_TASK_TYPES = new Set(['bpmn:UserTask', 'bpmn:StartEvent']);
 
 /**
  * View "Tarefas × Campos" — matriz full-page. Linhas = campos do formulário
- * agrupados pelo container do form-js. Colunas = tarefas humanas + Início.
+ * agrupados pela identidade do agrupamento. Colunas = tarefas humanas + Início.
  *
  * Cada célula expõe o toggle 3-estados (oculto/visível/editável) e persiste
  * em `septem:FormFields > septem:FormFieldEntry[]` na tarefa correspondente.
@@ -34,17 +34,8 @@ const HUMAN_TASK_TYPES = new Set(['bpmn:UserTask', 'bpmn:StartEvent']);
  */
 export function TarefasCamposView({ modeler }: Props) {
   const formFields = useFormStore((s) => s.fields);
-  const setFields = useFormStore((s) => s.setFields);
+  useEnsureFormFields(modeler);
   const fieldGroups = useMemo(() => selectFieldGroups(formFields), [formFields]);
-
-  // A matriz lê os campos do store, populado pelo polling do FormulárioView.
-  // Ao abrir direto nesta aba, o store pode estar vazio — sincroniza a partir do
-  // schema embutido no XML.
-  useEffect(() => {
-    if (!modeler) return;
-    const schema = getEmbeddedFormSchema(modeler);
-    if (schema) setFields(extractFields(schema as any));
-  }, [modeler, setFields]);
 
   const [tasks, setTasks] = useState<TaskInfo[]>([]);
   const [entriesByTask, setEntriesByTask] = useState<Record<string, FormFieldEntry[]>>({});
@@ -86,7 +77,7 @@ export function TarefasCamposView({ modeler }: Props) {
 
   function setCell(taskId: string, fieldRef: string, visibility: FieldVisibility) {
     const current = entriesByTask[taskId] ?? [];
-    const next = upsertFieldEntry(current, fieldRef, { visibility });
+    const next = upsertFieldEntry(current, fieldRef, { visibility }, formFields);
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
     setFormFieldEntries(modeler, task.element, next);
@@ -94,7 +85,7 @@ export function TarefasCamposView({ modeler }: Props) {
   }
 
   function entryFor(taskId: string, fieldRef: string): FormFieldEntry {
-    const e = entriesByTask[taskId]?.find((x) => x.fieldRef === fieldRef);
+    const e = findFieldEntry(entriesByTask[taskId] ?? [], fieldRef, formFields);
     return e ?? { fieldRef, visibility: 'visible' };
   }
 
@@ -103,7 +94,7 @@ export function TarefasCamposView({ modeler }: Props) {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
     let next = entriesByTask[taskId] ?? [];
-    for (const ref of fieldRefs) next = upsertFieldEntry(next, ref, { visibility });
+    for (const ref of fieldRefs) next = upsertFieldEntry(next, ref, { visibility }, formFields);
     setFormFieldEntries(modeler, task.element, next);
     setEntriesByTask((m) => ({ ...m, [taskId]: next }));
   }
@@ -141,10 +132,10 @@ export function TarefasCamposView({ modeler }: Props) {
             </tr>
           </thead>
           <tbody>
-            {fieldGroups.map(({ group, fields }) => (
+            {fieldGroups.map(({ id, group, fields }) => (
               // key no Fragment (não só na <tr> interna) — sem isso o React loga
               // "unique key" e pode re-renderizar grupos fora de ordem.
-              <Fragment key={group}>
+              <Fragment key={id}>
                 <tr className="bg-slate-100">
                   <th
                     className="sticky left-0 z-10 bg-slate-100 px-4 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600"

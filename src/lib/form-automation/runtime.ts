@@ -1,5 +1,5 @@
 import jquery from 'jquery';
-import type { FormComponent } from '@/lib/form-validation';
+import type { FormComponent, FieldState } from '@/lib/form-validation';
 
 export type AutomationSource = { taskId: string; code: string };
 export type AutomationSchema = { components?: FormComponent[]; [key: string]: unknown };
@@ -11,6 +11,7 @@ export type FormAutomationAdapter = {
   set: (key: string, value: unknown) => void;
   getSchema: () => AutomationSchema;
   setSchema: (schema: AutomationSchema) => void;
+  setFieldState: (path: string, patch: FieldState[string]) => void;
   setOptions: (key: string, options: { value: string; label: string }[]) => void;
   dataSource: (id: string, parameters?: Record<string, string>) => Promise<unknown>;
   onError: (message: string) => void;
@@ -59,6 +60,13 @@ export function createFormAutomation(adapter: FormAutomationAdapter, scripts: Au
     if (!found) throw new Error(`Elemento não encontrado: ${id}`);
     adapter.setSchema(schema);
   }
+  function find(id: string, list = adapter.getSchema().components ?? []): FormComponent | undefined {
+    for (const component of list) {
+      if (component.id === id || component.key === id) return component;
+      const child = find(id, component.components ?? []);
+      if (child) return child;
+    }
+  }
   const form = {
     root: adapter.root,
     query: (selector: string) => adapter.root.querySelectorAll(selector),
@@ -66,6 +74,31 @@ export function createFormAutomation(adapter: FormAutomationAdapter, scripts: Au
     get: (key: string) => structuredClone(adapter.getData()[key]),
     set: (key: string, value: unknown) => { if (!disposed) adapter.set(key, value); },
     getSchema: () => structuredClone(adapter.getSchema()),
+    has: (id: string) => !!find(id),
+    cell: (tableId: string, index: number, columnId: string) => {
+      const table = find(tableId);
+      const column = table?.components?.find(c => c.id === columnId || c.key === columnId);
+      const rows = () => table?.key ? adapter.getData()[table.key] : undefined;
+      const exists = () => Number.isInteger(index) && index >= 0 && Array.isArray(rows()) && index < (rows() as unknown[]).length;
+      if (table?.type !== 'dynamiclist' || !table.key || !column?.key || !exists()) throw new Error('Célula não encontrada.');
+      const tableKey = table.key, columnKey = column.key;
+      const patch = (state: FieldState[string]) => {
+        if (disposed) return;
+        if (!exists()) throw new Error('Célula não encontrada.');
+        adapter.setFieldState(`${tableKey}.${index}.${columnKey}`, state);
+      };
+      return {
+        get: () => structuredClone((rows() as Record<string, unknown>[])[index]?.[columnKey]),
+        set: (value: unknown) => {
+          if (disposed) return;
+          if (!exists()) throw new Error('Célula não encontrada.');
+          adapter.set(tableKey, (rows() as Record<string, unknown>[]).map((row, i) => i === index ? { ...row, [columnKey]: value } : row));
+        },
+        show: () => patch({ hidden: false }), hide: () => patch({ hidden: true }),
+        setDisabled: (disabled: boolean) => patch({ disabled }),
+        setRequired: (required: boolean) => patch({ required }),
+      };
+    },
     setSchema: (schema: AutomationSchema) => { if (!disposed) adapter.setSchema(structuredClone(schema)); },
     update: (id: string, patch: Partial<FormComponent>) => edit(id, c => Object.assign(c, patch)),
     add: (component: FormComponent, parentId?: string) => {

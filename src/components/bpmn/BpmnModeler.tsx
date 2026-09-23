@@ -3,6 +3,7 @@ import Modeler from 'bpmn-js/lib/Modeler';
 import emptyDiagram from '@/assets/empty-diagram.bpmn?raw';
 import { SeptemPaletteModule } from './SeptemPaletteProvider';
 import { SeptemContextPadModule } from './SeptemContextPadProvider';
+import { installCanvasColors } from './canvasColors';
 import septemModdle from './septem-moddle.json';
 import { useModeladorStore } from '@/stores/modelador';
 
@@ -48,6 +49,7 @@ export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, re
     });
     modelerRef.current = modeler;
     setInitializationError(false);
+    const removeCanvasColors = installCanvasColors(modeler);
 
     // Começa SEMPRE em branco: um processo existente é importado por ModeladorPage
     // (via ?key=), e "Novo processo" (sem key) fica em branco. NÃO restauramos do
@@ -93,6 +95,7 @@ export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, re
       window.clearTimeout(saveTimer);
       watchedEvents.forEach((ev) => eventBus.off(ev, scheduleSave));
       eventBus.off('selection.changed', onSelectionChanged);
+      removeCanvasColors();
       modelerRef.current = null;
       setSelectedElementId(null);
       modeler.destroy();
@@ -122,7 +125,7 @@ export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, re
 
   return <>
     {initializationError && <p role="alert" className="p-4 text-sm text-rose-600">Não foi possível iniciar o modelador. Reabra o processo para tentar novamente.</p>}
-    <div ref={canvasRef} className="flex-1 bg-white" />
+    <div ref={canvasRef} className="septem-bpmn-modeler flex-1 bg-white" />
   </>;
 });
 

@@ -124,8 +124,8 @@ export function usePublicService(key: string | undefined) {
 }
 
 /** Envio anônimo. Devolve o número do protocolo — é o que o cidadão anota. */
-export function submitPublicService(key: string, data: unknown, turnstileToken: string | null) {
-  return api.post<{ number: number }>(`/api/v1/public/services/${key}/submit`, { data, turnstileToken });
+export function submitPublicService(key: string, data: unknown, turnstileToken: string | null, formState?: unknown) {
+  return api.post<{ number: number }>(`/api/v1/public/services/${key}/submit`, { data, turnstileToken, formState });
 }
 
 // ── Autocadastro do cidadão (Fase 8) ────────────────────────────────────────

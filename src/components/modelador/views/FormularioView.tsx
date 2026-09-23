@@ -1,111 +1,74 @@
 import { useSessionStore } from '@/stores/session';
-import { openTab } from '@/lib/nav';
 import { routes } from '@/lib/routes';
-import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Rows3, Columns3, Regex, Eye, FileUp } from 'lucide-react';
-import { IconButton } from '@/components/ui/IconButton';
+import { useMemo, useRef, useState } from 'react';
+import { Regex, FileUp, Download, Eye, Code2 } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
-import { Tooltip } from '@/components/ui/Tooltip';
-import { FormBuilder } from '@/components/form/FormBuilder';
-import { useProcessFormEditor } from '@/components/form/useProcessFormEditor';
-import { FormFieldsPalette } from '@/components/form/FormFieldsPalette';
-import { FieldConfigPanel } from '@/components/form/FieldConfigPanel';
-import { ReactForm } from '@/components/form/ReactForm';
+import { ReactForm, type ReactFormHandle } from '@/components/form/ReactForm';
+import { IconButton } from '@/components/ui/IconButton';
 import { MasksDialog } from '@/components/form/MasksDialog';
-import { ImportFormDialog } from '@/components/form/ImportFormDialog';
-import { useProcessDefinition } from '@/lib/api/process-definitions';
+import { NativeFormEditor } from '@/components/form/NativeFormEditor';
+import { useNativeProcessForm } from '@/components/form/useNativeProcessForm';
 import { useFormMasks } from '@/lib/api/forms';
+import { toast } from '@/stores/toast';
 
-type Props = { modeler: any | null; processReady?: boolean };
+type Props = { modeler: any | null; processReady?: boolean; processKey?: string | null };
 
-/**
- * View "Formulário" — editor do @bpmn-io/form-js (FormBuilder) com o painel direito
- * estendido (grupo "Configurações Septem"). Além disso, um seletor define como os
- * grupos PRINCIPAIS são exibidos na execução: empilhados ou em abas. A flag viaja
- * no schema (`septemGroupLayout`), injetada na persistência e removida antes de
- * importar no editor (o form-js não precisa conhecê-la).
- */
-export function FormularioView({ modeler, processReady = true }: Props) {
-  const { builderRef, ready, loadError, selectedField, setSelectedField, groupLayout,
-    changeLayout, importForm, getPreview } = useProcessFormEditor(modeler, processReady);
+/** Native draft editor with the E4 filling preview; automation authoring follows in E6. */
+export function FormularioView({ modeler, processReady = true, processKey }: Props) {
+  const { definition, revision, error, update, importDefinition } = useNativeProcessForm(modeler, processReady);
   const masks = useFormMasks();
-  const canCustomize = useSessionStore(s => s.can('forms:javascript'));
+  const canAutomate = useSessionStore(s => s.can('forms:javascript'));
   const [masksOpen, setMasksOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
-  const [params] = useSearchParams();
-  const processDef = useProcessDefinition(params.get('key'));
-  const hasInstances = !!processDef.data?.hasInstances;
-  const [preview, setPreview] = useState<unknown | null>(null);
-  const maskOptions = useMemo(
-    () => (masks.data ?? []).map((m) => ({ value: m.id, label: m.name, regex: m.regex, template: m.template, shouldValidate: m.shouldValidate })),
-    [masks.data],
-  );
-
-  return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-2">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-900">Formulário do processo</h2>
-          <p className="text-xs text-slate-500">
-            Configure cada campo no painel à direita (máscara, fonte de dados, ajuda, visibilidade).
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Layout dos grupos principais — só afeta a EXECUÇÃO (não o editor) */}
-          <span className="text-xs text-slate-400">Grupos na execução:</span>
-          <div className="flex overflow-hidden rounded-md border border-slate-300" title="Como exibir os grupos principais quando o serviço/tarefa é aberto (não muda o editor)">
-            <button type="button" onClick={() => changeLayout('stacked')}
-              className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium ${groupLayout === 'stacked' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
-              <Rows3 size={13} /> Empilhados
-            </button>
-            <button type="button" onClick={() => changeLayout('tabs')}
-              className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium ${groupLayout === 'tabs' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
-              <Columns3 size={13} /> Abas
-            </button>
-          </div>
-          <IconButton disabled={!ready} onClick={() => setPreview(getPreview())}><Eye size={14} /> Pré-visualizar</IconButton>
-          {canCustomize && <IconButton disabled={!params.get('key')} onClick={() => openTab(routes.formAutomation(params.get('key')!))}>JavaScript</IconButton>}
-          <IconButton onClick={() => setMasksOpen(true)}><Regex size={14} /> Máscaras</IconButton>
-          {hasInstances ? (
-            <Tooltip text="Este processo já tem instâncias iniciadas. Importar sobrescreveria o formulário e quebraria os dados já preenchidos.">
-              <span data-testid="import-btn-disabled" className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-300"><FileUp size={14} /> Importar</span>
-            </Tooltip>
-          ) : (
-            <IconButton disabled={!ready} onClick={() => setImportOpen(true)}><FileUp size={14} /> Importar</IconButton>
-          )}
-          {/* "Limpar formulário" e "Modelo com agrupamento" removidos a pedido do
-              dono (2026-07-10): destrutivo/raramente úteis. */}
-        </div>
-      </header>
-      {!ready && <p role={loadError ? 'alert' : 'status'} className="px-5 py-3 text-sm">{loadError ?? 'Carregando formulário…'}</p>}
-      <div inert={!ready} className={`septem-cockpit flex flex-1 overflow-hidden ${!ready ? 'invisible' : ''}`}>
-        <FormFieldsPalette onAdd={(t) => builderRef.current?.addField(t)} />
-        {/* Canvas ocupa todo o meio entre a paleta e o painel de config. */}
-        <div className="flex flex-1 flex-col overflow-hidden bg-slate-100 p-3">
-          <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-            <FormBuilder ref={builderRef} onSelect={setSelectedField} />
-          </div>
-        </div>
-        <FieldConfigPanel
-          field={selectedField}
-          editField={(f, p, v) => builderRef.current?.editField(f, p, v)}
-          masks={maskOptions}
-        />
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewResult, setPreviewResult] = useState('');
+  const previewRef = useRef<ReactFormHandle>(null);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const maskOptions = useMemo(() => (masks.data ?? []).map(m => ({ value: m.id, label: m.name, regex: m.regex, template: m.template, shouldValidate: m.shouldValidate })), [masks.data]);
+  // Async file reads may finish after switching process; never apply to another draft.
+  const currentDefinition = useRef(definition);
+  currentDefinition.current = definition;
+  async function importFile(file?: File) {
+    if (!file || !definition) return;
+    const original = definition;
+    setImporting(true); setImportError(null);
+    try {
+      const parsed: unknown = JSON.parse(await file.text());
+      if (currentDefinition.current !== original) throw new Error('O formulário mudou durante a leitura. Selecione o arquivo novamente.');
+      importDefinition(parsed); toast.success('Definição nativa importada para o rascunho.');
+    } catch (cause) { setImportError(cause instanceof Error ? cause.message : 'Não foi possível importar. Escolha uma definição nativa em JSON.'); }
+    finally { setImporting(false); if (input.current) input.current.value = ''; }
+  }
+  function exportDefinition() {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(definition, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a'); link.href = url; link.download = 'formulario-nativo.json'; link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+  return <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-3">
+      <div><h2 className="text-sm font-semibold text-slate-900">Formulário do processo</h2><p className="text-xs text-slate-600">Selecione um agrupamento e adicione os campos. As alterações compõem o rascunho do processo.</p></div>
+      <div className="flex flex-wrap items-center gap-2">
+        {canAutomate && <IconButton disabled={!processKey} title={processKey ? 'Editar automações do processo salvo' : 'Salve o processo para editar automações'} onClick={() => { if (processKey) window.open(`${import.meta.env.BASE_URL ?? '/'}${routes.formAutomation(processKey).replace(/^\//, '')}`, '_blank', 'noopener,noreferrer'); }}><Code2 size={15} /> JavaScript</IconButton>}
+        <IconButton disabled={!definition} onClick={() => { setPreviewResult(''); setPreviewOpen(true); }}><Eye size={14} /> Prévia</IconButton>
+        <IconButton onClick={() => setMasksOpen(true)}><Regex size={14} /> Máscaras</IconButton>
+        <IconButton disabled={!definition || importing} onClick={() => input.current?.click()}><FileUp size={14} /> {importing ? 'Importando…' : 'Importar JSON'}</IconButton>
+        <IconButton disabled={!definition} onClick={exportDefinition}><Download size={14} /> Exportar JSON</IconButton>
+        <input ref={input} type="file" accept=".json,application/json" aria-label="Importar definição nativa" className="sr-only" tabIndex={-1} onChange={e => void importFile(e.target.files?.[0])} />
       </div>
-      {masksOpen && <MasksDialog onClose={() => setMasksOpen(false)} />}
-      {importOpen && (
-        <ImportFormDialog
-          onClose={() => setImportOpen(false)}
-          onApply={importForm}
-        />
-      )}
-      {preview != null && (
-        <Dialog open onClose={() => setPreview(null)} width="lg" title="Pré-visualização do formulário"
-          footer={<button type="button" onClick={() => setPreview(null)} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Fechar</button>}>
-          <ReactForm schema={preview} />
-        </Dialog>
-      )}
-    </div>
-  );
+    </header>
+    {error && <p role="alert" className="px-5 py-3 text-sm text-red-700">{error}</p>}
+    {importError && <p role="alert" className="px-5 py-3 text-sm text-red-700">{importError}</p>}
+    {!definition && !error && <p role="status" className="px-5 py-3 text-sm">Carregando formulário…</p>}
+    {definition && <NativeFormEditor key={`${processKey}:${definition.id}:${revision}`} definition={definition} modeler={modeler} processKey={processKey} update={update} masks={maskOptions} />}
+    {masksOpen && <MasksDialog onClose={() => setMasksOpen(false)} />}
+    {previewOpen && definition && <Dialog open title="Prévia do formulário" width="2xl" onClose={() => setPreviewOpen(false)}>
+      <p className="mb-4 text-sm text-slate-600">Teste o preenchimento e as pendências. As respostas desta prévia não serão salvas.</p>
+      <ReactForm ref={previewRef} schema={definition} />
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <IconButton onClick={async () => { const result = await previewRef.current?.submit(); setPreviewResult(result && !Object.keys(result.errors).length ? 'Validação concluída. Nenhuma pendência.' : 'Revise os campos indicados antes de continuar.'); }}>Validar preenchimento</IconButton>
+        <p role="status" className="text-sm text-slate-700">{previewResult}</p>
+      </div>
+    </Dialog>}
+  </div>;
 }

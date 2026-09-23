@@ -25,6 +25,8 @@ import {
 } from '@/lib/api/process-definitions';
 import type { BpmnModelerHandle } from '@/components/bpmn/BpmnModeler';
 import { routes } from '@/lib/routes';
+import { getEmbeddedFormSchema } from '@/lib/bpmn-process';
+import { nativeFields, parseNativeForm } from '@/lib/native-form';
 
 /**
  * Shell da página `/flows/edit`. Não contém lógica de modelagem — só:
@@ -183,6 +185,14 @@ export function ModeladorPage() {
     try {
       const xml = await currentXml();
       if (xml == null) return;
+      const schema = getEmbeddedFormSchema(modeler, true);
+      if (schema && typeof schema === 'object' && 'format' in schema && schema.format === 'septem-native') {
+        const unnamed = nativeFields(parseNativeForm(schema)).filter(({ field }) => !field.key);
+        if (unnamed.length) {
+          toast.error(`Preencha a chave de ${unnamed.length === 1 ? 'um campo' : `${unnamed.length} campos`} antes de publicar.`);
+          return;
+        }
+      }
       const r = key
         ? await updateMut.mutateAsync({ key, bpmnXml: xml })
         : await saveMut.mutateAsync({ bpmnXml: xml });
@@ -258,13 +268,13 @@ export function ModeladorPage() {
           <FluxoView ref={modelerHandleRef} onReady={onReady} modelerInstance={modeler} />
         </div>
         {/*
-          O editor de Formulário (form-js) também fica SEMPRE montado (oculto via
+          O editor de Formulário nativo também fica SEMPRE montado (oculto via
           `hidden`): remontá-lo ao trocar de view fazia a paleta de componentes
           sumir e recriava o editor desnecessariamente.
         */}
         <div className={currentView === 'formulario' ? 'flex flex-1 overflow-hidden' : 'hidden flex-1'}>
           <ErrorBoundary context="o editor de formulário">
-            <FormularioView modeler={modeler} processReady={!key || loadedKey === key} />
+            <FormularioView processKey={key} modeler={modeler} processReady={!key || loadedKey === key} />
           </ErrorBoundary>
         </div>
         {currentView === 'tarefasXcampos' && (

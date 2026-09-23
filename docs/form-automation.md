@@ -57,6 +57,25 @@ form.beforeSubmit(async () => {
 
 Use a API `form` para mudanças controladas pelo React; alterações diretas com jQuery no DOM podem ser substituídas por um novo render. Para manipular valores de listas, leia e atualize o array pela chave da lista.
 
+## Formulários nativos: existência e células
+
+`form.has(idOuKey)` consulta a estrutura em execução, inclusive elementos criados pelo próprio script. Use essa consulta para adaptar código a versões que não possuem determinado campo; ela não garante compatibilidade do restante do programa.
+
+```javascript
+if (form.has('nome')) {
+  form.setDisabled('nome', false);
+}
+if (form.has('pessoas')) {
+  form.set('pessoas', [{ cpf: '52998224725' }, { cpf: '' }]);
+  form.cell('pessoas', 0, 'cpf').setDisabled(true);
+  form.cell('pessoas', 1, 'cpf').setRequired(true);
+}
+```
+
+`form.cell(idOuChaveTabela, indice, idOuChaveColuna)` oferece `get()`, `set(valor)`, `show()`, `hide()`, `setDisabled(boolean)` e `setRequired(boolean)`. O índice começa em zero e deve identificar uma linha existente. A configuração da célula prevalece sobre a configuração da coluna; o modo de leitura global continua prevalecendo. Referências de célula são posicionais: obtenha-as novamente após remover ou reordenar linhas. Alterações feitas em `beforeSubmit` já participam da validação daquele envio e dos contadores.
+
+`getSchema`, `setSchema`, `add` e `update` operam sobre o modelo visual React (`components`), derivado da definição nativa; não publicam uma definição. Abas usam `type: 'group', nativeTab: true`; tabelas usam `type: 'dynamiclist', nativeTable: true`. A definição original da sessão delimita as respostas serializadas: campos temporários são excluídos, linhas de tabelas existentes conservam somente colunas definidas e ocultar um campo preserva seu valor. O backend e a publicação integrada de E6 ainda precisam de verificação específica; consulte o [andamento da etapa](specs/formularios-nativos-e6.md).
+
 ## Validação e acesso
 
 A análise do editor detecta sintaxe inválida e referências indefinidas; também avisa sobre `debugger` e laços sem condição de saída. O servidor revalida sintaxe e vínculo de tarefas ao salvar/publicar. A análise não prova que o programa funciona para todos os dados. Código síncrono com loop infinito ainda pode travar a página; a prévia deve ser usada antes de publicar.
@@ -73,3 +92,9 @@ A API de execução entrega apenas o código comum e o script da tarefa autoriza
 - No back-end: `dotnet test tests/Septem.Integration.Tests --filter FullyQualifiedName~FormAutomationTests`
 
 Os testes do agente usam um transporte OpenRouter simulado para verificar o contrato, histórico e troca de modelo, sem enviar código a um provedor real.
+
+## Versões e validação nativa
+
+O editor oferece prévia do rascunho e das versões publicadas/em uso retornadas pelo servidor. A análise de referências identifica chamadas com chaves literais; expressões calculadas e JavaScript livre exigem testar o script nas versões relevantes. A publicação de automação continua independente da estrutura.
+
+Ao enviar um formulário nativo, `formState` transporta visibilidade, edição e obrigatoriedade finais separadamente das respostas. O servidor considera esse estado quando há automação configurada, preserva a definição vinculada à requisição e valida seus tipos. Campos temporários não passam a integrar a persistência. As permissões de execução são verificadas pelo servidor independentemente desse estado; ocultação de UI não é controle de acesso.

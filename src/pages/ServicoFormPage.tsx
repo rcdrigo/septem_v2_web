@@ -50,11 +50,11 @@ export function ServicoFormPage() {
   if (!token) return <Navigate to={routes.login} replace />;
 
   async function submit(button?: TaskButton) {
-    const { data, errors } = await fillRef.current?.submit() ?? { data: {}, errors: {} };
+    const { data, errors, formState } = await fillRef.current?.submit() ?? { data: {}, errors: {} };
     if (errors._automation || ((button?.validateForm ?? true) && Object.keys(errors).length)) { toast.error(errors._automation ? 'O envio foi bloqueado pela automação.' : 'Preencha os campos obrigatórios.'); return; }
     try {
       const r = await start.mutateAsync({
-        key: processKey!, data,
+        key: processKey!, data, formState,
         isTest: canSimulate && isTest,
         useHomologation: canSimulate && isTest && usarHomologacao,
       });

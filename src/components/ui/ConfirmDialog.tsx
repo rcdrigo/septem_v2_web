@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useRef } from 'react';
+import { Dialog as BaseDialog } from '@base-ui/react/dialog';
 import { create } from 'zustand';
 import { TriangleAlert } from 'lucide-react';
 
@@ -65,55 +66,49 @@ export function confirm(opts: {
 export function ConfirmDialogHost() {
   const { open, title, message, confirmLabel, cancelLabel, destructive, resolve } = useConfirmStore();
 
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') resolve(false);
-      if (e.key === 'Enter') resolve(true);
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, resolve]);
-
-  if (!open) return null;
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="w-full max-w-md rounded-lg bg-white shadow-2xl">
-        <div className="flex items-start gap-3 p-5">
-          {destructive && (
-            <div className="mt-0.5 rounded-full bg-rose-50 p-1.5 text-rose-600">
-              <TriangleAlert size={20} />
+    <BaseDialog.Root open={open} disablePointerDismissal onOpenChange={(next) => { if (!next) resolve(false); }}>
+      <BaseDialog.Portal>
+        <BaseDialog.Backdrop className="fixed inset-0 z-[1100] bg-slate-900/40" />
+        <BaseDialog.Viewport className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
+          <BaseDialog.Popup initialFocus={cancelRef} className="max-h-full w-full max-w-md overflow-y-auto rounded-lg bg-white shadow-2xl">
+            <div className="flex items-start gap-3 p-5">
+              {destructive && (
+                <div className="mt-0.5 rounded-full bg-rose-50 p-1.5 text-rose-600">
+                  <TriangleAlert size={20} />
+                </div>
+              )}
+              <div className="flex-1">
+                <BaseDialog.Title className="text-base font-semibold text-slate-900">{title}</BaseDialog.Title>
+                <BaseDialog.Description className="mt-1 text-sm text-slate-600">{message}</BaseDialog.Description>
+              </div>
             </div>
-          )}
-          <div className="flex-1">
-            <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-            <p className="mt-1 text-sm text-slate-600">{message}</p>
-          </div>
-        </div>
-        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3">
-          <button
-            type="button"
-            onClick={() => resolve(false)}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            {cancelLabel}
-          </button>
-          <button
-            type="button"
-            autoFocus
-            onClick={() => resolve(true)}
-            className={[
-              'rounded-md px-3 py-1.5 text-sm font-medium text-white',
-              destructive
-                ? 'bg-rose-600 hover:bg-rose-700'
-                : 'bg-slate-900 hover:bg-slate-800',
-            ].join(' ')}
-          >
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3">
+              <BaseDialog.Close
+                ref={cancelRef}
+                type="button"
+                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                {cancelLabel}
+              </BaseDialog.Close>
+              <button
+                type="button"
+                onClick={() => resolve(true)}
+                className={[
+                  'rounded-md px-3 py-1.5 text-sm font-medium text-white',
+                  destructive
+                    ? 'bg-rose-600 hover:bg-rose-700'
+                    : 'bg-slate-900 hover:bg-slate-800',
+                ].join(' ')}
+              >
+                {confirmLabel}
+              </button>
+            </div>
+          </BaseDialog.Popup>
+        </BaseDialog.Viewport>
+      </BaseDialog.Portal>
+    </BaseDialog.Root>
   );
 }

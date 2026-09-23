@@ -1,3 +1,5 @@
+import { isNativeForm } from '@/lib/native-form-runtime';
+import { nativeFields } from '@/lib/native-form';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Loader2, Lock, Send, TriangleAlert } from 'lucide-react';
@@ -53,12 +55,12 @@ export function ServicoPublicoPage() {
 
   async function enviar() {
     if (!processKey) return;
-    const { data: valores, errors } = await formRef.current?.submit() ?? { data: {}, errors: {} };
+    const { data: valores, errors, formState } = await formRef.current?.submit() ?? { data: {}, errors: {} };
     if (Object.keys(errors).length) { setErro('Preencha os campos obrigatórios.'); return; }
 
     setEnviando(true); setErro(null);
     try {
-      const r = await submitPublicService(processKey, valores, token);
+      const r = await submitPublicService(processKey, valores, token, formState);
       setProtocolo(r.number);
     } catch (e) {
       const corpo = e instanceof ApiError ? (e.body as { detail?: string } | undefined) : undefined;
@@ -147,7 +149,7 @@ export function ServicoPublicoPage() {
 
       {schema ? (
         <div className="mt-5">
-          <ReactForm key={processKey} ref={formRef} automationScripts={data?.automationScripts} schema={schema} />
+          <ReactForm key={processKey} ref={formRef} uploadContext={autenticado ? { processKey } : undefined} automationScripts={data?.automationScripts} schema={schema} />
         </div>
       ) : (
         <p className="mt-5 text-sm text-slate-500">Este serviço não tem formulário publicado.</p>
@@ -207,6 +209,7 @@ function Moldura({ children }: { children: React.ReactNode }) {
 
 /** Rótulos dos campos de anexo do schema (inclusive dentro de grupos/listas). */
 function coletarAnexos(schema: unknown): string[] {
+  if (isNativeForm(schema)) return nativeFields(schema).filter(({ field }) => field.type === 'filepicker').map(({ field }) => field.label || field.key);
   const achados: string[] = [];
   const andar = (comps: unknown) => {
     if (!Array.isArray(comps)) return;

@@ -533,23 +533,23 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
   const [done, setDone] = useState<{ nextTaskForMe?: string | null; executionId?: string } | null>(null);
   const [tagsOpen, setTagsOpen] = useState(false);
   // Botão com "Obrigar justificativa": guarda o contexto até o usuário digitar e confirmar.
-  const [justify, setJustify] = useState<{ button?: TaskButton; data: unknown } | null>(null);
+  const [justify, setJustify] = useState<{ button?: TaskButton; data: unknown; formState?: unknown } | null>(null);
   useDocumentTitle(task.data?.name ?? 'Tarefa');
 
   async function finish(button?: TaskButton) {
-    const { data, errors } = await fillRef.current?.submit() ?? { data: {}, errors: {} };
+    const { data, errors, formState } = await fillRef.current?.submit() ?? { data: {}, errors: {} };
     if (errors._automation || ((button?.validateForm ?? true) && Object.keys(errors).length)) {
       toast.error(errors._automation ? 'O envio foi bloqueado pela automação.' : 'Preencha os campos obrigatórios.');
       return;
     }
-    if (button?.requireJustification) { setJustify({ button, data }); return; }
-    await doComplete(data, button?.id);
+    if (button?.requireJustification) { setJustify({ button, data, formState }); return; }
+    await doComplete(data, button?.id, undefined, formState);
   }
 
-  async function doComplete(data: unknown, action?: string, justification?: string) {
+  async function doComplete(data: unknown, action?: string, justification?: string, formState?: unknown) {
     try {
       await fillRef.current?.checkAutomation();
-      const r = await complete.mutateAsync({ id: taskId, data, action, justification });
+      const r = await complete.mutateAsync({ id: taskId, data, action, justification, formState });
       setJustify(null);
       setDone({ nextTaskForMe: r.nextTaskForMe, executionId: r.executionId });
     } catch (err) {
@@ -700,7 +700,7 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
           label={justify.button?.label}
           pending={complete.isPending}
           onCancel={() => setJustify(null)}
-          onConfirm={(texto) => doComplete(justify.data, justify.button?.id, texto)}
+          onConfirm={(texto) => doComplete(justify.data, justify.button?.id, texto, justify.formState)}
         />
       )}
     </div>

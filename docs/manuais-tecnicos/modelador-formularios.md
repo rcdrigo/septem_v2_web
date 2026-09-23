@@ -11,7 +11,9 @@ Aprenda a criar formulários claros, validar os dados recebidos e controlar como
 
 O formulário reúne as informações que entram e circulam pelo processo. Ele pode atender tanto o público externo, que solicita um licenciamento ou acompanha um contrato, quanto os servidores que analisam, complementam e decidem sobre a solicitação.
 
-O editor usa recursos do **form-js** para construir e visualizar o formulário. O Septem acrescenta integrações próprias, como a matriz **Tarefas × Campos**, fontes de dados, máscaras, documentos e automações. Uma opção descrita pela documentação geral do form-js só deve ser considerada disponível quando aparecer e funcionar na versão integrada ao sistema.
+O editor nativo organiza cada formulário em **Abas → Agrupamentos → Campos**. Cada aba contém ao menos um agrupamento, do tipo **Grupo Padrão** ou **Tabela**. A matriz **Tarefas × Campos**, fontes, máscaras, documentos e automações continuam sendo integrações do Septem.
+
+> A implantação nativa está em andamento. Consulte as pendências de integração e os critérios ainda não demonstrados no [registro da etapa 7](../specs/formularios-nativos-e7.md).
 
 Neste manual, você criará o formulário do processo fictício **Licenciamento — exercício** com quatro conjuntos de informações:
 
@@ -48,22 +50,21 @@ Defina também quais informações se repetem. Uma lista de responsáveis, equip
 
 Abra o processo e selecione **Formulário**. O editor é dividido em três áreas principais.
 
-### Paleta de componentes
+### Catálogo de campos
 
 A paleta agrupa os elementos disponíveis:
 
 | Categoria | Componentes disponíveis | Uso principal |
 |---|---|---|
-| **Container** | Grupo e Lista dinâmica. | Organizar e repetir conjuntos de campos. |
 | **Entrada** | Texto, Área de texto, Número, Data / Hora e Upload de arquivo. | Receber dados digitados ou anexados. |
 | **Seleção** | Lista, Opções, Caixa de seleção, Múltipla escolha e Tags. | Permitir escolhas previamente definidas. |
 | **Apresentação** | Texto estático, HTML, Imagem, Separador e Espaçador. | Explicar, contextualizar e organizar visualmente. |
 
-Clique em um componente para adicioná-lo. No desktop, também é possível arrastá-lo para a posição desejada.
+Selecione o agrupamento de destino e use **Adicionar campo** para abrir o catálogo. Crie estruturas pelas ações **Nova aba** e **Novo agrupamento**. Arrastar serve para reordenar ou mover campos existentes; transferências entre Grupo Padrão e Tabela usam uma ação explícita.
 
 ### Área do formulário
 
-A área central mostra a estrutura em edição. Selecione um elemento para configurá-lo, mova-o para corrigir a ordem e coloque campos dentro de grupos ou listas quando houver relação entre eles.
+A área central mostra a estrutura em edição. Selecione um elemento para configurá-lo, mova-o para corrigir a ordem e organize campos em grupos ou tabelas quando houver relação entre eles.
 
 ### Configurações do campo
 
@@ -75,12 +76,10 @@ Se o painel estiver vazio, selecione um elemento na área central.
 
 | Controle | Para que serve | Comportamento |
 |---|---|---|
-| **Empilhados** | Exibe os grupos principais em sequência vertical. | Altera a execução e a prévia; o canvas do editor não muda de formato. |
-| **Abas** | Exibe cada grupo principal como uma aba. | Altera a execução e exige que o usuário navegue entre os grupos. |
 | **Pré-visualizar** | Abre uma simulação visual do schema atual. | Ajuda a conferir campos e layout, mas não aplica regras de tarefa e acesso. |
-| **JavaScript** | Abre a automação do formulário em outra aba. | Só aparece para quem possui `forms:javascript` e depende de processo salvo. |
 | **Máscaras** | Lista, cria, edita e remove máscaras reutilizáveis. | As máscaras cadastradas passam a ficar disponíveis em campos compatíveis. |
-| **Importar** | Envia uma estrutura de formulário para validação e aplicação. | Fica bloqueado quando o processo já possui instâncias, pois a substituição poderia quebrar dados existentes. |
+| **Importar** | Lê um JSON nativo e valida sua estrutura. | Aplica ao rascunho; não converte schemas antigos. |
+| **Exportar** | Baixa a definição nativa em JSON. | Inclui identidades, abas, agrupamentos e configurações. |
 
 ### O que é configurado em cada aba do campo
 
@@ -136,7 +135,7 @@ Eventos são configuração avançada. Documente a finalidade da ação, evite e
 | Componente | Dados principais | Configurações específicas |
 |---|---|---|
 | **Grupo** | Nome e ajuda. | Ícone, contador de pendências, visibilidade, colunas e largura. |
-| **Lista dinâmica** | Nome e ajuda. | Ícone, visibilidade, colunas e largura; contém campos repetidos. |
+| **Tabela** | Nome do agrupamento e tipos de coluna. | Cada coluna é um campo de resposta; linhas são criadas durante o preenchimento. |
 | **Texto** | Nome, chave, ajuda e valor. | Fonte, obrigatório, CPF/CNPJ, máscara, prefixo/sufixo e limites. |
 | **Área de texto** | Nome, chave, ajuda e texto multilinha. | Obrigatório, máscara, prefixo/sufixo e limites. |
 | **Número** | Nome, chave e valor numérico. | Fonte, obrigatório, adornos, mínimo/máximo e limites. |
@@ -190,9 +189,9 @@ Feche a prévia, corrija o necessário e use **Salvar** na barra do modelador. A
 
 Use grupos para reunir campos do mesmo assunto. No exercício, separe **Dados do empreendimento**, **Documentos** e **Análise interna**. Evite criar um grupo para cada campo ou um único grupo com dezenas de informações sem relação visual.
 
-O editor permite definir a apresentação dos grupos na execução como **Empilhados** ou **Abas**. Empilhados favorecem a leitura contínua. Abas ajudam a dividir formulários longos, desde que os títulos sejam claros e o usuário perceba o conteúdo ainda não visitado.
+Crie abas para dividir formulários longos. Na execução, abas sem conteúdo visível ficam ocultas; se apenas uma permanecer visível, seus agrupamentos aparecem empilhados, sem navegação de abas. É possível mudar de aba sem completar a atual.
 
-O ícone e o contador de pendências, quando disponíveis, devem ajudar na orientação. Confira a execução antes de considerar a configuração concluída.
+Os contadores mostram obrigatórios vazios e respostas inválidas, inclusive por célula de tabela. Campos ocultos ou sem edição não contam. Ao enviar, o formulário abre a primeira aba com erro.
 
 ### Colunas e largura
 
@@ -203,13 +202,15 @@ Use a grade para aproximar informações relacionadas, como Município e UF. Dei
 > **Cuidado especial**
 > Uma composição lado a lado no desktop deve continuar utilizável em tela estreita. Confira rótulos, mensagens, seletores e uploads em diferentes larguras.
 
-### Lista dinâmica
+### Tabelas
 
-Use uma **Lista dinâmica** quando o usuário precisar adicionar zero, um ou vários itens com a mesma estrutura. Para cadastrar responsáveis, crie uma lista chamada **Responsáveis** e coloque dentro dela os campos **Nome**, **Função** e **E-mail**.
+Crie um agrupamento **Tabela**, informe a quantidade de colunas e escolha seus tipos. Cada campo é uma coluna e seu rótulo é o cabeçalho. Para **Responsáveis**, use as colunas **Nome**, **Função** e **E-mail**.
 
-Cada linha adicionada representa um item da coleção. Isso afeta o modo como dados são usados em relatórios, documentos e automações. Teste a lista vazia, com um item e com vários itens; confira também a remoção e a edição de uma linha.
+No preenchimento, cada linha representa uma ocorrência. A tabela começa com uma linha; a última pode ser limpa, mas não excluída pela interface. Linhas inteiramente vazias são descartadas ao salvar depois da validação de obrigatórios. Zero numérico e falso são preservados conforme o tipo.
 
-Não use lista dinâmica para opções fixas que poderiam ser representadas por múltipla escolha.
+Converter Grupo Padrão em Tabela preserva as identidades dos campos. Elementos de apresentação precisam ser movidos para outro Grupo Padrão antes da conversão. Alterações estruturais pertencem ao rascunho e não convertem respostas de requisições anteriores.
+
+Ocultar campos preserva seus valores. Scripts podem criar campos visuais, mas somente respostas de campos definidos na versão vinculada à requisição são persistidas, incluindo novas linhas de tabelas existentes.
 
 ## Conheça os tipos de campo
 
@@ -267,6 +268,8 @@ Use texto estático para instruções curtas. Use HTML apenas quando houver nece
 O **Nome** é o rótulo que o usuário lê. A **Chave** identifica o dado em condições, documentos, fontes, integrações e automações.
 
 Ao criar **Razão social**, o editor pode derivar uma chave enquanto ela ainda não tiver sido personalizada. Se você editar a chave manualmente, ela deixa de acompanhar alterações posteriores do nome. Saia do campo para confirmar e aguarde a verificação de unicidade.
+
+No editor nativo, a chave de um campo novo começa vazia. Ao digitar o nome pela primeira vez, ela é gerada em `snake_case` durante a digitação e deixa de acompanhar o nome quando você sai desse controle. Preencha as chaves que ainda estiverem vazias antes de publicar.
 
 Uma chave deve ser estável, única e significativa. Antes de alterar uma chave já usada, localize suas referências no processo. A mudança pode afetar condições, resumos, documentos, relatórios e código de automação.
 
@@ -365,7 +368,7 @@ Use o envio manual quando o usuário já possui o arquivo. Escreva um rótulo qu
 
 Quando a opção de documento gerado estiver disponível, escolha o modelo e configure os dados necessários. O resultado depende dos campos e das chaves referenciadas pelo modelo; uma renomeação pode exigir revisão.
 
-Se houver assinatura relacionada, descreva quem assina, em qual momento e o que acontece quando a assinatura falha. Não atribua esse comportamento ao form-js: ele pertence à integração do Septem.
+Se houver assinatura relacionada, descreva quem assina, em qual momento e o que acontece quando a assinatura falha. Esse comportamento pertence à integração de documentos do Septem.
 
 ### Visibilidade do documento
 
@@ -404,7 +407,7 @@ Antes de publicar uma automação:
 - diferencie aplicar ao editor, salvar rascunho e publicar;
 - verifique o histórico e possíveis conflitos de edição.
 
-Consulte a [documentação local de automação](../form-automation.md) para a API integrada, permissões, versionamento e tratamento de falhas. Não copie exemplos genéricos de form-js como se fossem contratos do Septem.
+Consulte a [documentação local de automação](../form-automation.md) para a API integrada, permissões, versionamento e tratamento de falhas. Use os contratos nativos do Septem nos scripts.
 
 <a id="formularios-testar"></a>
 
@@ -495,3 +498,22 @@ O exercício está concluído quando o requerente entende o que preencher, o ser
 **Atualizado em:** 13/09/2026
 
 **Estado:** protótipo editorial baseado no código; validação em ambiente e imagens pendentes.
+
+
+### Layout e identificação dos campos nativos
+
+Nas propriedades do campo, **Colunas (no container)** define a largura no grid de 16 colunas. Campos consecutivos de 8 colunas aparecem lado a lado; campos sem largura definida ocupam a linha inteira. No celular, os campos ficam empilhados. Ajuda, descrição, contador e erros só ocupam espaço quando há conteúdo para exibir.
+
+Em **Configurar aba → Ícone da aba**, pesquise por nome no catálogo completo de ícones disponíveis (sólidos e regulares), escolha ou remova um ícone. A seleção é salva na definição e aparece no editor e no preenchimento. Os ícones já configurados continuam funcionando.
+
+Nas tabelas, **Adicionar linha** fica no rodapé do card. A lixeira na base de cada linha remove a linha ou limpa os valores quando resta apenas uma.
+
+A matriz **Tarefas × Campos** associa cada campo ao seu ID interno (`fieldId`) dentro da tarefa BPMN. Alterar a chave mantém a visibilidade, a edição e a fonte de dados configuradas. O modelador converte vínculos anteriores por chave antes da renomeação e mantém `fieldRef` atualizado para as APIs de execução. Excluir e recriar um campo produz outra identidade; as configurações anteriores não são transferidas para o novo campo. Referências em scripts e outras regras que usam chaves continuam exigindo revisão ao renomear.
+
+### Exclusão e arquivamento de campos
+
+Ao excluir um campo pelo ícone de lixeira na sua linha, ou excluir um agrupamento ou aba de um processo salvo, o editor consulta se seus campos têm respostas em requisições de qualquer versão. Valores `0` e `false` contam como respostas. Se houver execuções, a exclusão é impedida, os campos são arquivados no rascunho e uma mensagem informa o resultado. Se a consulta falhar, nada é excluído; tente novamente.
+
+O arquivamento fica no rascunho até a publicação. Após publicar, os campos arquivados deixam de aparecer nas tarefas, inclusive de requisições vinculadas a versões anteriores, e nas colunas, detalhes e exportações dos relatórios por processo. As definições anteriores e as respostas armazenadas são preservadas. Relatórios que dependam desses campos em filtros ou cálculos exigem revisão da configuração antes de executar; resultados antigos em cache não são reutilizados.
+
+Campos sem respostas podem ser excluídos. Suas entradas na matriz da tarefa são removidas; outras dependências, como condições de saída, continuam exigindo revisão. Os avisos de referências e usos conhecidos não repetem ocorrências idênticas.

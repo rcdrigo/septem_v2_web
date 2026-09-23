@@ -1,0 +1,77 @@
+import { build } from '../../node_modules/esbuild/lib/main.js';
+import { chromium } from 'playwright-core';
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile, readdir, mkdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+const root = resolve(import.meta.dirname, '../..');
+const dir = await mkdtemp(join(tmpdir(), 'septem-native-editor-'));
+await build({ stdin: { contents: `
+import React from 'react';import {createRoot} from 'react-dom/client';import {flushSync} from 'react-dom';import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
+import {FormularioView} from './src/components/modelador/views/FormularioView';import {useModeladorStore} from './src/stores/modelador';
+window.referenceElements=[];const events={};const bo={};const shape={businessObject:bo};
+const modeler={get:key=>({elementRegistry:{getAll:()=>window.referenceElements},canvas:{getRootElement:()=>shape},eventBus:{on:(e,fn)=>{(events[e]??=[]).push(fn)},off:(e,fn)=>{events[e]=(events[e]??[]).filter(f=>f!==fn)}},moddle:{create:(type,props)=>({$type:type,...props})},modeling:{updateProperties:(el,props)=>Object.assign(el.businessObject,props)}}[key])};
+window.readSchema=()=>JSON.parse(bo.extensionElements?.values?.find(v=>v.$type==='septem:FormSchema')?.json??'null');
+window.loadXml=schema=>{(events['import.parse.start']??[]).forEach(f=>f());bo.extensionElements={values:schema?[{$type:'septem:FormSchema',json:typeof schema==='string'?schema:JSON.stringify(schema)}]:[]};(events['import.done']??[]).forEach(f=>f());};
+window.flush=()=>useModeladorStore.getState().flushForm();window.captureFlush=()=>useModeladorStore.getState().flushForm;
+const app=createRoot(document.getElementById('root')),client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+window.render=ready=>flushSync(()=>app.render(<QueryClientProvider client={client}><FormularioView modeler={modeler} processReady={ready} processKey="lifecycle-test"/></QueryClientProvider>));
+window.unmount=()=>flushSync(()=>app.render(null));window.render(false);
+`, resolveDir: root, loader: 'tsx' }, bundle: true, outfile: join(dir, 'editor.js'), format: 'iife', platform: 'browser', tsconfig: join(root, 'tsconfig.app.json'), define: { 'import.meta.env': '{}' } });
+const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
+try {
+  const page = await browser.newPage({viewport:{width:1440,height:1000}});
+  const errors=[]; page.on('pageerror', e=>errors.push(e.message));
+  const fixture=JSON.parse(await readFile(join(root,'tools/uitest/fixtures/native-form-v1.json'),'utf8'));
+  let usage=[{fieldId:'field-name',label:'Nome',executionCount:2}];
+  let failure=false;
+  await page.route('http://localhost/**', async route => {
+    const url=route.request().url();
+    if(url.endsWith('.woff2')) { const name=url.split('/').at(-1); return route.fulfill({contentType:'font/woff2',body:await readFile(join(root,'dist/assets',name))}); }
+    if(url.endsWith('/field-usage')) return route.fulfill({status:failure?503:200,contentType:'application/json',body:JSON.stringify(failure?{detail:'Não foi possível verificar as respostas.'}:usage)});
+    return route.fulfill({contentType:url.includes('/api/')?'application/json':'text/html',body:url.includes('/api/')?'[]':'<html><body><div id="root" style="height:100vh;display:flex;flex-direction:column"></div></body></html>'});
+  });
+  await page.goto('http://localhost');
+  for(const f of await readdir(join(root,'dist/assets'))) if(f.endsWith('.css')) await page.addStyleTag({content:await readFile(join(root,'dist/assets',f),'utf8')});
+  await page.addScriptTag({path:join(dir,'editor.js')});
+  await page.evaluate(()=>window.render(true));
+  await page.evaluate(s=>window.loadXml(s),fixture);
+  const saved=async()=>{await page.evaluate(()=>window.flush());return page.evaluate(()=>window.readSchema());};
+  await page.locator('[data-field-id="field-name"]').getByRole('button',{name:'Excluir campo Nome'}).click();
+  const dialog=page.getByRole('dialog',{name:'Não é possível excluir'});
+  await dialog.waitFor();
+  assert.equal((await saved()).tabs[0].groups[0].fields[0].id,'field-name');
+  assert.match(await dialog.innerText(),/Nome — 2 requisições/);
+  assert.equal((await saved()).tabs[0].groups[0].fields[0].config.archived,true);
+  await mkdir(join(root,'.impeccable/review'),{recursive:true});
+  await page.screenshot({path:join(root,'.impeccable/review/field-archive-desktop.png')});
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await page.screenshot({path:join(root,'.impeccable/review/field-archive-mobile.png')});
+  await dialog.getByRole('button',{name:'Entendi',exact:true}).click();
+  await page.getByRole('button',{name:'Prévia',exact:true}).click();
+  const preview=page.getByRole('dialog',{name:'Prévia do formulário'});
+  assert.equal(await preview.getByRole('textbox',{name:/Nome/}).count(),0);
+  await page.keyboard.press('Escape');
+  await page.setViewportSize({width:1440,height:1000});
+  await page.getByRole('button',{name:'Configurar aba',exact:true}).click();
+  await page.getByRole('button',{name:'Ícone da aba',exact:true}).click();
+  await page.getByRole('searchbox',{name:'Buscar ícone'}).fill('volcano');
+  await page.evaluate(()=>document.fonts.ready);
+  assert.equal(await page.evaluate(()=>document.fonts.check('900 18px "Font Awesome 7 Free"')),true);
+  await page.screenshot({path:join(root,'.impeccable/review/tab-icon-search-desktop.png')});
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:join(root,'.impeccable/review/tab-icon-search-mobile.png')});
+  await page.getByRole('button',{name:'fa-solid fa-volcano',exact:true}).click();
+  // Unavailable usage cannot be mistaken for no answers.
+  failure=true;
+  await page.locator('[data-field-id="field-name"]').getByRole('button',{name:'Excluir campo Nome'}).click();
+  await page.getByRole('alert').waitFor();
+  assert.equal((await saved()).tabs[0].groups[0].fields[0].id,'field-name');
+  failure=false;usage=[];
+  await page.locator('[data-field-id="field-name"]').getByRole('button',{name:'Excluir campo Nome'}).click();
+  await page.waitForFunction(()=>!document.querySelector('[data-field-id="field-name"]'));
+  assert.equal((await saved()).tabs[0].groups[0].fields.some(f=>f.id==='field-name'),false);
+  assert.deepEqual(errors,[]);
+  console.log('PASSOU: exclusão bloqueada por respostas, arquivamento preserva definição e oculta na prévia, falha da API impede excluir, campo sem respostas pode ser excluído; desktop/mobile e busca completa.');
+} finally {await browser.close();await rm(dir,{recursive:true,force:true});}

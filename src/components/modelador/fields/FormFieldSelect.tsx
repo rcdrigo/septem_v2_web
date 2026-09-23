@@ -13,7 +13,7 @@ export function FormFieldSelect({
   placeholder?: string;
 }) {
   const fields = useFormStore((s) => s.fields);
-  const base = fields.map((f) => ({ value: f.id, label: `${f.label || f.id} (${f.id})` }));
+  const base = fields.map((f) => ({ value: f.id, label: `${f.label || f.id} (${f.path || f.id})${f.tabId ? ` — ${f.tabLabel || 'Aba'} / ${f.group}` : ''}` }));
   const options = value && !base.some((o) => o.value === value) ? [{ value, label: value }, ...base] : base;
   return (
     <Combobox

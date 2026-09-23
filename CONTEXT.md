@@ -1,5 +1,32 @@
 # Domínio Septem
 
+## Linguagem — Formulários
+
+**Formulário**:
+Definição dos campos de um processo, organizada em abas, agrupamentos e campos.
+
+**Aba de formulário**:
+Divisão de navegação de um formulário que contém agrupamentos; não contém outras abas.
+
+**Agrupamento**:
+Conjunto de campos pertencente a uma aba, do tipo Grupo Padrão ou Tabela; não contém outros agrupamentos.
+
+**Grupo Padrão**:
+Agrupamento com uma coleção de campos sem repetição de linhas.
+
+**Tabela de formulário**:
+Agrupamento cujos campos definem colunas e cujas linhas são adicionadas por quem preenche o formulário.
+_Evitar_: Lista dinâmica para esse conceito no novo modelo.
+
+**Linha de tabela de formulário**:
+Ocorrência de respostas aos campos definidos nas colunas de uma Tabela, acrescentada durante o preenchimento pelo usuário ou por automação.
+
+**Campo**:
+Elemento de um agrupamento que define uma informação do formulário; em uma Tabela, corresponde a uma coluna.
+
+**Elemento de apresentação**:
+Conteúdo visual do formulário que não recebe respostas, como texto estático, imagem ou separador.
+
 ## Linguagem — Tags
 
 **Requisição**:
