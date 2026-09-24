@@ -26,7 +26,7 @@ window.mount=(kind,mode='interno',status='pendentes')=>{
  root.render(<QueryClientProvider key={++revision} client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter initialEntries={['/?status='+ (kind==='tasks'?status:'em_andamento')]}>{kind==='tasks'?<TarefasPage/>:<InstanciasPage/>}</MemoryRouter></QueryClientProvider>);
 };`, resolveDir: root, loader:'tsx'},bundle:true,outfile:join(out,'bundle.js'),format:'iife',platform:'browser',tsconfig:join(root,'tsconfig.app.json'),loader:{'.css':'empty'},define:{'import.meta.env':'{}'}});
 const tags=Array.from({length:8},(_,i)=>({id:`tag-${i}`,name:`Classificação ${i+1}`,addedBy:{id:'actor',name:'Ana'},addedAt:'2026-09-14T10:00:00Z'}));
-const task={id:'task-1',executionId:'exec-1',name:'Analisar documentação da contratação',process:'Contratação de serviços especializados para manutenção de equipamentos',processNumber:184,requester:'Maria Aparecida de Albuquerque e Vasconcelos',inboxText:'Solicitação de contratação de serviços de manutenção preventiva e corretiva dos equipamentos das unidades administrativas. Inclui avaliação técnica, levantamento de peças e parecer sobre a disponibilidade orçamentária. '.repeat(3),createdAt:'2026-09-10T10:00:00Z',dueAt:'2026-09-12T10:00:00Z',completedAt:'2026-09-14T10:00:00Z',isTest:true,absentUserName:'João Henrique de Albuquerque e Vasconcelos',tags};
+const task={categoryColor:'#123456',id:'task-1',executionId:'exec-1',name:'Analisar documentação da contratação',process:'Contratação de serviços especializados para manutenção de equipamentos',processNumber:184,requester:'Maria Aparecida de Albuquerque e Vasconcelos',inboxText:'Solicitação de contratação de serviços de manutenção preventiva e corretiva dos equipamentos das unidades administrativas. Inclui avaliação técnica, levantamento de peças e parecer sobre a disponibilidade orçamentária. '.repeat(3),createdAt:'2026-09-10T10:00:00Z',dueAt:'2026-09-12T10:00:00Z',completedAt:'2026-09-14T10:00:00Z',isTest:true,absentUserName:'João Henrique de Albuquerque e Vasconcelos',tags};
 const request={...task,id:'exec-1',number:184,status:'em_andamento',startedAt:task.createdAt,endedAt:null,pendingTasks:2};
 const browser=await chromium.launch({executablePath:process.env.CHROME_BIN??'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
 try {
@@ -38,8 +38,8 @@ try {
    const path=new URL(route.request().url()).pathname;
    if(!path.startsWith('/api/'))return route.fulfill({contentType:'text/html',body:'<div id="root"></div>'});
    let body={};
-   if(path.endsWith('/tasks'))body={items:[task,{...task,id:'task-2',executionId:'exec-2',processNumber:185,name:'Conferir solicitação',isTest:false,absentUserName:null,tags:[],dueAt:null,inboxText:null}],processes:[]};
-   if(path.endsWith('/instances'))body={items:[request,{...request,id:'exec-2',number:185,status:'concluido',endedAt:'2026-09-14T10:00:00Z',isTest:false,tags:[]}],total:2,page:1,pageSize:20};
+   if(path.endsWith('/tasks'))body={items:[task,{...task,categoryColor:'#fef08a',id:'task-2',executionId:'exec-2',processNumber:185,name:'Conferir solicitação',isTest:false,absentUserName:null,tags:[],dueAt:null,inboxText:null}],processes:[]};
+   if(path.endsWith('/instances'))body={items:[request,{...request,categoryColor:'#fef08a',id:'exec-2',number:185,status:'concluido',endedAt:'2026-09-14T10:00:00Z',isTest:false,tags:[]}],total:2,page:1,pageSize:20};
    await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
   });
   await page.goto('https://layout.test/');
@@ -48,9 +48,13 @@ try {
   await page.addScriptTag({path:join(out,'bundle.js')});
   for(const kind of ['tasks','requests']) {
    await page.evaluate(kind=>window.mount(kind),kind);
+   await page.getByRole('heading',{name:kind==='tasks'?'Tarefas':'Requisições',exact:true}).waitFor();
    const card=page.locator('article').first();await card.waitFor();
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${kind} ${width}: overflow da página`);
-   const summary=card.locator('p.line-clamp-3');
+   assert.equal(await card.getByTestId('process-pill').evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(18, 52, 86, 0.12)');
+   assert.equal(await card.getByTestId('process-pill').evaluate(el=>getComputedStyle(el).color),'rgb(18, 52, 86)');
+   assert.equal(await page.locator('article').nth(1).getByTestId('process-pill').evaluate(el=>getComputedStyle(el).color),'rgb(254, 240, 138)');
+   const summary=card.locator('.line-clamp-3');
    assert.ok(await summary.evaluate(el=>el.clientHeight<=3*parseFloat(getComputedStyle(el).lineHeight)), 'Resumo excede 3 linhas');
    assert.equal(await page.locator('article').nth(1).locator('[aria-label="Indicadores e tags"]').count(),0,'Rodapé vazio não deve aparecer');
    const number=card.getByRole('button',{name:'Acompanhar requisição #184',exact:true});
@@ -78,6 +82,10 @@ try {
    await page.getByTitle('Tabela',{exact:true}).click();
    if(width>=768){
     const row=page.locator('tbody tr:visible').first();await row.waitFor();
+    assert.deepEqual((await page.locator('thead th:visible').allTextContents()).slice(0,2),['Nº','Processo']);
+    assert.equal(await row.locator('td').nth(0).getByRole('button',{name:'Acompanhar requisição #184'}).count(),1);
+    assert.equal(await row.locator('td').nth(0).getByTestId('process-pill').count(),0);
+    assert.equal(await row.locator('td').nth(1).getByTestId('process-pill').count(),1);
     await page.evaluate(()=>window.opened=[]);await row.getByRole('button',{name:'Acompanhar requisição #184'}).click();
     assert.deepEqual(await page.evaluate(()=>window.opened),['/requests/exec-1']);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
@@ -90,7 +98,9 @@ try {
   assert.equal(await page.getByRole('button',{name:/Classificação/}).count(),0,'Tags ocultas no modo externo');
   assert.equal(await page.locator('article [data-testid="selo-teste"]').count(),1,'Teste independe de acesso a tags');
   await page.evaluate(()=>window.mount('tasks','interno','concluidas'));
-  await page.getByText('Concluída com 2 dias de atraso',{exact:true}).first().waitFor();
+  await page.locator('article').first().waitFor();
+  assert.equal(await page.getByText('Concluída com 2 dias de atraso',{exact:true}).count(),0,'Link antigo não reabre histórico concluído');
+  assert.equal(await page.getByRole('button',{name:'Concluídas',exact:true}).count(),0);
   assert.deepEqual(errors,[],`Erros React: ${width}`);
   await page.close();console.log(`PASS ${width}: cards, tabela, navegação, rodapé e ausência condicional`);
  }

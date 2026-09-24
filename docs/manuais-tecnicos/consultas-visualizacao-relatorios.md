@@ -41,7 +41,7 @@ Se o limite de favoritos for alcançado, remova um item antes de adicionar outro
 
 ## Abrindo e reconhecendo o relatório
 
-Na aba da consulta, confira o título antes de interpretar os dados. O cabeçalho permite fechar a aba e retornar à tela anterior.
+Na aba da consulta, confira o título antes de interpretar os dados. O cabeçalho permite fechar a aba e reúne as ações **Obter dados mais recentes** e **Imprimir / PDF**. O horário dos dados fica à direita da barra de filtros, centralizado verticalmente; em telas estreitas, pode ocupar a linha seguinte.
 
 A área principal pode apresentar:
 
@@ -53,7 +53,11 @@ A área principal pode apresentar:
 
 ## Aplicando filtros
 
-Os filtros são definidos pelo autor e podem ser:
+Clique em **Filtros**, à esquerda, para abrir o popover. Selecione uma categoria e preencha suas opções. As alterações são aplicadas automaticamente; os parâmetros globais aguardam uma pausa de 400 ms. Chips removíveis resumem os filtros ativos e permitem reabrir sua edição. **Limpar filtros** remove as restrições; parâmetros obrigatórios precisam ser preenchidos novamente.
+
+O popover reúne os parâmetros globais e os filtros das colunas visíveis, identificados pelo nome da tabela e da coluna. Os filtros de coluna atuam somente na respectiva tabela, sobre os dados carregados, e também são respeitados na impressão. Exportações CSV/XLSX continuam usando os parâmetros globais da consulta.
+
+Os filtros globais são definidos pelo autor e podem ser:
 
 | Tipo | Como preencher | Exemplo |
 |---|---|---|
@@ -73,7 +77,7 @@ Para verificar contratos que vencem no trimestre:
 1. abra a consulta **Contratos por vigência**;
 2. informe o período do trimestre;
 3. selecione a unidade gestora, quando o filtro existir;
-4. execute ou aguarde a atualização;
+4. aguarde a atualização automática;
 5. abra o detalhe dos resultados relevantes.
 
 ## Interpretando os componentes
@@ -110,7 +114,7 @@ Se uma operação acabou de ser concluída e ainda não aparece:
 
 1. confirme que a tarefa foi realmente concluída;
 2. aguarde o intervalo de cache;
-3. recarregue a consulta;
+3. clique em **Obter dados mais recentes** no cabeçalho;
 4. verifique os filtros e o período;
 5. comunique o responsável pelo relatório se a divergência persistir.
 

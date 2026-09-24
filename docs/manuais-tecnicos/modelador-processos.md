@@ -674,6 +674,8 @@ Exemplo:
 
 Use somente chaves existentes. Depois de alterar a chave de um campo, revise o resumo.
 
+O resumo aceita formatação HTML básica, como negrito, itálico, listas e quebras de linha. Ao salvar uma alteração nesse resumo, ela passa a valer para as requisições de todas as versões do mesmo processo, inclusive as já abertas ou concluídas. Limpar o resumo também remove sua exibição nessas requisições. Essa configuração de apresentação é compartilhada; o fluxo, o formulário e as permissões da execução continuam vinculados à versão em que ela começou. Os valores preenchidos nos campos são exibidos como texto, mesmo quando contêm caracteres de HTML.
+
 ### Informações gerais — Publicação e permissões
 
 O campo **Status** possui três opções:

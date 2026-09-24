@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Eye, EyeOff, LayoutGrid, Loader2, Lock, Mail, ShieldCheck, TriangleAlert } from 'lucide-react';
-import { useSessionStore } from '@/stores/session';
-import { ApiError } from '@/lib/api';
+import { useSessionStore, type AccessMode } from '@/stores/session';
+import { api, ApiError } from '@/lib/api';
 import { toast } from '@/stores/toast';
 import { Toaster } from '@/components/ui/Toaster';
 import { Dialog } from '@/components/ui/Dialog';
@@ -44,10 +44,26 @@ export function LoginPage() {
   const [consultationOpen, setConsultationOpen] = useState(false);
   const [step, setStep] = useState<Step>('credenciais');
   const [identifier, setIdentifier] = useState('');   // e-mail OU CPF
+  const [internalIdentifier, setInternalIdentifier] = useState<string | null>(null);
+  const [accessMode, setAccessMode] = useState<AccessMode>('interno');
+  const canChooseAccess = internalIdentifier === identifier.trim();
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [keepConnected, setKeepConnected] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (step !== 'credenciais' || !identifier.trim()) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      void api.post<{ isInternal: boolean }>('/api/v1/auth/access-options',
+        { identifier: identifier.trim() }, { anonymous: true, signal: controller.signal })
+        .then((result) => {
+          if (!controller.signal.aborted) setInternalIdentifier(result.isInternal ? identifier.trim() : null);
+        }).catch(() => { /* Sem identificação confirmada, mantém o seletor oculto. */ });
+    }, 350);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [identifier, step]);
 
   // Aviso progressivo do bloqueio (o backend diz quantas tentativas restam).
   const [aviso, setAviso] = useState<string | null>(null);
@@ -126,6 +142,7 @@ export function LoginPage() {
     setSubmitting(true);
     setAviso(null);
     try {
+      useSessionStore.getState().setAccessMode(canChooseAccess ? accessMode : 'interno');
       const r = await login(identifier, password, keepConnected);
       if (r.kind === 'two-factor') {
         setMaskedEmail(r.maskedEmail);
@@ -292,11 +309,25 @@ export function LoginPage() {
                     autoFocus
                     name="identifier"
                     value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
+                    onChange={(e) => { setIdentifier(e.target.value); setInternalIdentifier(null); setAccessMode('interno'); }}
                     className={inputCls}
                     placeholder="usuario@prefeitura.gov.br ou 000.000.000-00"
                   />
                 </Campo>
+
+                {canChooseAccess && (
+                  <fieldset disabled={submitting} className="space-y-2">
+                    <legend className="text-sm font-medium text-slate-700">Acessar como</legend>
+                    <div className="flex gap-4">
+                      {(['interno', 'externo'] as const).map((mode) => (
+                        <label key={mode} className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-slate-700">
+                          <input type="radio" name="accessMode" value={mode} checked={accessMode === mode} onChange={() => setAccessMode(mode)} className="accent-slate-900" />
+                          {mode === 'interno' ? 'Interno' : 'Externo'}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
 
                 <Campo label="Senha" icon={Lock}>
                   <input
@@ -399,7 +430,7 @@ export function LoginPage() {
                     autoFocus
                     name="identifier"
                     value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
+                    onChange={(e) => { setIdentifier(e.target.value); setInternalIdentifier(null); setAccessMode('interno'); }}
                     className={inputCls}
                     placeholder="usuario@prefeitura.gov.br ou 000.000.000-00"
                   />

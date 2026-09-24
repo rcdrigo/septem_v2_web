@@ -17,12 +17,9 @@ Concluir uma tarefa não significa necessariamente concluir a requisição. A a�
 
 ## Localizando tarefas
 
-Acesse **Tarefas** no menu lateral. A tela possui duas áreas de status:
+Acesse **Tarefas** no menu lateral para ver as tarefas em andamento atribuídas a você. Após concluir uma tarefa, acompanhe a execução em **Requisições**, usando o vínculo **Participei**.
 
-- **Pendentes:** itens que aguardam sua ação;
-- **Concluídas:** histórico de tarefas que você já executou.
-
-As pílulas de processo restringem a lista a um serviço específico e exibem sua quantidade. **Todos** remove essa restrição.
+Use **Filtros**, à esquerda da lista, para selecionar um ou mais processos. Sem seleção de processo, todos os processos disponíveis são considerados.
 
 Escolha a visualização de cartões ou tabela. Em telas menores a interface utiliza cartões, preservando processo, número, tarefa, resumo, requerente e prazo.
 
@@ -40,23 +37,31 @@ Escolha a visualização de cartões ou tabela. Em telas menores a interface uti
 
 Nos cartões, o processo aparece no canto superior esquerdo e o número da requisição é um botão discreto à direita. O nome da tarefa fica em negrito, seguido do resumo com até três linhas. Requisitante e prazo ficam abaixo, à esquerda e à direita, respectivamente.
 
-O rodapé reúne o indicador de teste, quando aplicável, e as tags disponíveis no modo interno. Quando o conteúdo excede a largura, use as setas ou deslize horizontalmente. Ao passar o mouse sobre o cartão, a indicação **Acessar →** aparece sobre um gradiente. O número abre o acompanhamento da requisição; o cartão abre a tarefa ou seu histórico, conforme a lista selecionada.
+O rodapé reúne o indicador de teste, quando aplicável, e as tags disponíveis no modo interno. Quando o conteúdo excede a largura, use as setas ou deslize horizontalmente. Ao passar o mouse sobre o cartão, a indicação **Acessar →** aparece sobre um gradiente. O número abre o acompanhamento da requisição; o cartão abre a tarefa para execução.
 
 ## Usando os filtros
 
-Clique em **Filtros** para abrir os critérios avançados.
+Clique em **Filtros** para abrir o popover. Escolha uma categoria à esquerda e edite suas opções à direita; no celular, use **Todos os filtros** para voltar às categorias. As alterações são aplicadas automaticamente. Pressione **Esc** ou clique fora para fechar.
+
+O contador mostra quantas categorias possuem restrições ativas. Os chips ao lado do botão resumem as seleções: clique no texto para editar ou no **×** para remover aquela categoria. **Limpar filtros** restaura o recorte inicial da tela.
+
+### Processos e tags
+
+Selecione um ou mais processos usando a busca e as caixas de seleção. A lista inclui resultados de qualquer processo selecionado. Tags, disponíveis no modo interno, exigem todas as selecionadas na mesma requisição. Categorias diferentes são combinadas entre si.
+
+As opções se adaptam aos demais filtros. Uma seleção que fique sem resultados continua visível para revisão ou remoção.
 
 ### Processo, tarefa ou palavra-chave
 
 Pesquisa nomes e textos relevantes. Exemplo: digite `compra de material` para localizar tarefas relacionadas. A pesquisa é aplicada alguns instantes após a digitação.
 
-### Número do processo
+### Número da requisição
 
 Use quando conhecer o número da requisição. Digite somente o valor exibido na interface, por exemplo `184`.
 
 ### Data de requisição
 
-Filtra pela data em que a solicitação foi iniciada. Informe somente **De**, somente **Até** ou um intervalo completo.
+Filtra pela data em que a solicitação foi iniciada. Informe somente **De**, somente **Até** ou um intervalo completo. Também é possível escolher **Hoje**, **Últimos 7 dias** ou **Este mês**. O primeiro e o último dia são incluídos.
 
 ### Data de recebimento
 
@@ -67,10 +72,10 @@ Filtra pela data em que a tarefa chegou à sua caixa. Esse critério é útil pa
 É possível ordenar por:
 
 - **Prazo**;
-- **Nº do processo**;
+- **Nº da requisição**;
 - padrão de mais recentes quando nenhum critério é escolhido.
 
-O botão ao lado inverte entre ordem crescente e decrescente. Os filtros ativos aparecem como marcadores; remova um individualmente ou use **Limpar tudo**.
+Na categoria **Ordenação**, escolha o campo e a direção crescente ou decrescente.
 
 ## Abrindo e conferindo uma tarefa
 
@@ -174,16 +179,15 @@ Não clique repetidamente durante a mensagem **Concluindo…**. A ação já est
 
 ## Acompanhando requisições
 
-Acesse **Requisições** para ver processos iniciados por você. Filtre por:
+Acesse **Requisições** para acompanhar as solicitações feitas por você e aquelas em que concluiu uma tarefa. Uma requisição que corresponda aos dois vínculos aparece apenas uma vez.
 
-- **Em andamento**;
-- **Concluídos**;
-- **Cancelados**;
-- **Todos**.
+No popover **Filtros**, a categoria **Meu vínculo** permite selecionar **Feitas por mim**, **Participei** ou ambos. Apenas receber uma tarefa não caracteriza participação. Inicialmente, ambos os vínculos e todas as situações são considerados.
 
-A busca localiza pelo processo. A paginação exibe vinte itens por página e a visualização pode alternar entre cartões e tabela.
+A categoria **Situação** permite consultar requisições em andamento, concluídas ou canceladas. Também é possível combinar processos, palavra-chave, número, tags no modo interno, datas de abertura e encerramento. Um intervalo de encerramento exclui requisições ainda abertas. Os filtros de data oferecem os mesmos atalhos e intervalos usados em tarefas.
 
-Os cartões mantêm processo e número no topo, status em destaque e resumo com até três linhas. Abaixo ficam as datas de início e conclusão; os indicadores e tags ficam no rodapé. Essa listagem apresenta a execução como um todo, sem acrescentar nomes ou prazos de tarefas ativas. Nas tabelas, as mesmas informações são agrupadas em colunas, com o número acessível por um botão próprio.
+**Limpar filtros** restaura ambos os vínculos e todas as situações, mantendo a lista pessoal. A paginação exibe vinte itens por página; alterar um filtro retorna à primeira página. A visualização pode alternar entre cartões e tabela.
+
+Os cartões mantêm processo e número no topo, status em destaque e resumo com até três linhas. Abaixo ficam as datas de início e conclusão; os indicadores e tags ficam no rodapé. Essa listagem apresenta a execução como um todo, sem acrescentar nomes ou prazos de tarefas ativas. Nas tabelas, o número aparece na primeira coluna, separado do nome do processo, e abre a requisição por um botão próprio. O pill do processo usa a cor da categoria no ícone e no nome; o fundo usa a mesma cor com aproximadamente 12% de opacidade, seguindo o modal Nova requisição. Nas listagens, os nomes, ícones, categorias e títulos das tarefas refletem a versão mais recente salva do processo, assim como o resumo, inclusive para execuções antigas. Isso não migra o fluxo da execução.
 
 ## Entendendo o detalhamento
 
@@ -235,7 +239,7 @@ Um fornecedor recebe a tarefa **Apresentar garantia contratual**:
 
 ### A lista ficou vazia
 
-Remova os filtros aplicados, confirme a aba **Pendentes** ou **Concluídas** e verifique o modo de acesso.
+Remova os filtros aplicados e verifique o modo de acesso. Tarefas concluídas deixam a caixa de tarefas; acompanhe suas requisições em **Requisições**, pelo vínculo **Participei**.
 
 ### A tarefa não permite concluir
 

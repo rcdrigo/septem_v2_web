@@ -1,10 +1,11 @@
+import { ExecutionSummary } from '@/components/execution/ExecutionSummary';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useSearchParams } from 'react-router-dom';
-import { AlertCircle, ArrowDownAZ, ArrowRight, ArrowUpAZ, CheckCircle2, Clock, ExternalLink, FileSignature, Inbox, LayoutGrid, LifeBuoy, RotateCw, SlidersHorizontal, Table as TableIcon, User, X } from 'lucide-react';
-import { useTasks, useTask, useCompleteTask, useSaveTask, useTaskSignatures, useSignAll, type TagNameFacet, type TaskButton, type TaskFilters, type TaskListItem } from '@/lib/api/execution';
+import { ExecutionFilters, useExecutionFilters } from '@/components/execution/ExecutionFilters';
+import { AlertCircle, ArrowRight, CheckCircle2, Clock, ExternalLink, FileSignature, Inbox, LayoutGrid, LifeBuoy, RotateCw, Table as TableIcon, User, X } from 'lucide-react';
+import { useTasks, useTask, useCompleteTask, useSaveTask, useTaskSignatures, useSignAll, type TaskButton, type TaskListItem } from '@/lib/api/execution';
 import { estaAssinado } from '@/lib/upload';
-import { CardAccess, ExecutionIndicators, ExecutionNumber } from '@/components/execution/ExecutionListParts';
+import { CardAccess, ExecutionIndicators, ExecutionNumber, ExecutionProcessPill } from '@/components/execution/ExecutionListParts';
 import { ReactForm, FormSkeleton, type ReactFormHandle } from '@/components/form/ReactForm';
 import { openTab, navTo } from '@/lib/nav';
 import { useDocumentTitle } from '@/lib/use-document-title';
@@ -14,56 +15,20 @@ import { Dialog } from '@/components/ui/Dialog';
 import { ExecutionHeader } from '@/components/execution/ExecutionHeader';
 import { TaskActionFooter, type ExecutionAction } from '@/components/execution/TaskActionFooter';
 import { processMessagesExtra } from '@/components/execution/ProcessMessages';
-import { renderIcon } from '@/lib/icon-catalog';
 import { queryClient } from '@/lib/queryClient';
 import '@/styles/task-index.css';
 import { routes } from '@/lib/routes';
 import { ContextHelp } from '@/components/guide/ContextHelp';
 import { TagsButton, useTagsAccess } from '@/components/tags';
 
-type TaskStatusFilter = 'pendentes' | 'concluidas';
-const ALL_PROCESSES = 'todos';
-/** Campos de filtro que vivem na URL (compartilháveis e sobrevivem ao refresh). */
-const TEXT_FILTERS = ['q', 'number'] as const;
-const DATE_FILTERS = ['requestedFrom', 'requestedTo', 'receivedFrom', 'receivedTo'] as const;
-type TextFilter = (typeof TEXT_FILTERS)[number];
-type DateFilter = (typeof DATE_FILTERS)[number];
-type FilterChanges = Record<string, string | string[] | undefined>;
-
-const sameTagName = (left: string, right: string) => left.trim().localeCompare(right.trim(), undefined, { sensitivity: 'accent' }) === 0;
-
 export function TarefasPage() {
   const canUseTags = useTagsAccess();
-  const [params, setParams] = useSearchParams();
-  const status: TaskStatusFilter = params.get('status') === 'concluidas' ? 'concluidas' : 'pendentes';
-  const selectedProcess = params.get('process') || ALL_PROCESSES;
-  const selectedTagNames = useMemo(() => {
-    if (!canUseTags) return [];
-    return params.getAll('tagNames').map((name) => name.trim()).filter((name, index, names) => name && names.findIndex((item) => sameTagName(item, name)) === index);
-  }, [canUseTags, params]);
-  const filters = useMemo<TaskFilters>(() => ({
-    q: params.get('q') ?? undefined,
-    process: selectedProcess === ALL_PROCESSES ? undefined : selectedProcess,
-    number: params.get('number') ?? undefined,
-    requestedFrom: params.get('requestedFrom') ?? undefined,
-    requestedTo: params.get('requestedTo') ?? undefined,
-    receivedFrom: params.get('receivedFrom') ?? undefined,
-    receivedTo: params.get('receivedTo') ?? undefined,
-    tagNames: selectedTagNames.length > 0 ? selectedTagNames : undefined,
-    sort: (params.get('sort') as TaskFilters['sort']) ?? undefined,
-    dir: (params.get('dir') as TaskFilters['dir']) ?? undefined,
-  }), [params, selectedProcess, selectedTagNames]);
-  const tasks = useTasks(status, filters);
+  const { filters, patch, clear } = useExecutionFilters('tasks', canUseTags);
+  const tasks = useTasks('pendentes', filters);
   const [view, setView] = useViewMode();
-  const [panelOpen, setPanelOpen] = useState(false);
-  const openTask = (task: TaskListItem) => openTab(status === 'concluidas' ? routes.request(task.executionId) : routes.task(task.id));
-  const processes = tasks.data?.processes ?? [];
-  const tagNames = tasks.data?.tagNames ?? [];
+  const openTask = (task: TaskListItem) => openTab(routes.task(task.id));
   const items = tasks.data?.items ?? [];
-
-  useEffect(() => {
-    if (!params.has('status')) setParams((current) => { current.set('status', status); return current; }, { replace: true });
-  }, [params, setParams, status]);
+  const hasFilters = Boolean(filters.q || filters.number || filters.processes?.length || filters.tagNames?.length || filters.requestedFrom || filters.requestedTo || filters.receivedFrom || filters.receivedTo || filters.sort);
 
   // Sempre que a página de Tarefas entra em foco (montagem + volta de aba/janela),
   // atualiza a lista E o summary de pendentes (prefixo ['workflow','tasks'] cobre os dois).
@@ -79,37 +44,6 @@ export function TarefasPage() {
     };
   }, []);
 
-  function patchParams(changes: FilterChanges) {
-    setParams((current) => {
-      for (const [key, value] of Object.entries(changes)) {
-        current.delete(key);
-        if (Array.isArray(value)) {
-          for (const item of value) if (item.trim()) current.append(key, item.trim());
-        } else if (value != null && value !== '') {
-          current.set(key, value);
-        }
-      }
-      return current;
-    });
-  }
-  const selectStatus = (next: TaskStatusFilter) => patchParams({ status: next });
-  const selectProcess = (next: string) => patchParams({ process: next === ALL_PROCESSES ? undefined : next });
-  const toggleTag = (name: string) => {
-    const selected = selectedTagNames.some((item) => sameTagName(item, name));
-    patchParams({ tagNames: selected ? selectedTagNames.filter((item) => !sameTagName(item, name)) : [...selectedTagNames, name] });
-  };
-
-  const applied = describeFilters(filters, processes);
-  const hasFilters = applied.length > 0;
-  const invalidProcess = !tasks.isFetching && selectedProcess !== ALL_PROCESSES && !processes.some((item) => item.key === selectedProcess);
-  const invalidTags = !tasks.isFetching
-    ? selectedTagNames.filter((name) => {
-        const facet = tagNames.find((item) => sameTagName(item.name, name));
-        return !facet || !facet.available;
-      })
-    : [];
-  const hasInvalidSelection = invalidProcess || invalidTags.length > 0;
-
   return (
     <div className="task-index-root flex h-full min-w-0 flex-col">
       <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
@@ -118,284 +52,66 @@ export function TarefasPage() {
             <h1 className="text-lg font-semibold text-slate-900">Tarefas</h1>
             <ContextHelp manual="operacao-tarefas-requisicoes" section="localizar-tarefas" label="Ajuda sobre tarefas" />
           </div>
-          <p className="mt-0.5 truncate text-sm text-slate-500">Itens que aguardam sua ação e histórico concluído.</p>
+          <p className="mt-0.5 truncate text-sm text-slate-500">Tarefas em andamento que aguardam sua ação.</p>
         </div>
         <ViewToggle view={view} setView={setView} />
       </header>
       <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
-        <div className="flex flex-wrap items-center" aria-label="Status das tarefas">
-          <FilterPill active={status === 'pendentes'} onClick={() => selectStatus('pendentes')}>Pendentes</FilterPill>
-          <FilterPill active={status === 'concluidas'} onClick={() => selectStatus('concluidas')}>Concluídas</FilterPill>
-          <span className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" aria-hidden="true" />
-          <FilterPill active={selectedProcess === ALL_PROCESSES} onClick={() => selectProcess(ALL_PROCESSES)}>Todos</FilterPill>
-          {processes.map((process) => <FilterPill key={process.key} active={selectedProcess === process.key} onClick={() => selectProcess(process.key)}>{process.name}<span data-testid="contador-processo" className="ml-1.5 opacity-70">{process.count}</span></FilterPill>)}
-          {invalidProcess && <FilterPill active onClick={() => selectProcess(ALL_PROCESSES)}>{selectedProcess}<span className="ml-1.5 opacity-70">0</span></FilterPill>}
-          <button
-            type="button"
-            onClick={() => setPanelOpen((open) => !open)}
-            aria-expanded={panelOpen}
-            data-testid="abrir-filtros"
-            className="ml-auto inline-flex min-h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
-          >
-            <SlidersHorizontal size={14} aria-hidden="true" />
-            Filtros{hasFilters && <span className="rounded-full bg-slate-900 px-1.5 text-[11px] text-white">{applied.length}</span>}
-          </button>
-        </div>
-
-        {panelOpen && <TaskFilterPanel filters={filters} tagNames={canUseTags ? tagNames : undefined} onChange={patchParams} onToggleTag={toggleTag} />}
-
-        {hasFilters && (
-          <div data-testid="filtros-aplicados" className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-slate-100 pt-3 text-xs text-slate-600">
-            <span className="font-semibold text-slate-500">Filtros aplicados:</span>
-            {applied.map((item) => (
-              <span key={item.key} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1">
-                {item.label}
-                <button type="button" aria-label={`Remover filtro ${item.label}`} onClick={() => patchParams(item.clear)} className="rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
-                  <X size={12} />
-                </button>
-              </span>
-            ))}
-            <button type="button" data-testid="limpar-filtros" onClick={() => patchParams(clearAll())} className="font-semibold text-slate-700 underline underline-offset-2 hover:text-slate-900">Limpar tudo</button>
-          </div>
-        )}
+        <ExecutionFilters kind="tasks" filters={filters} processes={tasks.data?.processes ?? []} tagNames={canUseTags ? (tasks.data?.tagNames ?? []) : undefined} busy={tasks.isFetching} onChange={patch} onClear={clear} />
       </div>
       <div className="flex-1 overflow-auto p-4 sm:p-6">
-        {hasInvalidSelection && (
-          <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
-            <AlertCircle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-            <span>Uma seleção de filtro não possui resultados disponíveis. Ela foi mantida para você revisar ou remover.</span>
-          </div>
-        )}
         {tasks.isLoading ? <TaskSkeletons /> : tasks.isError ? <ErrorState onRetry={() => tasks.refetch()} /> : items.length === 0 ? (
-          <EmptyTasks status={status} filtered={hasFilters} />
-        ) : view === 'cards' ? <TaskCards tasks={items} onOpen={openTask} status={status} /> : <>
-          <div className="md:hidden"><TaskCards tasks={items} onOpen={openTask} status={status} /></div>
-          <div className="hidden md:block"><TaskTable tasks={items} onOpen={openTask} status={status} /></div>
+          <EmptyTasks filtered={hasFilters} />
+        ) : view === 'cards' ? <TaskCards tasks={items} onOpen={openTask} /> : <>
+          <div className="md:hidden"><TaskCards tasks={items} onOpen={openTask} /></div>
+          <div className="hidden md:block"><TaskTable tasks={items} onOpen={openTask} /></div>
         </>}
       </div>
     </div>
   );
 }
 
-/** Limpa todos os campos de filtro de uma vez (status e visão continuam). */
-function clearAll(): Record<string, undefined> {
-  return Object.fromEntries([...TEXT_FILTERS, ...DATE_FILTERS, 'process', 'tagNames', 'sort', 'dir'].map((key) => [key, undefined]));
-}
-
-/** Descreve, em português, cada filtro ativo — o texto exibido acima da lista. */
-function describeFilters(filters: TaskFilters, processes: { key: string; name: string }[]) {
-  const applied: { key: string; label: string; clear: FilterChanges }[] = [];
-  const day = (value?: string) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('pt-BR') : '');
-  const range = (from?: string, to?: string) => (from && to ? `de ${day(from)} até ${day(to)}` : from ? `a partir de ${day(from)}` : `até ${day(to)}`);
-
-  if (filters.process) {
-    const name = processes.find((p) => p.key === filters.process)?.name ?? filters.process;
-    applied.push({ key: 'process', label: `Processo: ${name}`, clear: { process: undefined } });
-  }
-  if (filters.q) applied.push({ key: 'q', label: `Palavra-chave: “${filters.q}”`, clear: { q: undefined } });
-  if (filters.number) applied.push({ key: 'number', label: `Nº do processo: ${filters.number}`, clear: { number: undefined } });
-  if (filters.requestedFrom || filters.requestedTo) {
-    applied.push({ key: 'requested', label: `Requisição ${range(filters.requestedFrom, filters.requestedTo)}`, clear: { requestedFrom: undefined, requestedTo: undefined } });
-  }
-  if (filters.receivedFrom || filters.receivedTo) {
-    applied.push({ key: 'received', label: `Recebimento ${range(filters.receivedFrom, filters.receivedTo)}`, clear: { receivedFrom: undefined, receivedTo: undefined } });
-  }
-  for (const tagName of filters.tagNames ?? []) {
-    applied.push({
-      key: `tag:${tagName}`,
-      label: `Tag: ${tagName}`,
-      clear: { tagNames: filters.tagNames?.filter((name) => !sameTagName(name, tagName)) },
-    });
-  }
-  if (filters.sort) {
-    const campo = filters.sort === 'prazo' ? 'prazo' : 'nº do processo';
-    const sentido = filters.dir === 'asc' ? 'crescente' : 'decrescente';
-    applied.push({ key: 'sort', label: `Ordenado por ${campo} (${sentido})`, clear: { sort: undefined, dir: undefined } });
-  }
-  return applied;
-}
-
-/**
- * Painel de filtros. Os textos são aplicados com atraso (o usuário ainda está
- * digitando); datas e ordenação valem no ato.
- */
-function TaskFilterPanel({ filters, tagNames, onChange, onToggleTag }: {
-  filters: TaskFilters;
-  tagNames?: TagNameFacet[];
-  onChange: (changes: FilterChanges) => void;
-  onToggleTag: (name: string) => void;
-}) {
-  const [text, setText] = useState({ q: filters.q ?? '', number: filters.number ?? '' });
-  const committed = useRef(text);
-  // onChange nasce de novo a cada render do pai; guardado em ref, um refetch no meio
-  // da digitação não reinicia o atraso e engole a busca.
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-
-  useEffect(() => {
-    const pending: Record<string, string | undefined> = {};
-    for (const field of TEXT_FILTERS) if (text[field] !== committed.current[field]) pending[field] = text[field] || undefined;
-    if (Object.keys(pending).length === 0) return;
-    const timer = window.setTimeout(() => { committed.current = text; onChangeRef.current(pending); }, 400);
-    return () => window.clearTimeout(timer);
-  }, [text]);
-
-  // Filtro removido por fora (chip "×" ou "Limpar tudo"): sem isto o campo continuaria
-  // exibindo um texto que já não filtra nada — e redigitá-lo não reaplicaria o filtro.
-  useEffect(() => {
-    const incoming = { q: filters.q ?? '', number: filters.number ?? '' };
-    if (incoming.q === committed.current.q && incoming.number === committed.current.number) return;
-    committed.current = incoming;
-    setText(incoming);
-  }, [filters.q, filters.number]);
-
-  const field = 'min-h-9 w-full rounded-md border border-slate-300 px-2.5 text-sm text-slate-800 focus:border-slate-500 focus:outline-none';
-  // Campo de data tem largura mínima própria (Chrome desenha dd/mm/aaaa + ícone).
-  // Sem piso + wrap, os dois campos do intervalo se espremem, se sobrepõem e o
-  // segundo sai da tela quando a coluna é estreita.
-  const dateField = `${field} min-w-[8.75rem] flex-1`;
-  const label = 'block text-[11px] font-semibold uppercase tracking-wide text-slate-500';
-  const setDate = (name: DateFilter) => (event: React.ChangeEvent<HTMLInputElement>) => onChange({ [name]: event.target.value || undefined });
-  const setTextField = (name: TextFilter) => (event: React.ChangeEvent<HTMLInputElement>) => setText((current) => ({ ...current, [name]: event.target.value }));
-  const selectedTagNames = filters.tagNames ?? [];
-  const tagOptions = tagNames
-    ? [
-        ...tagNames,
-        ...selectedTagNames
-          .filter((name) => !tagNames.some((facet) => sameTagName(facet.name, name)))
-          .map((name) => ({ name, count: 0, available: false })),
-      ]
-    : [];
-
-  return (
-    <div data-testid="painel-filtros" className="mt-3 grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2 xl:grid-cols-3">
-      <label className="min-w-0">
-        <span className={label}>Processo, tarefa ou palavra-chave</span>
-        <input type="search" data-testid="filtro-q" value={text.q} onChange={setTextField('q')} placeholder="Ex.: compra de material" className={`mt-1 ${field}`} />
-      </label>
-      <label className="min-w-0">
-        <span className={label}>Nº do processo</span>
-        <input type="text" inputMode="numeric" data-testid="filtro-numero" value={text.number} onChange={setTextField('number')} placeholder="Ex.: 42" className={`mt-1 ${field}`} />
-      </label>
-      <fieldset className="min-w-0">
-        <legend className={label}>Data de requisição</legend>
-        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1.5">
-          <input type="date" aria-label="Requisição de" data-testid="filtro-req-de" value={filters.requestedFrom ?? ''} onChange={setDate('requestedFrom')} className={dateField} />
-          <span className="text-xs text-slate-400">até</span>
-          <input type="date" aria-label="Requisição até" data-testid="filtro-req-ate" value={filters.requestedTo ?? ''} onChange={setDate('requestedTo')} className={dateField} />
-        </div>
-      </fieldset>
-      <fieldset className="min-w-0">
-        <legend className={label}>Data de recebimento</legend>
-        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1.5">
-          <input type="date" aria-label="Recebimento de" data-testid="filtro-rec-de" value={filters.receivedFrom ?? ''} onChange={setDate('receivedFrom')} className={dateField} />
-          <span className="text-xs text-slate-400">até</span>
-          <input type="date" aria-label="Recebimento até" data-testid="filtro-rec-ate" value={filters.receivedTo ?? ''} onChange={setDate('receivedTo')} className={dateField} />
-        </div>
-      </fieldset>
-      {tagNames && (
-        <fieldset className="min-w-0 sm:col-span-2 xl:col-span-3">
-          <legend className={label}>Tags — corresponde a todas as selecionadas</legend>
-          {tagOptions.length === 0 ? (
-            <p className="mt-1.5 text-sm text-slate-500">Nenhuma tag disponível para os filtros atuais.</p>
-          ) : (
-            <div className="mt-1.5 flex flex-wrap gap-2" data-testid="filtro-tags">
-              {tagOptions.map((tag) => {
-                const selected = selectedTagNames.some((name) => sameTagName(name, tag.name));
-                const disabled = !tag.available && !selected;
-                return (
-                  <button
-                    key={tag.name}
-                    type="button"
-                    aria-pressed={selected}
-                    disabled={disabled}
-                    title={disabled ? 'Indisponível para os filtros atuais' : undefined}
-                    onClick={() => onToggleTag(tag.name)}
-                    className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 disabled:cursor-not-allowed disabled:opacity-45 ${selected ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
-                  >
-                    <span className="max-w-52 truncate">{tag.name}</span>
-                    <span className="tabular-nums opacity-70">{tag.count}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </fieldset>
-      )}
-      <div className="flex min-w-0 items-end gap-2 sm:col-span-2 xl:col-span-1">
-        <label className="min-w-0 flex-1">
-          <span className={label}>Ordenar por</span>
-          <select data-testid="filtro-ordenar" value={filters.sort ?? ''} onChange={(event) => onChange({ sort: event.target.value || undefined, dir: event.target.value ? (filters.dir ?? 'asc') : undefined })} className={`mt-1 ${field}`}>
-            <option value="">Mais recentes</option>
-            <option value="prazo">Prazo</option>
-            <option value="numero">Nº do processo</option>
-          </select>
-        </label>
-        <button
-          type="button"
-          data-testid="filtro-direcao"
-          disabled={!filters.sort}
-          onClick={() => onChange({ dir: filters.dir === 'asc' ? 'desc' : 'asc' })}
-          title={filters.dir === 'asc' ? 'Crescente' : 'Decrescente'}
-          aria-label={`Inverter ordem (atual: ${filters.dir === 'asc' ? 'crescente' : 'decrescente'})`}
-          className="inline-flex min-h-9 items-center gap-1 rounded-md border border-slate-300 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-        >
-          {filters.dir === 'asc' ? <ArrowUpAZ size={15} /> : <ArrowDownAZ size={15} />}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function FilterPill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button type="button" aria-pressed={active} onClick={onClick} className={`max-w-full truncate whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 ${active ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}>{children}</button>;
-}
-
-function EmptyTasks({ status, filtered }: { status: TaskStatusFilter; filtered: boolean }) {
+function EmptyTasks({ filtered }: { filtered: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400"><Inbox size={26} /></div>
-      <p className="text-sm font-medium text-slate-700">Nenhuma tarefa {status === 'pendentes' ? 'pendente' : 'concluída'}</p>
-      <p className="mt-1 max-w-sm text-sm text-slate-500">{filtered ? 'Nenhuma tarefa corresponde aos filtros aplicados.' : status === 'pendentes' ? 'Quando uma tarefa for atribuída a você, ela aparecerá aqui.' : 'Suas tarefas concluídas aparecerão neste histórico.'}</p>
+      <p className="text-sm font-medium text-slate-700">Nenhuma tarefa em andamento</p>
+      <p className="mt-1 max-w-sm text-sm text-slate-500">{filtered ? 'Nenhuma tarefa corresponde aos filtros aplicados.' : 'Quando uma tarefa for atribuída a você, ela aparecerá aqui.'}</p>
     </div>
   );
 }
 
-function ProcessPill({ task }: { task: TaskListItem }) {
-  const icon = task.processIcon ? renderIcon(task.processIcon, 13) : null;
-  return <span title={task.categoryName || task.process || undefined} className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700"><span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" style={task.categoryColor ? { backgroundColor: task.categoryColor } : undefined} />{icon}<span className="truncate">{task.process || 'Processo'}</span></span>;
+function TaskCards({ tasks, onOpen }: { tasks: TaskListItem[]; onOpen: (task: TaskListItem) => void }) {
+  return <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">{tasks.map((task) => <TaskCard key={task.id} task={task} onOpen={() => onOpen(task)} />)}</div>;
 }
 
-function TaskCards({ tasks, onOpen, status }: { tasks: TaskListItem[]; onOpen: (task: TaskListItem) => void; status: TaskStatusFilter }) {
-  return <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">{tasks.map((task) => <TaskCard key={task.id} task={task} onOpen={() => onOpen(task)} status={status} />)}</div>;
-}
-
-function TaskCard({ task, onOpen, status }: { task: TaskListItem; onOpen: () => void; status: TaskStatusFilter }) {
+function TaskCard({ task, onOpen }: { task: TaskListItem; onOpen: () => void }) {
   return (
     <article role="link" aria-label={task.name || 'Tarefa'} tabIndex={0} onClick={onOpen} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onOpen(); } }} className="task-card group relative flex min-w-0 cursor-pointer flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-slate-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700">
-      <div className="flex min-w-0 items-start justify-between gap-3"><div className="min-w-0"><ProcessPill task={task} /></div><ExecutionNumber executionId={task.executionId} number={task.processNumber} /></div>
+      <div className="flex min-w-0 items-start justify-between gap-3"><div className="min-w-0"><ExecutionProcessPill item={task} /></div><ExecutionNumber executionId={task.executionId} number={task.processNumber} /></div>
       <div className="task-card-main relative mt-3 flex-1">
         <h2 title={task.name || 'Tarefa'} className="truncate text-sm font-bold text-slate-900">{task.name || 'Tarefa'}</h2>
-        <p title={task.inboxText || undefined} className="mt-1 line-clamp-3 min-h-12 text-xs leading-4 text-slate-500">{task.inboxText || 'Sem resumo disponível.'}</p>
+        <ExecutionSummary html={task.inboxHtml} text={task.inboxText} className="mt-1 line-clamp-3 min-h-12 text-xs leading-4 text-slate-500" />
         <CardAccess />
       </div>
       <div className="mt-4 flex min-w-0 items-center justify-between gap-3 text-xs">
         <span title={task.requester || undefined} className="flex min-w-0 items-center gap-1 text-slate-500"><User size={12} className="shrink-0" /><span className="truncate">{task.requester || 'Requisitante não informado'}</span></span>
-        <div className="task-card-deadline min-w-0 shrink-0 text-right"><DuePill plain dueAt={task.dueAt} createdAt={task.createdAt} completedAt={task.completedAt} completed={status === 'concluidas'} /></div>
+        <div className="task-card-deadline min-w-0 shrink-0 text-right"><DuePill plain dueAt={task.dueAt} createdAt={task.createdAt} /></div>
       </div>
       <ExecutionIndicators isTest={task.isTest} absentUserName={task.absentUserName} tags={task.tags} className="mt-3 border-t border-slate-100 pt-2" />
     </article>
   );
 }
 
-function TaskTable({ tasks, onOpen, status }: { tasks: TaskListItem[]; onOpen: (task: TaskListItem) => void; status: TaskStatusFilter }) {
+function TaskTable({ tasks, onOpen }: { tasks: TaskListItem[]; onOpen: (task: TaskListItem) => void }) {
   return <div className="rounded-lg border border-slate-200 bg-white"><table className="w-full table-fixed text-sm">
-    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="w-[24%] px-4 py-3 text-left">Processo / Nº</th><th className="w-[34%] px-4 py-3 text-left">Tarefa / Resumo</th><th className="w-[18%] px-4 py-3 text-left">Requisitante</th><th className="w-[24%] px-4 py-3 text-left">Prazo</th></tr></thead>
+    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th scope="col" className="w-28 px-4 py-3 text-left">Nº</th><th scope="col" className="w-[22%] px-4 py-3 text-left">Processo</th><th scope="col" className="px-4 py-3 text-left">Tarefa / Resumo</th><th scope="col" className="w-[16%] px-4 py-3 text-left">Requisitante</th><th scope="col" className="w-[20%] px-4 py-3 text-left">Prazo</th></tr></thead>
     <tbody>{tasks.map((task) => <tr key={task.id} tabIndex={0} onClick={() => onOpen(task)} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onOpen(task); } }} className="group cursor-pointer border-t border-slate-100 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-slate-700">
-      <td className="px-4 py-3 align-top"><ProcessPill task={task} /><div className="mt-2"><ExecutionNumber executionId={task.executionId} number={task.processNumber} /></div></td>
-      <td className="px-4 py-3 align-top"><p title={task.name || undefined} className="truncate font-bold text-slate-900">{task.name || 'Tarefa'}</p><p title={task.inboxText || undefined} className="mt-1 line-clamp-3 text-xs leading-4 text-slate-500">{task.inboxText || 'Sem resumo disponível.'}</p><ExecutionIndicators isTest={task.isTest} absentUserName={task.absentUserName} tags={task.tags} className="mt-2" /></td>
+      <td className="px-4 py-3 align-top"><ExecutionNumber executionId={task.executionId} number={task.processNumber} /></td>
+      <td className="px-4 py-3 align-top"><ExecutionProcessPill item={task} /></td>
+      <td className="px-4 py-3 align-top"><p title={task.name || undefined} className="truncate font-bold text-slate-900">{task.name || 'Tarefa'}</p><ExecutionSummary html={task.inboxHtml} text={task.inboxText} className="mt-1 line-clamp-3 text-xs leading-4 text-slate-500" /><ExecutionIndicators isTest={task.isTest} absentUserName={task.absentUserName} tags={task.tags} className="mt-2" /></td>
       <td title={task.requester || undefined} className="truncate px-4 py-3 align-top text-xs text-slate-500">{task.requester || '—'}</td>
-      <td className="px-4 py-3 align-top"><DuePill plain dueAt={task.dueAt} createdAt={task.createdAt} completedAt={task.completedAt} completed={status === 'concluidas'} /><span className="task-access mt-2 flex items-center gap-1 text-xs font-semibold text-slate-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">Acessar <ArrowRight size={14} /></span></td>
+      <td className="px-4 py-3 align-top"><DuePill plain dueAt={task.dueAt} createdAt={task.createdAt} /><span className="task-access mt-2 flex items-center gap-1 text-xs font-semibold text-slate-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">Acessar <ArrowRight size={14} /></span></td>
     </tr>)}</tbody>
   </table></div>;
 }

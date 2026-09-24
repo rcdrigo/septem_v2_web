@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, ExternalLink, Eye, Filter, Printer, RefreshCw, TrendingDown, TrendingUp } from 'lucide-react';
+import { Download, ExternalLink, Eye, Printer, RefreshCw, TrendingDown, TrendingUp } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ReportFilters, type ReportFilterItem } from './ReportFilters';
 import { KPI_ICONS } from '@/components/reports/kpi-icons';
 import {
   Chart,
@@ -42,19 +44,26 @@ function fmt(value: number | string | null, format?: string | null, colType?: st
  * coluna oculta, drill-down ao clicar em fatia/barra, exportação CSV/XLSX e
  * impressão (PDF via navegador). Responsivo web+mobile.
  */
-export function ReportRunViewer({ reportKey, filtersDef, preview }: { reportKey: string; filtersDef: GlobalFilterDef[]; preview?: boolean }) {
+export function ReportRunViewer({ reportKey, filtersDef, preview, actionsTarget }: { reportKey: string; filtersDef: GlobalFilterDef[]; preview?: boolean; actionsTarget?: HTMLElement | null }) {
   const [values, setValues] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
     for (const f of filtersDef) if (f.default) init[f.id] = f.default;
     return init;
   });
   const [applied, setApplied] = useState(values);
-  const run = useReportRun(reportKey, applied, { preview });
+  const missingRequired = filtersDef.some(f => f.required && !values[f.id]?.trim());
+  const waiting = JSON.stringify(values) !== JSON.stringify(applied);
+  const run = useReportRun(reportKey, applied, { preview, enabled: !missingRequired && !waiting });
+  useEffect(() => {
+    if (missingRequired) return;
+    const timer = window.setTimeout(() => setApplied(values), 400);
+    return () => window.clearTimeout(timer);
+  }, [values, missingRequired]);
   const [data, setData] = useState<ReportRunResult | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [drill, setDrill] = useState<{ title: string; data: DrilldownResult; blockId: string; group: string; stack?: string } | null>(null);
   const [detailRow, setDetailRow] = useState<{ block: RunBlockTable; row: (string | null)[] } | null>(null);
-  const [showFilters, setShowFilters] = useState(false); // F7.8: filtros de tabela no viewer
+  const [tableFilters, setTableFilters] = useState<Record<string, Record<string, ColFilter>>>({});
 
   useEffect(() => { if (run.data) setData(run.data); }, [run.data]);
 
@@ -75,74 +84,40 @@ export function ReportRunViewer({ reportKey, filtersDef, preview }: { reportKey:
     }
   }
 
-  const missingRequired = filtersDef.some((f) => f.required && !(values[f.id] ?? f.default));
   const runError = run.error instanceof ApiError ? (run.error.detail ?? run.error.message) : run.isError ? 'Falha ao executar o relatório.' : null;
+
+  const filterItems: ReportFilterItem[] = filtersDef.map(f => {
+    const [from = '', to = ''] = (values[f.id] ?? '').split('..');
+    return { id: `global:${f.id}`, label: f.label ?? f.id, type: f.type, required: f.required, options: f.options,
+      value: f.type === 'date' ? from : values[f.id] ?? '', max: f.type === 'date' ? to : undefined, range: f.type === 'date',
+      onChange: (value, max) => setValues(current => ({ ...current, [f.id]: f.type === 'date' ? (value || max ? `${value}..${max ?? ''}` : '') : value })) };
+  });
+  for (const block of data?.blocks ?? []) if (block.type === 'table') {
+    for (const col of block.columns.filter(c => c.visible && c.colType !== 'processLink')) {
+      const value = tableFilters[block.id]?.[col.key] ?? {};
+      const range = isRangeCol(col);
+      filterItems.push({ id: JSON.stringify([block.id, col.key]), label: `${block.title ?? 'Tabela'} · ${col.label}`,
+        type: isDateCol(col) ? 'date' : range ? 'number' : 'text', range,
+        value: (range ? value.min : value.text) ?? '', max: value.max,
+        onChange: (text, max) => setTableFilters(current => ({ ...current, [block.id]: { ...current[block.id], [col.key]: range ? { min: text, max } : { text } } })) });
+    }
+  }
+  const actions = <div className="flex flex-wrap items-center gap-2 print:hidden">
+    <button type="button" onClick={forceRefresh} disabled={refreshing || missingRequired || waiting || run.isFetching}
+      className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+      <RefreshCw size={14} className={refreshing ? 'animate-spin' : undefined} />Obter dados mais recentes
+    </button>
+    <button type="button" onClick={() => window.print()} className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"><Printer size={14} />Imprimir / PDF</button>
+  </div>;
 
   return (
     <div className="flex flex-col gap-4 print:gap-2">
-      {/* Filtros globais */}
-      {filtersDef.length > 0 && (
-        <div className="flex flex-wrap items-end gap-3 rounded-md border border-slate-200 bg-white p-3 print:hidden">
-          {filtersDef.map((f) => (
-            <label key={f.id} className="flex min-w-36 flex-col gap-1 text-xs font-medium text-slate-600">
-              {(f.label ?? f.id) + (f.required ? ' *' : '')}
-              {f.type === 'select' ? (
-                <select
-                  value={values[f.id] ?? ''}
-                  onChange={(e) => setValues({ ...values, [f.id]: e.target.value })}
-                  className="rounded-md border border-slate-300 px-2 py-1.5 text-sm font-normal"
-                >
-                  <option value="">—</option>
-                  {(f.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
-                </select>
-              ) : f.type === 'date' ? (
-                <DateRangeInput value={values[f.id] ?? ''} onChange={(v) => setValues({ ...values, [f.id]: v })} />
-              ) : (
-                <input
-                  type={f.type === 'number' ? 'number' : 'text'}
-                  value={values[f.id] ?? ''}
-                  onChange={(e) => setValues({ ...values, [f.id]: e.target.value })}
-                  className="rounded-md border border-slate-300 px-2 py-1.5 text-sm font-normal"
-                />
-              )}
-            </label>
-          ))}
-          <button
-            type="button"
-            disabled={missingRequired}
-            onClick={() => setApplied({ ...values })}
-            className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
-          >
-            Aplicar filtros
-          </button>
-        </div>
-      )}
-
-      {/* Cache + ações */}
-      <div className="flex flex-wrap items-center gap-2 print:hidden">
-        {data && (
-          <span className="text-xs text-slate-500">
-            Dados de {new Date(data.generatedAt).toLocaleString('pt-BR')}
-            {data.fromCache ? ' (cache)' : ''} · {data.totalRows} registro{data.totalRows === 1 ? '' : 's'}
-          </span>
-        )}
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <button type="button" onClick={forceRefresh} disabled={refreshing}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-            <RefreshCw size={14} className={refreshing ? 'animate-spin' : undefined} /> Obter dados mais recentes
-          </button>
-          {data?.blocks.some((b) => b.type === 'table') && (
-            <button type="button" onClick={() => setShowFilters((v) => !v)} aria-pressed={showFilters}
-              className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm ${showFilters ? 'border-sky-500 bg-sky-50 text-sky-700' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}>
-              <Filter size={14} /> Filtrar
-            </button>
-          )}
-          <button type="button" onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
-            <Printer size={14} /> Imprimir / PDF
-          </button>
-        </div>
+      {actionsTarget ? createPortal(actions, actionsTarget) : <header className="flex justify-end print:hidden">{actions}</header>}
+      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <ReportFilters items={filterItems} busy={run.isFetching || waiting} onClear={() => { setValues({}); setTableFilters({}); }} />
+        {data && <span className="ml-auto max-w-full text-right text-xs text-slate-500" data-testid="report-timestamp">Dados de {new Date(data.generatedAt).toLocaleString('pt-BR')}{data.fromCache ? ' (cache)' : ''} · {data.totalRows} registro{data.totalRows === 1 ? '' : 's'}</span>}
       </div>
+      {missingRequired && <p role="status" className="text-sm text-amber-800">Preencha os filtros obrigatórios para atualizar o relatório.</p>}
 
       {runError && <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{runError}</p>}
       {run.isLoading && !data && <p className="text-sm text-slate-400">Executando relatório…</p>}
@@ -151,7 +126,7 @@ export function ReportRunViewer({ reportKey, filtersDef, preview }: { reportKey:
       {data && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 print:grid-cols-1">
           {data.blocks.map((b) => (
-            <BlockView key={b.id} block={b} reportKey={reportKey} filters={applied} showFilters={showFilters}
+            <BlockView key={b.id} block={b} reportKey={reportKey} filters={applied} colFilters={tableFilters[b.id]}
               onDrill={openDrill} onDetail={(block, row) => setDetailRow({ block, row })} />
           ))}
         </div>
@@ -185,25 +160,11 @@ export function ReportRunViewer({ reportKey, filtersDef, preview }: { reportKey:
   );
 }
 
-/** Intervalo de datas: "início..fim" (qualquer lado opcional). */
-function DateRangeInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [from = '', to = ''] = value.split('..');
-  return (
-    <span className="flex items-center gap-1">
-      <input type="date" value={from} onChange={(e) => onChange(`${e.target.value}..${to}`)}
-        className="rounded-md border border-slate-300 px-2 py-1.5 text-sm font-normal" />
-      <span className="text-slate-400">–</span>
-      <input type="date" value={to} onChange={(e) => onChange(`${from}..${e.target.value}`)}
-        className="rounded-md border border-slate-300 px-2 py-1.5 text-sm font-normal" />
-    </span>
-  );
-}
-
-function BlockView({ block, reportKey, filters, showFilters, onDrill, onDetail }: {
+function BlockView({ block, reportKey, filters, colFilters, onDrill, onDetail }: {
   block: RunBlock;
   reportKey: string;
   filters: Record<string, string>;
-  showFilters?: boolean;
+  colFilters?: Record<string, ColFilter>;
   onDrill: (b: RunBlockGrouped | RunBlockStacked, group?: string, stack?: string) => void;
   onDetail: (b: RunBlockTable, row: (string | null)[]) => void;
 }) {
@@ -234,7 +195,7 @@ function BlockView({ block, reportKey, filters, showFilters, onDrill, onDetail }
       {block.type === 'stackedBars' && (
         <StackedChart block={block} onDrill={(g, s) => onDrill(block, g, s)} />
       )}
-      {block.type === 'table' && <TableBlock block={block} showFilters={showFilters} onDetail={(row) => onDetail(block, row)} />}
+      {block.type === 'table' && <TableBlock block={block} colFilters={colFilters} onDetail={(row) => onDetail(block, row)} />}
     </section>
   );
 }
@@ -285,10 +246,11 @@ const isRangeCol = (c: { colType: string; format?: string }) =>
   c.colType === 'number' || c.colType === 'date' || c.format === 'number' || c.format === 'currency' || c.format === 'date';
 const isDateCol = (c: { colType: string; format?: string }) => c.colType === 'date' || c.format === 'date';
 
-function TableBlock({ block, onDetail, showFilters }: { block: RunBlockTable; onDetail: (row: (string | null)[]) => void; showFilters?: boolean }) {
+const EMPTY_COL_FILTERS: Record<string, ColFilter> = {};
+function TableBlock({ block, onDetail, colFilters = EMPTY_COL_FILTERS }: { block: RunBlockTable; onDetail: (row: (string | null)[]) => void; colFilters?: Record<string, ColFilter> }) {
   const visible = block.columns.map((c, i) => ({ ...c, index: i })).filter((c) => c.visible);
   const [page, setPage] = useState(1);
-  const [colFilters, setColFilters] = useState<Record<string, ColFilter>>({});
+  useEffect(() => setPage(1), [colFilters]);
   if (block.rows.length === 0) return <p className="text-sm text-slate-400">Sem resultados.</p>;
 
   // F7.8: filtro por coluna no viewer — intervalo (número/moeda/data), texto sem
@@ -313,7 +275,6 @@ function TableBlock({ block, onDetail, showFilters }: { block: RunBlockTable; on
       }
       return f.text ? norm(raw ?? '').includes(norm(f.text)) : true;
     }));
-  const setF = (key: string, patch: Partial<ColFilter>) => { setColFilters((p) => ({ ...p, [key]: { ...p[key], ...patch } })); setPage(1); };
 
   // Paginação client-side (impressão mostra tudo — CSS print ignora o recorte).
   const totalPages = Math.max(1, Math.ceil(rows.length / TABLE_PAGE_SIZE));
@@ -354,27 +315,7 @@ function TableBlock({ block, onDetail, showFilters }: { block: RunBlockTable; on
             {visible.map((c) => <th key={c.key} className="px-3 py-2 text-left">{c.label}</th>)}
             {block.hasHiddenColumns && <th className="w-10 print:hidden" aria-label="Detalhe" />}
           </tr>
-          {showFilters && (
-            <tr className="print:hidden">
-              {visible.map((c) => (
-                <th key={c.key} className="px-2 pb-2 align-top font-normal normal-case">
-                  {c.colType === 'processLink' ? null : isRangeCol(c) ? (
-                    <div className="flex items-center gap-1">
-                      <input type={isDateCol(c) ? 'date' : 'number'} aria-label={`Mínimo de ${c.label}`} value={colFilters[c.key]?.min ?? ''}
-                        onChange={(e) => setF(c.key, { min: e.target.value })} className="w-full min-w-0 rounded border border-slate-200 px-1 py-0.5 text-xs" />
-                      <span className="text-slate-300">–</span>
-                      <input type={isDateCol(c) ? 'date' : 'number'} aria-label={`Máximo de ${c.label}`} value={colFilters[c.key]?.max ?? ''}
-                        onChange={(e) => setF(c.key, { max: e.target.value })} className="w-full min-w-0 rounded border border-slate-200 px-1 py-0.5 text-xs" />
-                    </div>
-                  ) : (
-                    <input type="text" aria-label={`Filtrar ${c.label}`} placeholder="filtrar…" value={colFilters[c.key]?.text ?? ''}
-                      onChange={(e) => setF(c.key, { text: e.target.value })} className="w-full min-w-0 rounded border border-slate-200 px-1.5 py-0.5 text-xs" />
-                  )}
-                </th>
-              ))}
-              {block.hasHiddenColumns && <th className="print:hidden" />}
-            </tr>
-          )}
+
         </thead>
         <tbody className="print:hidden">{pageRows.map(renderRow)}</tbody>
         {/* impressão: todas as linhas (respeitando o filtro aplicado) */}

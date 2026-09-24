@@ -244,7 +244,7 @@ def main():
         backup=path.parent/'before-migration.dump'
         with backup.open('xb') as handle:
             backup.chmod(0o600)
-            subprocess.run([connection.executable('pg_dump'),'--format=custom','--no-owner','--no-acl'],stdout=handle,check=True)
+            subprocess.run([connection.executable('pg_dump'),'-w','--format=custom','--no-owner','--no-acl'],stdout=handle,check=True,env=connection.client_environment())
         output=path.parent/'applied.sql';output.write_text(script);output.chmod(0o600)
         query(script)
         print('Conversão concluída. Requisições, respostas, versões, anexos, históricos e automações preservados. Valide o fluxo antes de reabrir o acesso.')

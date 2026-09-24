@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, KeyRound, LogOut, User, UserCog, Search } from 'lucide-react';
+import { ChevronDown, LogOut, User, UserCog, Search } from 'lucide-react';
 import { Popover, MenuItem, MenuDivider } from '@/components/ui/Popover';
 import { Dialog } from '@/components/ui/Dialog';
 import { useSessionStore } from '@/stores/session';
 import { useUsersList } from '@/lib/api/users';
 import { toast } from '@/stores/toast';
+import { AccessModeToggle } from './AccessModeToggle';
 import { routes } from '@/lib/routes';
 
 /** Bloco de identidade do usuário no topo da sidebar, com dropdown de conta. */
@@ -15,6 +16,8 @@ export function SidebarUser() {
   const stopImpersonation = useSessionStore((s) => s.stopImpersonation);
   const isImpersonating = useSessionStore((s) => s.isImpersonating);
   const navigate = useNavigate();
+  const canImpersonate = useSessionStore((s) => s.can('users:impersonate'));
+  const [impersonateOpen, setImpersonateOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
 
   if (!user) return null;
@@ -53,9 +56,6 @@ export function SidebarUser() {
           <span className="min-w-0 truncate">
             Personificando <strong className="font-semibold">{user.name}</strong>
           </span>
-          <button type="button" disabled={leaving} onClick={leaveImpersonation} className="shrink-0 font-medium underline hover:text-amber-900 disabled:opacity-60">
-            Sair
-          </button>
         </div>
       )}
 
@@ -85,16 +85,17 @@ export function SidebarUser() {
             <MenuItem onClick={() => { close(); navigate(routes.me); }}>
               <User size={15} /> Meus dados
             </MenuItem>
-            <MenuItem onClick={() => { close(); navigate(routes.me); }}>
-              <KeyRound size={15} /> Mudar senha
-            </MenuItem>
-            {/* Segunda porta de saída da personificação: o banner pode ficar fora
-                da vista (scroll/mobile) — aqui está sempre a um clique. */}
+            {canImpersonate && !isImpersonating && (
+              <MenuItem onClick={() => { close(); setImpersonateOpen(true); }}>
+                <UserCog size={15} /> Personificar
+              </MenuItem>
+            )}
             {isImpersonating && (
-              <MenuItem onClick={async () => { close(); await leaveImpersonation(); }}>
+              <MenuItem disabled={leaving} onClick={async () => { close(); await leaveImpersonation(); }}>
                 <UserCog size={15} /> Sair da personificação
               </MenuItem>
             )}
+            <AccessModeToggle onClose={close} />
             <MenuDivider />
             <MenuItem destructive onClick={async () => { close(); await endSession(); }}>
               <LogOut size={15} /> Sair
@@ -102,11 +103,12 @@ export function SidebarUser() {
           </>
         )}
       </Popover>
+      {impersonateOpen && <ImpersonateDialog selfId={user.id} onClose={() => setImpersonateOpen(false)} />}
     </div>
   );
 }
 
-/** Modal de seleção de usuário p/ personificar. Acionado pelo rodapé do sidenav. */
+/** Modal de seleção de usuário p/ personificar. Acionado pelo menu do usuário. */
 export function ImpersonateDialog({ selfId, onClose }: { selfId: string; onClose: () => void }) {
   const impersonate = useSessionStore((s) => s.impersonate);
   const navigate = useNavigate();

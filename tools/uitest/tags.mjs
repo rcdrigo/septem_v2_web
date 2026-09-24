@@ -77,6 +77,8 @@ try {
   await mount('tags');
   await page.getByRole('button',{name:'Tags',exact:true}).click();
   await page.getByRole('dialog').waitFor();
+  await page.getByRole('region',{name:/Associadas a esta execução/}).getByText('Urgente',{exact:true}).waitFor();
+  await page.getByRole('region',{name:/Disponíveis no processo/}).getByText('Financeiro',{exact:true}).waitFor();
   check('leitura envia modo interno',calls.find(c=>c.url.endsWith('/tags'))?.headers['x-access-mode'],'interno');
   const editor=()=>page.getByRole('dialog',{name:'Tags da execução',exact:true});
   const openEditor=async()=>{await page.getByRole('button',{name:'Tags',exact:true}).click();await page.getByLabel('Nome da tag',{exact:true}).waitFor();};
@@ -110,23 +112,29 @@ try {
   check('nova tag enviada no lote',writes().at(-1).body.createTags,[{name:'Revisão',color:'#0ea5e9'}]);
 
   await openEditor();
-  await page.getByLabel('Código da cor da tag urgente',{exact:true}).fill('#ff0000');
+  await editor().getByRole('button',{name:'Renomear Urgente',exact:true}).click();
+  await editor().getByRole('button',{name:'Cor da tag Urgente',exact:true}).click();
+  await page.getByRole('button',{name:'Cor #b91c1c',exact:true}).click();
   check('aviso de cor explica alcance global',(await editor().innerText()).includes('todas as execuções'),true);
   const beforeColorCancel=writes().length;
   await editor().getByRole('button',{name:'Cancelar',exact:true}).click();
   check('cancelar alteração de cor não grava',writes().length,beforeColorCancel);
   await openEditor();
-  check('cancelar restaura cor persistida',await page.getByLabel('Código da cor da tag urgente',{exact:true}).inputValue(),'#000000');
-  await page.getByLabel('Código da cor da tag urgente',{exact:true}).fill('inválida');
-  check('cor inválida bloqueia salvar',await editor().getByRole('button',{name:'Salvar tags',exact:true}).isDisabled(),true);
-  await page.getByLabel('Código da cor da tag urgente',{exact:true}).fill('#ff0000');
+  await editor().getByRole('button',{name:'Renomear Urgente',exact:true}).click();
+  await editor().getByRole('button',{name:'Cor da tag Urgente',exact:true}).click();
+  check('cancelar restaura cor persistida',await page.getByLabel('Cor personalizada: Cor da tag Urgente',{exact:true}).inputValue(),'#000000');
+  await page.keyboard.press('Escape');
+  check('Escape da paleta preserva editor',await editor().isVisible(),true);
+  await editor().getByRole('button',{name:'Cor da tag Urgente',exact:true}).click();
+  await page.getByRole('button',{name:'Cor #b91c1c',exact:true}).click();
   await editor().getByRole('button',{name:'Salvar tags',exact:true}).click();
   await editor().waitFor({state:'hidden'});
-  check('cor existente salva em lote',writes().at(-1).body.colorUpdates,[{id:'tag-1',color:'#ff0000'}]);
+  check('cor existente salva em lote',writes().at(-1).body.colorUpdates,[{id:'tag-1',color:'#b91c1c'}]);
   check('alteração de cor não renomeia tag',writes().at(-1).body.renames,[]);
   await openEditor();
   await page.getByLabel('Nome da tag',{exact:true}).fill('Colorida');
-  await page.getByLabel('Código da cor da nova tag',{exact:true}).fill('#ffffff');
+  await editor().getByRole('button',{name:'Cor da nova tag',exact:true}).click();
+  await page.getByLabel('Cor personalizada: Cor da nova tag',{exact:true}).fill('#ffffff');
   await editor().getByRole('button',{name:'Adicionar',exact:true}).click();
   await editor().getByRole('button',{name:'Salvar tags',exact:true}).click();
   await editor().waitFor({state:'hidden'});
@@ -174,12 +182,13 @@ try {
   check('histórico identifica personificação',(await page.getByRole('listitem').nth(1).innerText()).includes('Operado por Operador'),true);
 
   await mount('tasks','interno',true,'/?process=removido&tagNames=Urgente&tagNames=Financeiro');
-  await page.getByRole('alert').waitFor();
-  check('filtro de processo inválido preservado',await page.getByRole('button',{name:'Remover filtro Processo: removido',exact:true}).count(),1);
+  await page.getByText('Uma seleção não possui resultados disponíveis.',{exact:false}).waitFor();
+  check('filtro de processo inválido preservado',await page.getByRole('button',{name:'Remover filtro Processos',exact:true}).count(),1);
   check('envia tags em parâmetros separados',new URL(calls.filter(c=>new URL(c.url).pathname.endsWith('/tasks')).at(-1).url).searchParams.getAll('tagNames'),['Urgente','Financeiro']);
   await page.getByTestId('abrir-filtros').click();
-  check('tags selecionadas podem ser removidas',await page.getByTestId('filtro-tags').getByRole('button',{name:/Urgente/}).getAttribute('aria-pressed'),'true');
-  await Promise.all([page.waitForResponse(r=>new URL(r.url()).pathname.endsWith('/tasks') && new URL(r.url()).searchParams.getAll('tagNames').length===1),page.getByTestId('filtro-tags').getByRole('button',{name:/Urgente/}).click()]);
+  await page.getByTestId('painel-filtros').getByRole('navigation').getByRole('button',{name:'Tags',exact:true}).click();
+  check('tags selecionadas podem ser removidas',await page.getByTestId('filtro-tags').getByLabel('Urgente',{exact:false}).isChecked(),true);
+  await Promise.all([page.waitForResponse(r=>new URL(r.url()).pathname.endsWith('/tasks') && new URL(r.url()).searchParams.getAll('tagNames').length===1),page.getByTestId('filtro-tags').getByLabel('Urgente',{exact:false}).click()]);
   check('remover uma tag preserva outra',new URL(calls.filter(c=>new URL(c.url).pathname.endsWith('/tasks')).at(-1).url).searchParams.getAll('tagNames'),['Financeiro']);
 
   await mount('tasks','externo',true,'/?tagNames=Urgente');
@@ -195,6 +204,11 @@ try {
   await sheet.getByRole('button',{name:'Tags',exact:true}).click();
   await page.getByLabel('Nome da tag',{exact:true}).waitFor();
   check('abrir tags no celular fecha sheet nativo',await page.locator('dialog[open]').count(),0);
+  await editor().getByRole('button',{name:'Cor da nova tag',exact:true}).click();
+  await page.getByRole('button',{name:'Cor #047857',exact:true}).click();
+  const nameBox = await page.getByLabel('Nome da tag',{exact:true}).boundingBox();
+  const colorBox = await editor().getByRole('button',{name:'Cor da nova tag',exact:true}).boundingBox();
+  check('nome e cor na mesma linha móvel',Math.abs(nameBox.y-colorBox.y)<2,true);
   await page.getByLabel('Nome da tag',{exact:true}).fill('Mobile');
   await editor().getByRole('button',{name:'Adicionar',exact:true}).click();
   check('editor móvel recebe interação',await editor().getByRole('listitem').filter({hasText:'Mobile'}).count(),1);

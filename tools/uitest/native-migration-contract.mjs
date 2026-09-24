@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 const dir = mkdtempSync(`${tmpdir()}/migration-contract-`);
 try {
   execFileSync('python3', ['tools/uitest/native-migration.py'], { stdio: 'inherit' });
+  execFileSync('python3', ['tools/uitest/postgres-tools.py'], { stdio: 'inherit' });
   await build({ entryPoints: ['src/lib/native-form.ts'], bundle: true, platform: 'node', format: 'esm', outfile: `${dir}/contract.mjs` });
   const { parseNativeForm, filterNativeAnswers } = await import(pathToFileURL(`${dir}/contract.mjs`));
   const schema = parseNativeForm(JSON.parse(execFileSync('python3', ['tools/uitest/native-migration.py', '--fixture'], { encoding: 'utf8' })));

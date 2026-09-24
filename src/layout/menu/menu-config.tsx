@@ -1,5 +1,4 @@
 import {
-  ArrowLeftRight,
   BarChart3,
   BookOpen,
   Building2,
@@ -11,7 +10,6 @@ import {
   LayoutDashboard,
   LifeBuoy,
   ListChecks,
-  LogOut,
   Mail,
   Network,
   ScrollText,
@@ -98,9 +96,7 @@ export const MENU: MenuByMode = {
       },
     ],
     footer: [
-      { kind: 'action', label: 'Personificar', icon: ArrowLeftRight, action: 'impersonate', perm: 'users:impersonate' },
       { kind: 'link', label: 'Suporte', to: routes.support, icon: LifeBuoy },
-      { kind: 'action', label: 'Sair', icon: LogOut, action: 'logout' },
     ],
   },
 
@@ -117,7 +113,6 @@ export const MENU: MenuByMode = {
     ],
     footer: [
       { kind: 'link', label: 'Suporte', to: routes.support, icon: LifeBuoy },
-      { kind: 'action', label: 'Sair', icon: LogOut, action: 'logout' },
     ],
   },
 };

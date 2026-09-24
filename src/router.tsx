@@ -88,7 +88,7 @@ export const router = createBrowserRouter(
         // --- Geral ---------------------------------------------------------
         stub(childPath(routes.dashboard), 'Dashboard', { phase: 'Fase 7' }),
         { path: childPath(routes.tasks), element: <TarefasPage /> },
-        { path: childPath(routes.requests), element: <InstanciasPage title="Requisições" lockMine initialStatus="em_andamento" /> },
+        { path: childPath(routes.requests), element: <InstanciasPage /> },
         // /reports = catálogo de consultas (relatórios publicados) (req. 8).
         { path: childPath(routes.reports), element: <ConsultasPage /> },
         { path: childPath(routes.orgchart), element: <OrganogramaPage /> },

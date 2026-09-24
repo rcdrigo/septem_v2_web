@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { History, Pencil, Plus, RotateCcw, Tag, Trash2, X } from 'lucide-react';
+import { PaletteField } from '@/components/ui/PaletteField';
 import { Dialog } from '@/components/ui/Dialog';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { TextInput } from '@/components/ui/Field';
@@ -72,18 +73,7 @@ function hasDraftChanges(tags: readonly DraftTag[]): boolean {
 function TagColorField({ label, value, onChange, disabled }: {
   label: string; value: string; onChange: (value: string) => void; disabled: boolean;
 }) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs font-medium text-slate-500">Cor</span>
-      <input type="color" aria-label={label} value={normalizeTagColor(value) ?? DEFAULT_TAG_COLOR}
-        disabled={disabled} onChange={(event) => onChange(event.target.value)}
-        className="h-9 w-10 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-0.5" />
-      <TextInput aria-label={`Código da ${label.toLowerCase()}`} value={value} disabled={disabled}
-        aria-invalid={!normalizeTagColor(value) || undefined} maxLength={7}
-        onChange={(event) => onChange(event.target.value)} placeholder={DEFAULT_TAG_COLOR}
-        className="w-28 min-w-0 font-mono" />
-    </div>
-  );
+  return <PaletteField label={label} value={normalizeTagColor(value) ?? DEFAULT_TAG_COLOR} onChange={onChange} disabled={disabled} compact />;
 }
 
 function TagsEditorDialog({
@@ -317,7 +307,7 @@ function TagsEditorDialog({
           )}
 
           <div>
-            <label htmlFor="new-tag-name" className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500">
+            <label htmlFor="new-tag-name" className="mb-1.5 block text-sm font-medium text-slate-800">
               Nome da tag
             </label>
             <div className="flex gap-2">
@@ -325,7 +315,7 @@ function TagsEditorDialog({
                 id="new-tag-name"
                 value={newName}
                 maxLength={50}
-                placeholder="Digite para adicionar ou reutilizar"
+                placeholder="Nome da nova tag"
                 onChange={(event) => setNewName(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
@@ -339,26 +329,30 @@ function TagsEditorDialog({
               <datalist id="tag-catalog-options">
                 {draft.filter((tag) => !tag.deleted).map((tag) => <option key={tag.id} value={tag.name} />)}
               </datalist>
+              <TagColorField label="Cor da nova tag" value={newColor} onChange={setNewColor} disabled={saveMutation.isPending} />
               <button
                 type="button"
+                aria-label="Adicionar"
                 onClick={addOrReuse}
                 className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
               >
-                <Plus size={15} aria-hidden="true" /> Adicionar
+                <Plus size={15} aria-hidden="true" /> <span className="hidden sm:inline">Adicionar</span>
               </button>
             </div>
-            <div className="mt-2"><TagColorField label="Cor da nova tag" value={newColor} onChange={setNewColor} disabled={saveMutation.isPending} /></div>
-            <p className="mt-1 text-xs text-slate-500">Até 50 caracteres. Nomes iguais ignoram maiúsculas e espaços nas extremidades. Ao reutilizar uma tag, sua cor atual é mantida.</p>
+            <p className="mt-1 text-xs text-slate-500">A nova tag será cadastrada no processo e associada a esta execução ao salvar. Um nome existente reutiliza a tag e sua cor.</p>
           </div>
 
-          {draft.length === 0 ? (
-            <p className="rounded-md border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
-              Nenhuma tag cadastrada neste processo.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {draft.map((tag) => (
-                <li key={tag.id} className={`rounded-md border p-3 ${tag.deleted ? 'border-rose-200 bg-rose-50/50' : 'border-slate-200 bg-white'}`}>
+          {[
+            { key: 'selected', title: 'Associadas a esta execução', description: 'Identificam esta requisição. Remover a associação mantém a tag disponível no processo.', items: draft.filter(tag => tag.selected && !tag.deleted), empty: 'Nenhuma tag associada a esta execução.' },
+            { key: 'catalog', title: 'Disponíveis no processo', description: 'Tags cadastradas que você pode associar a esta execução. Editar nome, cor ou excluir altera o cadastro para todas as execuções.', items: draft.filter(tag => !tag.selected && !tag.deleted), empty: 'Nenhuma outra tag disponível no processo.' },
+            { key: 'deleted', title: 'Exclusões pendentes', description: 'Estas tags serão excluídas do processo ao salvar.', items: draft.filter(tag => tag.deleted), empty: '' },
+          ].filter(group => group.key !== 'deleted' || group.items.length > 0).map(group => (
+            <section key={group.key} aria-labelledby={`tags-${group.key}`} className="border-t border-slate-200 pt-4">
+              <h3 id={`tags-${group.key}`} className="text-sm font-semibold text-slate-900">{group.title} <span className="ml-1 font-normal text-slate-500">({group.items.length})</span></h3>
+              <p className="mt-1 text-xs leading-relaxed text-slate-600">{group.description}</p>
+              {group.items.length === 0 ? <p className="mt-3 text-sm text-slate-500">{group.empty}</p> : <ul className="mt-3 divide-y divide-slate-100">
+              {group.items.map((tag) => (
+                <li key={tag.id} className={`py-3 first:pt-0 last:pb-0 ${tag.deleted ? 'text-rose-700' : ''}`}>
                   <div className="flex min-w-0 items-center gap-2">
                     <Tag size={15} style={{ color: normalizeTagColor(tag.color) ?? DEFAULT_TAG_COLOR }} className={tag.deleted ? 'text-rose-400' : 'text-slate-400'} aria-hidden="true" />
                     {tag.editing ? (
@@ -383,10 +377,11 @@ function TagsEditorDialog({
                         className="min-w-0 flex-1"
                       />
                     ) : (
-                      <span style={tag.deleted ? undefined : tagColorStyle(tag.color)} className={`min-w-0 flex-1 truncate rounded-full px-2.5 py-1 text-sm font-medium ${tag.deleted ? 'text-rose-700 line-through' : 'text-slate-800'}`}>
+                      <span style={tag.deleted ? undefined : tagColorStyle(tag.color)} className={`min-w-0 max-w-full truncate rounded-full px-2.5 py-1 text-sm font-medium ${tag.deleted ? 'text-rose-700 line-through' : 'text-slate-800'}`}>
                         {tag.name}
                       </span>
                     )}
+                    <span className="flex-1" />
                     {tag.isNew && <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">Nova</span>}
 
                     {tag.deleted ? (
@@ -403,7 +398,7 @@ function TagsEditorDialog({
                           <button
                             type="button"
                             aria-label={`Renomear ${tag.name}`}
-                            title="Renomear"
+                            title="Editar nome e cor no processo"
                             onClick={() => setDraft((current) => current.map((item) => item.id === tag.id ? { ...item, editing: !item.editing } : item))}
                             className="rounded p-1.5 text-slate-500 hover:bg-slate-100"
                           >
@@ -423,8 +418,8 @@ function TagsEditorDialog({
                     )}
                   </div>
 
-                  {!tag.deleted && (
-                    <div className="mt-2"><TagColorField label={`Cor da tag ${tag.name}`} value={tag.color} disabled={saveMutation.isPending} onChange={(color) => setDraft((current) => current.map((item) => item.id === tag.id ? { ...item, color } : item))} /></div>
+                  {!tag.deleted && (tag.editing || tag.isNew) && (
+                    <div className="mt-2 flex items-center gap-2"><span className="text-xs text-slate-600">Cor no processo</span><TagColorField label={`Cor da tag ${tag.name}`} value={tag.color} disabled={saveMutation.isPending} onChange={(color) => setDraft((current) => current.map((item) => item.id === tag.id ? { ...item, color } : item))} /></div>
                   )}
 
                   {!tag.deleted && !tag.isNew && (tag.name.trim() !== tag.originalName || normalizeTagColor(tag.color) !== normalizeTagColor(tag.originalColor)) && (
@@ -456,8 +451,9 @@ function TagsEditorDialog({
                   )}
                 </li>
               ))}
-            </ul>
-          )}
+              </ul>}
+            </section>
+          ))}
 
           {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
         </div>

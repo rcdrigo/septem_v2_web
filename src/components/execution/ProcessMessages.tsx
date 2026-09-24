@@ -1,3 +1,4 @@
+import { CardHeader } from '@/components/ui/CardHeader';
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -29,6 +30,7 @@ export function ProcessMessages({ executionId, originType, taskId, messageAccess
   const [replyTo, setReplyTo] = useState<ProcessMessage | null>(null);
   const [selected, setSelected] = useState<Record<string, SelectedMention>>({});
   const [menuIndex, setMenuIndex] = useState(0);
+  const [sendError, setSendError] = useState(false);
   const mentionMatch = body.match(/(?:^|\s)@([^@\s]*)$/);
   const mentionSearch = mentionMatch?.[1] ?? '';
   const mentionOpen = !!mentionMatch;
@@ -62,6 +64,7 @@ export function ProcessMessages({ executionId, originType, taskId, messageAccess
   }
 
   async function submit() {
+    if (send.isPending || !canPost) return;
     const text = body.trim();
     if (!text) { toast.error('Digite uma mensagem.'); return; }
     const active = Object.values(selected).filter((mention) => text.includes(`@${mention.name}`));
@@ -79,32 +82,47 @@ export function ProcessMessages({ executionId, originType, taskId, messageAccess
       setSelected({});
       setHidden(false);
       setReplyTo(null);
+      setSendError(false);
       toast.success('Mensagem enviada.');
-    } catch { toast.error('Não foi possível enviar a mensagem.'); }
+    } catch { setSendError(true); }
   }
 
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby={`messages-${executionId}`}>
-      <header className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
-        <MessageSquare size={17} className="text-slate-500" />
-        <h2 id={`messages-${executionId}`} className="text-sm font-semibold text-slate-900">Mensagens</h2>
-      </header>
+      <CardHeader id={`messages-${executionId}`} title="Mensagens" icon={<MessageSquare size={17} />} />
       <div className="p-4">
+
+      {messages.isError && !!messages.data && !messages.isFetchNextPageError && (
+        <div role="alert" className="mt-4 rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          <p>Não foi possível atualizar as mensagens. As mensagens exibidas podem estar desatualizadas.</p>
+          <button type="button" onClick={() => void messages.refetch()} className="mt-2 min-h-9 font-semibold underline underline-offset-2">Tentar novamente</button>
+        </div>
+      )}
 
       {messages.isLoading ? (
         <div className="mt-4 space-y-3" aria-label="Carregando mensagens">
           <div className="h-16 animate-pulse rounded-md bg-slate-100" />
           <div className="h-16 animate-pulse rounded-md bg-slate-100" />
         </div>
+      ) : messages.isError && !messages.data ? (
+        <div role="alert" className="mt-4 rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          <p>Não foi possível carregar as mensagens.</p>
+          <button type="button" onClick={() => void messages.refetch()} className="mt-2 min-h-9 rounded-md font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-700">Tentar novamente</button>
+        </div>
       ) : threads.length === 0 ? (
         <p className="mt-4 rounded-md bg-slate-50 px-3 py-4 text-center text-sm text-slate-500">Nenhuma mensagem enviada.</p>
       ) : (
         <div className="mt-4 space-y-4">
-          {messages.hasNextPage && (
+          {messages.hasNextPage && !messages.isFetchNextPageError && (
             <button type="button" onClick={() => void messages.fetchNextPage()} disabled={messages.isFetchingNextPage}
               className="w-full rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60">
               {messages.isFetchingNextPage ? 'Carregando…' : 'Carregar mensagens anteriores'}
             </button>
+          )}
+          {messages.isFetchNextPageError && (
+            <div role="alert" className="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-800">
+              Não foi possível carregar as mensagens anteriores. <button type="button" onClick={() => void messages.fetchNextPage()} className="font-semibold underline underline-offset-2">Tentar novamente</button>
+            </div>
           )}
           {threads.map((thread) => (
             <div key={thread.message.id} className="space-y-3">
@@ -129,9 +147,11 @@ export function ProcessMessages({ executionId, originType, taskId, messageAccess
           )}
           <label className="sr-only" htmlFor={`message-body-${executionId}`}>Nova mensagem</label>
           <textarea id={`message-body-${executionId}`} value={body} maxLength={4000} rows={4}
-            onChange={(event) => { setBody(event.target.value); setMenuIndex(0); }} onKeyDown={onComposerKeyDown}
+            onChange={(event) => { setBody(event.target.value); setMenuIndex(0); setSendError(false); }} onKeyDown={onComposerKeyDown}
             placeholder="Escreva uma mensagem. Use @ para mencionar alguém."
-            className="w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200" />
+            aria-invalid={sendError} aria-describedby={sendError ? `message-error-${executionId}` : undefined}
+            className="w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-base text-slate-900 outline-none placeholder:text-slate-500 focus:border-slate-500 focus:ring-2 focus:ring-slate-200" />
+          {sendError && <p id={`message-error-${executionId}`} role="alert" className="mt-2 text-sm text-rose-700">Não foi possível enviar a mensagem. Seu texto foi mantido; tente novamente.</p>}
           {mentionOpen && (
             <div role="listbox" aria-label="Usuários para mencionar" className="absolute bottom-[8.25rem] left-0 z-30 max-h-56 w-full max-w-md overflow-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
               {candidates.isLoading ? <p className="px-3 py-2 text-sm text-slate-400">Buscando…</p> : choices.length === 0 ? <p className="px-3 py-2 text-sm text-slate-500">Nenhum usuário disponível.</p> : choices.map((choice, index) => (
@@ -144,13 +164,14 @@ export function ProcessMessages({ executionId, originType, taskId, messageAccess
             </div>
           )}
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
               {canHide && (
                 <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-slate-600">
                   <input type="checkbox" checked={hidden} onChange={(event) => setHidden(event.target.checked)} className="h-4 w-4 rounded border-slate-300" />
                   <EyeOff size={13} /> Ocultar do requisitante
                 </label>
               )}
+              {canHide && <span className="text-xs text-slate-600">{hidden ? 'Oculta para o requisitante' : 'Não oculta para o requisitante'}</span>}
               <span className="text-xs tabular-nums text-slate-400">{body.length}/4000</span>
             </div>
             <button type="button" onClick={() => void submit()} disabled={send.isPending || !body.trim()}
@@ -160,7 +181,7 @@ export function ProcessMessages({ executionId, originType, taskId, messageAccess
           </div>
         </div>
       ) : (
-        <p className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-500">A inserção de novas mensagens está desativada para este processo.</p>
+        !!firstPage && <p className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-500">Você não pode enviar mensagens nesta requisição.</p>
       )}
       </div>
     </section>

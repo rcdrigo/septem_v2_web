@@ -36,6 +36,9 @@ _Evitar_: Processo quando a distinção entre definição e execução for relev
 **Tarefa de processo**:
 Etapa de trabalho de uma requisição, distinta da tarefa de atendimento de um chamado.
 
+**Participação em uma requisição**:
+Conclusão de pelo menos uma tarefa de processo pelo usuário naquela requisição. A mera atribuição ou o recebimento de uma tarefa não caracteriza participação para a listagem pessoal de requisições.
+
 **Substituição por ausência temporária**:
 Recebimento de uma tarefa em lugar de seu responsável original durante a ausência temporária dele. O usuário ausente é o responsável original, não o requisitante da requisição.
 

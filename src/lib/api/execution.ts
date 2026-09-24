@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { AutomationSource } from '@/lib/form-automation/runtime';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -6,7 +7,7 @@ import { useTagsAccess, type ExecutionTag } from '@/lib/api/tags';
 
 export type StartedInstance = { executionId: string; status: string; tasks: { id: string; name: string | null }[]; nextTaskForMe?: string | null };
 export type RequestSummary = { label: string; value: string };
-export type ProcessMetadata = { process?: string | null; processKey?: string | null; processIcon?: string | null; categoryName?: string | null; categoryColor?: string | null; inboxText?: string | null; processNumber?: number; requester?: string | null };
+export type ProcessMetadata = { process?: string | null; processKey?: string | null; processIcon?: string | null; categoryName?: string | null; categoryColor?: string | null; inboxText?: string | null; inboxHtml?: string | null; processNumber?: number; requester?: string | null };
 /** isTest: instância iniciada em modo simulação (todas as tarefas ficam com o requisitante). */
 export type MyTask = ProcessMetadata & { id: string; name: string | null; executionId: string; createdAt: string; startedAt?: string; dueAt: string | null; completedAt?: string | null; action?: string | null; isTest?: boolean; summary?: RequestSummary[]; tags?: ExecutionTag[];
   /** Projeção opcional a ser fornecida pela API para tarefas recebidas por substituição. */
@@ -22,6 +23,7 @@ export type TasksResult = { items: TaskListItem[]; processes: ProcessFacet[]; ta
 export type TaskFilters = {
   q?: string;
   process?: string;
+  processes?: string[];
   number?: string;
   requestedFrom?: string;
   requestedTo?: string;
@@ -169,7 +171,8 @@ function taskFilterParams(status: 'pendentes' | 'concluidas', filters: TaskFilte
 
 export function useTasks(status: 'pendentes' | 'concluidas', filters: TaskFilters = {}) {
   const internalMode = useTagsAccess();
-  const qs = taskFilterParams(status, filters, internalMode);
+  const search = useDebouncedSearch(filters.q, filters.number);
+  const qs = taskFilterParams(status, { ...filters, ...search }, internalMode);
   return useQuery({
     queryKey: [...execKeys.tasks, status, internalMode ? 'interno' : 'externo', qs.toString()],
     queryFn: () => api.get<TasksResult>(
@@ -204,7 +207,10 @@ export function useCompleteTask() {
   return useMutation({
     mutationFn: ({ id, data, action, justification, formState }: { id: string; data?: unknown; action?: string; justification?: string; formState?: unknown }) =>
       api.post<CompleteResult>(`/api/v1/workflow/tasks/${id}/complete`, { data, action, justification, formState }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: execKeys.tasks }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: execKeys.tasks });
+      qc.invalidateQueries({ queryKey: ['workflow', 'instances'] });
+    },
   });
 }
 
@@ -218,10 +224,10 @@ export function useSaveTask() {
 
 // ── instâncias (acompanhamento) ───────────────────────────────────────
 export type InstanceListItem = ProcessMetadata & { id: string; number?: number; status: string; isTest?: boolean; startedAt: string; endedAt: string | null; pendingTasks: number; tags?: ExecutionTag[] };
-export type InstancesPage = { items: InstanceListItem[]; total: number; page: number; pageSize: number };
+export type InstancesPage = { items: InstanceListItem[]; total: number; page: number; pageSize: number; processes?: ProcessFacet[]; tagNames?: TagNameFacet[] };
 export type FieldChange = { changedAt: string; changedBy: string | null; impersonator: string | null; action: string; group: string | null; field: string; changeType: string; oldValue: string | null; newValue: string | null };
 /** isStart: a tarefa nasceu do evento de início — na tramitação ela É o nó de abertura. */
-export type InstanceTask = { id: string; name: string | null; status: string; isStart?: boolean; assignee: string | null; completedBy: string | null; completedByImpersonator?: string | null; createdAt: string; completedAt: string | null; dueAt: string | null; action: string | null; justification?: string | null; fieldHistory?: FieldChange[] };
+export type InstanceTask = { id: string; name: string | null; status: string; isStart?: boolean; assignee: string | null; completedBy: string | null; completedByImpersonator?: string | null; createdAt: string; completedAt: string | null; dueAt: string | null; action: string | null; actionPrimaryColor?: string | null; actionTextColor?: string | null; justification?: string | null; fieldHistory?: FieldChange[] };
 export type ActiveTask = { name: string | null; assignee: string | null; startedAt?: string | null; dueAt: string | null };
 /** Ação administrativa registrada na tramitação (Fase 4). */
 export type InstanceAction = { action: string; justification: string; at: string; actor: string | null; onBehalfOf?: string | null; targetTaskName?: string | null; targetUser?: string | null };
@@ -234,18 +240,21 @@ export type ActionOptions = {
   reassignSource: string | null;
 };
 export type InstanceDetail = { id: string; number?: number; process: string | null; category?: string | null; flowKey?: string | null; requester?: string | null; status: string; isTest?: boolean; startedAt: string; endedAt: string | null; data: unknown; automationScripts?: AutomationSource[]; formSchema?: unknown; inboxHtml?: string | null; activeTask?: ActiveTask | null; tasks: InstanceTask[]; actions?: InstanceAction[]; tags?: ExecutionTag[]; canEdit?: boolean; canCancel?: boolean; canDelete?: boolean; canReopen?: boolean; canReturn?: boolean; canForward?: boolean; canReassign?: boolean; messages?: { count: number; canPost: boolean } };
-export type InstancesParams = { q?: string; status?: string; mine?: boolean; page?: number; pageSize?: number };
+export type InstancesParams = TaskFilters & { status?: string; mine?: boolean; scope?: 'personal'; relationship?: 'requester' | 'participant'; endedFrom?: string; endedTo?: string; page?: number; pageSize?: number };
 
 export function useInstances(params: InstancesParams) {
   const internalMode = useTagsAccess();
-  const qs = new URLSearchParams();
-  if (params.q) qs.set('q', params.q);
-  if (params.status) qs.set('status', params.status);
+  const search = useDebouncedSearch(params.q, params.number);
+  const qs = taskFilterParams('pendentes', { ...params, ...search }, internalMode);
+  qs.delete('assignee');
+  qs.delete('mine');
   if (params.mine) qs.set('mine', 'me');
   qs.set('page', String(params.page ?? 1));
   qs.set('pageSize', String(params.pageSize ?? 20));
   return useQuery({
-    queryKey: ['workflow', 'instances', internalMode ? 'interno' : 'externo', params],
+    queryKey: ['workflow', 'instances', internalMode ? 'interno' : 'externo', qs.toString()],
+    staleTime: 0,
+    refetchOnWindowFocus: true,
     queryFn: () => api.get<InstancesPage>(
       `/api/v1/workflow/instances?${qs.toString()}`,
       internalMode ? { headers: { 'X-Access-Mode': 'interno' } } : undefined,
@@ -324,4 +333,14 @@ export function useDeleteInstance() {
     mutationFn: (id: string) => api.del<void>(`/api/v1/workflow/instances/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['workflow', 'instances'] }),
   });
+}
+
+/** Textos atualizam a URL no ato, mas aguardam a pausa de digitação para consultar. */
+function useDebouncedSearch(q?: string, number?: string) {
+  const [search, setSearch] = useState({ q, number });
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearch({ q, number }), 400);
+    return () => window.clearTimeout(timer);
+  }, [q, number]);
+  return search;
 }

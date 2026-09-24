@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, MessageSquareText, Plus, Trash2 } from 'lucide-react';
+import { MessageSquareText, Plus, Trash2 } from 'lucide-react';
 import { Field, Switch, TextInput } from '@/components/ui/Field';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { Dialog } from '@/components/ui/Dialog';
 import { IconButton } from '@/components/ui/IconButton';
 import { IconSearchPicker } from '@/components/ui/IconSearchPicker';
-import { Popover } from '@/components/ui/Popover';
+import { PaletteField } from '@/components/ui/PaletteField';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { slugify } from '@/lib/slugify';
 import { uid } from '@/lib/uid';
@@ -21,64 +21,6 @@ type Props = {
   /** Label do primeiro botão criado por padrão (ex: "Concluir" ou "Enviar requisição"). */
   defaultLabel: string;
 };
-
-/** 10 cores sóbrias para os botões de conclusão (opção primária; custom é secundário). */
-const PALETTE = [
-  '#1e293b', '#334155', '#1d4ed8', '#0369a1', '#0f766e',
-  '#047857', '#b45309', '#c2410c', '#b91c1c', '#6d28d9',
-];
-
-/** Botão compacto que abre as cores predefinidas e o seletor personalizado. */
-function PaletteField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <Popover
-      align="left"
-      panelRole="dialog"
-      ariaLabel="Selecionar cor primária"
-      trigger={(open) => (
-        <span
-          className="inline-flex w-full min-w-0 items-center gap-2 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-left text-xs text-slate-600 hover:bg-slate-50"
-          data-testid="cor-primaria-trigger"
-          data-open={open || undefined}
-        >
-          <span className="h-5 w-5 shrink-0 rounded border border-black/10" style={{ backgroundColor: value }} />
-          <span className="min-w-0 flex-1 truncate font-mono uppercase">{value}</span>
-          <ChevronDown size={13} className="shrink-0 text-slate-400" />
-        </span>
-      )}
-    >
-      {(close) => (
-        <div className="w-56 p-2" data-testid="cor-paleta">
-          <div className="grid grid-cols-5 gap-2">
-            {PALETTE.map((color) => {
-              const selected = value.toLowerCase() === color;
-              return (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => { onChange(color); close(); }}
-                  aria-label={`Cor ${color}`}
-                  aria-pressed={selected}
-                  data-testid="cor-swatch"
-                  className={`h-8 w-8 rounded-full border border-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 ${selected ? 'ring-2 ring-slate-900 ring-offset-2' : ''}`}
-                  style={{ backgroundColor: color }}
-                />
-              );
-            })}
-          </div>
-          <div className="mt-2 border-t border-slate-100 pt-2">
-            <span className="mb-1.5 block text-xs font-medium text-slate-600">Cor personalizada</span>
-            <ColorPicker
-              value={value}
-              onChange={(color) => { onChange(color); close(); }}
-              ariaLabel="Cor personalizada"
-            />
-          </div>
-        </div>
-      )}
-    </Popover>
-  );
-}
 
 /**
  * Editor de botões de ação por tarefa. Em vez de um par fixo de botões

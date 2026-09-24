@@ -48,11 +48,11 @@ export function AcoesDoProcesso({ id, d, onFeito }: { id: string; d: InstanceDet
   const realocar = useReassignInstance();
 
   const disponiveis: { acao: Acao; ativo: boolean; icone: React.ReactNode; classe: string }[] = [
-    { acao: 'cancel', ativo: !!d.canCancel, icone: <XCircle size={14} />, classe: 'text-amber-700 hover:bg-amber-50' },
     { acao: 'return', ativo: !!d.canReturn, icone: <CornerUpLeft size={14} />, classe: 'text-slate-700 hover:bg-slate-50' },
     { acao: 'forward', ativo: !!d.canForward, icone: <Send size={14} />, classe: 'text-slate-700 hover:bg-slate-50' },
     { acao: 'reassign', ativo: !!d.canReassign, icone: <UserCog size={14} />, classe: 'text-slate-700 hover:bg-slate-50' },
     { acao: 'reopen', ativo: !!d.canReopen, icone: <RotateCcw size={14} />, classe: 'text-emerald-700 hover:bg-emerald-50' },
+    { acao: 'cancel', ativo: !!d.canCancel, icone: <XCircle size={14} />, classe: 'text-amber-700 hover:bg-amber-50' },
   ];
 
   function abrir(acao: Acao) {
@@ -98,7 +98,7 @@ export function AcoesDoProcesso({ id, d, onFeito }: { id: string; d: InstanceDet
           type="button"
           data-testid={`acao-${a.acao}`}
           onClick={() => abrir(a.acao)}
-          className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${a.classe}`}
+          className={`flex min-h-11 w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-sm ${a.classe}`}
         >
           {a.icone} {TITULO[a.acao]}
         </button>

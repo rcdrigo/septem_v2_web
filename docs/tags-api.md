@@ -49,9 +49,9 @@ Cores usam hexadecimal `#RRGGBB`, com padrão `#0ea5e9`. A alteração de cor af
 
 As listas e detalhes de tarefas e execuções incluem `tags` para exibir as associações sem uma consulta adicional por card. Tags são restritas a usuários internos em modo interno, indicado pelo header `X-Access-Mode: interno`; o backend também verifica a identidade e o acesso à execução.
 
-O filtro da lista de tarefas usa parâmetros repetidos, por exemplo `tagNames=Urgente&tagNames=Financeiro`. Os nomes são comparados sem distinção de maiúsculas/minúsculas e com espaços nas extremidades removidos, exigindo todas as tags na mesma execução. O filtro pode atravessar processos, sem compartilhar a identidade das tags entre eles.
+Os filtros das listas de tarefas e requisições usam parâmetros repetidos, por exemplo `tagNames=Urgente&tagNames=Financeiro`. Os nomes são comparados sem distinção de maiúsculas/minúsculas e com espaços nas extremidades removidos, exigindo todas as tags na mesma execução. O filtro pode atravessar processos, sem compartilhar a identidade das tags entre eles.
 
-O resultado acrescenta `tagNames: { name, count, available }[]`. Novas opções devem ser compatíveis com todas as tags selecionadas e demais filtros. A faceta `processes` considera as tags, texto e datas, ignorando apenas a seleção do próprio processo para permitir sua troca. Seleções antigas inválidas permanecem visíveis e removíveis; não são apagadas automaticamente.
+O resultado acrescenta `tagNames: { name, count, available }[]`. Novas opções devem ser compatíveis com todas as tags selecionadas e demais filtros. A faceta `processes` considera as tags, texto e datas, ignorando apenas a seleção de processos para permitir múltiplas escolhas. A seleção de processos usa parâmetros repetidos `processes=chave-a&processes=chave-b`, combinados por OU. Seleções antigas inválidas permanecem visíveis e removíveis; não são apagadas automaticamente.
 
 ## Validação do frontend
 

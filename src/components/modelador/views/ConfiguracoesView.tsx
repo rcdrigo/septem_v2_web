@@ -157,7 +157,7 @@ export function ConfiguracoesView({ modeler, processKey }: Props) {
                   </Field>
                   <Field
                     label="Inbox / resumo da requisição"
-                    help="HTML curto mostrado nas listagens. Use variáveis qualificadas, como {{formulario.titulo}}, {{requisitante.nome}}, {{requisitante.email}}, {{processo.nome}} e {{processo.numero}}. Exemplo: &lt;strong&gt;{{formulario.titulo}}&lt;/strong&gt; — solicitado por {{requisitante.nome}}."
+                    help="Resumo com formatação HTML básica mostrado nas listagens. Ao salvar, a alteração se aplica às requisições de todas as versões deste processo, inclusive às já abertas ou concluídas. Use variáveis qualificadas, como {{formulario.titulo}}, {{requisitante.nome}}, {{requisitante.email}}, {{processo.nome}} e {{processo.numero}}. Exemplo: &lt;strong&gt;{{formulario.titulo}}&lt;/strong&gt; — solicitado por {{requisitante.nome}}."
                   >
                     <TextArea
                       value={cfg.inbox}

@@ -4,6 +4,20 @@ import type { ExecutionTag } from '@/lib/api/tags';
 import { openTab } from '@/lib/nav';
 import { routes } from '@/lib/routes';
 import { TestBadge } from './TestBadge';
+import { renderIcon } from '@/lib/icon-catalog';
+import { FALLBACK_COLOR, tintOf } from '@/components/catalog/category-catalog';
+import type { ProcessMetadata } from '@/lib/api/execution';
+
+/** Identidade visual do processo, compartilhada por cartões e tabelas. */
+export function ExecutionProcessPill({ item }: { item: ProcessMetadata }) {
+  const color = item.categoryColor ?? FALLBACK_COLOR;
+  const icon = item.processIcon ? renderIcon(item.processIcon, 13) : null;
+  return <span data-testid="process-pill" title={item.categoryName ? `${item.process || 'Processo'} · ${item.categoryName}` : item.process || 'Processo'}
+    style={{ backgroundColor: tintOf(color), color }}
+    className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold [&>svg]:shrink-0">
+    {icon}<span className="truncate">{item.process || 'Processo'}</span>
+  </span>;
+}
 
 export function ExecutionNumber({ executionId, number }: { executionId: string; number?: number | null }) {
   if (number == null) return <span className="shrink-0 text-xs text-slate-500">Sem número</span>;

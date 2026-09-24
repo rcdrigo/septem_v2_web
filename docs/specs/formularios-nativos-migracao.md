@@ -6,6 +6,8 @@ Em 23/09/2026, o usuário substituiu a limpeza por conversão com preservação 
 
 Com aplicação e workers parados, configure a conexão PostgreSQL (`PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` e `.pgpass`, ou `PGSERVICE`) para o **banco do ambiente**, não o master. São necessários Python 3, `psql` e `pg_dump` no PATH.
 
+Se não houver senha configurada, o comando solicita uma única vez pelo terminal e a reutiliza em memória para as consultas e o backup daquela execução. A senha não entra no plano, no SQL nem nos argumentos dos comandos. Uma senha incorreta encerra a operação, sem repetir o pedido a cada consulta. No Windows, o arquivo padrão opcional é `%APPDATA%\postgresql\pgpass.conf`.
+
 Na pasta do frontend, gere um plano somente leitura em diretório novo:
 
 ```sh
