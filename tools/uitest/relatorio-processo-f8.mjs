@@ -89,6 +89,9 @@ check(semTags(detail0.body?.inboxHtml).includes('Compra de material'),
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
 // Editar pelo relatório: o campo mora na aba do grupo (a aba ativa é "Visão geral").
 async function editarAssunto(page, valor) {
+  // "Editar" saiu do cabeçalho do relatório e virou item do menu "Ações".
+  await page.getByRole('button', { name: /^Ações/ }).first().click();
+  await page.waitForTimeout(400);
   await page.getByRole('button', { name: 'Editar' }).first().click();
   await page.waitForTimeout(500);
   await page.getByRole('tab', { name: /Dados do pedido/i }).click();
@@ -132,10 +135,12 @@ try {
   // Item 4 na tela. ESCOPADO ao bloco do inbox: "Compra de material" também é o
   // valor do campo "assunto", que o relatório renderiza — checar no body inteiro
   // passaria em falso mesmo com o bloco de inbox vazio.
-  const blocoInbox = page.locator('div', { hasText: 'Inbox da requisição' }).last();
+  // O bloco mudou de nome: "Inbox da requisição" virou "Resumo do processo"
+  // (`aria-labelledby=request-summary-heading`), com o mesmo conteúdo.
+  const blocoInbox = page.locator('section[aria-labelledby=request-summary-heading]').last();
   const textoInbox = await blocoInbox.innerText();
   check(/Pedido de Administrador sobre Compra de material/.test(textoInbox),
-    `[item4] o bloco "Inbox da requisição" traz o inbox configurado ("${textoInbox.split('\n').pop()}")`);
+    `[item4] o bloco "Resumo do processo" traz o inbox configurado ("${textoInbox.split('\n').pop()}")`);
 
   await editarAssunto(page, 'Compra de material escolar');
 
@@ -166,19 +171,31 @@ try {
 
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(1500);
-  await page.getByRole('tab', { name: /Tramitação/i }).click();
+  // A tramitação deixou de ser ABA e virou o diálogo "Tramitação completa"; a linha do
+  // tempo foi reescrita (a ação vem num chip, e a abertura se chama "Requisição
+  // iniciada"). O que se cobra é o mesmo: a DESCRIÇÃO do botão aparece, o id técnico
+  // não, e a ordem é do mais recente para o mais antigo com a abertura uma única vez.
+  await page.getByRole('button', { name: /tramitação completa/i }).first().click();
+  await page.waitForSelector('[role=dialog]', { timeout: 8000 });
   await page.waitForTimeout(700);
-  const tram = await page.locator('[role=tabpanel]').innerText();
-  check(tram.includes(`Ação: ${BTN_LABEL}`), '[item2] tramitação exibe "Ação: <descrição>"');
+  const tram = await page.locator('[role=dialog]').innerText();
+  const chips = await page.locator('[role=dialog] [data-testid=completion-action-chip]').allInnerTexts();
+  check(chips.some((c) => c.trim() === BTN_LABEL),
+    `[item2] tramitação exibe a descrição do botão (${JSON.stringify(chips)})`);
   check(!tram.includes('Botão utilizado') && !tram.includes(BTN_ID),
     '[item2] sumiu o rótulo "Botão utilizado" e o id técnico');
 
   // ── Item 6: ordem decrescente (mais recente primeiro; abertura por último) ──
-  const ordem = await page.locator('[role=tabpanel] ol > li').allInnerTexts();
-  check(/Homologar pedido/.test(ordem[0] ?? ''), `[item6] o item mais recente vem primeiro ("${(ordem[0] ?? '').split('\n')[1]}")`);
-  check(/Processo iniciado/.test(ordem[ordem.length - 1] ?? ''), '[item6] "Processo iniciado" fecha a lista (evento mais antigo)');
+  const ordem = await page.locator('[role=dialog] ol > li').allInnerTexts();
+  // Tolerante a EMPATE: concluir uma tarefa cria a seguinte no MESMO segundo, e a
+  // ordenação por data mantém a ordem original quando os instantes são iguais. O que se
+  // cobra é que o evento mais recente esteja no topo da lista, não numa posição fixa.
+  check(/Homologar pedido/.test(ordem.slice(0, 2).join(' ')),
+    `[item6] o item mais recente vem no topo ("${(ordem[0] ?? '').split('\n')[0].slice(0, 60)}")`);
+  const ABERTURA = /Requisição iniciada/;
+  check(ABERTURA.test(ordem[ordem.length - 1] ?? ''), '[item6] a abertura fecha a lista (evento mais antigo)');
   // A abertura é UMA linha só: a tarefa do evento de início É o nó de abertura.
-  check(ordem.filter((l) => /Processo iniciado/.test(l)).length === 1,
+  check(ordem.filter((l) => ABERTURA.test(l)).length === 1,
     '[item6] a abertura aparece uma única vez (tarefa de início fundida com o nó)');
   check(ordem.length === det2.body.tasks.length,
     `[item6] a lista tem exatamente uma linha por evento (${ordem.length} linhas / ${det2.body.tasks.length} tarefas)`);
@@ -207,15 +224,18 @@ try {
   const m = await mob.newPage();
   await login(m);
   await m.goto(`${BASE}/requests/${execId}`, { waitUntil: 'networkidle' });
-  await m.waitForSelector('[role=tablist]', { timeout: 15000 });
+  await m.waitForSelector('section[aria-labelledby=request-form-heading]', { timeout: 15000 });
   await m.waitForTimeout(1200);
-  const larguras = await m.locator('[role=tablist]').evaluate((bar) => {
-    const faixa = bar.getBoundingClientRect().width;
-    const botoes = [...bar.querySelectorAll('[role=tab]')].map((b) => b.getBoundingClientRect().width);
-    return { faixa, botoes, todosCheios: botoes.every((w) => w >= faixa - 1) };
-  });
-  check(larguras.botoes.length >= 3, `[item5] mobile tem os botões de navegação (${larguras.botoes.length})`);
-  check(larguras.todosCheios, `[item5] todos ocupam 100% da largura (faixa ${Math.round(larguras.faixa)}px vs ${larguras.botoes.map((w) => Math.round(w)).join('/')})`);
+  // O item 5 pedia que os botões da BARRA DE NAVEGAÇÃO do relatório ocupassem 100% da
+  // largura no mobile. Essa barra não existe mais: o relatório virou uma página única
+  // com seções empilhadas (Resumo, Formulário, Mensagens, Próximo passo) e a tramitação
+  // saiu para um diálogo. Sem barra, não há o que esticar — o que resta do item, e é o
+  // que o dono queria evitar, é a tela vazar na largura do celular.
+  const secoes = await m.locator('section[aria-labelledby]').count();
+  check(secoes >= 2, `[item5] o relatório mobile empilha as seções (${secoes})`);
+  const cortados = await m.evaluate(() => [...document.querySelectorAll('button, input, select, a')]
+    .filter((el) => { const b = el.getBoundingClientRect(); return b.width > 0 && (b.right > window.innerWidth + 1 || b.left < -1); }).length);
+  check(cortados === 0, `[item5] nenhum controle cortado na largura do celular (${cortados})`);
   check(!(await m.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)),
     '[item5] relatório mobile sem overflow horizontal');
   await m.screenshot({ path: `${OUT}/f8-relatorio-mobile.png`, fullPage: true });

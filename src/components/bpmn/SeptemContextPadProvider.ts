@@ -77,6 +77,14 @@ export class SeptemContextPadProvider {
         allowed['append.terminate-end-event'] = this.appendAction('bpmn:EndEvent', 'bpmn-icon-end-event-terminate', 'Novo evento de fim total', { eventDefinitionType: 'bpmn:TerminateEventDefinition' });
       }
 
+      // Ações de RAIA do provider padrão (`lane-insert-above/below`, `lane-divide-*`):
+      // o filtro passou a SUBSTITUIR as entradas em vez de somar-se a elas e levou as
+      // raias embora — numa piscina não sobrava nenhuma forma de acrescentar raia pela
+      // tela. Só o `bpmn:Task` genérico precisa ficar de fora (o motor não o executa).
+      for (const [chave, entrada] of Object.entries(entries)) {
+        if (chave.startsWith('lane-')) allowed[chave] = entrada;
+      }
+
       if (entries.connect) allowed.connect = { ...entries.connect, title: 'Novo conector' };
       if (entries.replace) allowed.replace = { ...entries.replace, title: 'Alterar elemento' };
       if (entries.delete) allowed.delete = { ...entries.delete, title: 'Excluir elemento' };
