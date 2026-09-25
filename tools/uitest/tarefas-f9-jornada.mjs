@@ -4,6 +4,7 @@
 // processo. Web 1280 e mobile 375. O que se prova aqui, e as outras suítes não provam:
 // o fluxo inteiro de uma simulação vivido por um usuário, do início ao processo fechado.
 import { chromium } from 'playwright-core';
+import { escolherCategoria, fecharFiltros } from './lib-filtros.mjs';
 
 const BASE = 'http://localhost:5173';
 const API = 'http://localhost:5000';
@@ -112,7 +113,9 @@ try {
 
   // 3) A 1ª tarefa — do analista pelo desenho — está comigo.
   await page.goto(`${BASE}/tasks`, { waitUntil: 'networkidle' });
-  await page.click('[data-testid=abrir-filtros]');
+  // O campo de busca só existe depois de escolher a categoria no popover de filtros
+  // (o rótulo dela é "Palavra-chave").
+  await escolherCategoria(page, 'Palavra-chave');
   await page.fill('[data-testid=filtro-q]', String(rid));
   await page.waitForTimeout(1600);
   const card1 = page.locator('article[role=link]').filter({ hasText: `Analisar jornada ${rid}` }).first();
@@ -136,7 +139,9 @@ try {
 
   // 5) A 2ª tarefa nasceu na conclusão e também veio para mim.
   await page.reload({ waitUntil: 'networkidle' });
-  await page.click('[data-testid=abrir-filtros]');
+  // O campo de busca só existe depois de escolher a categoria no popover de filtros
+  // (o rótulo dela é "Palavra-chave").
+  await escolherCategoria(page, 'Palavra-chave');
   await page.fill('[data-testid=filtro-q]', String(rid));
   await page.waitForTimeout(1600);
   const card2 = page.locator('article[role=link]').filter({ hasText: `Homologar jornada ${rid}` }).first();

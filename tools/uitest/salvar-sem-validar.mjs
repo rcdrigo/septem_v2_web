@@ -32,8 +32,11 @@ const saved = await api(token, '/api/v1/workflow/process-definitions', 'POST', {
 check(saved.status === 201, `[api] processo criado (${saved.status})`);
 const key = saved.body.key;
 await api(token, `/api/v1/workflow/process-definitions/${key}/status`, 'PATCH', { status: 'published' });
-const inst = await api(token, '/api/v1/workflow/instances', 'POST', { key, data: {} });
-check(inst.status === 200 || inst.status === 201, `[api] instância iniciada com dados vazios (${inst.status})`);
+// Abre COM o campo preenchido: o `start` passou a validar os obrigatórios do formulário
+// (e está certo — é a mesma checagem que barra data inválida na abertura). O caso deste
+// teste é o SALVAR de uma tarefa com o campo VAZIO, então quem esvazia é a tela, abaixo.
+const inst = await api(token, '/api/v1/workflow/instances', 'POST', { key, data: { obrig: 'valor inicial' } });
+check(inst.status === 200 || inst.status === 201, `[api] instância iniciada com o obrigatório preenchido (${inst.status})`);
 const taskId = inst.body?.tasks?.[0]?.id;
 check(!!taskId, `[api] tarefa criada (${taskId})`);
 
@@ -48,6 +51,12 @@ try {
   await page.goto(`${BASE}/tasks/${taskId}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('text=Campo Obrigatório', { timeout: 15000 });
   await page.waitForTimeout(500);
+
+  // Esvazia o obrigatório NA TELA — é esta a situação que o teste cobra: salvar um
+  // rascunho incompleto sem levar erro na cara.
+  const campo = page.getByLabel('Campo Obrigatório', { exact: false }).first();
+  await campo.fill('');
+  await page.waitForTimeout(400);
 
   // SALVAR sem preencher → NÃO deve pintar "Campo obrigatório"; deve dar "Rascunho salvo".
   // O toast é transiente: espera o SINAL assim que aparece, não um tempo fixo.

@@ -11,13 +11,13 @@ await build({ stdin: { contents: `
 import React from 'react';import {createRoot} from 'react-dom/client';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {useSaveProcess,useUpdateProcess,usePatchProcessStatus} from './src/lib/api/process-definitions';
-import {useProcessForm,useHasHomologation} from './src/lib/api/execution';
+import {useProcessForm} from './src/lib/api/execution';
 import {ReactForm} from './src/components/form/ReactForm';
 import {useSessionStore} from './src/stores/session';
 useSessionStore.setState({accessToken:'test-token'});
 const client=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:60000,refetchOnWindowFocus:false}}});
 function Form(){const q=useProcessForm('existente');return q.isLoading ? <p>Carregando</p> : <ReactForm key={JSON.stringify(q.data?.formSchema)} schema={q.data?.formSchema}/>;}
-function App(){const save=useSaveProcess(),update=useUpdateProcess(),publish=usePatchProcessStatus();const [show,setShow]=React.useState(true);useHasHomologation('existente',true);
+function App(){const save=useSaveProcess(),update=useUpdateProcess(),publish=usePatchProcessStatus();const [show,setShow]=React.useState(true);
 window.act=async action=>{if(action==='save')await save.mutateAsync({key:'existente',bpmnXml:'test'});else if(action==='update')await update.mutateAsync({key:'existente',bpmnXml:'test'});else await publish.mutateAsync({key:'existente',status:'published'});};
 window.show=setShow;return show?<Form/>:null;}
 createRoot(document.getElementById('root')).render(<QueryClientProvider client={client}><App/></QueryClientProvider>);
@@ -30,23 +30,24 @@ const schema=(name)=>({format:'septem-native',schemaVersion:1,id:'form-publicati
 ]});
 try{
  for(const width of [1280,375]){
-  const page=await browser.newPage({viewport:{width,height:900}});page.setDefaultTimeout(15000);const errors=[];let current=schema('Anterior','stacked');let homologationReads=0;
+  const page=await browser.newPage({viewport:{width,height:900}});page.setDefaultTimeout(15000);const errors=[];let current=schema('Anterior','stacked');
   page.on('pageerror',e=>errors.push(e.message));
   await page.route('http://publication.local/**',async r=>{
    const req=r.request(),url=req.url();
    if(!url.includes('/api/'))return r.fulfill({contentType:'text/html',body:'<div id="root"></div>'});
    if(req.method()!=='GET')return r.fulfill({json:{key:'existente',version:2,status:'published'}});
-   if(url.includes('homologation=true'))homologationReads++;
    return r.fulfill({json:{formSchema:current,buttons:[]}});
   });
   await page.goto('http://publication.local/');await page.addScriptTag({path:join(dir,'app.js')});
   for (const file of await readdir(join(root,'dist/assets'))) if(file.endsWith('.css')) await page.addStyleTag({content:await readFile(join(root,'dist/assets',file),'utf8')});
   await page.getByRole('tab',{name:'Anterior, 0 pendências',exact:true}).waitFor();
+  // A versão em homologação foi aposentada (Fase 15/Q18) e com ela o `useHasHomologation`.
+  // A garantia que interessava continua medida: depois de salvar/atualizar/publicar, o
+  // formulário é RELIDO — a aba com o rótulo novo só aparece se o cache foi invalidado.
   for(const action of ['save','update','publish']){
-   const before=homologationReads;current=schema('Atual '+action,'tabs');
+   current=schema('Atual '+action,'tabs');
    await page.evaluate(action=>window.act(action),action);
    await page.getByRole('tab',{name:'Atual '+action+', 0 pendências',exact:true}).waitFor();
-   assert.ok(homologationReads>before,action+' invalida homologação');
   }
   const labels=await page.locator('input:visible').evaluateAll(inputs=>inputs.map(x=>x.parentElement.textContent));
   // O grid nativo segue a ordem dos campos e preenche as colunas, ignorando layout.row herdado.

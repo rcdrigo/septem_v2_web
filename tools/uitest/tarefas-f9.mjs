@@ -8,6 +8,7 @@
 // (7) iniciar como teste: checkbox acima do botão de enviar, TODAS as tarefas com o
 //     requisitante e selo "processo de teste" na tarefa e nas listas.
 import { chromium } from 'playwright-core';
+import { escolherCategoria, fecharFiltros } from './lib-filtros.mjs';
 
 const BASE = 'http://localhost:5173';
 const API = 'http://localhost:5000';
@@ -173,7 +174,9 @@ try {
   // ── Itens 1 a 4: a lista de tarefas ───────────────────────────────────────
   await page.goto(`${BASE}/tasks`, { waitUntil: 'networkidle' });
   await page.waitForSelector('article[role=link]', { timeout: 15000 });
-  await page.click('[data-testid=abrir-filtros]');
+  // O campo de busca só existe depois de escolher a categoria no popover de filtros
+  // (o rótulo dela é "Palavra-chave").
+  await escolherCategoria(page, 'Palavra-chave');
   await page.fill('[data-testid=filtro-q]', String(rid));
   await esperarCards(page, 3);
   check((await ordemVisivel(page)).sort().join('') === 'ABC',
@@ -316,7 +319,9 @@ try {
   await api(token, `/api/v1/workflow/tasks/${tarefaTeste.id}/complete`, 'POST', { data: {} });
   await page.goto(`${BASE}/tasks?status=concluidas`, { waitUntil: 'networkidle' });
   await page.waitForSelector('article[role=link]', { timeout: 15000 });
-  await page.click('[data-testid=abrir-filtros]');
+  // O campo de busca só existe depois de escolher a categoria no popover de filtros
+  // (o rótulo dela é "Palavra-chave").
+  await escolherCategoria(page, 'Palavra-chave');
   await page.fill('[data-testid=filtro-q]', String(rid));
   await page.waitForTimeout(1400);
   const executada = page.locator('article[role=link]').filter({ hasText: `Simulacao F9 ${rid}` }).first();
@@ -334,7 +339,9 @@ try {
   // ── Item 5: a lista se atualiza ao voltar o foco da aba ───────────────────
   await page.goto(`${BASE}/tasks`, { waitUntil: 'networkidle' });
   await page.waitForSelector('article[role=link]', { timeout: 15000 });
-  await page.click('[data-testid=abrir-filtros]');
+  // O campo de busca só existe depois de escolher a categoria no popover de filtros
+  // (o rótulo dela é "Palavra-chave").
+  await escolherCategoria(page, 'Palavra-chave');
   await page.fill('[data-testid=filtro-q]', String(rid));
   // A base de dev tem milhares de tarefas: sem esperar o filtro pegar, "antes" seria a
   // lista inteira e a comparação de +1 nunca fecharia.

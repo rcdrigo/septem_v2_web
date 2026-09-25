@@ -108,17 +108,33 @@ try {
   const table = page.locator('section:has-text("Nums")');
   const antes = await table.locator('tbody:not(.hidden) tr').count();
   check(antes === 3, `[F7.8] tabela começa com 3 linhas (${antes})`);
-  await page.getByRole('button', { name: 'Filtrar' }).click();
-  await page.waitForTimeout(300);
-  // a coluna "value" é número → deve renderizar min/max, não texto.
-  const minInput = table.locator('input[aria-label="Mínimo de value"]');
-  check(await minInput.count() === 1 && (await minInput.getAttribute('type')) === 'number', '[F7.8] coluna numérica mostra filtro de INTERVALO (min/max number)');
+  // O filtro por coluna virou categoria do popover de filtros do relatório
+  // ("<tabela> · <coluna>") e aplica sozinho.
+  await page.locator('.ef-trigger', { hasText: 'Filtros' }).first().click();
+  const popup = page.locator('[data-testid=report-filters]');
+  await popup.waitFor({ timeout: 8000 });
+  const catValue = (await popup.locator('.ef-category').allInnerTexts())
+    .map((t) => t.trim()).find((t) => /value$/i.test(t));
+  check(!!catValue, `[F7.8] existe filtro para a coluna value (${JSON.stringify(catValue)})`);
+  await popup.locator('.ef-category', { hasText: catValue }).first().click();
+  // A coluna "value" é número → o editor traz INTERVALO (mínimo/máximo), não texto.
+  const minInput = popup.locator('input[aria-label^="Mínimo de"]');
+  check(await minInput.count() === 1 && (await minInput.getAttribute('type')) === 'number',
+    '[F7.8] coluna numérica mostra filtro de INTERVALO (min/max number)');
   await minInput.fill('20'); // mantém 20 e 30, corta 10
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(500);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(700);
   const depois = await table.locator('tbody:not(.hidden) tr').count();
   check(depois === 2, `[F7.8-EFEITO] min=20 mantém 2 linhas (20,30) e corta a de 10 (${depois})`);
-  await table.locator('input[aria-label="Máximo de value"]').fill('20'); // agora só 20
-  await page.waitForTimeout(300);
+  // Máximo no mesmo editor do popover (reabre a categoria).
+  await page.locator('.ef-trigger', { hasText: 'Filtros' }).first().click();
+  await popup.waitFor({ timeout: 8000 });
+  await popup.locator('.ef-category', { hasText: catValue }).first().click();
+  await popup.locator('input[aria-label^="Máximo de"]').fill('20'); // agora só 20
+  await page.waitForTimeout(500);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(700);
   const soUm = await table.locator('tbody:not(.hidden) tr').count();
   check(soUm === 1, `[F7.8-EFEITO] min=20 e max=20 deixa só a linha 20 (${soUm})`);
 

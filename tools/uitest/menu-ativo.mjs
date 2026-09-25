@@ -1,4 +1,5 @@
 import { chromium } from 'playwright-core';
+import { trocarModoDeAcesso } from './lib-shell.mjs';
 
 const BASE = 'http://localhost:5173';
 const OUT = process.env.OUT_DIR || '.';
@@ -64,7 +65,7 @@ for (const route of ['/tarefas-executadas', '/minhas-solicitacoes', '/servicos',
 
 // O modo externo preserva os dois índices operacionais.
 await page.goto(BASE + '/tasks', { waitUntil: 'networkidle' });
-await page.getByRole('button', { name: /Externo/ }).click();
+await trocarModoDeAcesso(page, 'Externo');
 const externalLabels = await page.locator('aside nav a').allTextContents();
 const externalOk = externalLabels.some((x) => x.includes('Tarefas'))
   && externalLabels.some((x) => x.includes('Requisições'))
@@ -72,7 +73,7 @@ const externalOk = externalLabels.some((x) => x.includes('Tarefas'))
   && await page.getByRole('button', { name: 'Nova requisição' }).isVisible();
 if (!externalOk) failures++;
 console.log(`${externalOk ? '✓' : '✗ FALHOU'} menu externo → ${JSON.stringify(externalLabels)}`);
-await page.getByRole('button', { name: /Interno/ }).click();
+await trocarModoDeAcesso(page, 'Interno');
 
 for (const [route, label, group] of CASES) {
   const found = await actives(route);

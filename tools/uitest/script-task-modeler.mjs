@@ -40,8 +40,11 @@ try {
     const body=url.includes('/process-definitions/')?{key:'existente',name:'Processo existente',version:1,status:'draft',bpmnXml:xml.replace('id="Process_1" isExecutable','id="Process_1" name="Processo existente" isExecutable'),hasInstances:false}:[];
     return r.fulfill({contentType:'application/json',body:JSON.stringify(body)});
   });
+  // Sinal de "modelador montou": o canvas do bpmn-js. O `.septem-cockpit` que estava aqui
+  // era classe do editor de formulário ANTIGO e não existe mais em lugar nenhum — a espera
+  // nunca terminava.
   await page.goto('http://startup.local/flows/edit'+query);await page.addScriptTag({path:join(dir,'app.js')});
-  await page.waitForFunction(()=>document.body.innerText.includes('Unexpected Application Error')||!!document.querySelector('.septem-cockpit:not([inert])'),null,{timeout:15000});
+  await page.waitForFunction(()=>document.body.innerText.includes('Unexpected Application Error')||!!document.querySelector('.djs-container'),null,{timeout:15000});
   const body=await page.locator('body').innerText();
   assert.ok(!body.includes('Unexpected Application Error'),body);
   assert.deepEqual(errors,[]);

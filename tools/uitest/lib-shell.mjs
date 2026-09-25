@@ -28,3 +28,17 @@ export async function itemDoMenuDoUsuario(page, rotulo) {
   await abrirMenuDoUsuario(page);
   await page.getByRole('menuitem', { name: rotulo }).first().click();
 }
+
+/**
+ * Troca o modo de acesso (Interno/Externo). O switcher saiu da tela e virou um submenu
+ * dentro do menu do usuário: item com `aria-haspopup=menu` e opções `menuitemradio`.
+ */
+export async function trocarModoDeAcesso(page, rotulo) {
+  await abrirMenuDoUsuario(page);
+  // HOVER, não clique: o submenu abre no `mouseEnter` e o `onClick` do item alterna —
+  // clicar (que passa pelo hover antes) abriria e fecharia na mesma ação.
+  await page.locator('[role=menuitem][aria-haspopup=menu]').first().hover();
+  await page.getByRole('menuitemradio', { name: rotulo }).waitFor({ timeout: 8000 });
+  await page.getByRole('menuitemradio', { name: rotulo }).click();
+  await page.waitForTimeout(800);
+}

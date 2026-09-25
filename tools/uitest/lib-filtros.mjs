@@ -50,3 +50,21 @@ export async function fecharFiltros(page) {
     .waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   await page.waitForTimeout(300);
 }
+
+// ── Filtros do RELATÓRIO (`ReportFilters`) ──────────────────────────────────────
+// Mesma mudança da lista: a barra com um campo por filtro virou um popover com
+// categorias, e não há mais botão "Aplicar" — a alteração é aplicada sozinha.
+
+/** Preenche um filtro de texto/número/data do relatório e fecha o popover. */
+export async function filtrarRelatorio(page, rotulo, valor) {
+  const popup = page.locator('[data-testid=report-filters]');
+  if (await popup.count() === 0 || !(await popup.first().isVisible())) {
+    await page.locator('.ef-trigger', { hasText: 'Filtros' }).first().click();
+    await popup.first().waitFor({ timeout: 8000 });
+  }
+  await popup.locator('.ef-category', { hasText: rotulo }).first().click();
+  await popup.locator(`input[aria-label="${rotulo}"]`).first().fill(valor);
+  await page.waitForTimeout(400);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(900);
+}

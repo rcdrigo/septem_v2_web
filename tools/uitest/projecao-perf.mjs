@@ -12,6 +12,7 @@
 //   6. limpar o filtro devolve o total original.
 // Web 1280×900 e mobile 375×812, com overflow/clipped medidos.
 import { chromium } from 'playwright-core';
+import { filtrarRelatorio } from './lib-filtros.mjs';
 
 const BASE = 'http://localhost:5173';
 const API = 'http://localhost:5000';
@@ -126,10 +127,9 @@ const linhasVisiveis = (page) => page.locator('table tbody tr:visible').count();
 
 /** Digita o filtro na barra e aplica. */
 const filtrar = async (page, valor) => {
-  const campo = page.locator('label:has-text("Cidade") input');
-  await campo.fill(valor);
-  await page.getByRole('button', { name: /Aplicar|Atualizar/ }).first().click();
-  await page.waitForTimeout(1200);
+  // A barra de filtros do relatório virou popover com categorias e aplica sozinha
+  // (não há mais "Aplicar"). Ver `lib-filtros.mjs`.
+  await filtrarRelatorio(page, 'Cidade', valor);
 };
 
 try {

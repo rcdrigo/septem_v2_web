@@ -285,6 +285,9 @@ try {
   check(!mRel.overflows, '[web] relatório da solicitação sem overflow horizontal');
   check(mRel.clipped === 0, `[web] relatório da solicitação sem controle recortado (${mRel.clipped})`);
 
+  // "Editar" saiu do cabeçalho do relatório e virou item do menu "Ações".
+  await page.getByRole('button', { name: /^Ações/ }).first().click();
+  await page.waitForTimeout(400);
   await page.getByRole('button', { name: 'Editar' }).first().click();
   await page.waitForTimeout(800);
   const campoObs = page.locator('input[type=text]').filter({ hasNot: page.locator('[disabled]') })

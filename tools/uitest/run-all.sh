@@ -36,7 +36,11 @@ echo "Aquecendo o front... $(cd "$RAIZ" && OUT_DIR="$UITEST" node tools/uitest/w
 for f in *.mjs; do
   # `lib-*.mjs` são helpers compartilhados, não suítes.
   case "$f" in debug-*|lib-*|warmup.mjs) continue;; esac
-  OUT=$(cd "$RAIZ" && OUT_DIR="$UITEST" node "tools/uitest/$f" 2>&1); RC=$?
+  # Teto por suíte: uma sonda que espera uma promessa que nunca resolve (aconteceu com
+  # `script-task-modeler`, parada no `await saved`) travava a BATERIA INTEIRA, sem teto.
+  OUT=$(cd "$RAIZ" && OUT_DIR="$UITEST" timeout "${SUITE_TIMEOUT:-600}" node "tools/uitest/$f" 2>&1); RC=$?
+  if [ "$RC" -eq 124 ]; then OUT="$OUT
+FALHOU: estourou o teto de ${SUITE_TIMEOUT:-600}s (suíte travada)"; fi
   N=$(echo "$OUT" | grep -cE "^✓|^PASS ")
   CHECKS=$((CHECKS+N))
   VERDE=0

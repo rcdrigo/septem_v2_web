@@ -3,6 +3,7 @@
 // com coluna oculta, abre a consulta em aba própria e confere a renderização.
 // Web 1280 + checagem de overflow no mobile 375.
 import { chromium } from 'playwright-core';
+import { filtrarRelatorio } from './lib-filtros.mjs';
 
 const BASE = 'http://localhost:5173';
 const API = 'http://localhost:5000';
@@ -74,12 +75,16 @@ try {
   // F7.8 — filtros no viewer: botão Filtrar → filtra a tabela por coluna.
   const table = page.locator('section:has-text("Detalhe")');
   const rowsAntes = await table.locator('tbody:not(.hidden) tr').count();
-  await page.getByRole('button', { name: 'Filtrar' }).click();
+  // O filtro por COLUNA saiu da linha dentro da tabela e virou uma categoria do popover
+  // de filtros do relatório, rotulada "<tabela> · <coluna>". Aplica sozinho, sem botão.
+  const categoria = (await page.locator('.ef-trigger', { hasText: 'Filtros' }).first().click()
+    .then(() => page.locator('[data-testid=report-filters] .ef-category').allInnerTexts()))
+    .map((t) => t.trim()).find((t) => /Setor/.test(t));
+  check(!!categoria, `[F7.8] existe filtro para a coluna Setor (${JSON.stringify(categoria)})`);
+  await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
-  const filtro = table.locator('input[aria-label="Filtrar Setor"]');
-  check(await filtro.count() === 1, '[F7.8] linha de filtro aparece por coluna');
-  await filtro.fill('saude'); // sem acento e minúsculo → deve casar "Saúde"
-  await page.waitForTimeout(300);
+  // Sem acento e em minúsculas → deve casar "Saúde".
+  await filtrarRelatorio(page, categoria, 'saude');
   const rowsDepois = await table.locator('tbody:not(.hidden) tr').count();
   check(rowsDepois === 1 && rowsDepois < rowsAntes, `[F7.8] filtro sem acento/caixa reduz as linhas (${rowsAntes}→${rowsDepois})`);
   await page.screenshot({ path: `${OUT}/relatorio-f7-viewer.png`, fullPage: true });
