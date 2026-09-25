@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MousePointerClick, Pencil, ExternalLink } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
@@ -56,9 +56,9 @@ function chunkTabs<T>(arr: T[]): T[][] {
 }
 
 /** Ids das abas relevantes para o tipo do campo. */
-function availableTabIds(field: any): Tab[] {
+function availableTabIds(field: any, native = false): Tab[] {
   const type = field?.type;
-  const isInput = !!field?.key && !PRESENTATION.has(type) && !CONTAINER.has(type);
+  const isInput = (native ? field?.key !== undefined : !!field?.key) && !PRESENTATION.has(type) && !CONTAINER.has(type);
   return TABS.filter((t) => {
     switch (t.id) {
       case 'validacao': return type === 'number' || type === 'datetime';
@@ -72,7 +72,11 @@ function availableTabIds(field: any): Tab[] {
  * Painel de configuração do CAMPO selecionado, em 3 abas (Geral, Validação,
  * Aparência). Lê/edita o campo via a engine do form-js (`editField`).
  */
-export function FieldConfigPanel({ field, editField, masks }: {
+export function FieldConfigPanel({ field, editField, masks, native = false, nativeTypeOptions, onNativeTypeChange, availableFields }: {
+  native?: boolean;
+  nativeTypeOptions?: Opt[];
+  onNativeTypeChange?: (type: string) => void;
+  availableFields?: { id: string; label: string }[];
   field: any | null;
   editField: (field: any, path: string[], value: unknown) => void;
   masks: MaskOpt[];
@@ -84,16 +88,17 @@ export function FieldConfigPanel({ field, editField, masks }: {
   const [, force] = useState(0);
   // Drafts de Nome/Chave commitados no blur — evita re-render por tecla (que
   // tirava o foco, ex.: título da lista dinâmica).
-  const [draftLabel, setDraftLabel] = useState('');
-  const [draftKey, setDraftKey] = useState('');
+  const [draftLabel, setDraftLabel] = useState(() => field?.type === 'datetime' ? dateFieldLabel(field) : (field?.label ?? ''));
+  const [draftKey, setDraftKey] = useState(() => field?.key ?? '');
+  const generatingInitialKey = useRef(false);
   // Orientações também via draft (commit no blur/fechar) — evita re-render por
   // tecla que tirava o foco do editor/textarea.
-  const [helpDraft, setHelpDraft] = useState('');
+  const [helpDraft, setHelpDraft] = useState(() => field?.properties?.septemHelpText ?? '');
 
   // Se o tipo do campo mudou e a aba ativa não existe mais, volta pra Geral.
   // (Hook ANTES de qualquer early return — senão a contagem de hooks varia.)
   useEffect(() => {
-    if (field && !availableTabIds(field).includes(tab)) setTab('geral');
+    if (field && !availableTabIds(field, native).includes(tab)) setTab('geral');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [field?.type]);
 
@@ -103,6 +108,7 @@ export function FieldConfigPanel({ field, editField, masks }: {
     // `dateLabel`/`timeLabel`. Semeia o draft a partir deles nesse caso.
     setDraftLabel(field?.type === 'datetime' ? dateFieldLabel(field) : (field?.label ?? ''));
     setDraftKey(field?.key ?? '');
+    generatingInitialKey.current = false;
     setHelpDraft(field?.properties?.septemHelpText ?? '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [field?.id]);
@@ -123,29 +129,33 @@ export function FieldConfigPanel({ field, editField, masks }: {
   const props: Record<string, string> = field.properties || {};
   const validate: Record<string, unknown> = field.validate || {};
   const appearance: Record<string, string> = field.appearance || {};
-  const isInput = !!field.key && !PRESENTATION.has(field.type) && !CONTAINER.has(field.type);
+  const isInput = (native ? field.key !== undefined : !!field.key) && !PRESENTATION.has(field.type) && !CONTAINER.has(field.type);
   const isContainer = CONTAINER.has(field.type);
   const supportsOptions = OPTION_TYPES.has(field.type);
   const helpType = props.septemHelpType ?? 'inline';
 
-  const ids = availableTabIds(field);
+  const ids = availableTabIds(field, native);
   const availableTabs = TABS.filter((t) => ids.includes(t.id));
 
   /** Commit do Nome (label) no blur; se a Chave ainda era derivada do nome, sincroniza. */
   function changeLabel(v: string) {
-    const prevAuto = slugify(field.label ?? '');
-    const keyFollows = isInput && (!field.key || field.key === prevAuto);
+    // O formato da chave antiga não informa se ela é automática (schemas
+    // importados e campos cujo tipo mudou podem usar qualquer identificador).
+    // Só uma personalização explícita desliga o acompanhamento do nome.
+    const keyFollows = !native && isInput && props.septemKeyMode !== 'manual';
     editField(field, ['label'], v);
     // O canvas do form-js exibe o nome do campo de data por `dateLabel`/`timeLabel`
     // (não por `label`). Grava os três para o nome mudar no editor E no runtime (ReactForm).
-    if (field.type === 'datetime') {
+    if (!native && field.type === 'datetime') {
       editField(field, ['dateLabel'], v);
       editField(field, ['timeLabel'], v);
     }
     if (keyFollows) {
+      merge('properties', { septemKeyMode: 'auto' });
       const nextKey = slugify(v);
       if (nextKey && nextKey !== field.key) {
-        try { editField(field, ['key'], nextKey); setDraftKey(nextKey); } catch { /* unicidade — ignora */ }
+        try { editField(field, ['key'], nextKey); setDraftKey(nextKey); }
+        catch { setDraftKey(field.key); toast.error('Já existe um campo com essa chave. Use outro nome ou personalize a chave.'); }
       }
     }
     force((n) => n + 1);
@@ -154,8 +164,15 @@ export function FieldConfigPanel({ field, editField, masks }: {
   /** Commit da Chave no blur (slug). form-js valida unicidade. */
   function changeKey(v: string) {
     const slug = slugify(v);
-    setDraftKey(slug);
-    try { editField(field, ['key'], slug); } catch { /* dup — ignora */ }
+    if (slug === field.key) { setDraftKey(slug); return; }
+    try {
+      editField(field, ['key'], slug);
+      merge('properties', { septemKeyMode: 'manual' });
+      setDraftKey(slug);
+    } catch {
+      setDraftKey(field.key);
+      toast.error('Chave inválida ou já utilizada por outro campo.');
+    }
     force((n) => n + 1);
   }
 
@@ -167,10 +184,10 @@ export function FieldConfigPanel({ field, editField, masks }: {
     merge('properties', { septemEvents: arr.length ? JSON.stringify(arr) : undefined });
 
   return (
-    <aside className="hidden w-80 shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white lg:flex">
+    <aside className={native ? "flex min-h-0 w-full flex-col bg-white" : "hidden w-80 shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white lg:flex"}>
       <div className="border-b border-slate-200 px-4 py-3">
         <h2 className="text-base font-semibold text-slate-900">Configurações do campo</h2>
-        <p className="text-xs text-slate-400">{labelOfType(field.type)}{field.key ? ` · ${field.key}` : ''}</p>
+        <p className={native ? "text-xs text-slate-600" : "text-xs text-slate-400"}>{labelOfType(field.type)}{!native && field.key ? ` · ${field.key}` : ''}</p>
       </div>
 
       {/* Abas (sempre 3, no máx). */}
@@ -188,16 +205,30 @@ export function FieldConfigPanel({ field, editField, masks }: {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-4">
-        {tab === 'geral' && (
-          <div className="flex flex-col gap-3">
+          {tab === 'geral' && (
+            <div className="flex flex-col gap-3">
+              {native && nativeTypeOptions && onNativeTypeChange && <Select label="Tipo do campo" value={field.type} options={nativeTypeOptions} onChange={onNativeTypeChange} />}
             {/* Conteúdo dos elementos de apresentação (não têm "rótulo"). */}
             {field.type === 'text' && <TextArea label="Conteúdo (Markdown)" value={field.text ?? ''} onChange={(v) => set(['text'], v)} />}
             {field.type === 'html' && <TextArea label="Conteúdo (HTML)" value={field.content ?? ''} onChange={(v) => set(['content'], v)} />}
             {field.type === 'image' && <Text label="Origem (URL ou expressão)" value={field.source ?? ''} onChange={(v) => set(['source'], v)} />}
             {field.type === 'image' && <Text label="Texto alternativo" value={field.alt ?? ''} onChange={(v) => set(['alt'], v)} />}
 
-            {!NO_LABEL.has(field.type) && <Text label="Nome" value={draftLabel} onChange={setDraftLabel} onBlur={() => changeLabel(draftLabel)} />}
-            {isInput && <Text label="Chave (identificador)" value={draftKey} onChange={setDraftKey} onBlur={() => changeKey(draftKey)} hint="Sincroniza com o nome; pode ser editada." />}
+              {(native || !NO_LABEL.has(field.type)) && <Text label="Nome" value={draftLabel}
+                onChange={v => {
+                  setDraftLabel(v);
+                  if (native) {
+                    if (field.key === '' || generatingInitialKey.current) generatingInitialKey.current = true;
+                    editField(field, ['label'], v);
+                    if (generatingInitialKey.current && slugify(v)) {
+                      const nextKey = slugify(v).slice(0, 120);
+                      try { editField(field, ['key'], nextKey); setDraftKey(nextKey); }
+                      catch { toast.error('Já existe um campo com essa chave. Personalize a chave para continuar.'); }
+                    }
+                  }
+                }}
+                onBlur={() => { if (native) generatingInitialKey.current = false; else changeLabel(draftLabel); }} />}
+            {isInput && <Text label="Chave (identificador)" value={draftKey} onChange={setDraftKey} onBlur={() => changeKey(draftKey)} hint={native ? "Alterar a chave exige corrigir seus usos antes de publicar. A identidade do campo é preservada." : "Acompanha o nome até ser personalizada manualmente."} />}
 
             {isContainer && (
               <>
@@ -228,8 +259,8 @@ export function FieldConfigPanel({ field, editField, masks }: {
                     <span className="text-[11px] text-slate-400">{helpDraft ? 'definidas' : 'vazias'}</span>
                   </div>
                 ) : (
-                  <textarea rows={2} className={`${fieldCls} mt-1.5`} value={helpDraft}
-                    onChange={(e) => setHelpDraft(e.target.value)}
+                  <textarea rows={2} className={`${fieldCls} mt-1.5`} aria-label="Orientações" value={helpDraft}
+                    onChange={(e) => { setHelpDraft(e.target.value); if (native) merge('properties', { septemHelpText: e.target.value }); }}
                     onBlur={() => merge('properties', { septemHelpText: helpDraft.trim() || undefined })}
                     placeholder="Orientações exibidas abaixo do campo." />
                 )}
@@ -243,7 +274,7 @@ export function FieldConfigPanel({ field, editField, masks }: {
                   onChange={(v) => {
                     merge('properties', { septemDataSourceId: v || undefined });
                     // Campos de opção: carrega as opções da fonte direto no campo.
-                    if (v && supportsOptions) {
+                    if (v && supportsOptions && !native) {
                       fetchDataSourceOptions(v)
                         .then((opts) => { set(['values'], opts); toast.success(`${opts.length} opç${opts.length === 1 ? 'ão' : 'ões'} carregada${opts.length === 1 ? '' : 's'}.`); })
                         .catch(() => toast.error('Não foi possível carregar as opções da fonte.'));
@@ -280,7 +311,7 @@ export function FieldConfigPanel({ field, editField, masks }: {
                     <DocumentGenConfig
                       value={parseDocGen(props.septemDocGenConfig)}
                       onChange={(next) => merge('properties', { septemDocGenConfig: JSON.stringify(next) })}
-                      camposDoForm={formFields.map((f) => ({ key: f.id, label: f.label }))}
+                      camposDoForm={(availableFields ?? formFields).map((f) => ({ key: f.id, label: f.label }))}
                     />
                   </>
                 )}
@@ -372,7 +403,7 @@ export function FieldConfigPanel({ field, editField, masks }: {
         return (
           <Dialog open onClose={() => { commitHelp(); setHelpOpen(false); }} width="lg" title="Orientações do campo (popover)"
             footer={<button type="button" onClick={() => { commitHelp(); setHelpOpen(false); }} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Fechar</button>}>
-            <RichTextEditor value={helpDraft} onChange={setHelpDraft} onBlur={commitHelp} />
+            <RichTextEditor value={helpDraft} onChange={value => { setHelpDraft(value); if (native) merge('properties', { septemHelpText: value }); }} onBlur={commitHelp} />
           </Dialog>
         );
       })()}
@@ -394,14 +425,14 @@ function Lbl({ children, help }: { children: React.ReactNode; help?: string }) {
   return <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">{children}{help && <HelpPopover html={help} ariaLabel={`Ajuda: ${String(children)}`} />}</label>;
 }
 function Text({ label, value, onChange, onBlur, readOnly, hint }: { label: string; value: string; onChange?: (v: string) => void; onBlur?: () => void; readOnly?: boolean; hint?: string }) {
-  return <div><Lbl help={hint}>{label}</Lbl><input className={fieldCls} value={value} readOnly={readOnly} onChange={(e) => onChange?.(e.target.value)} onBlur={onBlur} /></div>;
+  return <div><Lbl help={hint}>{label}</Lbl><input aria-label={label} maxLength={label === 'Nome' ? 240 : undefined} className={fieldCls} value={value} readOnly={readOnly} onChange={(e) => onChange?.(e.target.value)} onBlur={onBlur} /></div>;
 }
 function TextArea({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return <div><Lbl>{label}</Lbl><textarea rows={2} className={fieldCls} value={value} onChange={(e) => onChange(e.target.value)} /></div>;
+  return <div><Lbl>{label}</Lbl><textarea aria-label={label} rows={2} className={fieldCls} value={value} onChange={(e) => onChange(e.target.value)} /></div>;
 }
 function NumberInput({ label, value, onChange, hint }: { label: string; value: unknown; onChange: (n: number | undefined) => void; hint?: string }) {
-  return <div><Lbl help={hint}>{label}</Lbl><input type="number" className={fieldCls} value={value === undefined || value === null ? '' : String(value)} onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))} /></div>;
+  return <div><Lbl help={hint}>{label}</Lbl><input aria-label={label} type="number" className={fieldCls} value={value === undefined || value === null ? '' : String(value)} onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))} /></div>;
 }
 function Select({ label, value, options, onChange, hint }: { label: string; value: string; options: Opt[]; onChange: (v: string) => void; hint?: string }) {
-  return <div><Lbl help={hint}>{label}</Lbl><select className={fieldCls} value={value} onChange={(e) => onChange(e.target.value)}>{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>;
+  return <div><Lbl help={hint}>{label}</Lbl><select aria-label={label} className={fieldCls} value={value} onChange={(e) => onChange(e.target.value)}>{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>;
 }

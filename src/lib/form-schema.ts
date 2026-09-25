@@ -1,7 +1,8 @@
 import type { FormFieldDescriptor } from '@/stores/form';
+import { nativeFields, parseNativeForm } from './native-form';
 
 /**
- * Achata o schema do @bpmn-io/form-js em uma lista de campos descritos
+ * Descobre campos de resposta nativos e, durante a transição, do form-js
  * para uso no modelador (FieldVisibilityEditor, TarefasCamposView,
  * GatewayConditionEditor → seletor de campo).
  *
@@ -28,10 +29,22 @@ type FormJsSchema = {
   components?: FormJsComponent[];
 };
 
-export function extractFields(schema: FormJsSchema | null | undefined): FormFieldDescriptor[] {
-  if (!schema?.components) return [];
+export function extractFields(schema: unknown): FormFieldDescriptor[] {
+  if (!schema || typeof schema !== 'object') return [];
+  if ('format' in schema && schema.format === 'septem-native') {
+    const definition = parseNativeForm(schema);
+    const tabs = new Map(definition.tabs.map(tab => [tab.id, tab.label]));
+    return nativeFields(definition).filter(({ field }) => !!field.key).map(({ field, tabId, groupId, groupLabel, tableKey, path }) => ({
+      // Response keys remain available to scripts and selectors. Task-field
+      // associations use fieldId and derive their execution key from this descriptor.
+      id: field.key, fieldId: field.id, label: field.label, type: field.type,
+      group: groupLabel, groupId, tabId, tabLabel: tabs.get(tabId), tableKey, path,
+    }));
+  }
+  const legacy = schema as FormJsSchema;
+  if (!Array.isArray(legacy.components)) return [];
   const out: FormFieldDescriptor[] = [];
-  walk(schema.components, 'Geral', out);
+  walk(legacy.components, 'Geral', out);
   return out;
 }
 

@@ -37,6 +37,7 @@ export const routes = {
   manualTemplates: '/manual-templates',
   /** Modelador de processos (BPMN) — aba própria. */
   flowEdit: '/flows/edit',
+  formAutomation: (processKey: string) => `/forms/${encodeURIComponent(processKey)}/javascript`,
   /** Builder de relatórios — aba própria. */
   reportEdit: '/reports/edit',
   /** Consulta publicada (visualização) — aba própria. */

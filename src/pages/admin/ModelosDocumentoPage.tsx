@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { AlertTriangle, BookOpen, Eye, FileStack, FlaskConical, History, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, Eye, FileStack, FlaskConical, History, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react';
 import {
   useDocumentTemplates, useDocumentTemplate, useCreateDocumentTemplate,
   useUpdateDocumentTemplate, useDeleteDocumentTemplate, useUploadDocumentTemplateFile,
@@ -17,6 +17,7 @@ import { toast } from '@/stores/toast';
 import { formatWithRelative, formatDuration } from '@/lib/relative-time';
 import { openTab } from '@/lib/nav';
 import { routes } from '@/lib/routes';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 /**
  * Preview do modelo em nova aba, somente leitura (:11). Vai pelo PDF, que o navegador
@@ -61,17 +62,11 @@ export function ModelosDocumentoPage() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="text-lg font-semibold text-slate-900">Modelos de documentos</h1>
+        <div className="flex items-center gap-1">
+          <h1 className="text-lg font-semibold text-slate-900">Modelos de documentos</h1>
+          <ContextHelp manual="documentos-assinaturas" section="criar-modelo-documento" label="Abrir manual de modelos de documentos" />
+        </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => openTab('manual-templates')}
-            title="Manual técnico de criação de templates"
-            data-testid="doc-manual"
-            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-          >
-            <BookOpen size={15} /> <span className="hidden sm:inline">Manual</span>
-          </button>
           <button
             type="button"
             onClick={() => setCamposOpen(true)}
@@ -569,8 +564,7 @@ function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
           </Field>
         </div>
 
-        {/* Ajuda para escrever o modelo, AQUI dentro do editor (a spec pede o botão ao
-            criar/editar — é neste momento que o usuário precisa das chaves). */}
+        {/* A busca fica dentro do editor, no momento em que o usuário precisa das chaves. */}
         <div className="flex flex-wrap gap-2 rounded-md bg-slate-50 p-2">
           <button
             type="button"
@@ -579,13 +573,6 @@ function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
             className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
           >
             <Search size={13} /> Buscar campos disponíveis
-          </button>
-          <button
-            type="button"
-            onClick={() => openTab('manual-templates')}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <BookOpen size={13} /> Manual técnico
           </button>
         </div>
 

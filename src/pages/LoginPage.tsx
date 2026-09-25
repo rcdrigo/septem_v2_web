@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Eye, EyeOff, LayoutGrid, Loader2, Lock, Mail, ShieldCheck, TriangleAlert } from 'lucide-react';
-import { useSessionStore } from '@/stores/session';
-import { ApiError } from '@/lib/api';
+import { useSessionStore, type AccessMode } from '@/stores/session';
+import { api, ApiError } from '@/lib/api';
 import { toast } from '@/stores/toast';
+import { Toaster } from '@/components/ui/Toaster';
+import { Dialog } from '@/components/ui/Dialog';
 import { routes } from '@/lib/routes';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { PasswordChecklist, isPasswordValid } from '@/components/PasswordChecklist';
@@ -39,12 +41,29 @@ export function LoginPage() {
     if (status === 'idle') void bootstrap();
   }, [status, bootstrap]);
 
+  const [consultationOpen, setConsultationOpen] = useState(false);
   const [step, setStep] = useState<Step>('credenciais');
   const [identifier, setIdentifier] = useState('');   // e-mail OU CPF
+  const [internalIdentifier, setInternalIdentifier] = useState<string | null>(null);
+  const [accessMode, setAccessMode] = useState<AccessMode>('interno');
+  const canChooseAccess = internalIdentifier === identifier.trim();
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [keepConnected, setKeepConnected] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (step !== 'credenciais' || !identifier.trim()) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      void api.post<{ isInternal: boolean }>('/api/v1/auth/access-options',
+        { identifier: identifier.trim() }, { anonymous: true, signal: controller.signal })
+        .then((result) => {
+          if (!controller.signal.aborted) setInternalIdentifier(result.isInternal ? identifier.trim() : null);
+        }).catch(() => { /* Sem identificação confirmada, mantém o seletor oculto. */ });
+    }, 350);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [identifier, step]);
 
   // Aviso progressivo do bloqueio (o backend diz quantas tentativas restam).
   const [aviso, setAviso] = useState<string | null>(null);
@@ -123,6 +142,7 @@ export function LoginPage() {
     setSubmitting(true);
     setAviso(null);
     try {
+      useSessionStore.getState().setAccessMode(canChooseAccess ? accessMode : 'interno');
       const r = await login(identifier, password, keepConnected);
       if (r.kind === 'two-factor') {
         setMaskedEmail(r.maskedEmail);
@@ -263,7 +283,7 @@ export function LoginPage() {
               <strong>Precisa de ajuda?</strong>
               <span>Domine a plataforma com nosso guia.</span>
             </button>
-            <button type="button" className="login-hero-action login-hero-action--wide">
+            <button type="button" className="login-hero-action login-hero-action--wide" onClick={() => setConsultationOpen(true)}>
               <strong>Consultar processo</strong>
               <span>Valide seu protocolo ou os documentos emitidos ao final dos processos.</span>
             </button>
@@ -289,11 +309,25 @@ export function LoginPage() {
                     autoFocus
                     name="identifier"
                     value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
+                    onChange={(e) => { setIdentifier(e.target.value); setInternalIdentifier(null); setAccessMode('interno'); }}
                     className={inputCls}
                     placeholder="usuario@prefeitura.gov.br ou 000.000.000-00"
                   />
                 </Campo>
+
+                {canChooseAccess && (
+                  <fieldset disabled={submitting} className="space-y-2">
+                    <legend className="text-sm font-medium text-slate-700">Acessar como</legend>
+                    <div className="flex gap-4">
+                      {(['interno', 'externo'] as const).map((mode) => (
+                        <label key={mode} className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-slate-700">
+                          <input type="radio" name="accessMode" value={mode} checked={accessMode === mode} onChange={() => setAccessMode(mode)} className="accent-slate-900" />
+                          {mode === 'interno' ? 'Interno' : 'Externo'}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
 
                 <Campo label="Senha" icon={Lock}>
                   <input
@@ -333,7 +367,7 @@ export function LoginPage() {
                       setAviso(null);
                       setStep('esqueci');
                     }}
-                    className="text-sm text-slate-400 hover:text-slate-600"
+                    className="rounded text-sm text-slate-600 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
                   >
                     Esqueci minha senha
                   </button>
@@ -396,7 +430,7 @@ export function LoginPage() {
                     autoFocus
                     name="identifier"
                     value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
+                    onChange={(e) => { setIdentifier(e.target.value); setInternalIdentifier(null); setAccessMode('interno'); }}
                     className={inputCls}
                     placeholder="usuario@prefeitura.gov.br ou 000.000.000-00"
                   />
@@ -478,6 +512,20 @@ export function LoginPage() {
         </main>
       </div>
 
+      <Toaster />
+      <Dialog open={consultationOpen} onClose={() => setConsultationOpen(false)} title="Consultar processo">
+        <p className="mb-4 text-sm text-slate-600">Escolha o que você precisa consultar.</p>
+        <div className="flex flex-col gap-3">
+          <button type="button" onClick={() => { setConsultationOpen(false); navigate(`${routes.login}?returnUrl=${encodeURIComponent(routes.requests)}`); }} className="rounded-md border border-slate-300 px-4 py-3 text-left text-sm text-slate-800 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-slate-700">
+            <strong className="block">Acompanhar minhas requisições</strong>
+            <span>Entre na sua conta para consultar o andamento.</span>
+          </button>
+          <button type="button" onClick={() => navigate(routes.validate)} className="rounded-md border border-slate-300 px-4 py-3 text-left text-sm text-slate-800 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-slate-700">
+            <strong className="block">Validar documento</strong>
+            <span>Confira a autenticidade com o número do processo e o código verificador.</span>
+          </button>
+        </div>
+      </Dialog>
       <CardCentralDeServicos />
       </div>
     </div>

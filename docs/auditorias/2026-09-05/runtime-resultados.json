@@ -1,0 +1,71 @@
+[
+  {
+    "case": "change copia valor atual",
+    "actual": {
+      "a": "novo",
+      "b": "antigo"
+    }
+  },
+  {
+    "case": "Anexo obrigatório vazio e data passada em lista",
+    "actual": {
+      "data": {
+        "anexo": [],
+        "itens": [
+          {
+            "data": "2000-01-01"
+          }
+        ]
+      },
+      "errors": {}
+    }
+  },
+  {
+    "case": "Múltipla escolha",
+    "actual": [
+      "text"
+    ]
+  },
+  {
+    "case": "Atualização props data",
+    "actual": {
+      "nome": "Processo A"
+    }
+  },
+  {
+    "case": "Desabilitado por evento ainda valida",
+    "actual": {
+      "data": {
+        "origem": "teste",
+        "destino": ""
+      },
+      "errors": {
+        "destino": "Campo obrigatório."
+      }
+    }
+  },
+  {
+    "case": "HTML e imagem configurados",
+    "actual": {
+      "text": "",
+      "images": 0
+    }
+  },
+  {
+    "case": "Minuto atual picker vs submit",
+    "actual": {
+      "data": {
+        "data": "2026-09-05T12:34"
+      },
+      "invalid": null,
+      "submit": {
+        "data": {
+          "data": "2026-09-05T12:34"
+        },
+        "errors": {
+          "data": "A data não pode ser no passado."
+        }
+      }
+    }
+  }
+]

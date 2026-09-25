@@ -1,3 +1,4 @@
+import { FormAutomationPage } from './pages/FormAutomationPage';
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom';
 import { AppShell } from './layout/AppShell';
 import { LoginPage } from './pages/LoginPage';
@@ -79,6 +80,7 @@ export const router = createBrowserRouter(
     { path: routes.manualTemplates, element: <ManualTemplatesPage /> },
     // Modelador em aba própria (sem menu lateral) — aberto via "Novo/Editar".
     { path: routes.flowEdit, element: <ModeladorPage /> },
+    { path: "/forms/:processKey/javascript", element: <FormAutomationPage /> },
     // Builder de relatórios em aba própria (Admin › Relatórios › Builder).
     { path: routes.reportEdit, element: <RelatorioBuilderPage /> },
     // Consulta (relatório publicado) em aba própria — aberta do catálogo (F7.1).
@@ -116,7 +118,7 @@ export const router = createBrowserRouter(
         // --- Geral ---------------------------------------------------------
         stub(childPath(routes.dashboard), 'Dashboard', { phase: 'Fase 7' }),
         { path: childPath(routes.tasks), element: <TarefasPage /> },
-        { path: childPath(routes.requests), element: <InstanciasPage title="Requisições" lockMine initialStatus="em_andamento" /> },
+        { path: childPath(routes.requests), element: <InstanciasPage /> },
         // /reports = catálogo de consultas (relatórios publicados) (req. 8).
         { path: childPath(routes.reports), element: <ConsultasPage /> },
         { path: childPath(routes.orgchart), element: <OrganogramaPage /> },

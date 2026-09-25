@@ -12,6 +12,7 @@ import { toast } from '@/stores/toast';
 import { ExecutionHeader } from '@/components/execution/ExecutionHeader';
 import { TaskActionFooter, type ExecutionAction } from '@/components/execution/TaskActionFooter';
 import { routes } from '@/lib/routes';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 /**
  * Aba standalone (sem menus) para preencher e iniciar um serviço (req. 7). O
@@ -44,11 +45,11 @@ export function ServicoFormPage() {
   if (!token) return <Navigate to={routes.login} replace />;
 
   async function submit(button?: TaskButton) {
-    const { data, errors } = fillRef.current?.submit() ?? { data: {}, errors: {} };
-    if ((button?.validateForm ?? true) && Object.keys(errors).length) { toast.error('Preencha os campos obrigatórios.'); return; }
+    const { data, errors, formState } = await fillRef.current?.submit() ?? { data: {}, errors: {} };
+    if (errors._automation || ((button?.validateForm ?? true) && Object.keys(errors).length)) { toast.error(errors._automation ? 'O envio foi bloqueado pela automação.' : 'Preencha os campos obrigatórios.'); return; }
     try {
       const r = await start.mutateAsync({
-        key: processKey!, data,
+        key: processKey!, data, formState,
         isTest: canSimulate && isTest,
       });
       setDone({ nextTaskForMe: r.nextTaskForMe, executionId: r.executionId });
@@ -98,35 +99,41 @@ export function ServicoFormPage() {
           {/* Cada grupo renderiza seu próprio card (sem container único). */}
           <main className="flex-1 overflow-auto p-4 sm:p-6">
             {formEscolhido.data?.documentationUrl && <DocBanner url={formEscolhido.data.documentationUrl} />}
-            {formEscolhido.isLoading ? <FormSkeleton /> : <ReactForm ref={fillRef} schema={formEscolhido.data?.formSchema} data={formEscolhido.data?.data ?? undefined} optionsByField={formEscolhido.data?.fieldOptions} uploadContext={{ processKey: processKey ?? undefined }} />}
+            {formEscolhido.isLoading ? <FormSkeleton /> : <ReactForm key={processKey ?? 'form'} ref={fillRef} automationScripts={formEscolhido.data?.automationScripts} schema={formEscolhido.data?.formSchema} data={formEscolhido.data?.data ?? undefined} optionsByField={formEscolhido.data?.fieldOptions} uploadContext={{ processKey: processKey ?? undefined }} />}
           </main>
+          {/* Merge: o wrapper e o ContextHelp do aviso abaixo são do trabalho de ajuda
+              contextual; o texto dentro é da Fase 15 — a escolha de versão saiu porque a versão
+              em homologação foi aposentada (Q18). */}
           <TaskActionFooter
             completionActions={completionActions}
             loading={formEscolhido.isLoading}
             notice={canSimulate ? (
-              <label className="inline-flex items-start gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  data-testid="iniciar-como-teste"
-                  checked={isTest}
-                  onChange={(event) => setIsTest(event.target.checked)}
-                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
-                />
-                <span>
-                  Iniciar como <strong>teste</strong>
-                  <span className="block text-xs text-slate-500">O processo é marcado como teste e todas as tarefas ficam com você.</span>
-                  {isTest && (
-                    <span
-                      data-testid="teste-usa-publicada"
-                      className="mt-2 block rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-600"
-                    >
-                      A simulação roda a versão <strong>publicada</strong>. Para testar uma
-                      alteração antes de ir ao ar, faça no <strong>ambiente de homologação</strong> e
-                      depois promova para produção em <strong>Transferências</strong>.
-                    </span>
-                  )}
-                </span>
-              </label>
+              <div className="flex items-start gap-1">
+                <label className="inline-flex items-start gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    data-testid="iniciar-como-teste"
+                    checked={isTest}
+                    onChange={(event) => setIsTest(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+                  />
+                  <span>
+                    Iniciar como <strong>teste</strong>
+                    <span className="block text-xs text-slate-500">O processo é marcado como teste e todas as tarefas ficam com você.</span>
+                    {isTest && (
+                      <span
+                        data-testid="teste-usa-publicada"
+                        className="mt-2 block rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-600"
+                      >
+                        A simulação roda a versão <strong>publicada</strong>. Para testar uma
+                        alteração antes de ir ao ar, faça no <strong>ambiente de homologação</strong> e
+                        depois promova para produção em <strong>Transferências</strong>.
+                      </span>
+                    )}
+                  </span>
+                </label>
+                <ContextHelp manual="simulacao-homologacao" section="iniciar-simulacao" label="Ajuda sobre simulação e homologação" />
+              </div>
             ) : undefined}
           />
         </>

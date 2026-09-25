@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 import { StartEventPanel } from './StartEventPanel';
 import { EndEventPanel } from './EndEventPanel';
 import { UserTaskPanel } from './UserTaskPanel';
+import { ScriptTaskPanel } from './ScriptTaskPanel';
 import { ServiceTaskPanel } from './ServiceTaskPanel';
 import { CallActivityPanel } from './CallActivityPanel';
 import { EmailEventPanel } from './EmailEventPanel';
@@ -31,6 +32,8 @@ export function resolvePanel(element: any): { Panel: PanelComponent; label: stri
       return { Panel: EndEventPanel, label: 'Fim' };
     case 'bpmn:UserTask':
       return { Panel: UserTaskPanel, label: 'Tarefa humana' };
+    case 'bpmn:ScriptTask':
+      return { Panel: ScriptTaskPanel, label: 'Tarefa de script' };
     case 'bpmn:ServiceTask':
       return { Panel: ServiceTaskPanel, label: 'Atividade de serviço' };
     case 'bpmn:CallActivity':

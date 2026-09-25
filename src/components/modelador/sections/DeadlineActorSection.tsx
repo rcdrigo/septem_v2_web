@@ -4,6 +4,7 @@ import { useAreas, useAreaPositions } from '@/lib/api/catalog';
 import { DataSourceSelect } from '../fields/DataSourceSelect';
 import { FormFieldSelect } from '../fields/FormFieldSelect';
 import { DeadlineAlertsEditor } from '../editors/DeadlineAlertsEditor';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 type Props = {
   modeler: any;
@@ -77,7 +78,16 @@ export function DeadlineActorSection({ modeler, element }: Props) {
   );
 
   return (
-    <Section title="Responsáveis e prazos">
+    <Section
+      title="Responsáveis e prazos"
+      headerAction={(
+        <ContextHelp
+          manual="modelador-processos"
+          section="responsaveis-prazos"
+          label="Ajuda sobre responsáveis e prazos"
+        />
+      )}
+    >
       <Switch
         checked={deadline.state.respectWorkHours}
         onChange={(v) => deadline.flush({ respectWorkHours: v })}

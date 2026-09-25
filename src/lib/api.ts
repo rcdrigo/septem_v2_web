@@ -7,7 +7,7 @@ import { toast } from '@/stores/toast';
  *  - Parse de `application/problem+json` → `ApiError` + toast de erro.
  *  - 1 retry transparente em 401 via `/auth/refresh` (rotacionando).
  *
- * Importações tardias para quebrar o ciclo `session ↔ api`.
+ * Callbacks configurados pelo store evitam o ciclo `session ↔ api`.
  */
 
 /**
@@ -85,13 +85,13 @@ export function onEnvironmentInactive(handler: () => void) {
 }
 
 let tokenProvider: () => string | null = () => null;
-let refreshHandler: () => Promise<string | null> = async () => null;
-let logoutHandler: () => Promise<void> = async () => {};
+let refreshHandler: (rejectedToken?: string | null) => Promise<string | null> = async () => null;
+let logoutHandler: (rejectedToken?: string | null) => Promise<void> = async () => {};
 
 export function configureApi(opts: {
   getAccessToken: () => string | null;
-  refresh: () => Promise<string | null>;
-  logout: () => Promise<void>;
+  refresh: (rejectedToken?: string | null) => Promise<string | null>;
+  logout: (rejectedToken?: string | null) => Promise<void>;
 }) {
   tokenProvider = opts.getAccessToken;
   refreshHandler = opts.refresh;
@@ -115,7 +115,8 @@ async function readError(resp: Response): Promise<ApiError> {
   }
 }
 
-export async function apiFetch<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
+/** Política comum a JSON, downloads e uploads; o chamador só escolhe a leitura do corpo. */
+async function request(path: string, options: ApiOptions = {}): Promise<Response> {
   const { anonymous, skipRefresh, headers, ...rest } = options;
   const finalHeaders = new Headers(headers);
   if (!finalHeaders.has('Content-Type') && rest.body && typeof rest.body === 'string')
@@ -127,19 +128,20 @@ export async function apiFetch<T = unknown>(path: string, options: ApiOptions = 
   if (TENANT_HEADER && !finalHeaders.has('X-Tenant'))
     finalHeaders.set('X-Tenant', TENANT_HEADER);
 
-  const resp = await fetch(`${BASE_URL}${path}`, { ...rest, headers: finalHeaders });
+  let resp = await fetch(`${BASE_URL}${path}`, { ...rest, headers: finalHeaders });
 
   if (resp.status === 401 && !anonymous && !skipRefresh) {
-    const newToken = await refreshHandler();
+    const rejectedToken = finalHeaders.get('Authorization')?.replace(/^Bearer /, '') ?? null;
+    const newToken = await refreshHandler(rejectedToken);
     if (newToken) {
       finalHeaders.set('Authorization', `Bearer ${newToken}`);
-      const retry = await fetch(`${BASE_URL}${path}`, { ...rest, headers: finalHeaders });
-      if (!retry.ok) throw await readError(retry);
-      return (await buildResponse(retry)) as T;
+      resp = await fetch(`${BASE_URL}${path}`, { ...rest, headers: finalHeaders });
+    } else {
+      // Só ausência/rejeição definitiva do refresh retorna null. Falhas transitórias
+      // são propagadas sem encerrar a sessão. A expiração não revoga outra sessão.
+      await logoutHandler(rejectedToken);
+      throw await readError(resp);
     }
-    // refresh falhou → desloga e sobe erro original
-    await logoutHandler();
-    throw await readError(resp);
   }
 
   if (!resp.ok) {
@@ -154,7 +156,11 @@ export async function apiFetch<T = unknown>(path: string, options: ApiOptions = 
     throw err;
   }
 
-  return (await buildResponse(resp)) as T;
+  return resp;
+}
+
+export async function apiFetch<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
+  return (await buildResponse(await request(path, options))) as T;
 }
 
 /** Açúcares mais comuns. */
@@ -169,34 +175,17 @@ export const api = {
   del: <T = unknown>(path: string, opts?: ApiOptions) => apiFetch<T>(path, { method: 'DELETE', ...opts }),
   /** POST que devolve o corpo cru (Blob) — downloads (export CSV/XLSX). */
   postBlob: async (path: string, body?: unknown): Promise<Blob> => {
-    const headers = new Headers({ 'Content-Type': 'application/json' });
-    const token = tokenProvider();
-    if (token) headers.set('Authorization', `Bearer ${token}`);
-    if (TENANT_HEADER) headers.set('X-Tenant', TENANT_HEADER);
-    const resp = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: JSON.stringify(body ?? {}) });
-    if (!resp.ok) throw await readError(resp);
+    const resp = await request(path, { method: 'POST', body: JSON.stringify(body ?? {}) });
     return resp.blob();
   },
 
   /** GET que devolve o corpo cru (Blob) — downloads (modelo XLSX, anexos). */
   getBlob: async (path: string): Promise<Blob> => {
-    const headers = new Headers();
-    const token = tokenProvider();
-    if (token) headers.set('Authorization', `Bearer ${token}`);
-    if (TENANT_HEADER) headers.set('X-Tenant', TENANT_HEADER);
-    const resp = await fetch(`${BASE_URL}${path}`, { headers });
-    if (!resp.ok) throw await readError(resp);
+    const resp = await request(path);
     return resp.blob();
   },
 
   /** POST multipart (upload de arquivo) — não define Content-Type (o browser põe o boundary). */
-  postForm: async <T = unknown>(path: string, form: FormData): Promise<T> => {
-    const headers = new Headers();
-    const token = tokenProvider();
-    if (token) headers.set('Authorization', `Bearer ${token}`);
-    if (TENANT_HEADER) headers.set('X-Tenant', TENANT_HEADER);
-    const resp = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: form });
-    if (!resp.ok) throw await readError(resp);
-    return (await buildResponse(resp)) as T;
-  },
+  postForm: <T = unknown>(path: string, form: FormData): Promise<T> =>
+    apiFetch<T>(path, { method: 'POST', body: form }),
 };

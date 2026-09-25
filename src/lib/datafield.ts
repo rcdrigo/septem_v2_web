@@ -107,7 +107,9 @@ export function validateDateClient(value: string, mode: DateMode | undefined, li
     if (limit === 'noFuture' && parsed > today) return 'A data não pode ser no futuro.';
     return null;
   }
-  if (limit === 'noPast' && parsed < now) return 'A data não pode ser no passado.';
-  if (limit === 'noFuture' && parsed > now) return 'A data não pode ser no futuro.';
+  const boundary = new Date(now);
+  boundary.setSeconds(0, 0);
+  if (limit === 'noPast' && parsed < boundary) return 'A data não pode ser no passado.';
+  if (limit === 'noFuture' && parsed > boundary) return 'A data não pode ser no futuro.';
   return null;
 }

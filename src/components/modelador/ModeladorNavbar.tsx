@@ -22,6 +22,7 @@ import { useModeladorStore, type ModeladorView } from '@/stores/modelador';
 import { MenuItem, Popover } from '@/components/ui/Popover';
 import { DiagnosticsBadge } from './DiagnosticsBadge';
 import { routes } from '@/lib/routes';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 type ViewButton = { view: ModeladorView; label: string; icon: LucideIcon };
 
@@ -222,6 +223,11 @@ export function ModeladorNavbar({ recursos, modeler, persistence }: Props) {
         {persistence && (
           <>
             <span className="mx-1 h-5 w-px bg-slate-200" />
+            <ContextHelp
+              manual="modelador-processos"
+              section="salvar-publicar"
+              label="Ajuda sobre salvar e publicar"
+            />
             {persistence.dirty && (
               <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600" title="Há alterações no fluxo ainda não salvas">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />

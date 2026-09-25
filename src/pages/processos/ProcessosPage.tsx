@@ -14,6 +14,7 @@ import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
 import { routes } from '@/lib/routes';
 import { openTab } from '@/lib/nav';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 /**
  * Admin › Processos — IF2. Lista real de `/api/v1/workflow/process-definitions`
@@ -95,13 +96,16 @@ export function ProcessosPage() {
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-6 py-4">
         <h1 className="text-lg font-semibold text-slate-900">Processos</h1>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setCategoriesOpen(true)}
-            className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-          >
-            <Tags size={16} /> Categorias
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setCategoriesOpen(true)}
+              className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              <Tags size={16} /> Categorias
+            </button>
+            <ContextHelp manual="categorias-catalogos" section="gerenciar-categorias" label="Abrir manual de categorias" />
+          </div>
           <button
             type="button"
             onClick={() => openModeler()}

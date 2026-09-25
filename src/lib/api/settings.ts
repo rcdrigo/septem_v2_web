@@ -55,11 +55,28 @@ export type SettingsSecurity = {
   lockoutMinutes: number;
 };
 
+export type SettingsOpenRouter = {
+  apiKeySet: boolean;
+  model: string | null;
+  siteUrl: string | null;
+  maxTokens: number;
+};
+export type OpenRouterPayload = Omit<SettingsOpenRouter, 'apiKeySet'> & { apiKey: string | null };
+
+export function useSaveOpenRouter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: OpenRouterPayload) => api.put('/api/v1/settings/openrouter', p),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+  });
+}
+
 export type Settings = {
   general: SettingsGeneral;
   email: SettingsEmail;
   storage: SettingsStorage;
   security: SettingsSecurity;
+  openRouter: SettingsOpenRouter;
   updatedAt: string;
 };
 

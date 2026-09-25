@@ -5,6 +5,7 @@ import { useOrgUnit, type OrgPerson } from '@/lib/api/org-units';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { openTab } from '@/lib/nav';
 import { routes } from '@/lib/routes';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 type AbaKey = 'processos' | 'manuais' | 'documentos' | 'usuarios';
 
@@ -51,6 +52,7 @@ export function UnidadePage() {
                 <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">inativa</span>
               )}
             </h1>
+            <ContextHelp manual="estrutura-organizacional" section="consultar-organograma" label="Abrir manual de estrutura organizacional" className="print:hidden" />
             {data.sigla && <p className="text-sm text-slate-600">{data.name}</p>}
           </div>
 

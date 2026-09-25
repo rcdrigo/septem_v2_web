@@ -1,5 +1,6 @@
 import { Section } from '@/components/ui/Field';
 import { ActionButtonsEditor } from '../editors/ActionButtonsEditor';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 type Props = {
   modeler: any;
@@ -16,7 +17,13 @@ export function ActionButtonsSection({ modeler, element, defaultLabel }: Props) 
   return (
     <Section
       title="Botões de ação"
-      help="Botões disponíveis ao usuário ao finalizar esta tarefa."
+      headerAction={(
+        <ContextHelp
+          manual="modelador-processos"
+          section="botoes-acao"
+          label="Ajuda sobre botões de ação"
+        />
+      )}
     >
       <ActionButtonsEditor modeler={modeler} element={element} defaultLabel={defaultLabel} />
     </Section>

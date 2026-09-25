@@ -21,7 +21,9 @@ import { Field, TextInput, TextArea, Select } from '@/components/ui/Field';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
+import { normalizeSqlQuery } from '@/lib/sql-query';
 import { routes } from '@/lib/routes';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 const TYPE_LABEL: Record<DataSourceType, string> = { fixed: 'Fixa', sql: 'SQL', api: 'API (JSON)' };
 
@@ -48,9 +50,12 @@ export function FontesDadosPage() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="text-lg font-semibold text-slate-900">
-          Fontes de dados <span className="text-sm font-normal text-slate-400">· {scope === 'report' ? 'Relatórios' : 'Processos'}</span>
-        </h1>
+        <div className="flex min-w-0 items-center gap-1">
+          <h1 className="truncate text-lg font-semibold text-slate-900">
+            Fontes de dados <span className="text-sm font-normal text-slate-400">· {scope === 'report' ? 'Relatórios' : 'Processos'}</span>
+          </h1>
+          <ContextHelp manual="fontes-dados-integracoes" section="configurar-fonte" label="Abrir manual de fontes de dados" />
+        </div>
         <div className="flex gap-2">
           <button type="button" onClick={() => openEditor()} className="flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-700">
             <Plus size={16} /> Nova fonte
@@ -128,7 +133,11 @@ export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string
 
   function buildConfig(): unknown {
     if (type === 'fixed') return { items: items.filter((i) => i.value || i.label) };
-    if (type === 'sql') return { query };
+    if (type === 'sql') {
+      const normalized = normalizeSqlQuery(query);
+      setQuery(normalized);
+      return { query: normalized };
+    }
     return { url, method, headers: headers.filter((h) => h.k), body, mapping };
   }
 
@@ -145,7 +154,7 @@ export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string
       if (id) await update.mutateAsync({ id, body }); else await create.mutateAsync(body);
       toast.success(id ? 'Fonte atualizada.' : `Fonte "${name}" criada.`);
       onClose();
-    } catch { toast.error('Não foi possível salvar a fonte.'); }
+    } catch (err) { toast.error(err instanceof ApiError ? (err.detail ?? err.message) : 'Não foi possível salvar a fonte.'); }
   }
 
   const title = id ? 'Editar fonte de dados' : 'Nova fonte de dados';
@@ -369,4 +378,3 @@ function PlaceholderHelp() {
     </div>
   );
 }
-

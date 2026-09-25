@@ -1,3 +1,5 @@
+import { syncTaskFieldEntries } from './bpmn-form-fields';
+import { extractFields } from './form-schema';
 /**
  * Helpers para acessar o elemento `bpmn:Process` raiz do diagrama atual e
  * sua configuração `septem:ProcessConfig`.
@@ -8,6 +10,7 @@
  */
 
 import { getExtensionConfig, setExtensionConfig } from './bpmn-helpers';
+import { parseNativeForm, type NativeFormDefinition } from './native-form';
 
 type AnyModeler = any;
 
@@ -57,7 +60,9 @@ export function getProcessShape(modeler: AnyModeler): any | null {
   if (!modeler) return null;
   try {
     const root = modeler.get('canvas').getRootElement();
-    return root ?? null;
+    // O canvas pode criar uma raiz implícita antes de importar o BPMN.
+    // Ela não pode receber comandos de modeling (não tem businessObject).
+    return root?.businessObject ? root : null;
   } catch {
     return null;
   }
@@ -89,7 +94,7 @@ export function setProcessConfig(modeler: AnyModeler, patch: Partial<ProcessConf
 // ─── Form schema embutido no BPMN ─────────────────────────────────────────────
 
 /** Lê o schema do formulário (JSON serializado) guardado em `septem:FormSchema`. */
-export function getEmbeddedFormSchema(modeler: AnyModeler): unknown | null {
+export function getEmbeddedFormSchema(modeler: AnyModeler, strict = false): unknown | null {
   const proc = getProcessShape(modeler);
   // `businessObject` pode faltar enquanto o diagrama ainda não importou (ou se o XML
   // veio sem DI) — sem esta guarda a página quebrava com
@@ -102,8 +107,21 @@ export function getEmbeddedFormSchema(modeler: AnyModeler): unknown | null {
   try {
     return JSON.parse(node.json);
   } catch {
+    if (strict) throw new Error('Schema do formulário inválido.');
     return null;
   }
+}
+
+/** E1 transport for the native editor: same process persistence, validated native contract. */
+export function getEmbeddedNativeForm(modeler: AnyModeler): NativeFormDefinition | null {
+  const schema = getEmbeddedFormSchema(modeler, true);
+  return schema === null ? null : parseNativeForm(schema);
+}
+
+export function setEmbeddedNativeForm(modeler: AnyModeler, definition: NativeFormDefinition) {
+  const valid = parseNativeForm(definition);
+  syncTaskFieldEntries(modeler, extractFields(getEmbeddedFormSchema(modeler)), extractFields(valid));
+  setEmbeddedFormSchema(modeler, valid);
 }
 
 export function setEmbeddedFormSchema(modeler: AnyModeler, schema: unknown) {

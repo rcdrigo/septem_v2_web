@@ -1,0 +1,46 @@
+.execution-filters button, .ef-popup button { cursor: pointer; }
+.execution-filters button:focus-visible, .ef-popup button:focus-visible, .ef-popup input:focus-visible, .ef-popup select:focus-visible { outline: 2px solid #0369a1; outline-offset: 2px; }
+.ef-trigger { display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:0 9px;border:1px solid #cbd5e1;border-radius:6px;background:white;color:#334155;font-size:12px;font-weight:600; }
+.ef-trigger:hover, .ef-trigger[data-popup-open] { background:#f1f5f9; }
+.ef-count { border-radius:4px;background:#e2e8f0;padding:0 5px;font-size:11px;font-variant-numeric:tabular-nums; }
+.ef-chip { display:inline-flex;align-items:center;max-width:100%;border-radius:6px;background:#f0f9ff;color:#075985; }
+.ef-chip-label { min-height:30px;min-width:0;max-width:260px;padding:4px 3px 4px 9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;text-align:left; }
+.ef-chip-remove { display:grid;place-items:center;min-width:28px;min-height:30px;border-radius:6px; }
+.ef-chip-remove:hover, .ef-chip-label:hover { background:#e0f2fe; }
+.ef-link { min-height:36px;font-size:12px;font-weight:600;color:#475569;text-decoration:underline;text-underline-offset:3px; }
+.ef-popup { width:min(760px, calc(100vw - 24px));max-height:min(680px, var(--available-height));display:flex;flex-direction:column;overflow:hidden;border-radius:12px;background:white;box-shadow:0 12px 36px -8px rgb(15 23 42 / 25%), 0 2px 8px rgb(15 23 42 / 10%);color:#334155; }
+.ef-header { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid #e2e8f0;flex-shrink:0; }
+.ef-icon-button { display:grid;place-items:center;min-height:44px;min-width:44px;border-radius:6px; }
+.ef-icon-button:hover { background:#f1f5f9; }
+.ef-body { display:grid;grid-template-columns:220px minmax(0, 1fr);min-height:0; }
+.ef-categories { padding:10px;background:#f8fafc;border-right:1px solid #e2e8f0;overflow-y:auto; }
+.ef-category { display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:10px;border-radius:6px;text-align:left;font-size:13px; }
+.ef-category svg { flex-shrink:0; }
+.ef-category:hover { background:#f1f5f9; }
+.ef-category[aria-current="true"] { background:#e2e8f0;color:#0f172a;font-weight:600; }
+.ef-editor { padding:24px;overflow-y:auto;min-height:340px; }
+.ef-back { display:none; }
+.ef-search { display:flex;align-items:center;gap:8px;border:1px solid #cbd5e1;border-radius:6px;padding:0 12px; }
+.ef-search input { min-width:0;width:100%;min-height:44px;font-size:14px;background:transparent; }
+.ef-search input::placeholder, .ef-input::placeholder { color:#64748b; }
+.ef-input { display:block;min-height:44px;min-width:0;width:100%;max-width:100%;border:1px solid #cbd5e1;border-radius:6px;padding:8px 10px;background:white;font-size:14px; }
+.ef-option { display:flex;align-items:center;gap:10px;min-height:44px;padding:10px 8px;border-radius:6px;font-size:14px;cursor:pointer; }
+.ef-option:hover { background:#f8fafc; }
+.ef-option input { width:17px;height:17px;flex-shrink:0;accent-color:#0369a1; }
+.ef-option-disabled { opacity:.55;cursor:not-allowed; }
+.ef-preset { min-height:36px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px; }
+.ef-preset:hover { background:#f1f5f9; }
+.ef-footer { display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid #e2e8f0;padding:8px 20px;flex-shrink:0; }
+@media (max-width:639px) {
+ .ef-popup { max-height:min(620px, var(--available-height)); }
+ .ef-body { display:flex;flex-direction:column;overflow-y:auto; }
+ .ef-categories { border-right:0; }
+ .ef-editor { display:none;padding:16px;min-height:260px; }
+ .ef-editing .ef-categories { display:none; }
+ .ef-editing .ef-editor { display:block; }
+ .ef-back { display:flex;align-items:center;gap:8px;min-height:44px;margin-bottom:12px;font-size:13px;font-weight:600; }
+ .ef-header { padding:12px 16px; }
+ .ef-chip-label { max-width:calc(100vw - 110px); }
+}
+
+.execution-filters .ef-link { min-height:30px; }

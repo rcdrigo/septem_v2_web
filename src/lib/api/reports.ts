@@ -130,12 +130,12 @@ export function useReport(key: string | null) {
 }
 
 /** Executa o relatório publicado (engine de blocos, cache 5min no servidor). */
-export function useReportRun(key: string | null, filters: Record<string, string>, opts?: { preview?: boolean }) {
+export function useReportRun(key: string | null, filters: Record<string, string>, opts?: { preview?: boolean; enabled?: boolean }) {
   const path = opts?.preview ? 'preview' : 'run';
   return useQuery({
     queryKey: [...reportKeys.run(key ?? ''), path, filters],
     queryFn: () => api.post<ReportRunResult>(`${BASE}/${key}/${path}`, { filters }),
-    enabled: !!key,
+    enabled: !!key && opts?.enabled !== false,
   });
 }
 

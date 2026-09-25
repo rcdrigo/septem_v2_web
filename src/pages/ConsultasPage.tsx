@@ -14,6 +14,7 @@ import { useFavorites, useToggleFavorite } from '@/lib/api/discovery';
 import { toast } from '@/stores/toast';
 import { routes } from '@/lib/routes';
 import { openTab } from '@/lib/nav';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 /**
  * Geral › Consultas (item 8): catálogo de relatórios publicados — mesma lógica
@@ -46,7 +47,10 @@ export function ConsultasPage() {
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="text-lg font-semibold text-slate-900">Consultas</h1>
+        <div className="flex items-center gap-1.5">
+          <h1 className="text-lg font-semibold text-slate-900">Consultas</h1>
+          <ContextHelp manual="consultas-relatorios" section="localizar-consulta" label="Ajuda sobre consultas" />
+        </div>
       </header>
 
       {/* Filtro por categoria — pílulas que quebram linha no mobile */}

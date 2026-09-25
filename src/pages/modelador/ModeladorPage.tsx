@@ -25,6 +25,8 @@ import {
 } from '@/lib/api/process-definitions';
 import type { BpmnModelerHandle } from '@/components/bpmn/BpmnModeler';
 import { routes } from '@/lib/routes';
+import { getEmbeddedFormSchema } from '@/lib/bpmn-process';
+import { nativeFields, parseNativeForm } from '@/lib/native-form';
 
 /**
  * Shell da página `/flows/edit`. Não contém lógica de modelagem — só:
@@ -38,6 +40,12 @@ export function ModeladorPage() {
   // Roda em aba própria (sem AppShell). Compartilha o token via localStorage com
   // a aba principal; sem sessão → volta para o login.
   const token = useSessionStore((s) => s.accessToken);
+  const sessionStatus = useSessionStore((s) => s.status);
+  const bootstrap = useSessionStore((s) => s.bootstrap);
+  // O token é compartilhado entre abas; usuário e permissões precisam ser carregados nesta aba.
+  useEffect(() => {
+    if (sessionStatus === 'idle') void bootstrap();
+  }, [sessionStatus, bootstrap]);
 
   const currentView = useModeladorStore((s) => s.currentView);
   const processName = useModeladorStore((s) => s.processName);
@@ -57,6 +65,7 @@ export function ModeladorPage() {
   const saveMut = useSaveProcess();     // POST = nova versão (Versionar)
   const updateMut = useUpdateProcess(); // PUT  = salva no lugar (Salvar)
   const patchMut = usePatchProcessStatus();
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const loadedKeyRef = useRef<string | null>(null);
   // Status/versão da definição carregada. Vem do backend e é atualizado a cada save —
   // (até a Fase 15 isto era o selo "Versão em homologação" — Q18 o aposentou.)
@@ -81,7 +90,12 @@ export function ModeladorPage() {
     if (loadedKeyRef.current === key) return;
     loadedKeyRef.current = key;
     suppressDirty.current = true;
-    void modelerHandleRef.current?.importXML(detail.data.bpmnXml).finally(() => {
+    void modelerHandleRef.current?.importXML(detail.data.bpmnXml).then(() => {
+      setLoadedKey(key);
+    }).catch(() => {
+      loadedKeyRef.current = null;
+      toast.error('Não foi possível carregar o processo.');
+    }).finally(() => {
       setDirty(false);
       setTimeout(() => { suppressDirty.current = false; }, 0);
     });
@@ -90,7 +104,10 @@ export function ModeladorPage() {
   async function currentXml(): Promise<string | null> {
     // O schema do formulário entra no BPMN por polling (600ms). Sem empurrar agora, um
     // Salvar logo após uma alteração gravaria o processo SEM ela — perda silenciosa.
-    useModeladorStore.getState().flushForm?.();
+    if (key && loadedKey !== key) throw new Error('Aguarde o carregamento do processo.');
+    const flush = useModeladorStore.getState().flushForm;
+    if (!flush) throw new Error('Formulário indisponível.');
+    await flush();
     if (!modeler) return null;
     const { xml } = await modeler.saveXML({ format: true });
     return xml as string;
@@ -101,6 +118,7 @@ export function ModeladorPage() {
     setStatusAtual(r.status ?? null);
     setVersaoAtual(r.version ?? null);
     if (key !== r.key) {
+      setLoadedKey(r.key);
       loadedKeyRef.current = r.key; // não re-importar o que acabamos de salvar
       setSearchParams({ key: r.key }, { replace: true });
     }
@@ -170,12 +188,20 @@ export function ModeladorPage() {
     try {
       const xml = await currentXml();
       if (xml == null) return;
+      const schema = getEmbeddedFormSchema(modeler, true);
+      if (schema && typeof schema === 'object' && 'format' in schema && schema.format === 'septem-native') {
+        const unnamed = nativeFields(parseNativeForm(schema)).filter(({ field }) => !field.key);
+        if (unnamed.length) {
+          toast.error(`Preencha a chave de ${unnamed.length === 1 ? 'um campo' : `${unnamed.length} campos`} antes de publicar.`);
+          return;
+        }
+      }
       const r = key
         ? await updateMut.mutateAsync({ key, bpmnXml: xml })
         : await saveMut.mutateAsync({ bpmnXml: xml });
-      await patchMut.mutateAsync({ key: r.key, status: 'published' });
-      toast.success(`Publicado v${r.version}.`);
-      afterPersist(r);
+      const published = await patchMut.mutateAsync({ key: r.key, status: 'published' });
+      toast.success(`Publicado v${published.version}.`);
+      afterPersist({ ...r, status: published.status, version: published.version });
     } catch (err) { handleError(err); }
     finally { setPendingAction(null); }
   }
@@ -210,6 +236,7 @@ export function ModeladorPage() {
     },
     onExport: async () => {
       try {
+        await currentXml();
         await exportBpmn(modeler, processName);
         toast.success('Fluxo exportado.');
       } catch (err) {
@@ -244,13 +271,13 @@ export function ModeladorPage() {
           <FluxoView ref={modelerHandleRef} onReady={onReady} modelerInstance={modeler} />
         </div>
         {/*
-          O editor de Formulário (form-js) também fica SEMPRE montado (oculto via
+          O editor de Formulário nativo também fica SEMPRE montado (oculto via
           `hidden`): remontá-lo ao trocar de view fazia a paleta de componentes
           sumir e recriava o editor desnecessariamente.
         */}
         <div className={currentView === 'formulario' ? 'flex flex-1 overflow-hidden' : 'hidden flex-1'}>
           <ErrorBoundary context="o editor de formulário">
-            <FormularioView modeler={modeler} />
+            <FormularioView processKey={key} modeler={modeler} processReady={!key || loadedKey === key} />
           </ErrorBoundary>
         </div>
         {currentView === 'tarefasXcampos' && (
@@ -260,7 +287,7 @@ export function ModeladorPage() {
         )}
         {currentView === 'configuracoes' && (
           <ErrorBoundary context="as configurações do processo">
-            <ConfiguracoesView modeler={modeler} />
+            <ConfiguracoesView modeler={modeler} processKey={key} />
           </ErrorBoundary>
         )}
       </div>

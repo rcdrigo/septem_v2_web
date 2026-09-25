@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useReport, type GlobalFilterDef } from '@/lib/api/reports';
@@ -13,6 +13,7 @@ import { routes } from '@/lib/routes';
  * página do catálogo; agora é uma aba dedicada (compartilhável, imprimível).
  */
 export function ConsultaViewPage() {
+  const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(null);
   const token = useSessionStore((s) => s.accessToken);
   const [params] = useSearchParams();
   const key = params.get('key');
@@ -29,19 +30,20 @@ export function ConsultaViewPage() {
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-6 py-4 print:border-0">
+      <header className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-white px-6 py-4 print:border-0">
         <button type="button" onClick={() => window.close()}
           className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 print:hidden" title="Fechar">
           <ArrowLeft size={18} />
         </button>
-        <h1 className="flex-1 truncate text-lg font-semibold text-slate-900">{detail.data?.name ?? '…'}</h1>
+        <h1 className="min-w-0 flex-1 truncate text-lg font-semibold text-slate-900">{detail.data?.name ?? '…'}</h1>
+        <div ref={setActionsTarget} className="ml-auto max-w-full print:hidden" />
       </header>
 
       <main className="flex-1 overflow-auto p-6">
         {detail.isLoading ? (
           <p className="text-sm text-slate-400">Carregando…</p>
         ) : (
-          <ReportRunViewer reportKey={key} filtersDef={filtersDef} />
+          <ReportRunViewer key={key} reportKey={key} filtersDef={filtersDef} actionsTarget={actionsTarget} />
         )}
       </main>
     </div>

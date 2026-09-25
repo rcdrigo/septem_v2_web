@@ -3,9 +3,10 @@ import { Navigate, useLocation, useParams, useSearchParams } from 'react-router-
 import { useInstance } from '@/lib/api/execution';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { useSessionStore } from '@/stores/session';
-import { InstanceReport, StatusPill } from './InstanciasPage';
-import { TestBadge } from '@/components/execution/TestBadge';
+import { InstanceReport } from './InstanciasPage';
 import { routes } from '@/lib/routes';
+import { Toaster } from '@/components/ui/Toaster';
+import { ConfirmDialogHost } from '@/components/ui/ConfirmDialog';
 
 /**
  * Relatório/acompanhamento de uma instância em tela cheia (rota
@@ -24,31 +25,19 @@ export function SolicitacaoPage() {
   useEffect(() => { if (status === 'idle') void bootstrap(); }, [status, bootstrap]);
   const inst = useInstance(instanceId ?? '', messageAccess);
   const d = inst.data;
-  useDocumentTitle(d?.process ?? 'Solicitação');
+  useDocumentTitle(d?.process ?? 'Requisição');
   if (!instanceId) return null;
   if (status === 'unauthenticated') {
     const returnUrl = `${location.pathname}${location.search}`;
     return <Navigate to={`${routes.login}?returnUrl=${encodeURIComponent(returnUrl)}`} replace />;
   }
   return (
-    <div className="flex h-screen flex-col bg-slate-100">
-      <header className="border-b border-slate-200 bg-white px-6 py-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <h1 className="text-xl font-semibold text-slate-900">
-              Detalhamento do processo{d?.number != null ? ` nº ${d.number}` : ''}
-            </h1>
-            {d?.status && <StatusPill status={d.status} />}
-            {d?.isTest && <TestBadge />}
-          </div>
-          {d?.process && <p className="mt-1 break-words text-sm text-slate-500 [overflow-wrap:anywhere]">{d.process}</p>}
-        </div>
-      </header>
-      <main className="flex-1 overflow-auto p-6">
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <InstanceReport id={instanceId} messageAccess={messageAccess} />
-        </div>
+    <div className="flex h-dvh flex-col bg-slate-100">
+      <main className="min-h-0 flex-1 overflow-auto">
+        <InstanceReport id={instanceId} messageAccess={messageAccess} />
       </main>
+      <Toaster />
+      <ConfirmDialogHost />
     </div>
   );
 }

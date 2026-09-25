@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { ChevronDown, ChevronUp, FileSearch, Plus, Search, Workflow } from 'lucide-react';
-import { SidebarUser, ImpersonateDialog } from './SidebarUser';
-import { AccessModeToggle } from './AccessModeToggle';
+import { SidebarUser } from './SidebarUser';
 import { MENU } from './menu/menu-config';
-import type { MenuAction, MenuGroup, MenuLink, MenuNode } from './menu/types';
+import type { MenuGroup, MenuLink, MenuNode } from './menu/types';
 import { useSessionStore } from '@/stores/session';
 import { useFeatureCheck } from '@/lib/features';
 import { useTaskSummary } from '@/lib/api/execution';
@@ -20,7 +19,6 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
   const tenant = session.tenant;
   const tenantName = tenant?.clienteNome ?? 'Septem V2';
   const layout = MENU[session.effectiveMode()];
-  const [impersonateOpen, setImpersonateOpen] = useState(false);
   const [newRequestOpen, setNewRequestOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -60,7 +58,6 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
       {/* Usuário + tipo de acesso */}
       <div className="border-b border-slate-200 py-1">
         <SidebarUser />
-        <AccessModeToggle />
       </div>
 
       {/* Navegação principal */}
@@ -108,26 +105,12 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
       {/* Rodapé */}
       <div className="border-t border-slate-200 px-2 py-2">
         <ul className="space-y-0.5">
-          {layout.footer
-            .filter((item) => session.can(item.perm))
-            .filter((item) => !(item.kind === 'action' && item.action === 'impersonate' && session.isImpersonating))
-            .map((item) =>
-              item.kind === 'link' ? (
-                <li key={item.to}>
-                  <LinkRow link={item} />
-                </li>
-              ) : (
-                <li key={item.action}>
-                  <ActionRow action={item} onImpersonate={() => setImpersonateOpen(true)} />
-                </li>
-              ),
-            )}
+          {layout.footer.filter((item) => item.kind === 'link' && session.can(item.perm)).map((item) =>
+            item.kind === 'link' && <li key={item.to}><LinkRow link={item} /></li>,
+          )}
         </ul>
       </div>
 
-      {impersonateOpen && session.user && (
-        <ImpersonateDialog selfId={session.user.id} onClose={() => setImpersonateOpen(false)} />
-      )}
       {newRequestOpen && <NewRequestDialog onClose={() => setNewRequestOpen(false)} />}
       {searchOpen && <GlobalSearchDialog onClose={() => setSearchOpen(false)} />}
     </aside>
@@ -281,34 +264,5 @@ function GroupRow({ group }: { group: MenuGroup }) {
         </ul>
       )}
     </li>
-  );
-}
-
-function ActionRow({ action, onImpersonate }: { action: MenuAction; onImpersonate?: () => void }) {
-  const Icon = action.icon;
-  const navigate = useNavigate();
-  const logout = useSessionStore((s) => s.logout);
-  const [busy, setBusy] = useState(false);
-
-  // "Sair" era um mock (toast) — nunca encerrava a sessão de fato.
-  async function run() {
-    if (action.action === 'logout') {
-      if (busy) return;
-      setBusy(true);
-      try {
-        await logout(); // revoga o refresh no backend e limpa os tokens
-      } finally {
-        setBusy(false);
-        navigate('/login', { replace: true });
-      }
-      return;
-    }
-    if (action.action === 'impersonate') onImpersonate?.();
-  }
-  return (
-    <button type="button" onClick={run} disabled={busy} className={[rowBase, 'w-full text-slate-700 hover:bg-slate-100 disabled:opacity-60'].join(' ')}>
-      <Icon size={18} className="shrink-0" />
-      <span className="truncate text-left">{action.label}</span>
-    </button>
   );
 }

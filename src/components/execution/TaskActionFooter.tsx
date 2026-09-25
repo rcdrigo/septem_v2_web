@@ -24,6 +24,10 @@ export type ExecutionAction = {
 type Props = {
   completionActions: ExecutionAction[];
   utilityActions?: ExecutionAction[];
+  /** Ações extras exclusivas do menu mobile, executadas após fechar o bottom sheet. */
+  mobileUtilityActions?: ExecutionAction[];
+  /** Controle independente exibido junto das ações utilitárias (ex.: Tags). */
+  utilityContent?: ReactNode;
   loading?: boolean;
   compactDesktop?: boolean;
   /** Conteúdo exibido ACIMA dos botões (ex.: "iniciar como teste") — vale no desktop e no mobile. */
@@ -67,7 +71,7 @@ function ActionButton({ action, fullWidth, onRun, compact }: {
 }
 
 /** Rodapé desktop e bottom sheet mobile compartilhados pelas telas de execução. */
-export function TaskActionFooter({ completionActions, utilityActions = [], loading, compactDesktop = false, notice }: Props) {
+export function TaskActionFooter({ completionActions, utilityActions = [], mobileUtilityActions = [], utilityContent, loading, compactDesktop = false, notice }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -124,8 +128,8 @@ export function TaskActionFooter({ completionActions, utilityActions = [], loadi
               <ActionButton action={action} fullWidth onRun={runFromSheet} />
             </div>
           ))}
-          {utilityActions.length > 0 && <div className="border-t border-slate-200 pt-3" />}
-          {utilityActions.map((action) => (
+          {(mobileUtilityActions.length > 0 || utilityActions.length > 0) && <div className="border-t border-slate-200 pt-3" />}
+          {[...mobileUtilityActions, ...utilityActions].map((action) => (
             <div key={action.id} data-action="">
               <ActionButton action={action} fullWidth onRun={runFromSheet} />
             </div>
@@ -149,8 +153,9 @@ export function TaskActionFooter({ completionActions, utilityActions = [], loadi
         {notice && <div className="mb-3">{notice}</div>}
         <div className="hidden items-center gap-2 sm:flex">
           {completionActions.map((action) => <ActionButton key={action.id} action={action} compact={compactDesktop} />)}
-          {utilityActions.length > 0 && (
+          {(utilityContent || utilityActions.length > 0) && (
             <div className="ml-auto flex items-center gap-2">
+              {utilityContent}
               {utilityActions.map((action) => <ActionButton key={action.id} action={action} compact={compactDesktop} />)}
             </div>
           )}

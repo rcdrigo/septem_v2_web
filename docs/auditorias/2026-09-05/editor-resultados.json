@@ -1,0 +1,31 @@
+[
+  {
+    "case": "Processo B sem schema herda cache do processo A",
+    "actual": "Data do processo A"
+  },
+  {
+    "case": "Editor modo date",
+    "actual": "date"
+  },
+  {
+    "case": "Editor modo time",
+    "actual": "time"
+  },
+  {
+    "case": "Editor modo datetime",
+    "actual": "datetime"
+  },
+  {
+    "case": "Restrição no editor",
+    "actual": "Data do processo A\nNão permite data no passado."
+  },
+  {
+    "case": "Esquema propagado ao BPMN B",
+    "actual": [
+      {
+        "type": "septem:FormSchema",
+        "json": "{\"components\":[{\"subtype\":\"datetime\",\"type\":\"datetime\",\"id\":\"date_a\",\"key\":\"data_a\",\"label\":\"Data do processo A\",\"dateLabel\":\"Data do processo A\",\"properties\":{\"septemDateLimit\":\"noPast\"}}],\"type\":\"default\",\"id\":\"form_a\",\"schemaVersion\":19,\"septemGroupLayout\":\"stacked\"}"
+      }
+    ]
+  }
+]

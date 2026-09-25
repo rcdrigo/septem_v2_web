@@ -1,17 +1,21 @@
+import { renderIcon } from '@/lib/icon-catalog';
+import { isNativeForm, nativeRuntime, initializeNativeValues, serializeNativeValues, hasVisibleContent, nativeSubmissionState } from '@/lib/native-form-runtime';
+import { createFormAutomation, type AutomationSource, type AutomationSchema } from '@/lib/form-automation/runtime';
+import { validateForm, fieldPath, INPUT_TYPES, type FormComponent as Component, type FieldState } from '@/lib/form-validation';
 // Merge: base é a reformulação do date picker (DatePickerField/normalizeDateMode) e do
 // HelpPopover; somamos o que a Fase 6 usa — o ícone e as chamadas de geração de
 // documento. useLayoutEffect/createPortal/HelpCircle/inputTypeForDateMode saíram
 // porque o corpo mesclado não os usa mais.
-import { createContext, forwardRef, Fragment, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { createContext, forwardRef, Fragment, useCallback, useContext, useEffect, useImperativeHandle, useId, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Plus, Trash2, Paperclip, X, Loader2, FileText, FileSignature, FileSearch } from 'lucide-react';
-import { HelpPopover } from '@/components/ui/HelpPopover';
+import { HelpContent, HelpPopover } from '@/components/ui/HelpPopover';
 import { routes } from '@/lib/routes';
 import { useQueryClient } from '@tanstack/react-query';
 import { signatureKeys, useDocumentCodes, useTaskSignatures } from '@/lib/api/execution';
 import { api, ApiError } from '@/lib/api';
 import { regexToTemplate, applyMask, isAllDigits } from '@/lib/mask';
-import { maskDocumento, validateDocumento, type DocKind } from '@/lib/documento';
-import { dateModeOfComponent, validateDateClient, type DateMode, type DateLimit } from '@/lib/datafield';
+import { maskDocumento, type DocKind } from '@/lib/documento';
+import { dateModeOfComponent, dateFieldLabel, type DateMode, type DateLimit } from '@/lib/datafield';
 import {
   uploadAttachment, parseAttachments, fetchDocumentOptions, generateDocument,
   estaAssinado, fetchSignaturesPreview, abrirBlobEmNovaAba, CANAL_ASSINATURAS,
@@ -19,36 +23,16 @@ import {
 } from '@/lib/upload';
 import { DatePickerField } from './DatePickerField';
 
-/** Mesmo contrato do FormFill (form-js), para ser intercambiável. */
-export type FormFillResult = { data: Record<string, unknown>; errors: Record<string, unknown> };
+/** Resultado de preenchimento; submit aguarda as automações assíncronas. */
+export type FormFillResult = { formState?: FieldState; data: Record<string, unknown>; errors: Record<string, unknown> };
 export type ReactFormHandle = {
-  submit: () => FormFillResult;
+  submit: () => Promise<FormFillResult>;
   /** Lê os valores atuais SEM validar nem pintar erros — para salvar rascunho
    *  (salvar não deve exigir preenchimento de campos obrigatórios). */
   getData: () => Record<string, unknown>;
+  checkAutomation: () => Promise<void>;
   /** Injeta erros vindos do servidor (422) no formulário, pintando os campos. */
   setServerErrors: (errs: Record<string, string>) => void;
-};
-
-type Component = {
-  id?: string;
-  type?: string;
-  subtype?: string;
-  key?: string;
-  label?: string;
-  description?: string;
-  text?: string;
-  disabled?: boolean;
-  prefixAdorner?: string;
-  suffixAdorner?: string;
-  appearance?: { prefixAdorner?: string; suffixAdorner?: string };
-  values?: { label: string; value: string }[];
-  validate?: { required?: boolean; minLength?: number; maxLength?: number; min?: number; max?: number };
-  components?: Component[];
-  /** Layout no grid de 16 colunas do form-js (columns null/0 = linha inteira). */
-  layout?: { columns?: number | null };
-  /** Config rica gravada pelo painel do form-js (field.properties): septemMask*, septemDataSourceId, septemHelp*, septemEvents, septemGroupIcon, septemShowPending. */
-  properties?: Record<string, string>;
 };
 
 const GRID_COLS = 16;
@@ -64,13 +48,8 @@ function dateModeOf(component: Component): DateMode {
 }
 
 type OptionsMap = Record<string, { value: string; label: string }[]>;
-type FieldState = Record<string, { hidden?: boolean; disabled?: boolean }>;
-
-const INPUT_TYPES = new Set(['textfield', 'textarea', 'number', 'checkbox', 'select', 'email', 'datetime', 'radio', 'password']);
-
 function collectInputs(components: Component[] | undefined, acc: Component[]) {
   for (const c of components ?? []) {
-    if (c.type === 'dynamiclist') continue; // itens da lista têm escopo próprio (array)
     if (c.key && INPUT_TYPES.has(c.type ?? '')) acc.push(c);
     if (c.components) collectInputs(c.components, acc);
   }
@@ -86,6 +65,9 @@ function parseEvents(raw?: string): { type: string; action: string }[] {
 // ── runtime compartilhado (evita prop-drilling pelos Nodes) ───────────────────
 type Runtime = {
   values: Record<string, unknown>;
+  readValues: () => Record<string, unknown>;
+  prefix: string;
+  removeRow: (key: string, index: number, scope?: string) => void;
   errors: Record<string, string>;
   set: (k: string, v: unknown) => void;
   dsOptions: OptionsMap;
@@ -93,7 +75,7 @@ type Runtime = {
   fieldState: FieldState;
   dateErrors: Record<string, string>;
   setDateError: (k: string, message: string | null) => void;
-  runEvent: (comp: Component, type: string, event: unknown) => void;
+  runEvent: (comp: Component, type: string, event: unknown, scope?: string) => void;
   uploadContext?: UploadContext;
   /** Assinaturas da tarefa (Fase 7a), buscadas UMA vez e distribuídas por aqui. */
   assinaturas?: { dados: TaskSignatures | null; recarregar: () => void };
@@ -115,26 +97,34 @@ function useRuntime() {
  */
 export type ExtraTab = { id: string; label: string; icon?: React.ReactNode; render: () => React.ReactNode };
 
-export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: Record<string, unknown>; readOnly?: boolean; optionsByField?: OptionsMap; uploadContext?: UploadContext; extraTabs?: { leading?: ExtraTab[]; trailing?: ExtraTab[] } }>(
-  ({ schema, data, readOnly, optionsByField, uploadContext, extraTabs }, ref) => {
-    const root = (schema ?? {}) as { components?: Component[] };
-    const inputs = useMemo(() => collectInputs(root.components, []), [schema]);
+export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: Record<string, unknown>; readOnly?: boolean; optionsByField?: OptionsMap; automationScripts?: AutomationSource[]; uploadContext?: UploadContext; extraTabs?: { leading?: ExtraTab[]; trailing?: ExtraTab[] } }>(
+  ({ schema, data, readOnly, optionsByField, automationScripts, uploadContext, extraTabs }, ref) => {
+    const [native] = useState(() => isNativeForm(schema) ? nativeRuntime(schema) : null);
+    const [runtimeSchema, setRuntimeSchema] = useState(() => native ? { components: native.components } as AutomationSchema : structuredClone((schema ?? {}) as AutomationSchema));
+    const [validationAttempt, setValidationAttempt] = useState(0);
+    const [submitted, setSubmitted] = useState(false);
+    const schemaRef = useRef(runtimeSchema);
+    const root = runtimeSchema;
+    const automationRoot = useRef<HTMLDivElement>(null);
+    const automation = useRef<ReturnType<typeof createFormAutomation> | null>(null);
+    const automationError = useRef<string | null>(null);
+    const [automationMessage, setAutomationMessage] = useState<string | null>(null);
+    const inputs = useMemo(() => collectInputs(root.components, []), [runtimeSchema]);
 
-    const [values, setValues] = useState<Record<string, unknown>>(() => {
-      const init: Record<string, unknown> = { ...(data ?? {}) };
-      for (const c of inputs) {
-        if (init[c.key!] === undefined) init[c.key!] = c.type === 'checkbox' ? false : '';
-      }
-      return init;
-    });
+    const [values, setValues] = useState<Record<string, unknown>>(() => native ? initializeNativeValues(native.definition, data) : ({ ...(data ?? {}) }));
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [dateErrors, setDateErrors] = useState<Record<string, string>>({});
     // Opções resolvidas no servidor (form já populado) entram como estado inicial.
     const [dsOptions, setDsOptions] = useState<OptionsMap>(() => optionsByField ?? {});
-    const [fieldState, setFieldState] = useState<FieldState>({});
+    const [fieldState, storeFieldState] = useState<FieldState>({});
+    const fieldStateRef = useRef(fieldState);
+    function setFieldState(update: FieldState | ((previous: FieldState) => FieldState)) {
+      fieldStateRef.current = typeof update === 'function' ? update(fieldStateRef.current) : update;
+      storeFieldState(fieldStateRef.current);
+    }
     // #28: só exibe o form depois que as fontes pendentes (não embutidas) carregarem.
     const needsFetch = (c: Component) =>
-      !!c.properties?.septemDataSourceId && (c.type === 'select' || c.type === 'radio') && !optionsByField?.[c.key!];
+      !!c.properties?.septemDataSourceId && (['select', 'radio', 'checklist', 'taglist'].includes(c.type ?? '')) && !optionsByField?.[c.key!];
     const [dsLoading, setDsLoading] = useState(() => inputs.some(needsFetch));
 
     // Ref pro valor mais recente — o runtime de eventos lê de forma síncrona.
@@ -163,7 +153,9 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
     }, [inputs]);
 
     function set(key: string, value: unknown) {
-      setValues((prev) => ({ ...prev, [key]: value }));
+      valuesRef.current = { ...valuesRef.current, [key]: value };
+      setValues(valuesRef.current);
+      if (native) setErrors({});
     }
 
     function setDateError(key: string, message: string | null) {
@@ -176,73 +168,108 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
       });
     }
 
-    // Executa os eventos do campo para um dado tipo (change/click/blur/focus).
-    function runEvent(comp: Component, type: string, event: unknown) {
+    // Resolve a linha no snapshot atual, inclusive após um set no mesmo evento.
+    function scopeData(scope: string): Record<string, unknown> {
+      let current: any = valuesRef.current;
+      for (const part of scope.split('.').filter(Boolean)) current = current?.[part];
+      return current && typeof current === 'object' ? current : {};
+    }
+    function setScoped(scope: string, key: string, value: unknown) {
+      if (!scope) { set(key, value); return; }
+      const parts = scope.split('.');
+      const update = (node: any, index: number): any => {
+        if (index === parts.length) return { ...node, [key]: value };
+        const part = parts[index];
+        const copy = Array.isArray(node) ? [...node] : { ...node };
+        copy[part as any] = update(node?.[part], index + 1);
+        return copy;
+      };
+      valuesRef.current = update(valuesRef.current, 0);
+      setValues(valuesRef.current);
+    }
+    function removeRow(key: string, index: number, scope = '') {
+      const rows = scopeData(scope)[key];
+      if (!Array.isArray(rows)) return;
+      setScoped(scope, key, native && rows.length === 1 ? [{}] : rows.filter((_, i) => i !== index));
+      const prefix = `${fieldPath(scope, key)}.`;
+      const reindex = <T,>(entries: Record<string, T>): Record<string, T> => {
+        const result: Record<string, T> = {};
+        for (const [path, value] of Object.entries(entries)) {
+          if (!path.startsWith(prefix)) { result[path] = value; continue; }
+          const tail = path.slice(prefix.length);
+          const dot = tail.indexOf('.');
+          const row = Number(dot < 0 ? tail : tail.slice(0, dot));
+          if (row === index) continue;
+          result[`${prefix}${row > index ? row - 1 : row}${dot < 0 ? '' : tail.slice(dot)}`] = value;
+        }
+        return result;
+      };
+      setErrors(reindex); setDateErrors(reindex); setFieldState(reindex);
+    }
+
+    function runEvent(comp: Component, type: string, event: unknown, scope = '') {
+      automation.current?.emit(type, { key: fieldPath(scope, comp.key ?? ''), value: scopeData(scope)[comp.key ?? ''], event });
       const evs = parseEvents(comp.properties?.septemEvents).filter((e) => e.type === type && e.action?.trim());
-      if (evs.length === 0) return;
-      const get = (k: string) => valuesRef.current[k];
-      const show = (k: string) => setFieldState((s) => ({ ...s, [k]: { ...s[k], hidden: false } }));
-      const hide = (k: string) => setFieldState((s) => ({ ...s, [k]: { ...s[k], hidden: true } }));
-      const setDisabled = (k: string, b: boolean) => setFieldState((s) => ({ ...s, [k]: { ...s[k], disabled: !!b } }));
+      const get = (k: string) => scopeData(scope)[k];
+      const updateState = (k: string, patch: { hidden?: boolean; disabled?: boolean }) => {
+        const path = fieldPath(scope, k);
+        setFieldState((s) => ({ ...s, [path]: { ...s[path], ...patch } }));
+      };
       for (const e of evs) {
         try {
-          // contexto exposto à action: o próprio valor, get/set de outros campos, show/hide/setDisabled, a chave e o evento DOM
-          // eslint-disable-next-line no-new-func
           const fn = new Function('value', 'get', 'set', 'show', 'hide', 'setDisabled', 'field', 'event', e.action);
-          fn(valuesRef.current[comp.key ?? ''], get, set, show, hide, setDisabled, comp.key, event);
-        } catch (err) {
-          console.warn('Evento do formulário falhou:', e.action, err);
-        }
+          fn(get(comp.key ?? ''), get, (k: string, v: unknown) => setScoped(scope, k, v),
+            (k: string) => updateState(k, { hidden: false }), (k: string) => updateState(k, { hidden: true }),
+            (k: string, disabled: boolean) => updateState(k, { disabled: !!disabled }), comp.key, event);
+        } catch (err) { automationError.current = (err as Error).message; setAutomationMessage(automationError.current); }
       }
     }
 
-    function validate(): Record<string, string> {
-      const errs: Record<string, string> = {};
-      for (const c of inputs) {
-        if (c.disabled || fieldState[c.key!]?.hidden) continue; // somente-leitura/escondido: não valida
-        if (dateErrors[c.key!]) { errs[c.key!] = dateErrors[c.key!]; continue; }
-        const v = values[c.key!];
-        const req = c.validate?.required;
-        const empty = v === '' || v === undefined || v === null || (c.type === 'checkbox' && v === false)
-          || (c.type === 'filepicker' && parseAttachments(v).length === 0);
-        if (req && empty) { errs[c.key!] = 'Campo obrigatório.'; continue; }
-        if (typeof v === 'string' && v) {
-          const docKind = c.type === 'textfield' ? (c.properties?.septemDocKind as DocKind | undefined) : undefined;
-          if (docKind) {
-            const msg = validateDocumento(v, docKind);
-            if (msg) { errs[c.key!] = msg; continue; }
-          }
-          if (c.validate?.minLength && v.length < c.validate.minLength) errs[c.key!] = `Mínimo de ${c.validate.minLength} caracteres.`;
-          if (c.validate?.maxLength && v.length > c.validate.maxLength) errs[c.key!] = `Máximo de ${c.validate.maxLength} caracteres.`;
-          const regex = c.properties?.septemMaskRegex;
-          if (!docKind && c.properties?.septemMaskValidate === 'true' && regex) {
-            try { if (!new RegExp(regex).test(v)) errs[c.key!] = 'Formato inválido.'; } catch { /* regex inválida: ignora */ }
-          }
-        }
-        if (c.type === 'number' && v !== '' && v !== undefined) {
-          const n = Number(v);
-          if (c.validate?.min !== undefined && n < c.validate.min) errs[c.key!] = `Valor mínimo ${c.validate.min}.`;
-          if (c.validate?.max !== undefined && n > c.validate.max) errs[c.key!] = `Valor máximo ${c.validate.max}.`;
-        }
-        if (c.type === 'datetime' && typeof v === 'string' && v) {
-          const msg = validateDateClient(v, dateModeOf(c), c.properties?.septemDateLimit as DateLimit | undefined);
-          if (msg) errs[c.key!] = msg;
-        }
-      }
-      return errs;
-    }
+    useEffect(() => {
+      if (dsLoading || !automationRoot.current || automation.current) return;
+      automationError.current = null;
+      setAutomationMessage(null);
+      const runtime = createFormAutomation({
+        root: automationRoot.current,
+        getData: () => valuesRef.current,
+        set,
+        getSchema: () => schemaRef.current,
+        setFieldState: (path, patch) => setFieldState(previous => ({ ...previous, [path]: { ...previous[path], ...patch } })),
+        setSchema: (next) => { schemaRef.current = next; setRuntimeSchema(next); },
+        setOptions: (key, options) => setDsOptions(prev => ({ ...prev, [key]: options })),
+        dataSource: (id, parameters) => api.post('/api/v1/workflow/field-options', { dataSourceId: id, parameters }),
+        onError: (message) => { automationError.current = message; setAutomationMessage(message); },
+      }, readOnly ? [] : automationScripts ?? []);
+      automation.current = runtime;
+    }, [automationScripts, readOnly, dsLoading]);
+    useEffect(() => () => { automation.current?.dispose(); automation.current = null; }, []);
 
     useImperativeHandle(ref, () => ({
-      submit: () => {
-        const errs = validate();
-        setErrors(errs);
-        return { data: values, errors: errs };
+      submit: async () => {
+        try {
+          if (dsLoading || !automation.current) throw new Error('Aguarde o carregamento do formulário.');
+          await automation.current.beforeSubmit();
+          if (automationError.current) throw new Error(automationError.current);
+        } catch (error) {
+          const message = (error as Error).message;
+          setAutomationMessage(message);
+          return { data: valuesRef.current, errors: { _automation: message } };
+        }
+        setAutomationMessage(null);
+        const errs = readOnly ? {} : validateForm(schemaRef.current.components ?? [], valuesRef.current, fieldStateRef.current, dateErrors);
+        setErrors(native ? {} : errs);
+        setSubmitted(true); setValidationAttempt(n => n + 1);
+        return { data: native && !Object.keys(errs).length ? serializeNativeValues(native.definition, valuesRef.current) : valuesRef.current, errors: errs, formState: native && !Object.keys(errs).length ? nativeSubmissionState(native.definition, schemaRef.current.components ?? [], valuesRef.current, fieldStateRef.current) : undefined };
       },
-      getData: () => values,
-      setServerErrors: (errs) => setErrors(errs),
-    }), [values, inputs, fieldState, dateErrors]);
+      checkAutomation: async () => {
+        await automation.current?.beforeSubmit(false);
+        if (automationError.current) throw new Error(automationError.current);
+      },
+      getData: () => native ? serializeNativeValues(native.definition, valuesRef.current) : valuesRef.current,
+      setServerErrors: (errs) => { setErrors(errs); setValidationAttempt(n => n + 1); },
+    }), [values, inputs, fieldState, dateErrors, dsLoading]);
 
-    const comps = root.components ?? [];
+    const comps = (root.components ?? []).filter(c => !c.automationHidden);
     const layout = (root as { septemGroupLayout?: string }).septemGroupLayout;
     // Assinaturas da tarefa: MESMO cache que os botões de conclusão usam (Fase 7c).
     // Ler de dois lugares diferentes deixaria o ícone verde com o botão ainda bloqueado.
@@ -273,9 +300,6 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
     // a consulta só sai quando o formulário tem algum. Buscar em toda tarefa era uma
     // requisição inútil na maioria delas e, pior, quebrava telas que não esperam essa
     // chamada (a suíte `execucao-layout-mock` intercepta a API e não a conhecia).
-    // ⚠️ Varre o SCHEMA, não `inputs`: `INPUT_TYPES` não inclui `filepicker` (anexo não
-    // é campo de digitação), então procurar aqui pela lista de inputs nunca acharia nada
-    // — e o código simplesmente não aparecia, sem erro nenhum.
     const temCampoDeDocumento = useMemo(() => {
       const varrer = (comps: Component[] | undefined): boolean => (comps ?? []).some(
         (c) => (c.type === 'filepicker' && c.properties?.septemDocGen === 'yes') || varrer(c.components),
@@ -286,8 +310,9 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
     const codigosDeDocumento = useMemo(() => Object.fromEntries(
       (queryCodigos.data ?? []).map((c) => [c.fieldKey, c.code])), [queryCodigos.data]);
 
+    const pendingErrors = native && !readOnly ? validateForm(root.components ?? [], values, fieldState, dateErrors) : {};
     const runtime: Runtime = {
-      values, errors, set, dsOptions, readOnly, fieldState, dateErrors, setDateError, runEvent, uploadContext,
+      values, readValues: () => valuesRef.current, prefix: '', removeRow, errors: native && submitted ? { ...errors, ...pendingErrors } : errors, set, dsOptions, readOnly, fieldState, dateErrors, setDateError, runEvent, uploadContext,
       assinaturas: { dados: queryAssinaturas.data ?? null, recarregar: recarregarAssinaturas },
       codigosDeDocumento,
     };
@@ -299,7 +324,9 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
     // o layout é "tabs" e viram cards antes/depois do formulário em "stacked".
     const useTabs = layout === 'tabs';
     let body: React.ReactNode;
-    if (useTabs) {
+    if (native) {
+      body = <NativeTabs groups={comps} pendingErrors={pendingErrors} validationAttempt={validationAttempt} extra={extraTabs} />;
+    } else if (useTabs) {
       const groups = comps.filter(isGroup);
       const loose = comps.filter((c) => !isGroup(c));
       body = (
@@ -318,15 +345,18 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
       );
     }
 
-    if (dsLoading) return <FormSkeleton />;
-    return <RuntimeCtx.Provider value={runtime}>{body}</RuntimeCtx.Provider>;
+    if (dsLoading && !automation.current) return <FormSkeleton />;
+    return <div ref={automationRoot}><RuntimeCtx.Provider value={runtime}>{automationMessage && <p role="alert" className="mb-3 text-sm text-rose-700">Envio bloqueado: {automationMessage}</p>}{errors._form && <p role="alert" className="text-sm text-rose-600">{errors._form}</p>}{body}</RuntimeCtx.Provider></div>;
   },
 );
 ReactForm.displayName = 'ReactForm';
 
 function Node({ comp }: { comp: Component }) {
-  const { values, errors, set, dsOptions, readOnly, fieldState, runEvent, setDateError } = useRuntime();
+  const { values, errors, set, dsOptions, readOnly, fieldState, runEvent, setDateError, prefix } = useRuntime();
+  const controlId = useId();
 
+  if (comp.key ? (fieldState[comp.key]?.hidden ?? comp.automationHidden) : comp.automationHidden) return null;
+  if (comp.nativeTable) return <NativeTable comp={comp} />;
   if (comp.type === 'dynamiclist') return <DynamicList comp={comp} />;
 
   if (comp.components && !comp.key) {
@@ -338,7 +368,10 @@ function Node({ comp }: { comp: Component }) {
     );
   }
 
-  if (comp.type === 'text' || comp.type === 'html') return <p className="text-sm text-slate-600">{comp.text}</p>;
+  if (comp.type === 'text') return <p className="whitespace-pre-wrap text-sm text-slate-600">{comp.text}</p>;
+  if (comp.type === 'html') return <StaticHtml content={comp.content ?? comp.text ?? ''} />;
+  if (comp.type === 'image') return comp.source ? <img src={comp.source} alt={comp.alt ?? ''} className="max-w-full" /> : null;
+  if (comp.type === 'table') return <p role="status" className="text-sm text-slate-500">Tabela não disponível neste formulário.</p>;
   if (comp.type === 'separator') return <hr className="border-slate-200" />;
   if (comp.type === 'spacer') return <div className="h-2" />;
 
@@ -362,7 +395,7 @@ function Node({ comp }: { comp: Component }) {
   // Prefixo/sufixo: o form-js grava em `appearance`; aceitamos os dois formatos.
   const prefixAdorner = comp.prefixAdorner ?? comp.appearance?.prefixAdorner;
   const suffixAdorner = comp.suffixAdorner ?? comp.appearance?.suffixAdorner;
-  const disabled = readOnly === true || comp.disabled === true || fieldState[key]?.disabled === true;
+  const disabled = readOnly === true || (fieldState[key]?.disabled ?? comp.disabled) === true;
   const dateMode = comp.type === 'datetime' ? dateModeOf(comp) : undefined;
 
   // Counter de min/max (campos de texto).
@@ -372,20 +405,22 @@ function Node({ comp }: { comp: Component }) {
 
   // Handlers de evento (change é disparado dentro dos onChange de cada controle).
   const evt = {
+    id: controlId, 'aria-label': comp.label, 'aria-invalid': !!err, 'aria-describedby': err ? `${controlId}-error` : undefined,
     onClick: (e: unknown) => runEvent(comp, 'click', e),
     onBlur: (e: unknown) => runEvent(comp, 'blur', e),
     onFocus: (e: unknown) => runEvent(comp, 'focus', e),
   };
   const setAndEmit = (val: unknown, e: unknown) => { set(key, val); runEvent(comp, 'change', e); };
 
-  const reqMark = comp.validate?.required
+  const reqMark = (fieldState[key]?.required ?? comp.validate?.required)
     ? <span className="text-rose-500"> *</span>
     : <span className="ml-1 text-[11px] font-normal text-slate-400">(opcional)</span>;
-  const labelEl = comp.label && (
-    <span className="flex items-center gap-1 text-sm font-medium text-slate-700">
-      {comp.label}{reqMark}
+  const label = comp.type === 'datetime' ? dateFieldLabel(comp) : comp.label;
+  const labelEl = label && (
+    <label htmlFor={controlId} className="flex items-center gap-1 text-sm font-medium text-slate-700">
+      {label}{reqMark}
       {popoverHelp && <HelpPopover html={popoverHelp} />}
-    </span>
+    </label>
   );
   const base = `w-full rounded-md border ${err ? 'border-rose-400' : 'border-slate-300'} bg-white px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500`;
 
@@ -395,7 +430,7 @@ function Node({ comp }: { comp: Component }) {
   } else if (disabled) {
     // Campo só-leitura (visível): exibe o valor como texto (não input desabilitado).
     const optLabel = options.find((o) => o.value === String(v ?? ''))?.label;
-    const display = comp.type === 'checkbox' ? (v ? 'Sim' : 'Não') : (optLabel ?? String(v ?? ''));
+    const display = Array.isArray(v) ? v.map(item => options.find(o => o.value === String(item))?.label ?? String(item)).join(', ') : comp.type === 'checkbox' ? (v ? 'Sim' : 'Não') : (optLabel ?? String(v ?? ''));
     control = <div className="min-h-[1.75rem] whitespace-pre-wrap py-1 text-sm text-slate-800">{display || <span className="text-slate-400">—</span>}</div>;
   } else if (comp.type === 'textarea') {
     control = <textarea rows={3} disabled={disabled} className={base} value={String(v ?? '')} {...evt} onChange={(e) => setAndEmit(e.target.value, e)} />;
@@ -406,12 +441,22 @@ function Node({ comp }: { comp: Component }) {
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
     );
+  } else if (comp.type === 'checklist' || comp.type === 'taglist') {
+    const selected = Array.isArray(v) ? v.map(String) : [];
+    control = <div className="flex flex-col gap-1" role="group" aria-label={label}>
+      {options.map(o => <label key={o.value} className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={selected.includes(o.value)} {...evt} id={undefined} aria-label={undefined}
+          onChange={e => setAndEmit(e.target.checked ? [...selected, o.value] : selected.filter(x => x !== o.value), e)} />
+        {o.label}
+      </label>)}
+      {!options.length && <span className="text-xs text-slate-400">Sem opções.</span>}
+    </div>;
   } else if (comp.type === 'radio') {
     control = (
       <div className="flex flex-col gap-1">
         {options.map((o) => (
           <label key={o.value} className="flex items-center gap-2 text-sm text-slate-700">
-            <input type="radio" name={key} disabled={disabled} checked={String(v ?? '') === o.value} onChange={(e) => setAndEmit(o.value, e)} />
+            <input type="radio" name={fieldPath(prefix, key)} disabled={disabled} checked={String(v ?? '') === o.value} onChange={(e) => setAndEmit(o.value, e)} />
             {o.label}
           </label>
         ))}
@@ -422,7 +467,7 @@ function Node({ comp }: { comp: Component }) {
     control = (
       <label className="flex items-center gap-2 text-sm text-slate-700">
         <input type="checkbox" disabled={disabled} checked={Boolean(v)} {...evt} onChange={(e) => setAndEmit(e.target.checked, e)} />
-        {comp.label}{reqMark}
+        {label}{reqMark}
         {popoverHelp && <HelpPopover html={popoverHelp} />}
       </label>
     );
@@ -433,8 +478,8 @@ function Node({ comp }: { comp: Component }) {
         mode={dateMode}
         limit={comp.properties?.septemDateLimit as DateLimit | undefined}
         error={!!err}
-        ariaLabel={comp.label}
-        required={comp.validate?.required}
+        ariaLabel={label}
+        required={fieldState[key]?.required ?? comp.validate?.required}
         onChange={(value, event) => setAndEmit(value, event)}
         onClick={evt.onClick}
         onBlur={evt.onBlur}
@@ -476,10 +521,10 @@ function Node({ comp }: { comp: Component }) {
     <div className="flex min-w-0 flex-col gap-1" style={effectiveWidth ? { maxWidth: effectiveWidth } : undefined}>
       {(comp.type !== 'checkbox' || disabled) && labelEl}
       {control}
-      <div className="flex min-h-[1lh] items-start justify-between gap-2">
+      {(err || inlineHelp || comp.description || showCounter) && <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          {err && <span className="text-xs text-rose-600">{err}</span>}
-          {!err && inlineHelp && <span className="text-xs text-slate-400" dangerouslySetInnerHTML={{ __html: inlineHelp }} />}
+          {err && <span id={`${controlId}-error`} role="alert" className="text-xs text-rose-600">{err}</span>}
+          {!err && inlineHelp && <HelpContent className="text-xs text-slate-400" html={inlineHelp} />}
           {!err && !inlineHelp && comp.description && <span className="text-xs text-slate-400">{comp.description}</span>}
         </div>
         {showCounter && (
@@ -488,7 +533,7 @@ function Node({ comp }: { comp: Component }) {
             {minLength != null && len < minLength ? ` (mín. ${minLength})` : ''}
           </span>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -660,9 +705,15 @@ function FilePickerControl({ comp, value, disabled, onChange }: { comp: Componen
 
 function DynamicList({ comp }: { comp: Component }) {
   const rt = useRuntime();
+  const rowIds = useRef<number[]>([]);
+  const nextRowId = useRef(0);
   const key = comp.key!;
   const rows = Array.isArray(rt.values[key]) ? (rt.values[key] as Record<string, unknown>[]) : [];
+  while (rowIds.current.length < rows.length) rowIds.current.push(nextRowId.current++);
+  rowIds.current.length = rows.length;
   const setRows = (next: Record<string, unknown>[]) => rt.set(key, next);
+  const disabled = rt.readOnly || comp.disabled || rt.fieldState[key]?.disabled;
+  if (rt.fieldState[key]?.hidden) return null;
 
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
@@ -673,7 +724,7 @@ function DynamicList({ comp }: { comp: Component }) {
           {comp.label || 'Lista'}
           <GroupHelp comp={comp} />
         </span>
-        {!rt.readOnly && (
+        {!disabled && (
           <button type="button" onClick={() => setRows([...rows, {}])}
             data-testid="lista-adicionar"
             className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">
@@ -682,17 +733,30 @@ function DynamicList({ comp }: { comp: Component }) {
         )}
       </header>
       <div className="flex flex-col gap-3 p-4">
+        {rt.errors[key] && <p role="alert" className="text-sm text-rose-600">{rt.errors[key]}</p>}
         {rows.length === 0 && <p className="text-sm text-slate-400">Nenhum item. Clique em "Adicionar".</p>}
         {rows.map((row, i) => (
-          <div key={i} className="relative rounded-md border border-slate-200 p-3"
+          <div key={rowIds.current[i]} className="relative rounded-md border border-slate-200 p-3"
             data-testid="lista-item" data-indice={i}>
-            {!rt.readOnly && (
-              <button type="button" onClick={() => setRows(rows.filter((_, j) => j !== i))}
+            {!disabled && (
+              <button type="button" onClick={() => { rowIds.current.splice(i, 1); rt.removeRow(key, i, rt.prefix); }}
                 className="absolute right-2 top-2 rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" aria-label="Remover item">
                 <Trash2 size={14} />
               </button>
             )}
-            <RuntimeCtx.Provider value={{ ...rt, values: row, errors: {}, set: (k, v) => setRows(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r))) }}>
+            <RuntimeCtx.Provider value={{ ...rt, values: row, readOnly: disabled,
+              prefix: fieldPath(rt.prefix, `${key}.${i}`),
+              readValues: () => (rt.readValues()[key] as Record<string, unknown>[] | undefined)?.[i] ?? {},
+              errors: scopeMap(rt.errors, `${key}.${i}`),
+              fieldState: scopeMap(rt.fieldState, `${key}.${i}`),
+              dateErrors: scopeMap(rt.dateErrors, `${key}.${i}`),
+              setDateError: (k, message) => rt.setDateError(`${key}.${i}.${k}`, message),
+              runEvent: (c, type, event, scope) => rt.runEvent(c, type, event, scope ?? fieldPath(rt.prefix, `${key}.${i}`)),
+              set: (k, v) => {
+                const latest = rt.readValues()[key] as Record<string, unknown>[];
+                setRows(latest.map((r, j) => j === i ? { ...r, [k]: v } : r));
+              },
+            }}>
               <LayoutGrid components={comp.components ?? []} render={(c) => <Node comp={c} />} />
             </RuntimeCtx.Provider>
           </div>
@@ -746,16 +810,35 @@ export function FormSkeleton() {
 /** Grid de 16 colunas; cada item ocupa `colSpan` colunas (8+8 = lado a lado).
  * Em telas pequenas colapsa para 1 coluna (cada campo vira uma linha) — regra
  * `.septem-form-grid` em globals.css. */
-function LayoutGrid({ components, render }: { components: Component[]; render: (c: Component) => React.ReactNode }) {
+function LayoutGrid({ components, render, native = false }: { native?: boolean; components: Component[]; render: (c: Component) => React.ReactNode }) {
+  const rt = useRuntime();
+  if (native) return <div className="septem-form-grid grid gap-3">
+    {components.filter(c => !(c.key ? rt.fieldState[c.key]?.hidden ?? c.automationHidden : c.automationHidden)).map((c, i) =>
+      <div key={c.id ?? i} data-form-id={c.id} data-form-key={c.key} style={{ gridColumn: `span ${colSpan(c)} / span ${colSpan(c)}` }}>{render(c)}</div>)}
+  </div>;
+  // O form-js agrupa por layout.row, na ordem da primeira ocorrência.
+  // Sem essa informação, campos de linhas distintas acabavam lado a lado.
+  const rows = new Map<string, Component[]>();
+  components.filter(c => !c.automationHidden).forEach((c, i) => {
+    const key = c.layout?.row ? `row:${c.layout.row}` : `field:${i}`;
+    rows.set(key, [...(rows.get(key) ?? []), c]);
+  });
   return (
-    <div className="septem-form-grid grid gap-3">
-      {components.map((c, i) => {
-        const span = colSpan(c);
-        return (
-          <div key={c.id ?? i} style={{ gridColumn: `span ${span} / span ${span}` }}>
-            {render(c)}
-          </div>
-        );
+    <div className="flex flex-col gap-3">
+      {[...rows].map(([key, fields]) => {
+        const fixed = fields.filter(c => (c.layout?.columns ?? 0) > 0);
+        const automatic = fields.length - fixed.length;
+        const remaining = Math.max(automatic, GRID_COLS - fixed.reduce((sum, c) => sum + colSpan(c), 0));
+        let autoIndex = 0;
+        return <div key={key} className="septem-form-grid grid gap-3">
+          {fields.map((c, i) => {
+            const span = (c.layout?.columns ?? 0) > 0 ? colSpan(c)
+              : Math.floor(remaining / automatic) + (autoIndex++ < remaining % automatic ? 1 : 0);
+            return <div key={c.id ?? i} data-form-id={c.id} data-form-key={c.key} style={{ gridColumn: `span ${span} / span ${span}` }}>
+              {render(c)}
+            </div>;
+          })}
+        </div>;
       })}
     </div>
   );
@@ -767,27 +850,22 @@ function GroupHelp({ comp }: { comp: Component }) {
   const txt = comp.properties?.septemHelpText;
   if (!txt) return null;
   if (t === 'popover') return <HelpPopover html={txt} />;
-  return <span className="text-xs font-normal text-slate-400" dangerouslySetInnerHTML={{ __html: txt }} />;
+  return <HelpContent className="text-xs font-normal text-slate-400" html={txt} />;
 }
 
 /** Conta campos obrigatórios não preenchidos dentro de um grupo (pill de pendências). */
-function countPendingRequired(group: Component, values: Record<string, unknown>): number {
-  let n = 0;
-  for (const c of collectInputs(group.components, [])) {
-    if (!c.validate?.required) continue;
-    const v = values[c.key!];
-    const empty = v === '' || v === undefined || v === null || (c.type === 'checkbox' && v === false);
-    if (empty) n++;
-  }
-  return n;
+function countPendingRequired(group: Component, values: Record<string, unknown>, fieldState: FieldState): number {
+  return Object.values(validateForm(group.components ?? [], values, fieldState))
+    .filter(message => message === 'Campo obrigatório.').length;
 }
 
 /** Grupo de topo como card próprio: ícone à esquerda + pill de pendências à direita. */
 function GroupCard({ group, showHeader = true }: { group: Component; showHeader?: boolean }) {
-  const { values } = useRuntime();
+  const rt = useRuntime();
+  const { values, fieldState } = rt;
   const icon = group.properties?.septemGroupIcon;
   const showPending = group.properties?.septemShowPending !== 'no';
-  const pending = showPending ? countPendingRequired(group, values) : 0;
+  const pending = showPending ? countPendingRequired(group, values, fieldState) : 0;
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       {showHeader && <header className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
@@ -803,7 +881,9 @@ function GroupCard({ group, showHeader = true }: { group: Component; showHeader?
         )}
       </header>}
       <div className="p-4">
-        <LayoutGrid components={group.components ?? []} render={(c) => <Node comp={c} />} />
+        <RuntimeCtx.Provider value={{ ...rt, readOnly: rt.readOnly || group.disabled }}>
+          <LayoutGrid native={group.nativeGroup} components={group.components ?? []} render={(c) => <Node comp={c} />} />
+        </RuntimeCtx.Provider>
       </div>
     </div>
   );
@@ -812,7 +892,7 @@ function GroupCard({ group, showHeader = true }: { group: Component; showHeader?
 /** Abas: barra num card; conteúdo da aba ativa noutro card. Abas extras
  * (leading/trailing) entram na mesma barra (ex.: "Visão geral"/"Tramitação"). */
 function GroupTabsCards({ groups, extra }: { groups: Component[]; extra?: { leading?: ExtraTab[]; trailing?: ExtraTab[] } }) {
-  const { values } = useRuntime();
+  const { values, fieldState } = useRuntime();
   const lead = extra?.leading ?? [];
   const trail = extra?.trailing ?? [];
   type Tab = { key: string; label: string; icon?: React.ReactNode; pending: number; content: React.ReactNode };
@@ -822,7 +902,7 @@ function GroupTabsCards({ groups, extra }: { groups: Component[]; extra?: { lead
       key: grp.id ?? `g${i}`,
       label: grp.label || `Grupo ${i + 1}`,
       icon: grp.properties?.septemGroupIcon ? <i className={grp.properties.septemGroupIcon} /> : undefined,
-      pending: grp.properties?.septemShowPending !== 'no' ? countPendingRequired(grp, values) : 0,
+      pending: grp.properties?.septemShowPending !== 'no' ? countPendingRequired(grp, values, fieldState) : 0,
       content: <GroupCard group={grp} showHeader={false} />,
     })),
     ...trail.map((t) => ({ key: `x:${t.id}`, label: t.label, icon: t.icon, pending: 0, content: t.render() })),
@@ -945,4 +1025,139 @@ function BotaoAssinatura({ taskId, fieldKey, doc }: { taskId?: string; fieldKey:
       )}
     </div>
   );
+}
+
+function scopeMap<T>(values: Record<string, T>, prefix: string): Record<string, T> {
+  const start = `${prefix}.`;
+  return Object.fromEntries(Object.entries(values).filter(([k]) => k.startsWith(start)).map(([k, v]) => [k.slice(start.length), v]));
+}
+
+/** HTML de autoria exibido sem scripts, atributos de evento ou navegação ativa. */
+function StaticHtml({ content }: { content: string }) {
+  const html = useMemo(() => {
+    const doc = new DOMParser().parseFromString(content, 'text/html');
+    doc.querySelectorAll('script,style,iframe,object,embed,form,meta,link,base').forEach(el => el.remove());
+    doc.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        if (/^on/i.test(attr.name) || ['srcdoc', 'style'].includes(attr.name) ||
+          (['href', 'src', 'xlink:href'].includes(attr.name) && !/^(https?:|mailto:|tel:|\/|#)/i.test(attr.value))) el.removeAttribute(attr.name);
+      }
+    });
+    return doc.body.innerHTML;
+  }, [content]);
+  return <div className="text-sm text-slate-600" dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+/** Native tabs share the exact validator used by submit, including per-cell state. */
+function NativeTabs({ groups, pendingErrors, validationAttempt, extra }: { groups: Component[]; pendingErrors: Record<string, string>; validationAttempt: number; extra?: { leading?: ExtraTab[]; trailing?: ExtraTab[] } }) {
+  const rt = useRuntime();
+  const id = useId();
+  const tabs = groups.filter(group => hasVisibleContent(group, rt.values, rt.fieldState));
+  const [active, setActive] = useState<string>();
+  const current = tabs.find(tab => tab.id === active) ?? tabs[0];
+  const buttons = useRef<Array<HTMLButtonElement | null>>([]);
+  const pathsFor = (tab: Component) => {
+    const paths: string[] = [];
+    for (const group of tab.components ?? []) for (const field of group.components ?? []) {
+      if (!field.key) continue;
+      if (group.nativeTable && group.key) {
+        paths.push(group.key);
+        const rows = rt.values[group.key];
+        const count = Array.isArray(rows) && rows.length ? rows.length : 1;
+        for (let i = 0; i < count; i++) paths.push(`${group.key}.${i}.${field.key}`);
+      } else paths.push(field.key);
+    }
+    return new Set(paths);
+  };
+  useEffect(() => {
+    if (!validationAttempt) return;
+    const first = tabs.find(tab => [...pathsFor(tab)].some(path => rt.errors[path]));
+    if (first) {
+      setActive(first.id);
+      buttons.current[tabs.indexOf(first)]?.focus();
+    }
+  }, [validationAttempt]);
+  function navigate(index: number) {
+    const next = (index + tabs.length) % tabs.length;
+    setActive(tabs[next].id); buttons.current[next]?.focus();
+  }
+  return <div className="flex min-w-0 flex-col gap-4">
+    {(extra?.leading ?? []).map(tab => <Fragment key={tab.id}>{tab.render()}</Fragment>)}
+    {tabs.length > 1 && <div role="tablist" aria-label="Abas do formulário" className="flex flex-wrap gap-1 rounded-lg border border-slate-200 bg-white p-1">
+      {tabs.map((tab, index) => {
+        const paths = pathsFor(tab);
+        const pending = Object.keys(pendingErrors).filter(path => paths.has(path)).length;
+        const invalid = Object.keys(rt.errors).some(path => paths.has(path));
+        const selected = current?.id === tab.id;
+        return <button key={tab.id} ref={el => { buttons.current[index] = el; }} type="button" role="tab"
+          id={`${id}-tab-${tab.id}`} aria-controls={`${id}-panel-${tab.id}`} aria-selected={selected} tabIndex={selected ? 0 : -1}
+          aria-label={`${tab.label}, ${pending} pendências${invalid ? ', com erros' : ''}`} onClick={() => setActive(tab.id)}
+          onKeyDown={event => {
+            const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : ['ArrowRight', 'ArrowDown'].includes(event.key) ? index + 1 : ['ArrowLeft', 'ArrowUp'].includes(event.key) ? index - 1 : null;
+            if (next !== null) { event.preventDefault(); navigate(next); }
+          }}
+          className={`flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 ${selected ? 'bg-slate-900 text-white' : invalid ? 'text-rose-700 hover:bg-rose-50' : 'text-slate-700 hover:bg-slate-100'}`}>
+          {renderIcon(tab.icon, 16)}{tab.label}<span aria-hidden className={`rounded-full px-2 text-xs tabular-nums ${selected ? 'bg-white/20 text-white' : invalid ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-700'}`}>{pending}</span>
+        </button>;
+      })}
+    </div>}
+    {/* Keep local date drafts and in-flight uploads alive while navigating. */}
+    {tabs.map(tab => <div key={tab.id} role={tabs.length > 1 ? 'tabpanel' : undefined} id={`${id}-panel-${tab.id}`} aria-labelledby={tabs.length > 1 ? `${id}-tab-${tab.id}` : undefined}
+      hidden={tab.id !== current?.id} className={tab.id === current?.id ? 'flex min-w-0 flex-col gap-4' : 'hidden'}>
+      <RuntimeCtx.Provider value={{ ...rt, readOnly: rt.readOnly || tab.disabled }}>
+      {(tab.components ?? []).filter(group => hasVisibleContent(group, rt.values, rt.fieldState)).map(group => group.nativeTable
+        ? <NativeTable key={group.id} comp={group} /> : <GroupCard key={group.id} group={group} />)}
+      </RuntimeCtx.Provider>
+    </div>)}
+    {!current && <p role="status" className="py-4 text-sm text-slate-600">Nenhum campo disponível para preenchimento nesta tarefa.</p>}
+    {(extra?.trailing ?? []).map(tab => <Fragment key={tab.id}>{tab.render()}</Fragment>)}
+  </div>;
+}
+
+function NativeTable({ comp }: { comp: Component }) {
+  const rt = useRuntime();
+  const rowIds = useRef<number[]>([]), nextId = useRef(0);
+  const key = comp.key!;
+  const stored = rt.values[key];
+  const rows = Array.isArray(stored) && stored.length ? stored as Record<string, unknown>[] : [{}];
+  while (rowIds.current.length < rows.length) rowIds.current.push(nextId.current++);
+  rowIds.current.length = rows.length;
+  const columns = (comp.components ?? []).filter(field => rows.some((_, index) => !(rt.fieldState[`${key}.${index}.${field.key}`]?.hidden ?? field.automationHidden)));
+  const disabled = rt.readOnly || comp.disabled || rt.fieldState[key]?.disabled;
+  const editable = !disabled && columns.some(field => rows.some((_, index) => !(rt.fieldState[`${key}.${index}.${field.key}`]?.disabled ?? field.disabled) && !(rt.fieldState[`${key}.${index}.${field.key}`]?.hidden ?? field.automationHidden)));
+  const latestRows = () => {
+    const current = rt.readValues()[key];
+    return Array.isArray(current) && current.length ? current as Record<string, unknown>[] : [{}];
+  };
+  if (comp.automationHidden || rt.fieldState[key]?.hidden || !columns.length) return null;
+  return <section aria-label={comp.label} className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white" data-native-table={key}>
+    <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
+      <h3 className="text-sm font-semibold text-slate-700">{comp.label}</h3>
+    </header>
+    {comp.description && <p className="px-4 pt-3 text-sm text-slate-600">{comp.description}</p>}
+    {rt.errors[key] && <p role="alert" className="px-4 pt-3 text-sm text-rose-700">{rt.errors[key]}</p>}
+    <p className="px-4 pt-3 text-xs text-slate-600 sm:hidden">Deslize a tabela para acessar todas as colunas e as ações de cada linha.</p>
+    <div className="overflow-x-auto p-4" tabIndex={0} role="region" aria-label={`Linhas de ${comp.label}`}>
+      <table className="w-full border-collapse text-left text-sm">
+        <thead><tr>{columns.map(field => <th key={field.id} scope="col" className="min-w-48 border-b border-slate-200 px-2 pb-3 font-semibold text-slate-700">{field.label}</th>)}{editable && <th scope="col" className="px-2 pb-3"><span className="sr-only">Ações da linha</span></th>}</tr></thead>
+        <tbody>{rows.map((row, index) => <tr key={rowIds.current[index]} data-native-row={index} className="border-b border-slate-100 last:border-0">
+          <RuntimeCtx.Provider value={{ ...rt, values: row ?? {}, readOnly: disabled, prefix: `${key}.${index}`,
+            readValues: () => latestRows()[index] ?? {}, errors: scopeMap(rt.errors, `${key}.${index}`),
+            fieldState: scopeMap(rt.fieldState, `${key}.${index}`), dateErrors: scopeMap(rt.dateErrors, `${key}.${index}`),
+            setDateError: (field, message) => rt.setDateError(`${key}.${index}.${field}`, message),
+            runEvent: (field, type, event) => rt.runEvent(field, type, event, `${key}.${index}`),
+            set: (field, value) => rt.set(key, latestRows().map((item, i) => i === index ? { ...item, [field]: value } : item)),
+          }}>
+            {columns.map(field => <td key={field.id} className="px-2 py-3 align-top" data-form-id={field.id} data-form-key={`${key}.${index}.${field.key}`}><Node comp={field} /></td>)}
+          </RuntimeCtx.Provider>
+          {editable && <td className="w-12 px-2 py-3 align-bottom"><button type="button" aria-label={rows.length === 1 ? 'Limpar valores da última linha' : `Remover linha ${index + 1}`}
+            onClick={() => { if (rows.length > 1) rowIds.current.splice(index, 1); rt.removeRow(key, index); }}
+            className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-md px-2 text-sm text-slate-600 hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-2"><Trash2 size={16} aria-hidden /></button></td>}
+        </tr>)}</tbody>
+      </table>
+    </div>
+    {editable && <footer className="flex justify-end border-t border-slate-200 px-4 py-3">
+      {editable && <button type="button" onClick={() => rt.set(key, [...latestRows(), {}])} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-100 focus-visible:outline-2"><Plus size={15} /> Adicionar linha</button>}
+    </footer>}
+  </section>;
 }

@@ -464,6 +464,11 @@
       ],
       "properties": [
         {
+          "name": "fieldId",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
           "name": "fieldRef",
           "isAttr": true,
           "type": "String"

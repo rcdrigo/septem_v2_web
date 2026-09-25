@@ -1,3 +1,4 @@
+import type { AutomationSource } from '@/lib/form-automation/runtime';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
@@ -111,7 +112,7 @@ export function usePublicServices() {
 }
 
 /** Detalhe público de um serviço — inclui o formulário para preencher. */
-export type PublicServiceDetail = PublicService & { formSchema: string | null };
+export type PublicServiceDetail = PublicService & { automationScripts?: AutomationSource[]; formSchema: string | null };
 
 export function usePublicService(key: string | undefined) {
   return useQuery({
@@ -123,8 +124,8 @@ export function usePublicService(key: string | undefined) {
 }
 
 /** Envio anônimo. Devolve o número do protocolo — é o que o cidadão anota. */
-export function submitPublicService(key: string, data: unknown, turnstileToken: string | null) {
-  return api.post<{ number: number }>(`/api/v1/public/services/${key}/submit`, { data, turnstileToken });
+export function submitPublicService(key: string, data: unknown, turnstileToken: string | null, formState?: unknown) {
+  return api.post<{ number: number }>(`/api/v1/public/services/${key}/submit`, { data, turnstileToken, formState });
 }
 
 // ── Autocadastro do cidadão (Fase 8) ────────────────────────────────────────

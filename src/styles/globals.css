@@ -8,12 +8,6 @@
 /* properties panel (compartilhado com bpmn-js-properties-panel) */
 @import "@bpmn-io/properties-panel/assets/properties-panel.css";
 
-/* form-js (editor) */
-@import "@bpmn-io/form-js/dist/assets/form-js.css";
-@import "@bpmn-io/form-js/dist/assets/form-js-base.css";
-@import "@bpmn-io/form-js/dist/assets/form-js-editor.css";
-@import "@bpmn-io/form-js/dist/assets/form-js-editor-base.css";
-
 html, body, #root {
   height: 100%;
   margin: 0;
@@ -31,18 +25,108 @@ summary {
   cursor: pointer;
 }
 
-/* Cockpit do formulário: usamos nossa paleta de cards + nosso painel de campo no
-   lugar da paleta e do painel de propriedades padrão do form-js. Escondemos os
-   CONTAINERS externos (a paleta reserva largura própria e o painel de propriedades
-   tem 300px fixos — esconder só o filho deixava o vão). */
-.septem-cockpit .fjs-palette-container,
-.septem-cockpit .fjs-properties-container { display: none !important; }
-
 /* Garante que canvases dos editores ocupem o container pai */
 .bjs-container,
-.djs-container,
-.fjs-container {
+.djs-container {
   height: 100%;
+}
+
+/* Ícones BPMN: cores e contornos acompanham o tipo de elemento no modelador. */
+.septem-bpmn-modeler {
+  --bpmn-event-start: #078522;
+  --bpmn-event-intermediate: #d55f00;
+  --bpmn-event-end: #a31818;
+  --bpmn-activity: #1769aa;
+  --bpmn-gateway: #d12d4b;
+}
+
+.septem-bpmn-modeler .djs-palette [data-action="create.start-event"] {
+  color: var(--bpmn-event-start);
+}
+
+.septem-bpmn-modeler .djs-palette [data-action="create.end-event"] {
+  color: var(--bpmn-event-end);
+}
+
+.septem-bpmn-modeler .djs-palette [data-action$="-event"]:not([data-action="create.start-event"]):not([data-action="create.end-event"]) {
+  color: var(--bpmn-event-intermediate);
+}
+
+.septem-bpmn-modeler .djs-palette [data-group="activity"] .entry {
+  color: var(--bpmn-activity);
+  font-size: 43px;
+}
+
+.septem-bpmn-modeler .djs-palette [data-group="gateway"] .entry {
+  color: var(--bpmn-gateway);
+}
+
+.septem-bpmn-modeler .djs-palette .entry,
+.septem-bpmn-modeler .djs-context-pad .entry {
+  box-shadow: none;
+}
+
+.septem-bpmn-modeler .djs-context-pad .entry {
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  margin: 0 4px 4px 0;
+  background: white;
+  font-size: 23px;
+  line-height: 27px;
+}
+
+.septem-bpmn-modeler .djs-context-pad [data-action="append.user-task"],
+.septem-bpmn-modeler .djs-context-pad [data-action="append.script-task"],
+.septem-bpmn-modeler .djs-context-pad [data-action="append.service-task"],
+.septem-bpmn-modeler .djs-context-pad [data-action="append.subprocess"] {
+  color: var(--bpmn-activity);
+}
+
+.septem-bpmn-modeler .djs-context-pad [data-action="append.email-event"],
+.septem-bpmn-modeler .djs-context-pad [data-action="append.timer-event"] {
+  color: var(--bpmn-event-intermediate);
+}
+
+.septem-bpmn-modeler .djs-context-pad [data-action="append.exclusive-gateway"] {
+  color: var(--bpmn-gateway);
+}
+
+.septem-bpmn-modeler .djs-context-pad [data-action="append.terminate-end-event"] {
+  color: var(--bpmn-event-end);
+}
+
+.septem-bpmn-modeler .djs-element.septem-bpmn-start {
+  --bpmn-canvas-stroke: var(--bpmn-event-start);
+}
+
+.septem-bpmn-modeler .djs-element.septem-bpmn-intermediate {
+  --bpmn-canvas-stroke: var(--bpmn-event-intermediate);
+}
+
+.septem-bpmn-modeler .djs-element.septem-bpmn-end {
+  --bpmn-canvas-stroke: var(--bpmn-event-end);
+}
+
+.septem-bpmn-modeler .djs-element.septem-bpmn-activity {
+  --bpmn-canvas-stroke: var(--bpmn-activity);
+}
+
+.septem-bpmn-modeler .djs-element.septem-bpmn-gateway {
+  --bpmn-canvas-stroke: var(--bpmn-gateway);
+}
+
+.septem-bpmn-modeler .djs-element[class*="septem-bpmn-"] .djs-visual :is(circle, ellipse, rect, path, polygon, polyline, line) {
+  stroke: var(--bpmn-canvas-stroke) !important;
+}
+
+.septem-bpmn-modeler .djs-element[class*="septem-bpmn-"] .djs-visual :is(circle, ellipse, rect, path, polygon, polyline)[style*="fill: rgb(34, 36, 42)"] {
+  fill: var(--bpmn-canvas-stroke) !important;
+}
+
+.septem-bpmn-modeler .djs-palette .entry:hover,
+.septem-bpmn-modeler .djs-context-pad .entry:hover {
+  filter: brightness(.85);
 }
 
 /* Grid de campos do formulário (16 col); em telas pequenas vira 1 coluna. */

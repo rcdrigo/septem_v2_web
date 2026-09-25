@@ -7,6 +7,7 @@ import {
 } from '@/lib/upload';
 import { ApiError } from '@/lib/api';
 import { useDocumentTitle } from '@/lib/use-document-title';
+import { ContextHelp } from '@/components/guide/ContextHelp';
 
 /** Tipos de assinatura oferecidos. O A1 chega na etapa 7b — o espaço já fica visível. */
 type Tipo = 'simple' | 'a1';
@@ -109,6 +110,7 @@ export function AssinaturaPage() {
         <h1 className="min-w-0 truncate text-lg font-semibold text-slate-800" data-testid="assinatura-titulo">
           {doc.fileName ?? 'Documento'}
         </h1>
+        <ContextHelp manual="documentos-assinaturas" section="assinar-documento" label="Abrir manual de assinatura de documentos" />
       </header>
 
       {/* O documento em si. `min-h` para o iframe não colapsar no mobile. */}

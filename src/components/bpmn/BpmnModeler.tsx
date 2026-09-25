@@ -1,8 +1,9 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import Modeler from 'bpmn-js/lib/Modeler';
 import emptyDiagram from '@/assets/empty-diagram.bpmn?raw';
 import { SeptemPaletteModule } from './SeptemPaletteProvider';
 import { SeptemContextPadModule } from './SeptemContextPadProvider';
+import { installCanvasColors } from './canvasColors';
 import septemModdle from './septem-moddle.json';
 import { useModeladorStore } from '@/stores/modelador';
 
@@ -20,21 +21,21 @@ const STORAGE_KEY = 'septem.modelador.xml';
 const AUTOSAVE_DEBOUNCE_MS = 500;
 
 export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, ref) => {
+  const [initializationError, setInitializationError] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<any>(null);
+  const importQueue = useRef<Promise<void>>(Promise.resolve());
   const setXml = useModeladorStore((s) => s.setXml);
   const setSelectedElementId = useModeladorStore((s) => s.setSelectedElementId);
 
-  async function loadDiagram(modeler: any, xml: string) {
-    try {
+  function loadDiagram(modeler: any, xml: string): Promise<void> {
+    const pending = importQueue.current.catch(() => {}).then(async () => {
+      if (modelerRef.current !== modeler) throw new Error('Modelador indisponível.');
       await modeler.importXML(xml);
-      if (modelerRef.current !== modeler) return;
-      modeler.get('canvas').zoom('fit-viewport', 'auto');
-    } catch (err) {
-      if (modelerRef.current === modeler) {
-        console.error('Falha ao carregar diagrama BPMN:', err);
-      }
-    }
+      if (modelerRef.current === modeler) modeler.get('canvas').zoom('fit-viewport', 'auto');
+    });
+    importQueue.current = pending;
+    return pending;
   }
 
   useEffect(() => {
@@ -47,13 +48,22 @@ export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, re
       // keyboard.bindTo foi removido no diagram-js atual (bind agora é implícito).
     });
     modelerRef.current = modeler;
-    onReady?.(modeler);
+    setInitializationError(false);
+    const removeCanvasColors = installCanvasColors(modeler);
 
     // Começa SEMPRE em branco: um processo existente é importado por ModeladorPage
     // (via ?key=), e "Novo processo" (sem key) fica em branco. NÃO restauramos do
     // localStorage aqui — o rascunho era global e, como o auto-save gravava qualquer
     // diagrama aberto, "Novo" acabava restaurando o último processo editado.
-    void loadDiagram(modeler, emptyDiagram);
+    // Só expõe a instância depois de existir uma raiz BPMN com businessObject.
+    // Antes disso canvas.getRootElement() pode devolver uma raiz implícita vazia.
+    void loadDiagram(modeler, emptyDiagram).then(() => {
+      if (modelerRef.current === modeler) onReady?.(modeler);
+    }).catch((err: unknown) => {
+      if (modelerRef.current !== modeler) return;
+      console.error('Falha ao iniciar o modelador:', err);
+      setInitializationError(true);
+    });
     window.localStorage.removeItem(STORAGE_KEY); // limpa rascunho global legado (contaminado)
 
     // Espelha o XML no store (consumido por outras views), com debounce.
@@ -85,6 +95,7 @@ export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, re
       window.clearTimeout(saveTimer);
       watchedEvents.forEach((ev) => eventBus.off(ev, scheduleSave));
       eventBus.off('selection.changed', onSelectionChanged);
+      removeCanvasColors();
       modelerRef.current = null;
       setSelectedElementId(null);
       modeler.destroy();
@@ -112,7 +123,10 @@ export const BpmnModeler = forwardRef<BpmnModelerHandle, Props>(({ onReady }, re
     [],
   );
 
-  return <div ref={canvasRef} className="flex-1 bg-white" />;
+  return <>
+    {initializationError && <p role="alert" className="p-4 text-sm text-rose-600">Não foi possível iniciar o modelador. Reabra o processo para tentar novamente.</p>}
+    <div ref={canvasRef} className="septem-bpmn-modeler flex-1 bg-white" />
+  </>;
 });
 
 BpmnModeler.displayName = 'BpmnModeler';
