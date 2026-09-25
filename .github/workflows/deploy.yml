@@ -33,6 +33,12 @@ jobs:
           VITE_API_URL: ${{ vars.VITE_API_URL || 'https://septem-api.onrender.com' }}
           # Pages é host único (sem subdomínio por tenant) → tenant fixo no build.
           VITE_TENANT: ${{ vars.VITE_TENANT || 'prefeitura-x' }}
+      # SPA no Pages: qualquer caminho fundo (`/platform/login`, `/admin/transfers`,
+      # `/requests/<id>`) devolvia 404 do próprio GitHub, porque só existe `index.html`
+      # na raiz. O Pages serve `404.html` para o que não casa com arquivo — copiar o
+      # index para lá faz o roteador do SPA assumir. Sem isto, a área central só era
+      # alcançável navegando por dentro do app, e link colado no navegador não abria.
+      - run: cp dist/index.html dist/404.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
