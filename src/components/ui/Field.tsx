@@ -13,8 +13,12 @@ import { HelpPopover } from './HelpPopover';
  * contrast: existing application palette
  */
 
+// `w-full min-w-0`: sem isto o input adota a largura INTRÍNSECA do conteúdo (placeholder
+// longo, opção longa do select) e, como item de grid/flex com `min-width: auto`, não
+// encolhe — empurrava o formulário além da largura do celular (medido: campo de 463px
+// numa célula de 277px, no editor de manual em 375px).
 const INPUT_BASE =
-  'rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-500 focus:outline-none';
+  'w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-500 focus:outline-none';
 
 // ─── Field ───────────────────────────────────────────────────────────────────
 
@@ -28,7 +32,7 @@ type FieldProps = {
 
 export function Field({ label, hint, help, htmlFor, children }: FieldProps) {
   return (
-    <label className="flex flex-col gap-1.5" htmlFor={htmlFor}>
+    <label className="flex min-w-0 flex-col gap-1.5" htmlFor={htmlFor}>
       <span className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
         {label}
         {help && <HelpPopover html={help} ariaLabel={`Ajuda: ${label}`} />}

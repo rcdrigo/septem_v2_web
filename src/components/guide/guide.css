@@ -171,8 +171,10 @@
 
 @media (min-width: 80rem) {
   .guide-content-grid {
-    grid-template-areas: "main toc";
-    grid-template-columns: minmax(0, 1fr) 16rem;
+    /* "Nesta página" à ESQUERDA do conteúdo — item 25 dos ajustes da Fase 10, pedido do
+       dono. A reestruturação havia passado o índice para a direita ("main toc"). */
+    grid-template-areas: "toc main";
+    grid-template-columns: 16rem minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
   }
 }

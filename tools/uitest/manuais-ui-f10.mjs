@@ -27,6 +27,20 @@ const rid = Math.floor(Math.random() * 1e9);
 const cat = (await api(token, '/api/v1/manual-categories', 'POST', { name: `Categoria Guide ${rid}` })).body.id;
 const criar = (b) => api(token, '/api/v1/manuals', 'POST', { categoryId: cat, published: true, ...b }).then((r) => r.body.id);
 const tPai = `Guia do painel ${rid}`;
+
+/**
+ * Abre um manual pelo menu lateral do guia.
+ *
+ * Clique por JS de propósito: o menu re-renderiza sem parar (o Playwright nunca
+ * considera o item "estável" e desiste em 30 s). Como o alvo é o elemento exato — e não
+ * uma coordenada — não há risco de acertar o item vizinho.
+ */
+async function abrirNoMenu(page, titulo) {
+  const item = page.locator('[data-testid=guide-menu] [data-testid=guide-menu-item]', { hasText: titulo }).first();
+  await item.waitFor({ state: 'attached', timeout: 15000 });
+  await item.evaluate((el) => el.click());
+  await page.waitForTimeout(700);
+}
 const tFilho = `Detalhe do painel ${rid}`;
 const tExterno2 = `Segundo externo ${rid}`;
 const tInterno = `Área interna ${rid}`;
@@ -156,7 +170,7 @@ try {
   // Escopado ao menu do DESKTOP: o guia renderiza a mesma árvore duas vezes (o menu
   // lateral e o do mobile, dentro de um diálogo oculto), e o `.first()` pegava a cópia
   // invisível — esperava eternamente por um elemento que nunca aparece.
-  await page.locator('[data-testid=guide-menu] [data-testid=guide-menu-item]', { hasText: tPai }).first().click();
+  await abrirNoMenu(page, tPai);
   await page.waitForTimeout(700);
   const conteudo = await page.locator('[data-testid=guide-conteudo]').innerText();
   check(conteudo.includes(`corpo do painel ${rid}`), '[10c] o conteúdo do manual é renderizado');
@@ -168,7 +182,7 @@ try {
   check(await page.locator('[data-testid=guide-anterior]').count() > 0, '[10c] após avançar, existe "anterior"');
 
   // Item 22: o ícone do manual aparece no menu do guia.
-  await page.locator('[data-testid=guide-menu] [data-testid=guide-menu-item]', { hasText: tPai }).first().click();
+  await abrirNoMenu(page, tPai);
   await page.waitForTimeout(500);
   check(await page.locator('[data-testid=guide-menu-item] i').count() > 0, '[item22] o ícone do manual é exibido no menu do guia');
 
@@ -254,8 +268,14 @@ try {
   await m.waitForTimeout(800);
   await m.locator('[data-testid=guide-tab-externo]').click();
   await m.waitForTimeout(400);
-  await m.locator('[data-testid=guide-menu] [data-testid=guide-menu-item]', { hasText: tPai }).first().click();
-  await m.waitForTimeout(700);
+  // No 375 o menu lateral não existe: é o botão "Menu" que abre a árvore num diálogo.
+  await m.getByRole('button', { name: /^Menu$/ }).click();
+  await m.waitForSelector('[data-testid=guide-menu-mobile]', { timeout: 8000 });
+  await m.waitForTimeout(400);
+  const itemMobile = m.locator('[data-testid=guide-menu-mobile] [data-testid=guide-menu-item]', { hasText: tPai }).first();
+  await itemMobile.waitFor({ state: 'attached', timeout: 10000 });
+  await itemMobile.evaluate((el) => el.click());
+  await m.waitForTimeout(900);
   check((await m.locator('[data-testid=guide-conteudo]').innerText()).includes(`corpo do painel ${rid}`), '[mobile] Guide renderiza o conteúdo do manual');
   check(await semOverflow(m), '[mobile] Guide sem overflow horizontal');
   await m.screenshot({ path: `${OUT}/f10-guide-mobile.png`, fullPage: true });
