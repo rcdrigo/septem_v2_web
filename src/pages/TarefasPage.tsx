@@ -24,7 +24,11 @@ import { TagsButton, useTagsAccess } from '@/components/tags';
 export function TarefasPage() {
   const canUseTags = useTagsAccess();
   const { filters, patch, clear } = useExecutionFilters('tasks', canUseTags);
-  const tasks = useTasks('pendentes', filters);
+  // Pendentes × Concluídas: a reestruturação deixou a lista fixa em 'pendentes' e o
+  // histórico do que o usuário concluiu ficou inalcançável (a `TarefasExecutadasPage`
+  // não tem rota). O switcher volta aqui, que é onde o usuário procura.
+  const [situacao, setSituacao] = useState<'pendentes' | 'concluidas'>('pendentes');
+  const tasks = useTasks(situacao, filters);
   const [view, setView] = useViewMode();
   const openTask = (task: TaskListItem) => openTab(routes.task(task.id));
   const items = tasks.data?.items ?? [];
@@ -52,10 +56,21 @@ export function TarefasPage() {
             <h1 className="text-lg font-semibold text-slate-900">Tarefas</h1>
             <ContextHelp manual="operacao-tarefas-requisicoes" section="localizar-tarefas" label="Ajuda sobre tarefas" />
           </div>
-          <p className="mt-0.5 truncate text-sm text-slate-500">Tarefas em andamento que aguardam sua ação.</p>
+          <p className="mt-0.5 truncate text-sm text-slate-500">
+            {situacao === 'pendentes' ? 'Tarefas em andamento que aguardam sua ação.' : 'Tarefas que você concluiu.'}
+          </p>
         </div>
         <ViewToggle view={view} setView={setView} />
       </header>
+      {/* Sem gap entre os dois botões: item 10 dos ajustes de 26/07. */}
+      <div className="flex border-b border-slate-200 bg-white px-4 pt-3 sm:px-6" role="group" aria-label="Situação das tarefas">
+        {([['pendentes', 'Pendentes'], ['concluidas', 'Concluídas']] as const).map(([valor, rotulo]) => (
+          <button key={valor} type="button" aria-pressed={situacao === valor} onClick={() => setSituacao(valor)}
+            className={`min-h-9 whitespace-nowrap rounded-md px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 ${situacao === valor ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}>
+            {rotulo}
+          </button>
+        ))}
+      </div>
       <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
         <ExecutionFilters kind="tasks" filters={filters} processes={tasks.data?.processes ?? []} tagNames={canUseTags ? (tasks.data?.tagNames ?? []) : undefined} busy={tasks.isFetching} onChange={patch} onClear={clear} />
       </div>

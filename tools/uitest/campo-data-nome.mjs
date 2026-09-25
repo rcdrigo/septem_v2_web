@@ -1,12 +1,13 @@
-// Bugs: (3) "o NOME do campo de data não muda" — form-js exibe o datetime por
-// dateLabel/timeLabel, não por label; o painel só gravava label. Fix: para datetime,
-// grava label+dateLabel+timeLabel. (4) O preview usa o datepicker compartilhado e
-// abre seu calendário ao focar. Modelador é desktop → 1280.
+// Bug (3): "o NOME do campo de data não muda". Depois da troca do editor de formulário
+// (form-js → editor NATIVO), o nome deixou de ser um par dateLabel/timeLabel e virou o
+// `label` do elemento nativo — mas o que se cobra é o mesmo: renomear no painel muda o
+// que aparece na LISTA de campos e no formulário renderizado. Bug (4): o seletor de data
+// abre o calendário ao focar. Modelador é desktop → 1280.
 import { chromium } from 'playwright-core';
 const BASE = 'http://localhost:5173';
 const OUT = process.env.OUT_DIR || '.';
 const ok = [], bad = [];
-const check = (c, m) => (c ? ok.push(m) : bad.push(m));
+const check = (c, m) => { (c ? ok : bad).push(m); console.log(`${c ? '✓' : '✗'} ${m}`); };
 
 const chrome = process.env.CHROME_BIN
   || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : '/usr/bin/google-chrome');
@@ -19,51 +20,49 @@ try {
   await page.click('button[type=submit]');
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
-  // Processo novo → Formulário.
+  // Processo novo → aba Formulário. Um processo novo nasce com formulário nativo
+  // (`createNativeForm`): uma aba, um agrupamento, nenhum campo.
   await page.goto(`${BASE}/flows/edit`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.djs-palette', { timeout: 15000 });
-  await page.waitForTimeout(1000);
   await page.locator('header button, nav button', { hasText: 'Formulário' }).first().click();
-  await page.waitForTimeout(1500);
+  await page.locator('[data-native-editor]').waitFor({ timeout: 15000 });
 
-  // Adiciona o campo "Data / Hora" pela paleta. O addField já AUTO-SELECIONA o novo
-  // campo (form-js selection.set) → o painel de configuração abre sozinho.
-  await page.locator('button', { hasText: 'Data / Hora' }).first().click();
-  await page.waitForTimeout(1200);
+  // Adiciona o campo "Data / Hora" pelo catálogo do agrupamento. O `addField` já
+  // seleciona o campo novo e foca o "Nome" no painel de propriedades.
+  await page.getByRole('button', { name: /^Adicionar campo em / }).first().click();
+  await page.getByRole('button', { name: 'Data / Hora', exact: true }).click();
+  await page.waitForTimeout(600);
+  check(await page.locator('[data-field-id]').count() === 1, '[web] o campo entra no agrupamento');
 
-  // Muda o "Nome" no painel de configuração e confirma que o canvas reflete (bug 3).
-  const nomeInput = page.locator('aside label', { hasText: 'Nome' }).locator('xpath=following-sibling::input[1]').first();
+  // Renomeia no painel e confirma que a LISTA de campos passa a mostrar o novo nome.
+  const nomeInput = page.locator('[data-native-properties] input[aria-label="Nome"]');
   await nomeInput.waitFor({ timeout: 8000 });
   const NOVO = 'Nascimento ABC';
   await nomeInput.fill(NOVO);
   await nomeInput.blur();
   await page.waitForTimeout(800);
-  const canvasMostra = await page.evaluate((txt) => {
-    const canvas = document.querySelector('.fjs-container') || document.body;
-    return canvas.textContent?.includes(txt) ?? false;
-  }, NOVO);
-  check(canvasMostra, `[web] o nome do campo de data muda no canvas ("${NOVO}")`);
-  // Confirma no schema serializado que dateLabel foi gravado (não só label).
-  const schemaOk = await page.evaluate((txt) => {
-    // saveSchema não é exposto no window; checa via o texto do canvas do form-js,
-    // que renderiza o subtítulo do datetime por dateLabel.
-    const els = [...document.querySelectorAll('.fjs-element')];
-    return els.some((e) => e.textContent?.includes(txt));
-  }, NOVO);
-  check(schemaOk, `[web] o datetime passa a exibir o novo nome (dateLabel aplicado)`);
+  check(await page.locator('[data-field-id]', { hasText: NOVO }).count() === 1,
+    `[web] o nome do campo de data muda na lista ("${NOVO}")`);
+  // O commit do Nome deriva a CHAVE enquanto ela não foi personalizada — sem chave o
+  // campo não tem resposta e não chega ao formulário.
+  const chave = await page.locator('[data-native-properties] input[aria-label="Chave (identificador)"]').inputValue();
+  check(/\w/.test(chave), `[web] e a chave é derivada do nome ("${chave}")`);
 
-  // Pré-visualização → ReactForm com datepicker moderno (default = data e hora).
-  await page.locator('button', { hasText: 'Pré-visualizar' }).first().click();
+  // Prévia → ReactForm com o seletor de data novo (default = data e hora).
+  await page.locator('button', { hasText: 'Prévia' }).first().click();
   const dateSel = '[role=dialog] .septem-date-picker-input';
   await page.waitForSelector(dateSel, { timeout: 8000 });
-  check(await page.locator('[role=dialog] [data-date-picker-mode="datetime"]').count() === 1, '[web] campo novo mantém o subtipo data e hora');
+  check(await page.locator('[role=dialog]').getByText(NOVO).count() >= 1,
+    '[web] o formulário renderizado exibe o novo nome');
+  check(await page.locator('[role=dialog] [data-date-picker-mode="datetime"]').count() === 1,
+    '[web] campo novo mantém o subtipo data e hora');
   await page.locator(dateSel).focus();
-  const abriu = await page.locator('[data-date-picker-popover]').count() > 0;
-  check(abriu, '[web] o calendário shadcn Base abre ao focar o campo');
-  check(await page.locator('[data-date-picker-time]').count() === 1, '[web] o subtipo data e hora exibe o seletor de horário');
+  await page.waitForTimeout(300);
+  check(await page.locator('[data-date-picker-popover]').count() > 0,
+    '[web] o calendário abre ao focar o campo');
+  check(await page.locator('[data-date-picker-time]').count() === 1,
+    '[web] o subtipo data e hora exibe o seletor de horário');
   await page.screenshot({ path: `${OUT}/campo-data-nome.png` });
 } finally { await browser.close(); }
-ok.forEach((m) => console.log('✓ ' + m));
-bad.forEach((m) => console.log('✗ ' + m));
 console.log(bad.length === 0 ? `\nPASSOU (${ok.length} checks)` : `\nFALHOU (${bad.length} de ${ok.length + bad.length})`);
 process.exit(bad.length === 0 ? 0 : 1);

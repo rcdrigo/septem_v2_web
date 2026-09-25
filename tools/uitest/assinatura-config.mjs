@@ -31,10 +31,19 @@ const token = (await api(null, '/api/v1/auth/login', 'POST',
 
 const rid = Math.floor(Math.random() * 1e9);
 // Formulário com DOIS anexos e um texto: o texto é o controle negativo do filtro.
-const FORM = '{"type":"default","schemaVersion":17,"components":['
-  + '{"type":"filepicker","key":"anexo_parecer","label":"Parecer assinado"},'
-  + '{"type":"filepicker","key":"anexo_oficio","label":"Ofício"},'
-  + '{"type":"textfield","key":"observacao","label":"Observação"}]}';
+// Formulário NATIVO (`septem-native`). A fixture era do formato anterior e, depois que
+// o modelador passou a só editar o nativo, os painéis que leem os campos do formulário
+// (assinatura, condições, matriz de tarefas) ficam VAZIOS com o formato antigo — provado
+// rodando os dois lado a lado: legado devolve "Nenhum resultado.", nativo lista os dois
+// anexos. Testar com a fixture antiga media um caminho que o produto não oferece mais.
+const FORM = JSON.stringify({
+  format: 'septem-native', schemaVersion: 1, id: `form_${rid}`,
+  tabs: [{ id: `tab_${rid}`, label: 'Principal', groups: [{ id: `grp_${rid}`, label: 'Dados', type: 'group', fields: [
+    { id: `fp_${rid}`, kind: 'field', type: 'filepicker', key: 'anexo_parecer', label: 'Parecer assinado' },
+    { id: `fo_${rid}`, kind: 'field', type: 'filepicker', key: 'anexo_oficio', label: 'Ofício' },
+    { id: `tx_${rid}`, kind: 'field', type: 'textfield', key: 'observacao', label: 'Observação' },
+  ] }] }],
+});
 
 const xml = (assinatura) => `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:septem="http://septem.app/schema/1.0/bpmn" id="dsu" targetNamespace="x">

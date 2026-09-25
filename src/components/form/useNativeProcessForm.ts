@@ -14,9 +14,13 @@ export function useNativeProcessForm(modeler: any, processReady: boolean) {
   const draft = useRef<NativeFormDefinition | null>(null);
   const lastStored = useRef('');
   const active = useRef(false);
+  // Formulário em formato anterior: o editor não o assume, mas o PROCESSO continua
+  // salvável. Sem esta distinção o `flush` rejeitava e o Salvar do modelador morria
+  // antes de chamar a API — nem renomear uma tarefa era possível, sem dizer por quê.
+  const legado = useRef(false);
 
   useEffect(() => {
-    const pause = () => { active.current = false; draft.current = null; setDefinition(null); useFormStore.getState().setFields([]); };
+    const pause = () => { active.current = false; legado.current = false; draft.current = null; setDefinition(null); useFormStore.getState().setFields([]); };
     const load = (event?: { error?: unknown }) => {
       pause(); setError(null);
       if (!processReady || !getProcessShape(modeler)) return;
@@ -24,7 +28,8 @@ export function useNativeProcessForm(modeler: any, processReady: boolean) {
         if (event?.error) throw event.error;
         const stored = getEmbeddedFormSchema(modeler, true);
         if (stored && (stored as { format?: string }).format !== 'septem-native') {
-          throw new Error('Este formulário usa o formato anterior e não pode ser editado aqui. Abra um processo novo ou uma definição nativa.');
+          legado.current = true;
+          throw new Error('Este formulário usa o formato anterior e não pode ser editado aqui. Abra um processo novo ou uma definição nativa. O resto do processo continua editável e pode ser salvo.');
         }
         const next = stored ? parseNativeForm(stored) : createNativeForm();
         lastStored.current = stored ? JSON.stringify(next) : '';
@@ -36,7 +41,11 @@ export function useNativeProcessForm(modeler: any, processReady: boolean) {
     load();
     bus?.on('import.parse.start', pause); bus?.on('import.done', load);
     const flush = async () => {
-      if (!active.current || !draft.current || useModeladorStore.getState().flushForm !== flush) throw new Error('O formulário não está pronto para salvar.');
+      if (useModeladorStore.getState().flushForm !== flush) throw new Error('O formulário não está pronto para salvar.');
+      // Formato anterior: nada a empurrar para o BPMN (o schema fica como está) e o
+      // Salvar do processo segue. Só "ainda carregando" é impedimento de verdade.
+      if (legado.current) return;
+      if (!active.current || !draft.current) throw new Error('O formulário não está pronto para salvar.');
       const serialized = JSON.stringify(draft.current);
       if (serialized !== lastStored.current) {
         setEmbeddedNativeForm(modeler, draft.current);

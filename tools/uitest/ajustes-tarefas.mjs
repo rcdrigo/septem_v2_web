@@ -4,6 +4,7 @@
 //  (14) o popover de prazos (DuePill) NÃO é recortado (portal + fixed).
 // Web 1280 + mobile 375.
 import { chromium } from 'playwright-core';
+import { abrirMenuDoUsuario } from './lib-shell.mjs';
 
 const BASE = 'http://localhost:5173';
 const OUT = process.env.OUT_DIR || '.';
@@ -96,7 +97,7 @@ for (const view of [{ name: 'web', width: 1280, height: 900 }, { name: 'mobile',
   // Abre o diálogo de personificação e escolhe um usuário.
   // O menu do usuário virou Popover: o gatilho é um <span> na barra lateral (não mais um
   // <button>) e os itens saem num PORTAL, fora do <aside>. Abrir e clicar por papel.
-  await page.locator('aside [class*="cursor-pointer"]').last().click();
+  await abrirMenuDoUsuario(page);
   await page.getByRole('menuitem', { name: /Personificar/ }).click();
   await page.waitForSelector('[role=dialog]', { timeout: 8000 });
   await page.waitForTimeout(800);
@@ -113,7 +114,7 @@ for (const view of [{ name: 'web', width: 1280, height: 900 }, { name: 'mobile',
   // sidenav e passou a ser o item "Sair da personificação" no menu do usuário (no mobile
   // continua sendo a faixa âmbar). O que se cobra é a SAÍDA existir e refazer o summary.
   impSummaryHits = 0;
-  await page.locator('aside [class*="cursor-pointer"]').last().click();
+  await abrirMenuDoUsuario(page);
   const sair = page.getByRole('menuitem', { name: /Sair da personificação/ });
   check(await sair.count() === 1, '[web] o menu do usuário oferece sair da personificação');
   await sair.click();

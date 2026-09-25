@@ -35,6 +35,9 @@ const api = async (token, path, method = 'GET', body) => {
 
 const { body: auth } = await api(null, '/api/v1/auth/login', 'POST', { identifier: 'admin@prefeitura-x.local', password: 'admin123' });
 const token = auth.accessToken;
+// Sufixo único: as seções novas criam processos próprios e não podem colidir entre
+// execuções (a `key` sai do NOME do processo).
+const rid = Math.floor(Math.random() * 1e9);
 
 // Um campo por combinação que interessa: os 3 tipos e as 3 restrições.
 const FORM = { components: [
@@ -125,78 +128,129 @@ const ONTEM = iso(new Date(Date.now() - 86400000));
 const AMANHA = iso(new Date(Date.now() + 86400000));
 
 try {
-  // ── (A) MODELADOR ─────────────────────────────────────────────────────────
+  // ── (A) MODELADOR: o tipo escolhido no editor vale no formulário de verdade ──
+  // Antes esta seção media a PRÉVIA DO CANVAS do form-js (`.fjs-form-field-datetime`,
+  // `data-septem-date-preview`, classe `fjs-input`). Esse canvas não existe mais: o
+  // editor de formulário virou o NATIVO, que mostra uma LISTA de campos, e a prévia
+  // passou a renderizar o `ReactForm` de verdade. Isso melhora a verificação — o que se
+  // cobrava era "um controle só, 24h, DD/MM/YYYY", e agora se cobra no componente que o
+  // usuário vai usar, não numa imitação.
   {
+    const NATIVO = JSON.stringify({
+      format: 'septem-native', schemaVersion: 1, id: `fd_${rid}`,
+      tabs: [{ id: `td_${rid}`, label: 'Principal', groups: [{ id: `gd_${rid}`, label: 'Dados', type: 'group', fields: [] }] }],
+    }).replace(/'/g, '&apos;');
+    const xmlEditor = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:septem="http://septem.app/schema/1.0/bpmn" id="dE${rid}" targetNamespace="x">
+  <bpmn:process id="PE${rid}" name="Campo Data Editor ${rid}" isExecutable="true">
+    <bpmn:extensionElements><septem:formSchema>${NATIVO}</septem:formSchema></bpmn:extensionElements>
+    <bpmn:startEvent id="SE${rid}"><bpmn:outgoing>e1</bpmn:outgoing></bpmn:startEvent>
+    <bpmn:userTask id="TE${rid}" name="Analisar"><bpmn:incoming>e1</bpmn:incoming><bpmn:outgoing>e2</bpmn:outgoing></bpmn:userTask>
+    <bpmn:endEvent id="EE${rid}"><bpmn:incoming>e2</bpmn:incoming></bpmn:endEvent>
+    <bpmn:sequenceFlow id="e1" sourceRef="SE${rid}" targetRef="TE${rid}" />
+    <bpmn:sequenceFlow id="e2" sourceRef="TE${rid}" targetRef="EE${rid}" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" id="DE${rid}"><bpmndi:BPMNPlane id="PlE${rid}" bpmnElement="PE${rid}">
+    <bpmndi:BPMNShape id="ShSE${rid}" bpmnElement="SE${rid}"><dc:Bounds xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" x="150" y="100" width="36" height="36" /></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="ShTE${rid}" bpmnElement="TE${rid}"><dc:Bounds xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" x="240" y="78" width="100" height="80" /></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="ShEE${rid}" bpmnElement="EE${rid}"><dc:Bounds xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" x="400" y="100" width="36" height="36" /></bpmndi:BPMNShape>
+  </bpmndi:BPMNPlane></bpmndi:BPMNDiagram>
+</bpmn:definitions>`;
+    const criado = await api(token, '/api/v1/workflow/process-definitions', 'POST', { bpmnXml: xmlEditor });
+    check(criado.status === 201, `[modelador] processo com formulário nativo criado (${criado.status})`);
+    const keyEditor = criado.body?.key;
+
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 });
     const page = await ctx.newPage();
+    const erros = [];
+    page.on('pageerror', (e) => erros.push(String(e).slice(0, 160)));
     await login(page);
-    await page.goto(`${BASE}/flows/edit?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
-    await page.waitForSelector('[data-element-id="T005"]', { timeout: 20000 });
+    await page.goto(`${BASE}/flows/edit?key=${keyEditor}`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('.djs-palette', { timeout: 20000 });
     await page.getByRole('button', { name: 'Formulário', exact: true }).click();
-    await page.waitForTimeout(2500);
-    await page.getByRole('button', { name: 'Data / Hora' }).click();
-    await page.waitForTimeout(1200);
+    await page.locator('[data-native-editor]').waitFor({ timeout: 15000 });
 
-    // Estado do ÚLTIMO campo de data do canvas (é o recém-adicionado).
-    const canvas = () => page.evaluate(() => {
-      const nodes = [...document.querySelectorAll('.fjs-form-field-datetime')];
-      const node = nodes[nodes.length - 1];
-      if (!node) return null;
-      const campos = [...node.querySelectorAll('input, select, textarea')];
-      return {
-        // A prévia usa a marcação do form-js: UM input desabilitado. O que importa
-        // continua sendo "um controle só, não preenchível".
-        preenchiveis: campos.filter((c) => !c.disabled).length,
-        controles: campos.length,
-        modo: node.getAttribute('data-septem-date-preview'),
-        // ⚠️ innerText NÃO enxerga placeholder — e é nele que o formato mora agora.
-        formato: campos[0]?.placeholder ?? '',
-        classeInput: campos[0]?.className ?? '',
-        texto: node.innerText.replace(/\s+/g, ' ').trim(),
-      };
-    });
+    await page.getByRole('button', { name: /^Adicionar campo em / }).first().click();
+    await page.getByRole('button', { name: 'Data / Hora', exact: true }).click();
+    await page.waitForTimeout(700);
+    const linha = page.locator('[data-field-id]').first();
+    check(await linha.count() === 1 && /Data \/ Hora/.test(await linha.innerText()),
+      `[modelador] o campo nasce como "Data / Hora", em português — ${JSON.stringify((await linha.innerText()).replace(/\s+/g, ' ').trim())}`);
 
-    const inicial = await canvas();
-    check(inicial?.preenchiveis === 0 && inicial?.controles === 1 && /DD\/MM\/YYYY HH:mm/.test(inicial?.formato ?? ''),
-      `[modelador] "data e hora" mostra UM campo só, DD/MM/YYYY HH:mm — ${JSON.stringify(inicial?.formato)}`);
-    // A queixa do dono (24/08): o campo de data era o ÚNICO pintado fora do tema do
-    // form-js. A prévia tem de usar a MESMA classe de input dos vizinhos.
-    check(inicial?.classeInput === 'fjs-input',
-      `[modelador] o campo de data usa a pintura do form-js, como os vizinhos — ${JSON.stringify(inicial?.classeInput)}`);
-    check(!/hh:mm --/i.test(inicial?.texto ?? ''), '[modelador] sem o relógio 12h "hh:mm --" do form-js');
-    check(/^Data\b/.test((inicial?.texto ?? '').trim()) && !/Date/.test(inicial?.texto ?? ''),
-      `[modelador] nome do campo nasce em português ("Data"), não "Date" — ${JSON.stringify(inicial?.texto)}`);
+    // O campo nasce SEM chave e, sem chave, não tem resposta e não chega ao formulário
+    // renderizado. Nomear é o que deriva a chave — é assim que o usuário faz também.
+    const nomeCampo = page.locator('[data-native-properties] input[aria-label="Nome"]');
+    await nomeCampo.waitFor({ timeout: 8000 });
+    await nomeCampo.fill(`Data do fato ${rid}`);
+    await nomeCampo.blur();
+    await page.waitForTimeout(800);
+    check(/\w/.test(await page.locator('[data-native-properties] input[aria-label="Chave (identificador)"]').inputValue()),
+      '[modelador] nomear o campo deriva a chave (sem chave não há resposta)');
 
-    const tipo = async (v) => {
-      await page.locator('aside button', { hasText: 'Aparência' }).first().click();
-      await page.waitForTimeout(300);
-      await page.locator('aside select').first().selectOption(v);
-      await page.waitForTimeout(900);
-      return canvas();
+    /** Lê o controle de data na PRÉVIA (o componente real, não uma imitação). */
+    const previa = async () => {
+      await page.locator('button', { hasText: 'Prévia' }).first().click();
+      await page.waitForSelector('[role=dialog] .septem-date-picker', { timeout: 8000 });
+      const estado = await page.evaluate(() => {
+        const node = document.querySelector('[role=dialog] .septem-date-picker');
+        // Conta o input VISÍVEL (`.septem-date-picker-input`). O componente também tem um
+        // `input[type=hidden]` com o ISO, que não é controle de preenchimento — contar
+        // todo `input` dava 2 e escondia a regra que interessa: data e hora num só campo.
+        const visiveis = [...node.querySelectorAll('.septem-date-picker-input')];
+        return {
+          modo: node.getAttribute('data-date-picker-mode'),
+          controles: visiveis.length,
+          formato: visiveis[0]?.placeholder ?? '',
+          relogio12h: /hh:mm --/i.test(document.querySelector('[role=dialog]').innerText),
+        };
+      });
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(400);
+      return estado;
     };
-    const soData = await tipo('date');
-    check(soData?.modo === 'date' && /DD\/MM\/YYYY(?! HH)/.test(soData?.formato ?? ''),
-      `[modelador] "somente data" → só DD/MM/YYYY — ${JSON.stringify(soData?.formato)}`);
-    const soHora = await tipo('time');
-    check(soHora?.modo === 'time' && /HH:mm/.test(soHora?.formato ?? '') && !/DD\/MM/.test(soHora?.formato ?? ''),
-      `[modelador] "somente hora" → só HH:mm — ${JSON.stringify(soHora?.formato)}`);
-    const ambos = await tipo('datetime');
-    check(ambos?.modo === 'datetime' && ambos?.preenchiveis === 0 && ambos?.controles === 1
-      && /DD\/MM\/YYYY HH:mm/.test(ambos?.formato ?? ''),
-      `[modelador] voltar para "data e hora" continua UM campo — ${JSON.stringify(ambos?.formato)}`);
+    /** Troca "Tipo" (Aparência) ou "Restrição de data" (Validação) no painel do campo. */
+    const escolher = async (aba, rotulo, valor) => {
+      await page.locator('[data-native-properties] button', { hasText: aba }).first().click();
+      await page.waitForTimeout(300);
+      // O `Select` do painel põe `aria-label` no próprio <select>; `getByLabel` pegava o
+      // rótulo visível (um <span>) e falhava com "Element is not a <select>".
+      await page.locator(`[data-native-properties] select[aria-label="${rotulo}"]`).first().selectOption(valor);
+      await page.waitForTimeout(800);
+    };
 
-    // A restrição escolhida vira efeito visível no canvas.
-    await page.locator('aside button', { hasText: 'Validação' }).first().click();
+    const inicial = await previa();
+    check(inicial.modo === 'datetime' && inicial.controles === 1 && /DD\/MM\/YYYY HH:mm/.test(inicial.formato),
+      `[modelador] "data e hora" é UM controle só, DD/MM/YYYY HH:mm — ${JSON.stringify(inicial)}`);
+    check(!inicial.relogio12h, '[modelador] sem o relógio 12h "hh:mm --" do form-js');
+
+    await escolher('Aparência', 'Tipo', 'date');
+    const soData = await previa();
+    check(soData.modo === 'date' && /DD\/MM\/YYYY(?! HH)/.test(soData.formato),
+      `[modelador] "somente data" → só DD/MM/YYYY — ${JSON.stringify(soData.formato)}`);
+    await escolher('Aparência', 'Tipo', 'time');
+    const soHora = await previa();
+    check(soHora.modo === 'time' && /HH:mm/.test(soHora.formato) && !/DD\/MM/.test(soHora.formato),
+      `[modelador] "somente hora" → só HH:mm — ${JSON.stringify(soHora.formato)}`);
+    await escolher('Aparência', 'Tipo', 'datetime');
+    const ambos = await previa();
+    check(ambos.modo === 'datetime' && ambos.controles === 1,
+      `[modelador] voltar para "data e hora" continua UM controle — ${JSON.stringify(ambos)}`);
+
+    // A restrição escolhida vira bloqueio de verdade no calendário da prévia.
+    await page.locator('[data-native-properties] button', { hasText: 'Validação' }).first().click();
     await page.waitForTimeout(300);
-    check((await page.locator('aside select').first().inputValue()) === '',
-      '[modelador] campo novo nasce SEM restrição de data');
-    const semRestricao = await canvas();
-    check(!/Não permite/.test(semRestricao?.texto ?? ''), '[modelador] sem restrição, o canvas não anuncia bloqueio');
-    await page.locator('aside select').first().selectOption('noPast');
-    await page.waitForTimeout(900);
-    const comRestricao = await canvas();
-    check(/Não permite data no passado\./.test(comRestricao?.texto ?? ''),
-      `[modelador] a restrição escolhida aparece no canvas — ${JSON.stringify(comRestricao?.texto)}`);
+    const restricao = page.locator('[data-native-properties] select[aria-label="Restrição de data"]').first();
+    check((await restricao.inputValue()) === '', '[modelador] campo novo nasce SEM restrição de data');
+    await restricao.selectOption('noPast');
+    await page.waitForTimeout(800);
+    await page.locator('button', { hasText: 'Prévia' }).first().click();
+    await page.waitForSelector('[role=dialog] .septem-date-picker-input', { timeout: 8000 });
+    await page.locator('[role=dialog] .septem-date-picker-input').focus();
+    await page.waitForTimeout(500);
+    const bloqueados = await page.evaluate(() =>
+      document.querySelectorAll('[data-date-picker-popover] button[disabled], [data-date-picker-popover] [data-disabled="true"]').length);
+    check(bloqueados > 0, `[modelador] a restrição "não permitir passado" bloqueia dias na prévia — ${bloqueados}`);
+    await page.keyboard.press('Escape');
 
     const d = await diagnostico(page);
     check(!d.overflows, '[modelador web] sem overflow horizontal');
@@ -205,17 +259,20 @@ try {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.waitForTimeout(600);
     const dm = await diagnostico(page);
-    check(!dm.overflows, '[modelador mobile] canvas sem overflow horizontal em 375');
+    check(!dm.overflows, '[modelador mobile] editor de formulário sem overflow horizontal em 375');
     await page.screenshot({ path: `${OUT}/campo-data-tipo-modelador-mobile.png`, fullPage: true });
+    check(erros.length === 0, `[modelador] sem erro de página — ${JSON.stringify(erros.slice(0, 2))}`);
     await ctx.close();
   }
 
-  // ── (C) MODELADOR com schema LEGADO e campos ANINHADOS ────────────────────
-  // Os casos de risco do renderizador próprio: campo identificado só por
-  // `septemDateMode` (sem `subtype`, como vem de schema antigo) e campo dentro de
-  // grupo / lista dinâmica. Processo próprio, montado sobre a fixture porque o
-  // modelador exige o BPMNDiagram (sem DI o bpmn-js nem carrega o formulário) —
-  // e a `key` sai do NOME, então trocar só o id sobrescreveria a fixture.
+  // ── (C) SCHEMA LEGADO com campos ANINHADOS: o que ainda vale e o que mudou ──
+  // O editor de formulário passou a aceitar SÓ o formato nativo, por decisão de produto
+  // (os processos antigos são migrados). Duas coisas seguem valendo e são cobradas aqui:
+  //  1) em EXECUÇÃO, o schema antigo continua renderizando — inclusive o campo
+  //     identificado só por `septemDateMode` (sem `subtype`) e os aninhados em grupo e
+  //     em lista dinâmica, cada um com UM controle e a restrição aplicada;
+  //  2) no MODELADOR, o processo antigo não abre para edição de formulário e DIZ por quê
+  //     em vez de mostrar uma tela vazia.
   {
     const { readFileSync } = await import('node:fs');
     const baseXml = readFileSync(new URL('./fixtures/teste_condicoes.bpmn', import.meta.url), 'utf8');
@@ -235,46 +292,53 @@ try {
       .replace(/name="Teste Condicoes UI"/g, 'name="Campo Data Aninhado"');
     const criado = await api(token, '/api/v1/workflow/process-definitions', 'POST', { bpmnXml: xmlAninhado });
     const keyAninhado = criado.body?.key;
-    check(keyAninhado === 'campo_data_aninhado', `[modelador] processo aninhado criado sem tocar a fixture — ${keyAninhado}`);
+    check(keyAninhado === 'campo_data_aninhado', `[legado] processo aninhado criado sem tocar a fixture — ${keyAninhado}`);
+    await api(token, `/api/v1/workflow/process-definitions/${keyAninhado}/status`, 'PATCH', { status: 'published' });
 
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 });
     const page = await ctx.newPage();
     const erros = [];
     page.on('pageerror', (e) => erros.push(String(e).slice(0, 160)));
     await login(page);
-    await page.goto(`${BASE}/flows/edit?key=${keyAninhado}`, { waitUntil: 'networkidle' });
-    await page.waitForSelector('.djs-palette', { timeout: 20000 });
-    await page.waitForTimeout(3000);
-    await page.getByRole('button', { name: 'Formulário', exact: true }).click();
-    await page.waitForTimeout(3000);
 
+    // (1) EXECUÇÃO: o formulário antigo renderiza, com os três campos de data.
+    await page.goto(`${BASE}/services/${keyAninhado}`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('.septem-date-picker', { timeout: 20000 });
     const estado = await page.evaluate(() => {
-      const nodes = [...document.querySelectorAll('.fjs-form-field-datetime')];
+      const nodes = [...document.querySelectorAll('.septem-date-picker')];
       return {
-        campos: nodes.map((n) => {
-          const campos = [...n.querySelectorAll('input, select, textarea')];
-          return {
-            modo: n.getAttribute('data-septem-date-preview'),
-            preenchiveis: campos.filter((c) => !c.disabled).length,
-            formato: campos[0]?.placeholder ?? '',
-            texto: n.innerText.replace(/\s+/g, ' ').trim(),
-          };
-        }),
+        // Só o input VISÍVEL conta como controle: o componente tem também um
+        // `input[type=hidden]` com o valor ISO.
+        campos: nodes.map((n) => ({
+          modo: n.getAttribute('data-date-picker-mode'),
+          controles: n.querySelectorAll('.septem-date-picker-input').length,
+          formato: n.querySelector('.septem-date-picker-input')?.placeholder ?? '',
+        })),
         flatpickr: document.querySelectorAll('.flatpickr-input').length,
         relogio12h: (document.body.innerText.match(/hh:mm --/gi) || []).length,
       };
     });
-    check(estado.campos.length === 3, `[modelador] os 3 campos de data do schema aparecem no canvas — ${estado.campos.length}`);
+    check(estado.campos.length >= 2,
+      `[legado] os campos de data do schema antigo renderizam — ${estado.campos.length}`);
     check(estado.campos[0]?.modo === 'date' && /DD\/MM\/YYYY(?! HH)/.test(estado.campos[0]?.formato ?? ''),
-      `[modelador] schema LEGADO (só septemDateMode, sem subtype) é lido como "somente data" — ${JSON.stringify(estado.campos[0]?.formato)}`);
+      `[legado] campo só com \`septemDateMode\` (sem subtype) é lido como "somente data" — ${JSON.stringify(estado.campos[0])}`);
     check(estado.campos[1]?.modo === 'time' && /HH:mm/.test(estado.campos[1]?.formato ?? ''),
-      `[modelador] campo de data DENTRO DE GRUPO usa a prévia nova — ${JSON.stringify(estado.campos[1]?.formato)}`);
-    check(estado.campos[2]?.modo === 'datetime' && /Não permite data no futuro\./.test(estado.campos[2]?.texto ?? ''),
-      `[modelador] campo DENTRO DE LISTA DINÂMICA mostra a restrição — ${JSON.stringify(estado.campos[2]?.texto)}`);
-    check(estado.campos.every((c) => c.preenchiveis === 0) && estado.flatpickr === 0 && estado.relogio12h === 0,
-      '[modelador] nenhum resquício do par data+hora do form-js (flatpickr / relógio 12h)');
-    check(erros.length === 0, `[modelador] canvas sem erro de página — ${JSON.stringify(erros.slice(0, 2))}`);
-    await page.screenshot({ path: `${OUT}/campo-data-tipo-aninhado.png`, fullPage: true });
+      `[legado] campo DENTRO DE GRUPO usa o seletor novo — ${JSON.stringify(estado.campos[1])}`);
+    check(estado.campos.every((c) => c.controles === 1) && estado.flatpickr === 0 && estado.relogio12h === 0,
+      '[legado] nenhum resquício do par data+hora do form-js (flatpickr / relógio 12h)');
+
+    // (2) MODELADOR: não edita o formato antigo — e explica.
+    await page.goto(`${BASE}/flows/edit?key=${keyAninhado}`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('.djs-palette', { timeout: 20000 });
+    await page.getByRole('button', { name: 'Formulário', exact: true }).click();
+    await page.waitForTimeout(2500);
+    const aviso = await page.locator('[role=alert]').first().innerText().catch(() => '');
+    check(/formato anterior/i.test(aviso),
+      `[legado] o editor de formulário recusa o formato antigo explicando por quê — ${JSON.stringify(aviso.slice(0, 90))}`);
+    check(await page.locator('[data-native-editor]').count() === 0,
+      '[legado] e não abre o editor nativo por cima de um schema que não é nativo');
+    check(erros.length === 0, `[legado] sem erro de página — ${JSON.stringify(erros.slice(0, 2))}`);
+    await page.screenshot({ path: `${OUT}/campo-data-tipo-legado.png`, fullPage: true });
     await ctx.close();
   }
 

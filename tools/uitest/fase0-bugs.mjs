@@ -1,4 +1,5 @@
 import { chromium } from 'playwright-core';
+import { abrirMenuDoUsuario } from './lib-shell.mjs';
 const OUT = process.env.OUT_DIR || '.';
 let failures = 0;
 function check(ok, msg) { if (!ok) failures++; console.log(`${ok ? '✓' : '✗ FALHOU'} ${msg}`); }
@@ -52,7 +53,10 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
       return !!a && a.getBoundingClientRect().left >= 0;
     }, { timeout: 8000 }).catch(() => {});
   }
-  await page.locator('aside button', { hasText: 'Sair' }).click();
+  // Sair deixou de ser botão no rodapé do sidenav: agora é o último item do menu do
+  // usuário (popover com gatilho em <span>, itens em portal).
+  await abrirMenuDoUsuario(page);
+  await page.getByRole('menuitem', { name: /^Sair$/ }).click();
   await page.waitForURL(/\/login/, { timeout: 10000 }).catch(() => {});
   await page.waitForTimeout(800);
 
@@ -82,7 +86,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
 
   // O menu do usuário virou Popover: o gatilho é um <span> na barra lateral (não mais um
   // <button>) e os itens saem num PORTAL, fora do <aside>. Abrir e clicar por papel.
-  await page.locator('aside [class*="cursor-pointer"]').last().click();
+  await abrirMenuDoUsuario(page);
   await page.getByRole('menuitem', { name: /Personificar/ }).click();
   await page.waitForSelector('[role=dialog]', { timeout: 8000 });
   await page.waitForTimeout(800);
@@ -94,14 +98,29 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await page.waitForTimeout(2000);
   if (vp.n === 'mobile') { await page.locator('button[aria-label="Abrir menu"]').click().catch(() => {}); await page.waitForTimeout(400); }
 
-  const banner = page.locator('aside .bg-amber-50 button', { hasText: 'Sair' });
-  const visivel = await banner.count();
-  const habilitado = visivel ? await banner.isEnabled() : false;
-  check(visivel === 1, `[${vp.n}][${alvoNome}] botão "Sair da personificação" presente`);
-  check(habilitado, `[${vp.n}][${alvoNome}] botão HABILITADO (bug do dono: ficava desativado)`);
+  // A saída da personificação tem DOIS lugares depois da reestruturação: a faixa âmbar
+  // fixa no mobile (onde não há sidenav visível) e o item "Sair da personificação" no
+  // menu do usuário, no desktop. O que se cobra é que exista e esteja habilitada.
+  let sair;
+  if (vp.n === 'mobile') {
+    // O drawer aberto cobre a faixa âmbar: fecha pelo backdrop antes de clicar.
+    await page.locator('.bg-black\\/40').click({ position: { x: 300, y: 600 } }).catch(() => {});
+    await page.waitForTimeout(500);
+    sair = page.locator('.bg-amber-500 button', { hasText: 'Sair' });
+  } else {
+    await abrirMenuDoUsuario(page);
+    sair = page.getByRole('menuitem', { name: /Sair da personificação/ });
+  }
+  const visivel = await sair.count();
+  const habilitado = visivel ? await sair.first().isEnabled() : false;
+  check(visivel === 1, `[${vp.n}][${alvoNome}] saída da personificação presente`);
+  check(habilitado, `[${vp.n}][${alvoNome}] e HABILITADA (bug do dono: ficava desativada)`);
 
-  await banner.click();
-  await page.waitForTimeout(2500);
+  await sair.first().click();
+  // Espera o DESFECHO (o aviso sair da tela), não um tempo fixo: a volta passa por
+  // /impersonate/stop + recarga da sessão e sob carga leva mais que 2,5 s.
+  await page.waitForFunction(() => !document.body.innerText.includes('Personificando'),
+    null, { timeout: 15000 }).catch(() => {});
   const voltou = await page.evaluate(() => !document.body.innerText.includes('Personificando'));
   check(voltou, `[${vp.n}][${alvoNome}] voltou ao usuário original (sem re-login)`);
   await page.screenshot({ path: `${OUT}/fase0-impersonate-${vp.n}.png` });
@@ -194,8 +213,15 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await page.waitForTimeout(2500);
 
   // o histórico de concluídas deve mostrar o processo que acabei de iniciar
-  await page.goto(BASE + '/tasks', { waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: 'Concluídas' }).click();
+  await page.goto(BASE + '/tasks', { waitUntil: 'domcontentloaded' });
+  // Espera o switcher existir antes de clicar e, se não vier, diz o que havia na tela:
+  // um timeout seco aqui não se investiga.
+  const switcher = page.getByRole('group', { name: 'Situação das tarefas' });
+  await switcher.waitFor({ timeout: 20000 }).catch(async () => {
+    console.log(`! [${vp.n}] sem switcher em /tasks: ` +
+      JSON.stringify((await page.locator('button').allInnerTexts()).map((t) => t.trim()).slice(0, 12)));
+  });
+  await switcher.getByRole('button', { name: 'Concluídas' }).click();
   await page.waitForTimeout(2000);
   const txt = await page.evaluate(() => document.body.innerText);
   check(!/Nenhuma tarefa|Nada por aqui/i.test(txt), `[${vp.n}] item5: histórico de concluídas NÃO está vazio`);

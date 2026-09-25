@@ -158,14 +158,25 @@ try {
     // autor e justificativa — que é o que o usuário precisa ler.
     await page.keyboard.press('Escape');
     await page.waitForTimeout(400);
-    const abaTramitacao = page.getByRole('tab', { name: /Tramitação/i });
-    if (await abaTramitacao.count() > 0) {
-      await abaTramitacao.click();
-      await page.waitForTimeout(600);
-    }
-    const linha = page.locator('li', { hasText: `Faltou o parecer ${rid}` }).last();
+    // A tramitação deixou de ser ABA do relatório: virou o diálogo "Tramitação completa",
+    // aberto pelo botão "Visualizar tramitação completa" no card do próximo passo.
+    // Recarrega em vez de tentar fechar o menu de Ações: com o menu aberto o botão da
+    // tramitação fica coberto — o Playwright o vê "instável" e, com `force`, o clique
+    // cai no item que estiver por cima (uma vez caiu em "Excluir requisição").
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('text=Ações', { timeout: 20000 });
+    await page.waitForTimeout(800);
+    const verTramitacao = page.getByRole('button', { name: /tramitação completa/i }).first();
+    await verTramitacao.scrollIntoViewIfNeeded();
+    await verTramitacao.click();
+    await page.waitForSelector('[role=dialog]', { timeout: 8000 });
+    await page.waitForTimeout(600);
+    const linha = page.locator('[role=dialog] li', { hasText: `Faltou o parecer ${rid}` }).last();
     const temLinha = await linha.count() > 0 && await linha.isVisible();
-    check(temLinha, `[${vp.n}] a ação aparece na tramitação para o usuário`);
+    // Sem o conteúdo do diálogo na mensagem, uma falha aqui não se investiga.
+    const dialogo = (await page.locator('[role=dialog]').first().innerText().catch(() => '(sem diálogo)'))
+      .replace(/\s+/g, ' ').slice(0, 160);
+    check(temLinha, `[${vp.n}] a ação aparece na tramitação para o usuário — ${JSON.stringify(dialogo)}`);
     const textoLinha = temLinha ? await linha.innerText() : '';
     check(/Devolvido para tarefa já executada/i.test(textoLinha),
       `[${vp.n}] com o rótulo da ação (${textoLinha.slice(0, 60).replace(/\n/g, ' ')})`);

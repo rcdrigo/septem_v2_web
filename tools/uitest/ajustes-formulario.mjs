@@ -53,7 +53,9 @@ const key = saved.body.key;
 const pub = await api(token, `/api/v1/workflow/process-definitions/${key}/status`, 'PATCH', { status: 'published' });
 check(pub.status === 200 || pub.status === 204, `[api] processo publicado (${pub.status})`);
 
-const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
+const chrome = process.env.CHROME_BIN
+  || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : '/usr/bin/google-chrome');
+const browser = await chromium.launch({ executablePath: chrome, headless: true });
 
 async function login(page) {
   await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
@@ -129,49 +131,71 @@ for (const view of [{ name: 'web', width: 1280, height: 900 }, { name: 'mobile',
   await ctx.close();
 }
 
-// ── Item 4 (round-trip): o MODELADOR persiste a escolha de layout dos grupos ──
-// Usa uma CÓPIA de um processo real (com BPMN DI) — sem DI, o bpmn-js do modelador
-// não monta o businessObject e o form embutido não carrega (artefato de teste).
+// ── Item 4 (round-trip): o que o EDITOR DE FORMULÁRIO muda sobrevive ao Salvar ──
+// Antes isto media o toggle "Abas / Empilhados" do editor form-js. Esse toggle NÃO
+// EXISTE MAIS: o editor de formulário passou a ser o nativo, cuja estrutura é sempre
+// em abas (`definition.tabs`) — não há layout a escolher. O `septemGroupLayout` do XML
+// continua honrado em EXECUÇÃO para os formulários no formato antigo (é o que os checks
+// do item 4 acima medem), mas não há tela para alterá-lo.
+// O que restou de substância, e é o que se cobra aqui: uma alteração feita no editor
+// de formulário chega ao processo salvo. Precisa de DI (senão o bpmn-js não monta) e de
+// formulário NATIVO (o editor recusa o formato anterior, por decisão de produto).
 {
-  const base = await api(token, '/api/v1/workflow/process-definitions/teste_condicoes_ui');
-  const rtXml = (base.body?.bpmnXml ?? '').replace(/(<bpmn:process[^>]*\sname=")[^"]*(")/, `$1RoundTrip ${rid}$2`);
-  const rtSaved = await api(token, '/api/v1/workflow/process-definitions', 'POST', { bpmnXml: rtXml });
+  const NATIVO = JSON.stringify({
+    format: 'septem-native', schemaVersion: 1, id: `fn_${rid}`,
+    tabs: [{ id: `tn_${rid}`, label: 'Principal', groups: [{ id: `gn_${rid}`, label: 'Dados', type: 'group', fields: [
+      { id: `cn_${rid}`, kind: 'field', type: 'textfield', key: 'campo_a', label: 'Campo A' },
+    ] }] }],
+  }).replace(/'/g, '&apos;');
+  const XML_RT = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:septem="http://septem.app/schema/1.0/bpmn" id="dR${rid}" targetNamespace="x">
+  <bpmn:process id="PR${rid}" name="Form RT ${rid}" isExecutable="true">
+    <bpmn:extensionElements><septem:formSchema>${NATIVO}</septem:formSchema></bpmn:extensionElements>
+    <bpmn:startEvent id="SR${rid}"><bpmn:outgoing>r1</bpmn:outgoing></bpmn:startEvent>
+    <bpmn:userTask id="TR${rid}" name="Analisar"><bpmn:incoming>r1</bpmn:incoming><bpmn:outgoing>r2</bpmn:outgoing></bpmn:userTask>
+    <bpmn:endEvent id="ER${rid}"><bpmn:incoming>r2</bpmn:incoming></bpmn:endEvent>
+    <bpmn:sequenceFlow id="r1" sourceRef="SR${rid}" targetRef="TR${rid}" />
+    <bpmn:sequenceFlow id="r2" sourceRef="TR${rid}" targetRef="ER${rid}" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" id="DR${rid}"><bpmndi:BPMNPlane id="PlR${rid}" bpmnElement="PR${rid}">
+    <bpmndi:BPMNShape id="ShS${rid}" bpmnElement="SR${rid}"><dc:Bounds xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" x="150" y="100" width="36" height="36" /></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="ShT${rid}" bpmnElement="TR${rid}"><dc:Bounds xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" x="240" y="78" width="100" height="80" /></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="ShE${rid}" bpmnElement="ER${rid}"><dc:Bounds xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" x="400" y="100" width="36" height="36" /></bpmndi:BPMNShape>
+  </bpmndi:BPMNPlane></bpmndi:BPMNDiagram>
+</bpmn:definitions>`;
+  const rtSaved = await api(token, '/api/v1/workflow/process-definitions', 'POST', { bpmnXml: XML_RT });
+  check(rtSaved.status === 201, `[modelador] processo com formulário nativo criado (${rtSaved.status})`);
   const rtKey = rtSaved.body.key;
+
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
   await login(page);
   await page.goto(`${BASE}/flows/edit?key=${rtKey}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.djs-palette', { timeout: 20000 });
   await page.locator('header button, nav button', { hasText: 'Formulário' }).first().click();
-  await page.waitForTimeout(2500);
+  await page.locator('[data-native-editor]').waitFor({ timeout: 15000 });
+  check(await page.locator('[data-field-id]').count() === 1,
+    '[modelador] o editor abre o formulário nativo do processo salvo');
 
-  // O toggle carrega a escolha persistida (o processo base nasceu com 'tabs').
-  const abasBtn = page.locator('button', { hasText: 'Abas' }).first();
-  const empBtn = page.locator('button', { hasText: 'Empilhados' }).first();
-  const abasAtivo = await abasBtn.evaluate((el) => el.className.includes('bg-slate-900'));
-  check(abasAtivo, '[modelador] o toggle carrega a escolha persistida (Abas ativa)');
-  const key = rtKey; // o round-trip abaixo opera sobre a cópia
+  // Renomeia a aba e salva.
+  const NOVA_ABA = `Aba RT ${rid}`;
+  await page.getByRole('button', { name: 'Configurar aba', exact: true }).click();
+  // O painel da ABA usa <Field label="Nome"> (label envolvendo o input), não o `Text`
+  // com aria-label do painel de CAMPO — daí o getByLabel em vez do seletor por atributo.
+  const nome = page.locator('[data-native-properties]').getByLabel('Nome').first();
+  await nome.waitFor({ timeout: 8000 });
+  await nome.fill(NOVA_ABA);
+  await nome.blur();
+  await page.waitForTimeout(900);
+  await page.locator('header button', { hasText: 'Salvar' }).first().click();
+  await page.waitForTimeout(3000);
 
-  async function salvar() {
-    await page.locator('header button', { hasText: 'Salvar' }).first().click();
-    await page.waitForTimeout(3000);
-  }
-  const layoutNoXml = async () => {
-    const det = await api(token, `/api/v1/workflow/process-definitions/${key}`);
-    const m = (det.body?.bpmnXml ?? '').match(/septemGroupLayout[\\"':]+(\w+)/);
-    return m?.[1] ?? null;
-  };
-
-  await empBtn.click();
-  await page.waitForTimeout(500);
-  await salvar();
-  check((await layoutNoXml()) === 'stacked', '[modelador] trocar para Empilhados persiste (stacked) no processo salvo');
-
-  await empBtn.click(); // reabre para clicar Abas (mesmo grupo de botões)
-  await page.locator('button', { hasText: 'Abas' }).first().click();
-  await page.waitForTimeout(500);
-  await salvar();
-  check((await layoutNoXml()) === 'tabs', '[modelador] trocar para Abas persiste (tabs) no processo salvo');
+  const det = await api(token, `/api/v1/workflow/process-definitions/${rtKey}`);
+  const xmlSalvo = det.body?.bpmnXml ?? '';
+  check(xmlSalvo.includes(NOVA_ABA),
+    '[modelador] round-trip: a alteração do editor de formulário sobrevive ao Salvar');
+  check(/septem-native/.test(xmlSalvo),
+    '[modelador] e o formulário continua no formato nativo');
 
   await ctx.close();
 }
