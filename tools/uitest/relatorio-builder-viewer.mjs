@@ -1,4 +1,5 @@
 import { chromium } from 'playwright-core';
+import { filtrarRelatorioOpcao, categoriasDoRelatorio } from './lib-filtros.mjs';
 
 const BASE = 'http://localhost:5173';
 const API = 'http://localhost:5000';
@@ -93,25 +94,23 @@ const state = await viewer.evaluate(() => ({
   kpi: document.body.innerText.includes('R$') && document.body.innerText.includes('2.750'),
   charts: document.querySelectorAll('canvas').length,
   timestamp: /Dados de \d{2}\/\d{2}\/\d{4}/.test(document.body.innerText),
-  filtro: [...document.querySelectorAll('label')].some((l) => l.textContent?.includes('Setor')),
   detailBtns: document.querySelectorAll('button[aria-label="Visualizar detalhamento"]').length,
   exportBtns: [...document.querySelectorAll('button')].filter((b) => /CSV|XLSX/.test(b.textContent ?? '')).length,
 }));
 check(state.kpi, 'KPI formatado em moeda com o total correto (R$ 2.750)');
 check(state.charts >= 2, `gráficos Chart.js renderizados (pizza + barras): ${state.charts} canvas`);
 check(state.timestamp, 'timestamp do cache exibido');
-check(state.filtro, 'filtro global "Setor" presente');
+// Os filtros do relatório saíram da barra e viraram categorias de um popover.
+const categorias = await categoriasDoRelatorio(viewer);
+check(categorias.some((c) => c.includes('Setor')), `filtro global "Setor" presente (${JSON.stringify(categorias)})`);
 check(state.detailBtns > 0, `tabela com coluna oculta mostra botão de detalhe por linha (${state.detailBtns})`);
 check(state.exportBtns >= 2, 'botões de exportação CSV/XLSX presentes');
 
 // filtro global: aplica "Obras" → KPI recalcula (1200+800=2000)
-await viewer.selectOption('select', 'Obras');
-await viewer.locator('button', { hasText: 'Aplicar filtros' }).click();
-await viewer.waitForTimeout(1200);
+// Filtro de lista virou rádio no popover e aplica sozinho (sem "Aplicar filtros").
+await filtrarRelatorioOpcao(viewer, 'Setor', 'Obras');
 check(await viewer.evaluate(() => document.body.innerText.includes('2.000')), 'filtro global aplicado recalcula KPI (R$ 2.000)');
-await viewer.selectOption('select', '');
-await viewer.locator('button', { hasText: 'Aplicar filtros' }).click();
-await viewer.waitForTimeout(800);
+await filtrarRelatorioOpcao(viewer, 'Setor', 'Qualquer valor');
 
 // detalhe da linha (coluna oculta)
 await viewer.locator('button[aria-label="Visualizar detalhamento"]').first().click();

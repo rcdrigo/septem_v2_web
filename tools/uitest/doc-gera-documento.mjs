@@ -31,15 +31,19 @@ const base = await api(token, '/api/v1/workflow/process-definitions/teste_condic
 // O EDITOR do form-js exige o envelope (type/schemaVersion) — sem ele recusa o schema
 // com "form field of type <undefined> not supported" e abre o formulário vazio. O
 // runtime (ReactForm) é tolerante, por isso os outros testes passavam sem o envelope.
+// Formulário NATIVO: o editor de formulário do modelador só assume esse formato (o
+// anterior nem abre, por decisão de produto). Um campo de anexo já nomeado — sem chave o
+// campo não é guardado ao salvar.
 const FORM = {
-  type: 'default',
-  schemaVersion: 17,
-  components: [{ type: 'filepicker', key: 'documento', label: 'Documento', id: 'doc_anexo' }],
+  format: 'septem-native', schemaVersion: 1, id: `fdg_${rid}`,
+  tabs: [{ id: `tdg_${rid}`, label: 'Principal', groups: [{ id: `gdg_${rid}`, label: 'Dados', type: 'group', fields: [
+    { id: `cdg_${rid}`, kind: 'field', type: 'filepicker', key: 'documento', label: 'Documento' },
+  ] }] }],
 };
 const XML = (base.body?.bpmnXml ?? '')
   .replace(/<septem:formSchema>[\s\S]*?<\/septem:formSchema>/, `<septem:formSchema>${JSON.stringify(FORM)}</septem:formSchema>`)
   .replace(/(<bpmn:process[^>]*\sname=")[^"]*(")/, `$1Gera Documento ${rid}$2`);
-check(XML.includes('filepicker'), '[setup] XML base preparado com o campo de anexo');
+check(XML.includes('filepicker') && XML.includes('septem-native'), '[setup] XML base com o campo de anexo em formulário nativo');
 const salvo = await api(token, '/api/v1/workflow/process-definitions', 'POST', { bpmnXml: XML });
 check(salvo.status === 201, `[api] processo com campo de anexo criado (${salvo.status})`);
 const key = salvo.body.key;
@@ -57,11 +61,11 @@ try {
   await page.goto(`${BASE}/flows/edit?key=${key}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.djs-palette', { timeout: 20000 });
   await page.locator('header button, nav button', { hasText: 'Formulário' }).first().click();
-  await page.waitForTimeout(2000);
+  await page.locator('[data-native-editor]').waitFor({ timeout: 15000 });
 
-  // Seleciona o campo de anexo no canvas do form-js.
-  await page.locator('.fjs-element').last().click();
-  await page.waitForTimeout(800);
+  // Seleciona o campo de anexo na LISTA do editor nativo (o canvas do form-js não existe).
+  await page.locator('[data-field-id]', { hasText: 'Documento' }).first().click();
+  await page.locator('[data-native-properties] input[aria-label="Nome"]').waitFor({ timeout: 10000 });
 
   // :50 — o checkbox existe e vem DESMARCADO por padrão.
   // O painel usa o <Switch> de ui/Field: o input é sr-only atrás do visual do

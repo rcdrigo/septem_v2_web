@@ -68,3 +68,81 @@ export async function filtrarRelatorio(page, rotulo, valor) {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(900);
 }
+
+/** Escolhe uma OPÇÃO de um filtro do tipo lista no relatório (vira rádio no popover). */
+export async function filtrarRelatorioOpcao(page, rotulo, opcao) {
+  const popup = page.locator('[data-testid=report-filters]');
+  if (await popup.count() === 0 || !(await popup.first().isVisible())) {
+    await page.locator('.ef-trigger', { hasText: 'Filtros' }).first().click();
+    await popup.first().waitFor({ timeout: 8000 });
+  }
+  await popup.locator('.ef-category', { hasText: rotulo }).first().click();
+  await popup.locator('.ef-option', { hasText: opcao }).first().locator('input').check();
+  await page.waitForTimeout(400);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(1200);
+}
+
+/** Lista os rótulos das categorias de filtro do relatório (abre e fecha o popover). */
+export async function categoriasDoRelatorio(page) {
+  await page.locator('.ef-trigger', { hasText: 'Filtros' }).first().click();
+  const popup = page.locator('[data-testid=report-filters]');
+  await popup.waitFor({ timeout: 8000 });
+  const nomes = (await popup.locator('.ef-category').allInnerTexts()).map((t) => t.trim());
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+  return nomes;
+}
+
+// ── Leitura e uso dos filtros da LISTA (tarefas e requisições) ─────────────────
+
+/** Rótulos dos chips de filtro ativos, no formato "Categoria: resumo". */
+export async function chipsDeFiltro(page) {
+  return (await page.locator('.ef-chip .ef-chip-label').allInnerTexts()).map((t) => t.trim());
+}
+
+/** Marca um PROCESSO na categoria "Processos" e devolve o contador exibido para ele. */
+export async function escolherProcesso(page, nome) {
+  await escolherCategoria(page, 'Processos');
+  const opcao = page.locator('[data-testid=filtro-processos] .ef-option', { hasText: nome }).first();
+  await opcao.waitFor({ timeout: 8000 });
+  const contador = (await opcao.locator('span').last().innerText()).trim();
+  await opcao.locator('input').check();
+  await page.waitForTimeout(400);
+  await fecharFiltros(page);
+  return contador;
+}
+
+/** Ordena a lista: `campo` é '', 'prazo' ou 'numero'; `direcao` é 'asc' ou 'desc'. */
+export async function ordenarPor(page, campo, direcao) {
+  await escolherCategoria(page, 'Ordenação');
+  await page.locator('[data-testid=filtro-ordenar]').selectOption(campo);
+  await page.waitForTimeout(300);
+  if (direcao) {
+    await page.locator('[data-testid=painel-filtros] .ef-option', { hasText: direcao === 'asc' ? 'Crescente' : 'Decrescente' })
+      .first().locator('input').check();
+    await page.waitForTimeout(300);
+  }
+  await fecharFiltros(page);
+}
+
+/** Preenche um intervalo de datas. `categoria` é o rótulo; `de`/`ate` são ISO (ou ''). */
+export async function filtrarIntervalo(page, categoria, prefixo, de, ate) {
+  await escolherCategoria(page, categoria);
+  if (de !== undefined) await page.locator(`[data-testid=painel-filtros] input[aria-label="${prefixo} de"]`).fill(de);
+  if (ate !== undefined) await page.locator(`[data-testid=painel-filtros] input[aria-label="${prefixo} até"]`).fill(ate);
+  await page.waitForTimeout(400);
+  await fecharFiltros(page);
+}
+
+/** Remove um filtro pelo chip (o rótulo do botão é "Remover filtro <categoria>"). */
+export async function removerFiltro(page, categoria) {
+  await page.getByRole('button', { name: `Remover filtro ${categoria}` }).first().click();
+  await page.waitForTimeout(600);
+}
+
+/** Limpa todos os filtros. */
+export async function limparFiltros(page) {
+  await page.locator('[data-testid=limpar-filtros]').first().click();
+  await page.waitForTimeout(800);
+}

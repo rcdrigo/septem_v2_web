@@ -7,7 +7,7 @@ UITEST=$PWD
 # ['src/lib/native-form.ts']`) e nem compilam quando o processo roda de `tools/uitest`.
 # Rodar da raiz atende as duas: OUT_DIR continua apontando para cá.
 RAIZ=$(cd ../.. && pwd)
-PASS=0; FAIL=0; FAILED=""; CHECKS=0
+PASS=0; FAIL=0; FAILED=""; CHECKS=0; PENDENTES=""
 
 # O Chrome mora em lugar diferente por SO e há mais de uma máquina rodando esta bateria.
 # Toda sonda aceita CHROME_BIN, mas várias caem no caminho do macOS quando ele não está
@@ -35,7 +35,10 @@ echo "Aquecendo o front... $(cd "$RAIZ" && OUT_DIR="$UITEST" node tools/uitest/w
 # O detector antigo só olhava "PASSOU" e reprovava ~30 suítes verdes do outro dev.
 for f in *.mjs; do
   # `lib-*.mjs` são helpers compartilhados, não suítes.
+  # `pendente-*.mjs` são suítes cuja TELA deixou de existir e que esperam decisão do dono:
+  # não contam como verde nem como falha, mas aparecem no fim para não sumirem do radar.
   case "$f" in debug-*|lib-*|warmup.mjs) continue;; esac
+  case "$f" in pendente-*) PENDENTES="$PENDENTES ${f%.mjs}"; continue;; esac
   # Teto por suíte: uma sonda que espera uma promessa que nunca resolve (aconteceu com
   # `script-task-modeler`, parada no `await saved`) travava a BATERIA INTEIRA, sem teto.
   OUT=$(cd "$RAIZ" && OUT_DIR="$UITEST" timeout "${SUITE_TIMEOUT:-600}" node "tools/uitest/$f" 2>&1); RC=$?
@@ -61,4 +64,5 @@ done
 echo "────────────────────────────────────────────"
 echo "SUÍTES: $PASS ok / $((PASS+FAIL)) · CHECKS: $CHECKS"
 [ -n "$FAILED" ] && echo "FALHARAM:$FAILED"
+[ -n "$PENDENTES" ] && echo "PENDENTES (tela removida, aguardando decisão):$PENDENTES"
 exit $FAIL

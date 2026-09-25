@@ -1,5 +1,6 @@
 import { ExecutionSummary } from '@/components/execution/ExecutionSummary';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { ExecutionFilters, useExecutionFilters } from '@/components/execution/ExecutionFilters';
 import { AlertCircle, ArrowRight, CheckCircle2, Clock, ExternalLink, FileSignature, Inbox, LayoutGrid, LifeBuoy, RotateCw, Table as TableIcon, User, X } from 'lucide-react';
@@ -27,7 +28,18 @@ export function TarefasPage() {
   // Pendentes × Concluídas: a reestruturação deixou a lista fixa em 'pendentes' e o
   // histórico do que o usuário concluiu ficou inalcançável (a `TarefasExecutadasPage`
   // não tem rota). O switcher volta aqui, que é onde o usuário procura.
-  const [situacao, setSituacao] = useState<'pendentes' | 'concluidas'>('pendentes');
+  //
+  // O estado fica na URL — link colado e recarga precisam cair na mesma lista — sob o nome
+  // `caixa`, NÃO `status`: `status=concluidas` é um parâmetro que os filtros apagam de
+  // propósito (link antigo cai em pendentes), e reaproveitá-lo faria a caixa trocar
+  // sozinha no meio de uma busca.
+  const [params, setParams] = useSearchParams();
+  const situacao: 'pendentes' | 'concluidas' = params.get('caixa') === 'concluidas' ? 'concluidas' : 'pendentes';
+  const setSituacao = (valor: 'pendentes' | 'concluidas') => {
+    const next = new URLSearchParams(params);
+    if (valor === 'concluidas') next.set('caixa', valor); else next.delete('caixa');
+    setParams(next, { replace: true });
+  };
   const tasks = useTasks(situacao, filters);
   const [view, setView] = useViewMode();
   const openTask = (task: TaskListItem) => openTab(routes.task(task.id));

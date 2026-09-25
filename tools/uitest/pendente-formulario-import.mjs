@@ -1,3 +1,14 @@
+// ⏸ PENDENTE — a TELA que esta suíte exercita não existe mais.
+//
+// O botão "Importar" (formulário a partir de planilha, Fase 4d) vivia no editor de
+// formulário form-js, substituído pelo editor NATIVO. O backend continua inteiro
+// (`FormImportEndpoints` + `FormXlsxImporter`, com testes verdes), mas ele produz um
+// schema no FORMATO ANTERIOR (`schemaVersion: 17`, `components`) — e o editor novo só
+// assume `septem-native`. Portar o importador para o formato nativo é decisão de produto,
+// não conserto de sonda: enquanto isso, importar planilha levaria a um formulário que o
+// modelador não abre.
+//
+// O `run-all.sh` ignora `pendente-*.mjs` e lista o nome no fim da bateria.
 // Fase 4d — Importar formulário via planilha. No MODELADOR: baixar o modelo, subir
 // a planilha e SOBRESCREVER o formulário; planilha inválida lista os erros; o botão
 // é DESABILITADO quando o processo já tem instâncias. Web 1280 (+ modal no mobile 375).

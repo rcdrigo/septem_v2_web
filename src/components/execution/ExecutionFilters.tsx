@@ -54,6 +54,8 @@ export function useExecutionFilters(kind: 'tasks' | 'requests', canUseTags: bool
     return next;
   }, { flushSync: true });
   // Links antigos de tarefas concluídas agora abrem a caixa de tarefas em andamento.
+  // (O switcher Pendentes × Concluídas que voltou usa `caixa=`, não `status=`, justamente
+  // para não reabrir esta porta: `status` continua sendo um parâmetro morto.)
   useEffect(() => {
     if (kind === 'tasks' && params.has('status')) setParams(current => {
       const next = new URLSearchParams(current); next.delete('status'); return next;

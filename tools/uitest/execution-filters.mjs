@@ -49,7 +49,14 @@ try {
   const query=async()=>new URLSearchParams(await page.evaluate(()=>window.currentSearch));
   for(const kind of ['tasks','requests']){
    calls.length=0;await page.evaluate(kind=>window.mount(kind),kind);await page.locator('article').first().waitFor();
-   assert.equal(await page.getByRole('button',{name:'Concluídas',exact:true}).count(),0);
+   // ⚠️ CONFLITO DE INTENÇÃO, registrado em doc/plano_26_09/PENDENCIAS.md (§8) para o dono
+   // decidir: esta linha fixava que a caixa "Concluídas" das Tarefas havia sido REMOVIDA.
+   // Ela voltou, porque o histórico do que o usuário concluiu ficou sem porta alguma (a
+   // `TarefasExecutadasPage` está sem rota) enquanto o backend continua servindo
+   // `status=concluida`. O switcher usa `caixa=`, não `status=`, então o contrato de que
+   // `status` é parâmetro morto — medido algumas linhas abaixo — segue valendo.
+   assert.equal(await page.getByRole('button',{name:'Concluídas',exact:true}).count(),kind==='tasks'?1:0,
+    'Tarefas têm o switcher Pendentes/Concluídas; Requisições não');
    if(kind==='requests'){assert.equal(calls.find(u=>u.pathname.endsWith('/instances')).searchParams.get('scope'),'personal');assert.equal((await query()).get('status'),null);}
    const trigger=page.getByTestId('abrir-filtros');const box=await trigger.boundingBox();assert.ok(box.x<30,'Filtros à esquerda');assert.ok(box.height<=32,'Botão compacto');
    await trigger.click();await popup.waitFor();await category('Processos');

@@ -8,7 +8,8 @@
 // (7) iniciar como teste: checkbox acima do botão de enviar, TODAS as tarefas com o
 //     requisitante e selo "processo de teste" na tarefa e nas listas.
 import { chromium } from 'playwright-core';
-import { escolherCategoria, fecharFiltros } from './lib-filtros.mjs';
+import { escolherCategoria, fecharFiltros, chipsDeFiltro, escolherProcesso, ordenarPor,
+  filtrarIntervalo, removerFiltro, limparFiltros } from './lib-filtros.mjs';
 
 const BASE = 'http://localhost:5173';
 const API = 'http://localhost:5000';
@@ -182,105 +183,113 @@ try {
   check((await ordemVisivel(page)).sort().join('') === 'ABC',
     `[item3] palavra-chave reduz a lista aos 3 processos do teste (${(await ordemVisivel(page)).join(',')})`);
 
-  const aplicados = await page.locator('[data-testid=filtros-aplicados]').innerText();
-  check(aplicados.includes('Filtros aplicados:') && aplicados.includes(`Palavra-chave: “${rid}”`),
-    '[item4] o filtro de palavra-chave é descrito acima da lista');
+  // A descrição "Filtros aplicados: …" virou uma fileira de CHIPS ao lado do botão de
+  // filtros, um por categoria ativa, no formato "Categoria: resumo".
+  await fecharFiltros(page);
+  const chips1 = await chipsDeFiltro(page);
+  check(chips1.some((c) => c.includes('Palavra-chave') && c.includes(String(rid))),
+    `[item4] o filtro de palavra-chave aparece como chip (${JSON.stringify(chips1)})`);
 
   // Item 1: botões de processo com contador. O contador é lido do PRÓPRIO elemento —
   // o nome do processo termina em dígitos (o rid), e casar o fim do texto do botão
   // passaria em falso mesmo sem contador nenhum.
-  const botaoA = page.locator('button[aria-pressed]').filter({ hasText: `Compras F9 ${rid}` }).first();
-  const contadorA = await botaoA.locator('[data-testid=contador-processo]').innerText();
-  check(contadorA === '1', `[item1] o botão do processo traz o contador (${contadorA})`);
-  await page.getByRole('button', { name: new RegExp(`Compras F9 ${rid}`) }).click();
-  await page.waitForTimeout(1200);
-  check((await ordemVisivel(page)).join('') === 'A', '[item1] clicar no botão filtra a lista por aquele processo');
-  // O contador tem de ser a quantidade real, não um número solto ao lado do nome.
+  // As pílulas de processo com contador saíram da tela e viraram a categoria "Processos"
+  // do popover: uma opção por processo, com a contagem ao lado. O que se cobra é o mesmo —
+  // o contador existe, bate com a lista, e escolher um processo filtra.
+  const contadorA = await escolherProcesso(page, `Compras F9 ${rid}`);
+  check(contadorA === '1', `[item1] a opção do processo traz o contador (${contadorA})`);
+  await esperarCards(page, 1);
+  check((await ordemVisivel(page)).join('') === 'A', '[item1] escolher o processo filtra a lista por ele');
   check(String(await page.locator('article[role=link]').count()) === contadorA,
-    `[item1] o contador bate com o que a lista mostra ao clicar (${contadorA})`);
-  const pillsFiltrado = await page.locator('button[aria-pressed]').allInnerTexts();
-  check(pillsFiltrado.some((p) => p.includes(`Ferias F9 ${rid}`)),
-    '[item1] os demais botões continuam com contador (a faceta ignora o filtro de processo)');
-  const aplicados2 = await page.locator('[data-testid=filtros-aplicados]').innerText();
-  check(aplicados2.includes(`Processo: Compras F9 ${rid}`), '[item4] o processo filtrado também é descrito acima da lista');
+    `[item1] o contador bate com o que a lista mostra (${contadorA})`);
+  // A faceta ignora o filtro de processo: os demais continuam contando.
+  await escolherCategoria(page, 'Processos');
+  const outros = await page.locator('[data-testid=filtro-processos] .ef-option').allInnerTexts();
+  await fecharFiltros(page);
+  check(outros.some((o) => o.includes(`Ferias F9 ${rid}`)),
+    '[item1] os demais processos continuam listados com contador (a faceta ignora o filtro)');
+  const chips2 = await chipsDeFiltro(page);
+  check(chips2.some((c) => c.includes('Processos') && c.includes(`Compras F9 ${rid}`)),
+    `[item4] o processo filtrado também aparece como chip (${JSON.stringify(chips2)})`);
 
-  // Item 4: remover a descrição do filtro devolve a lista.
-  await page.getByRole('button', { name: `Remover filtro Processo: Compras F9 ${rid}` }).click();
-  await page.waitForTimeout(1200);
-  check((await ordemVisivel(page)).sort().join('') === 'ABC', '[item4] remover o filtro descrito restaura a lista');
+  // Item 4: remover o chip devolve a lista.
+  await removerFiltro(page, 'Processos');
+  await esperarCards(page, 3);
+  check((await ordemVisivel(page)).sort().join('') === 'ABC', '[item4] remover o chip do filtro restaura a lista');
 
   // ── Item 2: ordenação por prazo (24h < 72h < 120h) ────────────────────────
-  await page.selectOption('[data-testid=filtro-ordenar]', 'prazo');
-  await page.waitForTimeout(1200);
+  await ordenarPor(page, 'prazo', 'asc');
   check((await ordemVisivel(page)).join('') === 'ACB',
     `[item2] prazo crescente: o vencimento mais próximo vem primeiro (${(await ordemVisivel(page)).join('')})`);
-  await page.click('[data-testid=filtro-direcao]');
-  await page.waitForTimeout(1200);
+  await ordenarPor(page, 'prazo', 'desc');
   check((await ordemVisivel(page)).join('') === 'BCA',
     `[item2] invertida, a ordem por prazo é decrescente (${(await ordemVisivel(page)).join('')})`);
-  const descOrdenacao = await page.locator('[data-testid=filtros-aplicados]').innerText();
-  check(/Ordenado por prazo \(decrescente\)/.test(descOrdenacao), '[item4] a ordenação aplicada também é descrita');
+  const chipsOrdem = await chipsDeFiltro(page);
+  check(chipsOrdem.some((c) => /Ordena/.test(c) && /Prazo/i.test(c) && /decrescente/i.test(c)),
+    `[item4] a ordenação aplicada também aparece como chip (${JSON.stringify(chipsOrdem)})`);
 
   // Item 2: por nº do processo.
-  await page.selectOption('[data-testid=filtro-ordenar]', 'numero');
-  await page.waitForTimeout(1200);
+  await ordenarPor(page, 'numero', 'desc');
   const numerosDesc = (await page.locator('article[role=link]').allInnerTexts())
     .map((t) => Number((t.match(/#(\d+)/) ?? [])[1])).filter(Boolean);
   check(numerosDesc.length === 3 && numerosDesc.every((n, i) => i === 0 || numerosDesc[i - 1] >= n),
     `[item2] nº do processo em ordem decrescente (${numerosDesc.join(',')})`);
-  await page.click('[data-testid=filtro-direcao]');
-  await page.waitForTimeout(1200);
+  await ordenarPor(page, 'numero', 'asc');
   const numerosAsc = (await page.locator('article[role=link]').allInnerTexts())
     .map((t) => Number((t.match(/#(\d+)/) ?? [])[1])).filter(Boolean);
   check(numerosAsc.length === 3 && numerosAsc.every((n, i) => i === 0 || numerosAsc[i - 1] <= n),
     `[item2] e em ordem crescente (${numerosAsc.join(',')})`);
 
   // ── Item 3: nº do processo e intervalos de data ───────────────────────────
+  await escolherCategoria(page, 'Nº da requisição');
   await page.fill('[data-testid=filtro-numero]', String(numA));
-  await page.waitForTimeout(1400);
+  await page.waitForTimeout(400);
+  await fecharFiltros(page);
+  await esperarCards(page, 1);
   check((await ordemVisivel(page)).join('') === 'A', `[item3] filtro por nº do processo isola a requisição #${numA}`);
-  check((await page.locator('[data-testid=filtros-aplicados]').innerText()).includes(`Nº do processo: ${numA}`),
-    '[item4] o nº filtrado é descrito acima da lista');
+  const chipsNum = await chipsDeFiltro(page);
+  check(chipsNum.some((c) => c.includes(String(numA))), `[item4] o nº filtrado aparece como chip (${JSON.stringify(chipsNum)})`);
+  await escolherCategoria(page, 'Nº da requisição');
   await page.fill('[data-testid=filtro-numero]', '');
-  await page.waitForTimeout(1400);
+  await page.waitForTimeout(400);
+  await fecharFiltros(page);
+  await esperarCards(page, 3);
 
   const hoje = hojeLocal();
-  await page.fill('[data-testid=filtro-req-de]', hoje);
-  await page.fill('[data-testid=filtro-req-ate]', hoje);
-  await page.waitForTimeout(1200);
+  await filtrarIntervalo(page, 'Data da requisição', 'Requisição', hoje, hoje);
+  await esperarCards(page, 3);
   check((await ordemVisivel(page)).sort().join('') === 'ABC',
     '[item3] intervalo de requisição de hoje até hoje é inclusivo (traz o que foi criado hoje)');
-  await page.fill('[data-testid=filtro-req-de]', '2020-01-01');
-  await page.fill('[data-testid=filtro-req-ate]', '2020-01-31');
-  await page.waitForTimeout(1200);
+  await filtrarIntervalo(page, 'Data da requisição', 'Requisição', '2020-01-01', '2020-01-31');
+  await esperarCards(page, 0);
   check((await page.locator('article[role=link]').count()) === 0,
     '[item3] janela no passado não traz requisição de hoje');
-  await page.fill('[data-testid=filtro-rec-de]', hoje);
-  await page.fill('[data-testid=filtro-req-de]', hoje);
-  await page.fill('[data-testid=filtro-req-ate]', hoje);
-  // Espera a DESCRIÇÃO aparecer em vez de dormir: o filtro tem debounce e, no meio da
-  // bateria, 1,2 s não bastava — falhava só no lote, que é o pior tipo de falha.
-  await page.waitForFunction(
-    () => document.querySelector('[data-testid=filtros-aplicados]')?.textContent?.includes('Recebimento a partir de'),
-    null, { timeout: 20000 }).catch(() => {});
-  check((await page.locator('[data-testid=filtros-aplicados]').innerText()).includes('Recebimento a partir de'),
-    '[item4] o intervalo de recebimento é descrito acima da lista');
+  await filtrarIntervalo(page, 'Data da requisição', 'Requisição', hoje, hoje);
+  await filtrarIntervalo(page, 'Data de recebimento', 'Recebimento', hoje, undefined);
+  const chipsData = await chipsDeFiltro(page);
+  check(chipsData.some((c) => /Recebimento/i.test(c)),
+    `[item4] o intervalo de recebimento também aparece como chip (${JSON.stringify(chipsData)})`);
   const cortadosWeb = await controlesCortados(page);
   check(cortadosWeb.length === 0, `[web] nenhum controle de filtro cortado ou sobreposto (${cortadosWeb.join(' | ') || 'clipped: 0'})`);
   await page.screenshot({ path: `${OUT}/f9-tarefas-filtros-web.png`, fullPage: true });
 
-  await page.click('[data-testid=limpar-filtros]');
-  await page.waitForFunction(() => !document.querySelector('[data-testid=filtros-aplicados]'), null,
-    { timeout: 20000 }).catch(() => {});
-  check(await page.locator('[data-testid=filtros-aplicados]').count() === 0,
-    '[item4] "Limpar tudo" remove a descrição e os filtros');
-  // O campo tem de esvaziar junto: texto sobrando ali seria um filtro fantasma —
+  await limparFiltros(page);
+  check((await chipsDeFiltro(page)).length === 0, '[item4] "Limpar filtros" remove todos os chips');
+  // Os campos têm de esvaziar junto: texto sobrando ali seria um filtro fantasma —
   // a tela diria que está filtrando por algo que já não filtra.
-  check(await page.inputValue('[data-testid=filtro-q]') === '' && await page.inputValue('[data-testid=filtro-numero]') === '',
-    '[item4] limpar também esvazia os campos do painel');
+  await escolherCategoria(page, 'Palavra-chave');
+  const qVazio = await page.inputValue('[data-testid=filtro-q]');
+  await escolherCategoria(page, 'Nº da requisição');
+  const numVazio = await page.inputValue('[data-testid=filtro-numero]');
+  await fecharFiltros(page);
+  check(qVazio === '' && numVazio === '', '[item4] limpar também esvazia os campos do painel');
 
   // ── Item 7: selo nas listas e no topo da tarefa ───────────────────────────
+  // O campo vive no popover: reabrir a categoria antes de digitar.
+  await escolherCategoria(page, 'Palavra-chave');
   await page.fill('[data-testid=filtro-q]', String(rid));
+  await page.waitForTimeout(400);
+  await fecharFiltros(page);
   await esperarCards(page, 3);
   check((await ordemVisivel(page)).sort().join('') === 'ABC',
     '[item4] depois de limpar, redigitar a mesma palavra volta a filtrar');
@@ -317,7 +326,8 @@ try {
 
   // Concluída, o selo continua na lista de executadas.
   await api(token, `/api/v1/workflow/tasks/${tarefaTeste.id}/complete`, 'POST', { data: {} });
-  await page.goto(`${BASE}/tasks?status=concluidas`, { waitUntil: 'networkidle' });
+  // A caixa de concluídas é `?caixa=concluidas` (o `status=` é apagado pelos filtros).
+  await page.goto(`${BASE}/tasks?caixa=concluidas`, { waitUntil: 'networkidle' });
   await page.waitForSelector('article[role=link]', { timeout: 15000 });
   // O campo de busca só existe depois de escolher a categoria no popover de filtros
   // (o rótulo dela é "Palavra-chave").
@@ -434,25 +444,31 @@ try {
   await login(m);
   await m.goto(`${BASE}/tasks`, { waitUntil: 'networkidle' });
   await m.waitForSelector('article[role=link]', { timeout: 15000 });
-  await m.click('[data-testid=abrir-filtros]');
-  await m.fill('[data-testid=filtro-q]', String(rid));
-  await m.waitForTimeout(1500);
+  await escolherCategoria(m, 'Palavra-chave');
   check(await m.locator('[data-testid=painel-filtros]').isVisible(), '[mobile] o painel de filtros abre em 375px');
-  check((await m.locator('[data-testid=filtros-aplicados]').innerText()).includes('Filtros aplicados:'),
-    '[mobile] os filtros aplicados são descritos acima da lista');
+  await m.fill('[data-testid=filtro-q]', String(rid));
+  await m.waitForTimeout(600);
+  await fecharFiltros(m);
+  await esperarCards(m, 3);
+  const chipsMob = await chipsDeFiltro(m);
+  check(chipsMob.some((c) => c.includes('Palavra-chave')),
+    `[mobile] o filtro aplicado aparece como chip acima da lista (${JSON.stringify(chipsMob)})`);
   const cardTesteMob = m.locator('article[role=link]').filter({ hasText: `Simulacao F9 ${rid}` }).first();
   check(await cardTesteMob.locator('[data-testid=selo-teste]').count() > 0, '[mobile] o selo de teste aparece no card');
   check(!(await m.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)),
     '[mobile] lista de tarefas sem rolagem horizontal');
   const hojeMob = hojeLocal();
-  for (const campo of ['filtro-req-de', 'filtro-req-ate', 'filtro-rec-de', 'filtro-rec-ate']) await m.fill(`[data-testid=${campo}]`, hojeMob);
-  await m.waitForTimeout(1200);
+  // Os intervalos de data agora são categorias do popover, com "De"/"Até" por categoria.
+  await filtrarIntervalo(m, 'Data da requisição', 'Requisição', hojeMob, hojeMob);
+  await filtrarIntervalo(m, 'Data de recebimento', 'Recebimento', hojeMob, hojeMob);
+  await escolherCategoria(m, 'Data de recebimento');
   const cortadosMob = await controlesCortados(m);
   check(cortadosMob.length === 0, `[mobile] nenhum controle de filtro cortado ou sobreposto (${cortadosMob.join(' | ') || 'clipped: 0'})`);
   const campos = await m.locator('[data-testid=painel-filtros] input, [data-testid=painel-filtros] select').all();
   const alturas = await Promise.all(campos.map(async (c) => (await c.boundingBox())?.height ?? 0));
   check(alturas.every((h) => h >= 32), `[mobile] campos de filtro com altura tocável (mín ${Math.round(Math.min(...alturas))}px)`);
   await m.screenshot({ path: `${OUT}/f9-tarefas-filtros-mobile.png`, fullPage: true });
+  await fecharFiltros(m);
 
   await m.goto(`${BASE}/services/${keyC}`, { waitUntil: 'networkidle' });
   await m.waitForSelector('[data-testid=iniciar-como-teste]', { timeout: 15000 });
