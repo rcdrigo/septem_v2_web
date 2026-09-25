@@ -2,24 +2,29 @@ import { useMemo, useState } from 'react';
 import { AlertCircle, ArrowRight, Inbox, RotateCw, Search, Tags, Workflow } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { FALLBACK_COLOR, groupByCategory, NamedIcon, tintOf } from '@/components/catalog/category-catalog';
-import { useProcessList, type ProcessListItem } from '@/lib/api/process-definitions';
+import { useServiceCatalog, type ProcessListItem } from '@/lib/api/process-definitions';
 import { openTab } from '@/lib/nav';
 import { useFavorites, useToggleFavorite } from '@/lib/api/discovery';
 import { FavoriteButton } from '@/components/discovery/FavoriteButton';
 import { toast } from '@/stores/toast';
 import '@/styles/new-request.css';
 import { routes } from '@/lib/routes';
+import { useSessionStore } from '@/stores/session';
 
 const ALL_CATEGORIES = 'all';
 
 export function NewRequestDialog({ onClose }: { onClose: () => void }) {
-  const list = useProcessList({ status: 'published', pageSize: 100 });
+  const list = useServiceCatalog();
+  // Ambiente com novas requisições bloqueadas (ADM-07): avisamos AQUI, na porta de
+  // entrada. Deixar a pessoa escolher o serviço e preencher o formulário inteiro para
+  // levar 403 no envio seria trabalho jogado fora.
+  const bloqueado = useSessionStore((s) => s.tenant?.operatingMode) === 'new_requests_blocked';
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState(ALL_CATEGORIES);
   const favorites = useFavorites();
   const toggleFavorite = useToggleFavorite();
   const favoriteKeys = useMemo(() => new Set((favorites.data?.items ?? []).filter((item) => item.type === 'service').map((item) => item.id)), [favorites.data?.items]);
-  const items = list.data?.items ?? [];
+  const items = list.data ?? [];
   const groups = useMemo(() => groupByCategory(items), [items]);
   const normalizedQuery = normalize(query.trim());
   const filtered = useMemo(() => items.filter((service) => {
@@ -34,7 +39,20 @@ export function NewRequestDialog({ onClose }: { onClose: () => void }) {
   }), [category, items, normalizedQuery]);
   const selectedCategory = groups.find((group) => group.key === category);
 
+  // ⚠️ TETO DE RENDERIZAÇÃO.
+  //
+  // O catálogo chega COMPLETO de propósito (a paginação de 100 escondia serviços da busca
+  // e categorias da lateral). Mas pintar um cartão por serviço não escala: num ambiente com
+  // milhares de serviços o modal trava — a digitação na busca ficava presa por mais de 30 s.
+  //
+  // A busca e o filtro continuam varrendo a lista INTEIRA; só a pintura tem teto. Quando há
+  // mais que isso, o aviso diz o que fazer em vez de deixar a pessoa rolando às cegas.
+  const TETO_DE_CARTOES = 120;
+  const visiveis = filtered.length > TETO_DE_CARTOES ? filtered.slice(0, TETO_DE_CARTOES) : filtered;
+  const ocultos = filtered.length - visiveis.length;
+
   function start(service: ProcessListItem) {
+    if (bloqueado) return;   // a guarda de verdade é do servidor; aqui é só não abrir à toa
     openTab(routes.service(service.key));
     onClose();
   }
@@ -50,6 +68,16 @@ export function NewRequestDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <Dialog open onClose={onClose} title="Nova requisição" width="2xl" bodyClassName="min-h-0 flex-1 overflow-hidden">
+      {bloqueado && (
+        <p
+          role="alert"
+          data-testid="novas-requisicoes-bloqueadas"
+          className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+        >
+          Este ambiente não está aceitando novas requisições no momento. As requisições já
+          abertas continuam funcionando normalmente.
+        </p>
+      )}
       <div className="grid h-[min(44rem,calc(100dvh-7rem))] min-h-0 grid-rows-[auto_minmax(0,1fr)] md:grid-cols-[17rem_minmax(0,1fr)] md:grid-rows-1">
         <aside className="flex min-h-0 max-h-56 flex-col border-b border-slate-200 bg-slate-50/70 md:max-h-none md:border-b-0 md:border-r">
           <div className="shrink-0 p-4">
@@ -108,9 +136,21 @@ export function NewRequestDialog({ onClose }: { onClose: () => void }) {
                 {(query || category !== ALL_CATEGORIES) && <button type="button" onClick={() => { setQuery(''); setCategory(ALL_CATEGORIES); }} className="mt-3 min-h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 active:bg-slate-100">Limpar filtros</button>}
               </div>
             ) : (
-              <div className="grid min-w-0 gap-3 lg:grid-cols-2">
-                {filtered.map((service) => <ServiceCard key={service.key} service={service} favorite={favoriteKeys.has(service.key)} favoritePending={toggleFavorite.isPending && toggleFavorite.variables?.key === service.key} onFavorite={() => toggle(service)} onStart={() => start(service)} />)}
-              </div>
+              <>
+                <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+                  {visiveis.map((service) => <ServiceCard key={service.key} service={service} favorite={favoriteKeys.has(service.key)} favoritePending={toggleFavorite.isPending && toggleFavorite.variables?.key === service.key} onFavorite={() => toggle(service)} onStart={() => start(service)} />)}
+                </div>
+                {ocultos > 0 && (
+                  <p
+                    data-testid="nova-requisicao-teto"
+                    aria-live="polite"
+                    className="mt-3 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600"
+                  >
+                    Mostrando os primeiros {visiveis.length} de {filtered.length} serviços. Use a busca ou
+                    escolha uma categoria para encontrar o que precisa.
+                  </p>
+                )}
+              </>
             )}
           </div>
         </section>

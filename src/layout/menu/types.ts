@@ -11,6 +11,12 @@ export type MenuLink = {
   badge?: 'pendingTasks';
   /** Permissão necessária; ausente = sempre visível. */
   perm?: string;
+  /**
+   * Funcionalidade contratada exigida (ADM-04, Fase 10). Sem ela o item some do menu —
+   * o servidor recusaria a rota de qualquer jeito, e oferecer o que não funciona é pior
+   * que não oferecer.
+   */
+  feature?: string;
   /** Visibilidade condicional extra (ex: Dashboard só se configurado). */
   visible?: (s: SessionState) => boolean;
 };
@@ -30,6 +36,7 @@ export type MenuGroup = {
   label: string;
   icon: LucideIcon;
   perm?: string;
+  feature?: string;
   children: MenuLink[];
 };
 

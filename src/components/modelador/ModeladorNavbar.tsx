@@ -46,7 +46,7 @@ export type PersistenceHandlers = {
   pendingAction: 'save' | 'publish' | 'version' | null;
   /** Há alterações no fluxo ainda não salvas no servidor. */
   dirty: boolean;
-  /** draft | homologation | published | inactive — pinta o selo ao lado do nome. */
+  /** draft | published | inactive. (A Fase 15 aposentou `homologation` — Q18.) */
   status?: string | null;
   version?: number | null;
 };
@@ -126,17 +126,6 @@ export function ModeladorNavbar({ recursos, modeler, persistence }: Props) {
             title="Clique para renomear o processo"
           >
             <span className="truncate">{processName}</span>
-            {/* Selo de HOMOLOGAÇÃO (Fase 5): sem ele o usuário não tem como saber que
-                está editando a versão de teste, e não a que roda em produção. */}
-            {persistence?.status === 'homologation' && (
-              <span
-                data-testid="selo-homologacao"
-                title="Esta versão está em homologação: só a simulação a usa. Produção segue na versão publicada até você clicar em Publicar."
-                className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
-              >
-                Em homologação{persistence?.version ? ` · v${persistence.version}` : ''}
-              </span>
-            )}
             <Pencil
               size={14}
               className="shrink-0 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100"

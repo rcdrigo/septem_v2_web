@@ -50,6 +50,25 @@ export const routes = {
   signDocument: (taskId: string, fieldKey: string) =>
     `/sign?task=${encodeURIComponent(taskId)}&field=${encodeURIComponent(fieldKey)}`,
 
+  /** Ambiente inativado (ADM-07): ocupa o lugar do login enquanto durar. */
+  environmentInactive: '/environment-inactive',
+
+  // --- Área central da Septem (fora do shell; não pertence a nenhum ambiente) -
+  /** Aceite do convite do admin do cliente — sem sessão, autorizado pelo token do e-mail. */
+  platformAcceptInvite: '/platform/invite',
+  /** Login da equipe da Septem — 2FA obrigatório, sem branding de cliente. */
+  platformLogin: '/platform/login',
+  /** Clientes da plataforma. */
+  platformClients: '/platform/clients',
+  /** Catálogo de processos da Septem (Fase 12). */
+  platformCatalog: '/platform/process-catalog',
+  /** Assistente de cadastro de cliente (provisionamento). */
+  platformNewClient: '/platform/clients/new',
+  /** Um cliente e seus ambientes. */
+  platformClient: (id: string) => `/platform/clients/${id}`,
+  /** Um ambiente na área central: modo de operação e ocorrências vencidas. */
+  platformEnvironment: (tenantId: string) => `/platform/environments/${tenantId}`,
+
   // --- Dentro do shell ------------------------------------------------------
   dashboard: '/dashboard',
   tasks: '/tasks',
@@ -62,6 +81,8 @@ export const routes = {
 
   // --- Admin ----------------------------------------------------------------
   adminFlows: '/admin/flows',
+  /** Transferências entre ambientes do cliente (Fase 13). */
+  adminTransfers: '/admin/transfers',
   adminFlowCategories: '/admin/flows/categories',
   adminEmailTemplates: '/admin/email-templates',
   adminDocumentTemplates: '/admin/document-templates',

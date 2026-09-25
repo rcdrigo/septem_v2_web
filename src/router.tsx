@@ -5,6 +5,7 @@ import { ModeladorPage } from './pages/modelador/ModeladorPage';
 import { RelatorioBuilderPage } from './pages/relatorios/RelatorioBuilderPage';
 import { ConsultaViewPage } from './pages/relatorios/ConsultaViewPage';
 import { ProcessosPage } from './pages/processos/ProcessosPage';
+import { TransferenciasPage } from './pages/transferencias/TransferenciasPage';
 import { UsuariosPage } from './pages/admin/UsuariosPage';
 import { UnidadesPage } from './pages/admin/UnidadesPage';
 import { UnidadePage } from './pages/UnidadePage';
@@ -35,6 +36,15 @@ import { GuidePage } from './pages/GuidePage';
 import { FonteDadosPage } from './pages/FonteDadosPage';
 import { ManualEditorPage } from './pages/ManualEditorPage';
 import { StubPage } from './pages/StubPage';
+import { AmbienteInativoPage } from './pages/AmbienteInativoPage';
+import { PlatformLayout } from './pages/platform/PlatformLayout';
+import { PlatformLoginPage } from './pages/platform/PlatformLoginPage';
+import { PlatformClientesPage } from './pages/platform/PlatformClientesPage';
+import { PlatformClientePage } from './pages/platform/PlatformClientePage';
+import { PlatformAmbientePage } from './pages/platform/PlatformAmbientePage';
+import { PlatformNovoClientePage } from './pages/platform/PlatformNovoClientePage';
+import { PlatformAceitarConvitePage } from './pages/platform/PlatformAceitarConvitePage';
+import { PlatformCatalogoPage } from './pages/platform/PlatformCatalogoPage';
 import { SearchX } from 'lucide-react';
 import { childPath, routes } from './lib/routes';
 
@@ -77,6 +87,26 @@ export const router = createBrowserRouter(
     { path: routes.orgUnit, element: <UnidadePage /> },
     // Assinatura de documento em aba própria (Fase 7a) — aberta pelo ícone do anexo.
     { path: routes.sign, element: <AssinaturaPage /> },
+    // Área central da Septem. Fica FORA do AppShell de propósito: o shell do
+    // ambiente roda o bootstrap do tenant, e a área central existe justamente para
+    // funcionar sem tenant — inclusive com um ambiente inativado.
+    // Ambiente inativado: fora do shell, sem bootstrap de tenant e sem menu.
+    { path: routes.environmentInactive, element: <AmbienteInativoPage /> },
+    { path: routes.platformLogin, element: <PlatformLoginPage /> },
+    // Aceite do convite: fora da guarda, porque quem chega ainda não tem credencial.
+    { path: routes.platformAcceptInvite, element: <PlatformAceitarConvitePage /> },
+    {
+      path: '/platform',
+      element: <PlatformLayout />,
+      children: [
+        { index: true, element: <Navigate to={routes.platformClients} replace /> },
+        { path: 'clients', element: <PlatformClientesPage /> },
+        { path: 'clients/new', element: <PlatformNovoClientePage /> },
+        { path: 'clients/:id', element: <PlatformClientePage /> },
+        { path: 'environments/:tenantId', element: <PlatformAmbientePage /> },
+        { path: 'process-catalog', element: <PlatformCatalogoPage /> },
+      ],
+    },
     {
       path: '/',
       element: <AppShell />,
@@ -93,6 +123,7 @@ export const router = createBrowserRouter(
 
         // --- Admin › Processos --------------------------------------------
         { path: childPath(routes.adminFlows), element: <ProcessosPage /> },
+        { path: childPath(routes.adminTransfers), element: <TransferenciasPage /> },
         // Categorias de processos: geridas no modal da tela Admin › Processos.
         { path: childPath(routes.adminFlowCategories), element: <Navigate to={routes.adminFlows} replace /> },
         { path: childPath(routes.adminEmailTemplates), element: <ModelosEmailPage /> },

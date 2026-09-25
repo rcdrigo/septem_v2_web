@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { Play } from 'lucide-react';
 import { useProcessDefinition } from '@/lib/api/process-definitions';
-import { useHasHomologation, useProcessForm, useStartInstance, type TaskButton } from '@/lib/api/execution';
+import { useProcessForm, useStartInstance, type TaskButton } from '@/lib/api/execution';
 import { ReactForm, FormSkeleton, type ReactFormHandle } from '@/components/form/ReactForm';
 import { CompletionScreen, DocBanner } from '@/pages/TarefasPage';
 import { useDocumentTitle } from '@/lib/use-document-title';
@@ -22,7 +22,7 @@ export function ServicoFormPage() {
   const { processKey } = useParams();
   const token = useSessionStore((s) => s.accessToken);
   const detail = useProcessDefinition(processKey ?? null);
-  const form = useProcessForm(processKey ?? null, false);
+  const form = useProcessForm(processKey ?? null);
   const start = useStartInstance();
   // Aba standalone (sem AppShell): sem bootstrap próprio o usuário e as permissões
   // não chegam a carregar, e o "iniciar como teste" sumiria de quem pode simular.
@@ -32,15 +32,10 @@ export function ServicoFormPage() {
   const canSimulate = useSessionStore((s) => s.can('workflow:simulate'));
   const fillRef = useRef<ReactFormHandle>(null);
   const [isTest, setIsTest] = useState(false);
-  // Fase 5: com uma versão em homologação disponível, o teste pergunta CONTRA QUAL
-  // versão rodar. A pergunta só aparece quando existe homologação — quem não usa o
-  // recurso não vê nada de novo.
-  const [usarHomologacao, setUsarHomologacao] = useState(false);
-  const temHomologacao = useHasHomologation(processKey ?? null, true);
-  // O formulário TEM de vir da versão escolhida: abrir o de produção e enviar para a
-  // homologação faria o usuário ver o campo antigo e concluir que o recurso não funciona.
-  const formHomologacao = useProcessForm(processKey ?? null, true);
-  const formEscolhido = isTest && usarHomologacao ? formHomologacao : form;
+  // ⚠️ Havia aqui uma escolha de versão (produção × homologação) da Fase 5. A Fase 15
+  // aposentou a versão em homologação (Q18): a simulação roda contra a versão PUBLICADA, e
+  // testar mudança antes de ir ao ar é trabalho do **ambiente** de homologação.
+  const formEscolhido = form;
   const [done, setDone] = useState<{ nextTaskForMe?: string | null; executionId?: string } | null>(null);
   const processName = formEscolhido.data?.processName ?? detail.data?.name ?? 'Serviço';
   const taskName = formEscolhido.data?.startTaskName || processName;
@@ -55,7 +50,6 @@ export function ServicoFormPage() {
       const r = await start.mutateAsync({
         key: processKey!, data,
         isTest: canSimulate && isTest,
-        useHomologation: canSimulate && isTest && usarHomologacao,
       });
       setDone({ nextTaskForMe: r.nextTaskForMe, executionId: r.executionId });
     } catch { toast.error('Não foi possível iniciar o processo.'); }
@@ -121,21 +115,14 @@ export function ServicoFormPage() {
                 <span>
                   Iniciar como <strong>teste</strong>
                   <span className="block text-xs text-slate-500">O processo é marcado como teste e todas as tarefas ficam com você.</span>
-                  {isTest && temHomologacao.data === true && (
-                    <span className="mt-2 block rounded-md border border-orange-200 bg-orange-50 px-2.5 py-2">
-                      <span className="block text-xs font-semibold text-orange-900">Qual versão testar?</span>
-                      <span className="mt-1 flex flex-wrap gap-3">
-                        <label className="inline-flex items-center gap-1.5 text-xs text-slate-700">
-                          <input type="radio" name="versao-teste" data-testid="versao-producao"
-                            checked={!usarHomologacao} onChange={() => setUsarHomologacao(false)} />
-                          Produção (publicada)
-                        </label>
-                        <label className="inline-flex items-center gap-1.5 text-xs text-slate-700">
-                          <input type="radio" name="versao-teste" data-testid="versao-homologacao"
-                            checked={usarHomologacao} onChange={() => setUsarHomologacao(true)} />
-                          Em homologação
-                        </label>
-                      </span>
+                  {isTest && (
+                    <span
+                      data-testid="teste-usa-publicada"
+                      className="mt-2 block rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-600"
+                    >
+                      A simulação roda a versão <strong>publicada</strong>. Para testar uma
+                      alteração antes de ir ao ar, faça no <strong>ambiente de homologação</strong> e
+                      depois promova para produção em <strong>Transferências</strong>.
                     </span>
                   )}
                 </span>

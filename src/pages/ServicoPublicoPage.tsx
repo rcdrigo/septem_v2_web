@@ -61,7 +61,14 @@ export function ServicoPublicoPage() {
       const r = await submitPublicService(processKey, valores, token);
       setProtocolo(r.number);
     } catch (e) {
-      const corpo = e instanceof ApiError ? (e.body as { detail?: string } | undefined) : undefined;
+      const corpo = e instanceof ApiError ? (e.body as { detail?: string; error?: string } | undefined) : undefined;
+      // Ambiente com novas requisições bloqueadas (ADM-07): o pedido do cidadão está
+      // certo — quem não está aceitando é o órgão. Dizer "tente novamente" mandaria
+      // alguém reenviar um formulário que vai ser recusado de novo.
+      if (corpo?.error === 'new_requests_blocked') {
+        setErro('Este órgão não está recebendo novos pedidos no momento. Tente mais tarde.');
+        return;
+      }
       setErro(corpo?.detail ?? 'Não foi possível enviar a requisição. Tente novamente.');
     } finally {
       setEnviando(false);

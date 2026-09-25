@@ -59,7 +59,7 @@ export function ModeladorPage() {
   const patchMut = usePatchProcessStatus();
   const loadedKeyRef = useRef<string | null>(null);
   // Status/versão da definição carregada. Vem do backend e é atualizado a cada save —
-  // é o que o selo "Em homologação" mostra (Fase 5).
+  // (até a Fase 15 isto era o selo "Versão em homologação" — Q18 o aposentou.)
   const [statusAtual, setStatusAtual] = useState<string | null>(null);
   const [versaoAtual, setVersaoAtual] = useState<number | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -134,12 +134,15 @@ export function ModeladorPage() {
       const r = key
         ? await updateMut.mutateAsync({ key, bpmnXml: xml })
         : await saveMut.mutateAsync({ bpmnXml: xml });
-      // Fase 5: salvar um processo PUBLICADO cria uma versão de homologação — o aviso
-      // precisa dizer isso, senão o usuário acha que acabou de mexer em produção (que
-      // era, aliás, o que acontecia antes).
-      const label = r.status === 'homologation'
-        ? `Salvo em homologação v${r.version} — produção segue na versão publicada`
-        : r.status === 'published' ? `Salvo (publicado) v${r.version}` : `Rascunho salvo v${r.version}`;
+      // Salvar um processo PUBLICADO cria um RASCUNHO novo (Fase 15/Q18: a versão em
+      // homologação foi aposentada). O aviso precisa dizer que produção NÃO mudou — senão o
+      // usuário acha que acabou de mexer no que está no ar, que era o comportamento de antes
+      // da Fase 5 e o acidente que tudo isso evita.
+      const label = r.status === 'published'
+        ? `Salvo (publicado) v${r.version}`
+        : r.version > 1
+          ? `Rascunho salvo v${r.version} — produção segue na versão publicada`
+          : `Rascunho salvo v${r.version}`;
       toast.success(label + warnSuffix(r));
       afterPersist(r);
     } catch (err) { handleError(err); }

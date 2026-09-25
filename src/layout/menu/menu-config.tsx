@@ -65,6 +65,9 @@ export const MENU: MenuByMode = {
               { kind: 'link', label: 'Modelos de e-mails', to: routes.adminEmailTemplates, icon: Mail },
               { kind: 'link', label: 'Modelos de documentos', to: routes.adminDocumentTemplates, icon: FileStack },
               { kind: 'link', label: 'Fontes de dados', to: routes.adminDataSources, icon: Database },
+              // Transferência entre ambientes do cliente (Fase 13). "Serviços" é o nome
+              // amigável do catálogo de processos, e é o que a tela usa.
+              { kind: 'link', label: 'Transferências', to: routes.adminTransfers, icon: ArrowLeftRight },
             ],
           },
           {
@@ -73,7 +76,7 @@ export const MENU: MenuByMode = {
             icon: BarChart3,
             perm: 'reports:read',
             children: [
-              { kind: 'link', label: 'Relatórios', to: routes.adminReports, icon: FileSearch },
+              { kind: 'link', label: 'Relatórios', to: routes.adminReports, icon: FileSearch, feature: 'reports' },
               // Categorias não têm mais página própria: modal "Categorias" em Admin › Relatórios.
               { kind: 'link', label: 'Dashboards', to: routes.adminDashboards, icon: BarChart3 },
               { kind: 'link', label: 'Fontes de dados', to: `${routes.adminDataSources}?scope=report`, icon: Database },
@@ -86,7 +89,7 @@ export const MENU: MenuByMode = {
             perm: 'admin:settings',
             children: [
               { kind: 'link', label: 'Parâmetros do sistema', to: routes.adminSettings, icon: SlidersHorizontal },
-              { kind: 'link', label: 'Manuais', to: routes.adminManuals, icon: BookOpen },
+              { kind: 'link', label: 'Manuais', to: routes.adminManuals, icon: BookOpen, feature: 'manuals' },
               { kind: 'link', label: 'Usuários', to: routes.adminUsers, icon: Users },
               { kind: 'link', label: 'Unidades organizacionais', to: routes.adminOrgUnits, icon: Building2 },
               { kind: 'link', label: 'Posições', to: routes.adminPositions, icon: UserCog },

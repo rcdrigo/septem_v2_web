@@ -1,12 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
-/** draft = rascunho, published = publicado, inactive = inativo (soft-delete). */
 /**
- * `homologation` (Fase 5): versão em teste de um processo já publicado. Só a simulação
- * a executa; produção continua na versão `published` até alguém publicar.
+ * draft = rascunho, published = publicado, inactive = inativo (soft-delete).
+ *
+ * ⚠️ Havia um `homologation` entre a Fase 5 do plano 2026-08-03 e a Fase 15 do plano 26_09,
+ * quando a decisão Q18 o aposentou: homologar passou a ser no **ambiente** de homologação,
+ * com a transferência promovendo para produção depois.
  */
-export type ProcessStatus = 'draft' | 'homologation' | 'published' | 'inactive';
+export type ProcessStatus = 'draft' | 'published' | 'inactive';
 
 export type ProcessListItem = {
   key: string;
@@ -21,6 +23,11 @@ export type ProcessListItem = {
   categoryIcon: string | null;
   area: string | null;
   updatedAt: string;
+  /** Origem no catálogo da Septem (Fase 12); nulo = processo próprio do cliente. */
+  catalogKey?: string | null;
+  catalogVersion?: number | null;
+  /** A cópia foi alterada depois de instalada. */
+  customized?: boolean;
 };
 
 export type ProcessPage = { items: ProcessListItem[]; total: number; page: number; pageSize: number };
@@ -90,6 +97,23 @@ export function useProcessList(params: ProcessListParams) {
     queryKey: processKeys.list(params),
     queryFn: () => api.get<ProcessPage>(`${BASE}/${toQuery(params)}`),
     placeholderData: (prev) => prev,
+  });
+}
+
+/**
+ * Catálogo de serviços do usuário: TODOS os publicados que ele pode iniciar, sem
+ * paginação (`GET /api/v1/services`).
+ *
+ * A tela "Nova requisição" usava `useProcessList({ status: 'published', pageSize: 100 })`,
+ * que é a lista de ADMINISTRAÇÃO e tem teto de 100 por página no servidor. Como as
+ * categorias da barra lateral são montadas a partir dos itens carregados, um catálogo
+ * com mais de 100 serviços perdia serviços E categorias inteiras — a busca local
+ * também não alcançava o que não veio.
+ */
+export function useServiceCatalog() {
+  return useQuery({
+    queryKey: ['service-catalog'] as const,
+    queryFn: () => api.get<ProcessListItem[]>('/api/v1/services'),
   });
 }
 

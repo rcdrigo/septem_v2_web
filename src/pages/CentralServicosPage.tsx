@@ -53,6 +53,17 @@ export function CentralServicosPage() {
             </div>
           </div>
 
+          {tenant?.operatingMode === 'new_requests_blocked' && (
+            <p
+              role="alert"
+              data-testid="central-bloqueada"
+              className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+            >
+              Este órgão não está recebendo novos pedidos no momento. Os pedidos já enviados
+              continuam em andamento.
+            </p>
+          )}
+
           {/* "campo de busca grande" — é o primeiro controle da página, de propósito. */}
           <label className="relative block">
             <span className="sr-only">Buscar serviço</span>

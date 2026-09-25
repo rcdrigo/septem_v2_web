@@ -98,35 +98,24 @@ export type StartForm = {
   startTaskSector?: string | null;
 };
 /**
- * Formulário inicial do serviço. Com `homologation`, serve o formulário da versão EM
- * HOMOLOGAÇÃO (Fase 5) — sem isso a simulação abriria o formulário de PRODUÇÃO e
- * mandaria os dados para a versão de teste: o usuário veria o campo antigo e juraria
- * que a homologação não funcionou.
+ * Formulário inicial do serviço — sempre o da versão PUBLICADA.
+ *
+ * ⚠️ Havia um parâmetro `homologation` (Fase 5) que servia o formulário da versão em
+ * homologação para a simulação. A Fase 15 aposentou essa versão (Q18): testar alteração é
+ * trabalho do ambiente de homologação, e depois se promove em Transferências.
  */
-export function useProcessForm(key: string | null, homologation = false) {
+export function useProcessForm(key: string | null) {
   return useQuery({
-    queryKey: ['workflow', 'process-form', key, homologation],
-    queryFn: () => api.get<StartForm>(
-      `/api/v1/workflow/process-definitions/${key}/form${homologation ? '?homologation=true' : ''}`),
+    queryKey: ['workflow', 'process-form', key],
+    queryFn: () => api.get<StartForm>(`/api/v1/workflow/process-definitions/${key}/form`),
     enabled: !!key,
-  });
-}
-
-/** Existe versão em homologação para este processo? Decide se a tela pergunta a versão. */
-export function useHasHomologation(key: string | null, enabled: boolean) {
-  return useQuery({
-    queryKey: ['workflow', 'process-form', key, 'has-homologation'],
-    queryFn: () => api.get<StartForm>(`/api/v1/workflow/process-definitions/${key}/form?homologation=true`)
-      .then((r) => !!r.formSchema)
-      .catch(() => false),
-    enabled: !!key && enabled,
   });
 }
 
 export function useStartInstance() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { key: string; data?: unknown; isTest?: boolean; useHomologation?: boolean }) => api.post<StartedInstance>('/api/v1/workflow/instances', body),
+    mutationFn: (body: { key: string; data?: unknown; isTest?: boolean }) => api.post<StartedInstance>('/api/v1/workflow/instances', body),
     onSuccess: () => qc.invalidateQueries({ queryKey: execKeys.tasks }),
   });
 }

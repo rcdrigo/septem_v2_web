@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { applyTenantMeta } from '@/lib/tenant-meta';
-import { api, configureApi } from '@/lib/api';
+import { api, configureApi, onEnvironmentInactive } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
 
 /**
@@ -41,6 +41,8 @@ export type Tenant = {
   /** Chave PÚBLICA do Cloudflare Turnstile (Central de serviços, Fase 8). */
   turnstileSiteKey?: string | null;
   modulos: string[];
+  /** active | new_requests_blocked | inactive (ADM-07). */
+  operatingMode?: string;
 };
 
 export type SessionStatus = 'idle' | 'booting' | 'unauthenticated' | 'authenticated' | 'error';
@@ -159,6 +161,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       // /tenant/config é não-autenticado — sempre tenta.
       const tenant = await api.get<Tenant>('/api/tenant/config', { anonymous: true });
       cacheTenant(tenant);
+      // O 403 do /tenant/config já teria acionado o handler global; isto cobre o caso do
+      // ambiente que responde mas está bloqueado — o modo entra na store para as telas
+      // decidirem o que oferecer.
       if (!get().accessToken) {
         set({ status: 'unauthenticated', tenant });
         return;
@@ -265,6 +270,25 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     return perms.includes('*') || perms.includes(perm);
   },
 }));
+
+/**
+ * Ambiente inativado: qualquer rota deste ambiente passa a responder 403. O tratamento
+ * é o mesmo em toda tela — apagar o que já foi carregado (o cache do React Query guarda
+ * dados de dentro do ambiente), soltar os tokens e sair para a página de indisponível.
+ *
+ * `replace` em vez de push: voltar no histórico não pode devolver a tela anterior com os
+ * dados antigos à mostra.
+ */
+onEnvironmentInactive(() => {
+  if (window.location.pathname.endsWith('/environment-inactive')) return;
+  queryClient.clear();
+  try {
+    localStorage.removeItem(ACCESS_KEY);
+    localStorage.removeItem(REFRESH_KEY);
+  } catch { /* storage bloqueado */ }
+  useSessionStore.setState({ accessToken: null, refreshToken: null, user: null, status: 'unauthenticated' });
+  window.location.replace(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/environment-inactive`);
+});
 
 // Liga o api.ts à store para token + refresh + logout (quebra ciclo de import).
 configureApi({

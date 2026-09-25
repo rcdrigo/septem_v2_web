@@ -162,6 +162,15 @@ export function ProcessosPage() {
                   <tr key={p.key} className="border-t border-slate-100 hover:bg-slate-50">
                     <td className="px-4 py-2 font-medium text-slate-800">
                       <button type="button" onClick={() => edit(p.key)} className="hover:underline">{p.name}</button>
+                      {p.catalogKey && (
+                        <span
+                          data-testid={`origem-catalogo-${p.key}`}
+                          className="mt-0.5 block text-xs font-normal text-slate-500"
+                        >
+                          Do catálogo v{p.catalogVersion ?? '?'}
+                          {p.customized ? ', personalizado' : ''}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-2 text-slate-600">{p.category ?? '—'}</td>
                     <td className="px-4 py-2 text-slate-600">{p.area ?? '—'}</td>
@@ -264,7 +273,6 @@ function StatusBadge({ status }: { status: ProcessStatus }) {
     draft:        { label: 'Rascunho',       cls: 'bg-amber-100 text-amber-700' },
     // Fase 5: âmbar mais forte que o rascunho — é uma versão de teste de algo que JÁ
     // está no ar, e confundi-la com produção é o erro caro desta tela.
-    homologation: { label: 'Em homologação', cls: 'bg-orange-100 text-orange-800' },
     published:    { label: 'Publicado',      cls: 'bg-emerald-100 text-emerald-700' },
     inactive:     { label: 'Inativo',        cls: 'bg-slate-200 text-slate-600' },
   };

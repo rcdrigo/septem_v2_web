@@ -118,6 +118,22 @@ export function useSaveGeneral() {
   });
 }
 
+/** Situação das integrações do ambiente e se este cliente pode trocar credenciais (ADM-04). */
+export type IntegrationState = {
+  kind: string;
+  name: string;
+  owner: string;
+  status: 'configured' | 'missing';
+  requiredBy: string[];
+};
+
+export function useIntegrations() {
+  return useQuery({
+    queryKey: ['settings', 'integrations'] as const,
+    queryFn: () => api.get<{ items: IntegrationState[]; canEditCredentials: boolean }>('/api/v1/settings/integrations'),
+  });
+}
+
 export function useSaveEmail() {
   const qc = useQueryClient();
   return useMutation({

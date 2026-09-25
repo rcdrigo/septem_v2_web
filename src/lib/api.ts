@@ -66,6 +66,24 @@ type ApiOptions = RequestInit & {
 };
 
 /** Hooks para o session store; setados pelo store no boot. Evita ciclo de import. */
+/**
+ * Ambiente inativado (ADM-07): o backend responde 403 `environment_inactive` em TODA
+ * rota deste ambiente. O tratamento é global porque o erro não pertence a nenhuma tela —
+ * pode chegar no meio de qualquer requisição, inclusive numa aba aberta há horas.
+ */
+let inactiveHandler: (() => void) | null = null;
+
+/**
+ * Funcionalidade não contratada (ADM-04): o backend responde 403 `feature_disabled` com a
+ * mensagem que a spec fixa. Guardamos o texto do servidor para a tela mostrar EXATAMENTE
+ * o que ele disse, em vez de inventar uma segunda versão da mesma frase.
+ */
+export const FEATURE_DISABLED = 'feature_disabled';
+
+export function onEnvironmentInactive(handler: () => void) {
+  inactiveHandler = handler;
+}
+
 let tokenProvider: () => string | null = () => null;
 let refreshHandler: () => Promise<string | null> = async () => null;
 let logoutHandler: () => Promise<void> = async () => {};
@@ -126,6 +144,12 @@ export async function apiFetch<T = unknown>(path: string, options: ApiOptions = 
 
   if (!resp.ok) {
     const err = await readError(resp);
+    // Antes de qualquer outro tratamento: o ambiente saiu do ar para este cliente.
+    // Nenhuma tela deve seguir renderizando dados carregados antes disso.
+    if (resp.status === 403 && (err.body as { error?: string } | undefined)?.error === 'environment_inactive') {
+      inactiveHandler?.();
+      throw err;
+    }
     if (resp.status >= 500) toast.error(err.detail ?? err.message);
     throw err;
   }

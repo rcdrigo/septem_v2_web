@@ -3,6 +3,7 @@ import { Save, Building2, Mail, HardDrive, Loader2, Send, PlugZap, ShieldCheck }
 import { toast } from '@/stores/toast';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { useSessionStore } from '@/stores/session';
+import { useIntegrations } from '@/lib/api/settings';
 import { ApiError } from '@/lib/api';
 import {
   useSettings,
@@ -22,11 +23,12 @@ import {
   type SettingsSecurity,
 } from '@/lib/api/settings';
 
-type TabKey = 'geral' | 'email' | 'arquivos' | 'seguranca';
+type TabKey = 'geral' | 'email' | 'arquivos' | 'seguranca' | 'integracoes';
 
 const TABS: Array<{ key: TabKey; label: string; icon: typeof Building2 }> = [
   { key: 'geral', label: 'Informações gerais', icon: Building2 },
   { key: 'email', label: 'E-mail', icon: Mail },
+  { key: 'integracoes', label: 'Integrações', icon: PlugZap },
   { key: 'arquivos', label: 'Arquivos', icon: HardDrive },
   { key: 'seguranca', label: 'Segurança', icon: ShieldCheck },
 ];
@@ -46,7 +48,7 @@ export function ParametrosPage() {
       <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
         <h1 className="text-lg font-semibold text-slate-900">Parâmetros do sistema</h1>
         <p className="mt-0.5 text-sm text-slate-500">Identidade, expediente, e-mail e armazenamento de arquivos.</p>
-        <nav className="-mb-4 mt-3 flex gap-1 overflow-x-auto" role="tablist" aria-label="Seções de parâmetros">
+        <nav className="-mb-4 mt-3 flex flex-wrap gap-1 sm:flex-nowrap sm:overflow-x-auto" role="tablist" aria-label="Seções de parâmetros">
           {TABS.map((t) => {
             const Icon = t.icon;
             const active = tab === t.key;
@@ -80,7 +82,50 @@ export function ParametrosPage() {
         {data && tab === 'email' && <EmailTab data={data.email} />}
         {data && tab === 'arquivos' && <ArquivosTab data={data.storage} />}
         {data && tab === 'seguranca' && <SegurancaTab data={data.security} />}
+        {tab === 'integracoes' && <IntegracoesTab />}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Situação das integrações do ambiente (ADM-04). Distingue "falta configurar" de
+ * "você não pode configurar": são problemas de donos diferentes, e a orientação muda.
+ */
+function IntegracoesTab() {
+  const { data, isLoading } = useIntegrations();
+
+  if (isLoading) return <p className="text-sm text-slate-400">Carregando…</p>;
+  if (!data) return <p className="text-sm text-slate-400">Não foi possível carregar as integrações.</p>;
+
+  return (
+    <div className="max-w-3xl space-y-4" data-testid="integracoes">
+      {!data.canEditCredentials && (
+        <p
+          role="alert"
+          data-testid="credenciais-bloqueadas"
+          className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+        >
+          As credenciais de integração deste ambiente são mantidas pela Septem. Entre em
+          contato para alterá-las.
+        </p>
+      )}
+
+      <ul className="grid gap-3 sm:grid-cols-2">
+        {data.items.map((i) => (
+          <li key={i.kind} className="rounded-lg border border-slate-200 bg-white p-4" data-testid={`integracao-${i.kind}`}>
+            <p className="font-medium text-slate-900">{i.name}</p>
+            <dl className="mt-2 grid grid-cols-2 gap-y-1 text-xs">
+              <dt className="text-slate-500">Situação</dt>
+              <dd className={i.status === 'configured' ? 'text-emerald-700' : 'text-amber-700'}>
+                {i.status === 'configured' ? 'Configurada' : 'Falta configurar'}
+              </dd>
+              <dt className="text-slate-500">Conta</dt>
+              <dd className="text-slate-800">{i.owner === 'client' ? 'Do cliente' : 'Da Septem'}</dd>
+            </dl>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { AccessModeToggle } from './AccessModeToggle';
 import { MENU } from './menu/menu-config';
 import type { MenuAction, MenuGroup, MenuLink, MenuNode } from './menu/types';
 import { useSessionStore } from '@/stores/session';
+import { useFeatureCheck } from '@/lib/features';
 import { useTaskSummary } from '@/lib/api/execution';
 import { NewRequestDialog } from '@/components/requests/NewRequestDialog';
 import { GlobalSearchDialog } from '@/components/discovery/GlobalSearchDialog';
@@ -14,6 +15,8 @@ import { openTab } from '@/lib/nav';
 
 export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
   const session = useSessionStore();
+  // Item que depende de funcionalidade não contratada some do menu (ADM-04).
+  const temFuncionalidade = useFeatureCheck();
   const tenant = session.tenant;
   const tenantName = tenant?.clienteNome ?? 'Septem V2';
   const layout = MENU[session.effectiveMode()];
@@ -79,10 +82,10 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
           // grupo com ao menos um filho permitido). Seção sem itens não renderiza
           // (esconde o título, ex.: "Admin" para quem não tem acesso).
           const items = section.items.filter((node) =>
-            session.can(node.perm) &&
+            session.can(node.perm) && temFuncionalidade(node.feature) &&
             (node.kind === 'link'
               ? (node.visible ? node.visible(session) : true)
-              : node.children.some((c) => session.can(c.perm))),
+              : node.children.some((c) => session.can(c.perm) && temFuncionalidade(c.feature))),
           );
           if (items.length === 0) return null;
           return (
@@ -167,11 +170,12 @@ function nodeKey(node: MenuNode): string {
 }
 
 function NavNode({ node }: { node: MenuNode }) {
+  const temFuncionalidade = useFeatureCheck();
   const can = useSessionStore((s) => s.can);
   const visible = useSessionStore((s) => (node.kind === 'link' && node.visible ? node.visible(s) : true));
   if (!visible) return null;
   if (node.kind === 'group') {
-    const children = node.children.filter((c) => can(c.perm));
+    const children = node.children.filter((c) => can(c.perm) && temFuncionalidade(c.feature));
     return children.length ? <GroupRow group={{ ...node, children }} /> : null;
   }
   return (
