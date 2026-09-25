@@ -213,16 +213,11 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await page.waitForTimeout(2500);
 
   // o histórico de concluídas deve mostrar o processo que acabei de iniciar
-  await page.goto(BASE + '/tasks', { waitUntil: 'domcontentloaded' });
-  // Espera o switcher existir antes de clicar e, se não vier, diz o que havia na tela:
-  // um timeout seco aqui não se investiga.
-  const switcher = page.getByRole('group', { name: 'Situação das tarefas' });
-  await switcher.waitFor({ timeout: 20000 }).catch(async () => {
-    console.log(`! [${vp.n}] sem switcher em /tasks: ` +
-      JSON.stringify((await page.locator('button').allInnerTexts()).map((t) => t.trim()).slice(0, 12)));
-  });
-  await switcher.getByRole('button', { name: 'Concluídas' }).click();
-  await page.waitForTimeout(2000);
+  // A caixa de concluídas não tem botão na tela (decisão dele em 67e3358): é alcançada por
+  // LINK DIRETO, que é o que o `useTasks` honra.
+  await page.goto(BASE + '/tasks?caixa=concluidas', { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('article[role=link], [data-testid=lista-vazia]', { timeout: 25000 }).catch(() => {});
+  await page.waitForTimeout(1500);
   const txt = await page.evaluate(() => document.body.innerText);
   check(!/Nenhuma tarefa|Nada por aqui/i.test(txt), `[${vp.n}] item5: histórico de concluídas NÃO está vazio`);
   check(/Tres Tarefas Bug/i.test(txt), `[${vp.n}] item5: aparece o processo que o usuário iniciou`);

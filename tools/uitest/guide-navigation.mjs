@@ -162,6 +162,12 @@ try {
   console.log('PASSOU: larguras 320, 375, 414, 768, 1024 e 1440');
   await page.setViewportSize({ width: 375, height: 900 });
   const tocSummary = page.getByTestId('guide-toc').locator('summary');
+  // Espera o RECOLHIMENTO acontecer: no 1440 o índice fica aberto e, ao estreitar para 375,
+  // o React precisa de um render para fechá-lo. Ler o atributo na hora pegava o estado
+  // antigo — passava sozinho e caía no lote, que é o pior tipo de falha.
+  await page.waitForFunction(
+    () => !document.querySelector('[data-testid="guide-toc"] details')?.open,
+    null, { timeout: 10000 }).catch(() => {});
   assert.equal(await page.getByTestId('guide-toc').locator('details').getAttribute('open'), null);
   await tocSummary.click();
   await page.getByTestId('guide-toc').getByRole('link', {name:'Validação final', exact:true}).click();

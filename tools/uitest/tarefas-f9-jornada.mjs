@@ -117,14 +117,25 @@ try {
   // (o rótulo dela é "Palavra-chave").
   await escolherCategoria(page, 'Palavra-chave');
   await page.fill('[data-testid=filtro-q]', String(rid));
-  await page.waitForTimeout(1600);
+  // Fechar é parte do filtro: o popover aberto COBRE a lista, e o clique no card caía nele.
+  await fecharFiltros(page);
+  await page.waitForTimeout(1200);
   const card1 = page.locator('article[role=link]').filter({ hasText: `Analisar jornada ${rid}` }).first();
   check(await card1.count() > 0, '[jornada] a 1ª tarefa da simulação aparece nas minhas pendentes');
   check(await card1.locator('[data-testid=selo-teste]').count() > 0, '[jornada] com o selo de processo de teste');
   await page.screenshot({ path: `${OUT}/f9j-2-pendentes-web.png`, fullPage: true });
 
   // 4) Abrir e concluir a 1ª tarefa PELA TELA (abre em aba nova).
-  const [tarefa1] = await Promise.all([ctx.waitForEvent('page'), card1.click()]);
+  // A lista re-renderiza a cada segundo (o relógio dos prazos), então o Playwright nunca
+  // considera o card "estável" e desiste em 30 s. `force` clica no CENTRO do card: é
+  // clique de verdade (o card abre com `window.open`, que um clique por JS bloquearia por
+  // não ser gesto do usuário) e o centro é a superfície do próprio card — a pílula de
+  // prazo, que engole o clique, fica no rodapé.
+  await card1.scrollIntoViewIfNeeded();
+  const [tarefa1] = await Promise.all([
+    ctx.waitForEvent('page'),
+    card1.click({ force: true }),
+  ]);
   await tarefa1.waitForLoadState('networkidle');
   await tarefa1.waitForSelector('header', { timeout: 15000 });
   await tarefa1.waitForTimeout(1000);
@@ -143,12 +154,17 @@ try {
   // (o rótulo dela é "Palavra-chave").
   await escolherCategoria(page, 'Palavra-chave');
   await page.fill('[data-testid=filtro-q]', String(rid));
-  await page.waitForTimeout(1600);
+  await fecharFiltros(page);
+  await page.waitForTimeout(1200);
   const card2 = page.locator('article[role=link]').filter({ hasText: `Homologar jornada ${rid}` }).first();
   check(await card2.count() > 0, '[jornada] a 2ª tarefa (criada na conclusão) também é minha');
   check(await card2.locator('[data-testid=selo-teste]').count() > 0, '[jornada] e continua marcada como teste');
 
-  const [tarefa2] = await Promise.all([ctx.waitForEvent('page'), card2.click()]);
+  await card2.scrollIntoViewIfNeeded();
+  const [tarefa2] = await Promise.all([
+    ctx.waitForEvent('page'),
+    card2.click({ force: true }),
+  ]);
   await tarefa2.waitForLoadState('networkidle');
   await tarefa2.waitForSelector('header', { timeout: 15000 });
   await tarefa2.waitForTimeout(800);
@@ -203,9 +219,10 @@ try {
   check(instMob && instMob.id !== inst.id, '[mobile] uma nova instância de teste foi criada pelo celular');
 
   await m.goto(`${BASE}/tasks`, { waitUntil: 'networkidle' });
-  await m.click('[data-testid=abrir-filtros]');
+  await escolherCategoria(m, 'Palavra-chave');
   await m.fill('[data-testid=filtro-q]', String(rid));
-  await m.waitForTimeout(1600);
+  await fecharFiltros(m);
+  await m.waitForTimeout(1200);
   const cardMob = m.locator('article[role=link]').filter({ hasText: `Analisar jornada ${rid}` }).first();
   check(await cardMob.count() > 0, '[mobile] a tarefa da simulação aparece nas pendentes');
   check(await cardMob.locator('[data-testid=selo-teste]').count() > 0, '[mobile] com o selo de processo de teste');
@@ -213,7 +230,11 @@ try {
     '[mobile] sem rolagem horizontal na jornada');
   await m.screenshot({ path: `${OUT}/f9j-6-pendentes-mobile.png`, fullPage: true });
 
-  const [tarefaMob] = await Promise.all([mobCtx.waitForEvent('page'), cardMob.click()]);
+  await cardMob.scrollIntoViewIfNeeded();
+  const [tarefaMob] = await Promise.all([
+    mobCtx.waitForEvent('page'),
+    cardMob.click({ force: true }),
+  ]);
   await tarefaMob.waitForLoadState('networkidle');
   await tarefaMob.waitForSelector('header', { timeout: 15000 });
   await tarefaMob.waitForTimeout(800);

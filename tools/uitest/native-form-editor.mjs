@@ -153,7 +153,15 @@ try {
   assert.equal(await page.evaluate(() => window.flush().then(() => false, () => true)), true, 'XML inválido bloqueia save');
   await page.evaluate(() => window.loadXml({ type: 'default', components: [] }));
   assert.match(await page.getByRole('alert').innerText(), /formato anterior/);
-  assert.equal(await page.evaluate(() => window.flush().then(() => false, () => true)), true, 'não sobrescreve legado');
+  // O que importa aqui é o EFEITO — o schema em formato anterior sair intacto do flush — e
+  // não o mecanismo. O flush rejeitava, e isso abortava o Salvar do modelador INTEIRO: um
+  // processo com formulário antigo não podia ser salvo de jeito nenhum (nem renomear
+  // tarefa), sem requisição e sem aviso. Agora ele é no-op para legado, e o que se cobra é
+  // que o schema continue o mesmo.
+  assert.equal(await page.evaluate(() => window.flush().then(() => true, () => false)), true,
+    'flush com legado não estoura (senão o Salvar do processo morre)');
+  assert.deepEqual(await page.evaluate(() => window.readSchema()), { type: 'default', components: [] },
+    'e não sobrescreve o schema legado');
   assert.deepEqual(errors, []);
   console.log('PASSOU: CA04–CA06, catálogo, identidade, propriedades, estrutura mínima, teclado, mobile, importação e round-trip BPMN simulado.');
 } finally { await browser.close(); await rm(dir, { recursive: true, force: true }); }
