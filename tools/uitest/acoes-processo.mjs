@@ -150,18 +150,27 @@ try {
     const txtAlerta = await page.locator('[data-testid=alerta-risco]').innerText();
     check(/arriscada/i.test(txtAlerta) && /exce/i.test(txtAlerta), `[${vp.n}] com o texto que a spec pede`);
 
-    // O card da tramitação mostra a ação para o usuário.
+    // A tramitação mostra a ação PARA O USUÁRIO — e o que se cobra é a substância, não o
+    // formato: a ação administrativa antes vivia num card próprio (`card-acoes`); a
+    // reestruturação da tramitação a trouxe para dentro da MESMA linha do tempo das
+    // tarefas. Manter o card e a linha do tempo mostraria a ação duas vezes, então o
+    // card saiu. A verificação passou a exigir a linha visível com rótulo da ação,
+    // autor e justificativa — que é o que o usuário precisa ler.
     await page.keyboard.press('Escape');
     await page.waitForTimeout(400);
-    const temCard = await page.locator('[data-testid=card-acoes]').count() > 0
-      || (await page.getByRole('tab', { name: /Tramitação/i }).count() > 0
-        && await page.getByRole('tab', { name: /Tramitação/i }).click().then(() => page.waitForTimeout(600))
-          .then(() => page.locator('[data-testid=card-acoes]').count() > 0));
-    check(temCard, `[${vp.n}] o card das ações aparece na tramitação`);
-    if (temCard) {
-      const txt = await page.locator('[data-testid=card-acoes]').innerText();
-      check(txt.includes(`Faltou o parecer ${rid}`), `[${vp.n}] e traz a justificativa registrada`);
+    const abaTramitacao = page.getByRole('tab', { name: /Tramitação/i });
+    if (await abaTramitacao.count() > 0) {
+      await abaTramitacao.click();
+      await page.waitForTimeout(600);
     }
+    const linha = page.locator('li', { hasText: `Faltou o parecer ${rid}` }).last();
+    const temLinha = await linha.count() > 0 && await linha.isVisible();
+    check(temLinha, `[${vp.n}] a ação aparece na tramitação para o usuário`);
+    const textoLinha = temLinha ? await linha.innerText() : '';
+    check(/Devolvido para tarefa já executada/i.test(textoLinha),
+      `[${vp.n}] com o rótulo da ação (${textoLinha.slice(0, 60).replace(/\n/g, ' ')})`);
+    check(/por\s+\S+/.test(textoLinha) && /Faltou o parecer/.test(textoLinha),
+      `[${vp.n}] com autor e justificativa visíveis`);
     await page.screenshot({ path: `${OUT}/acoes-tramitacao-${vp.n}.png` });
     await ctx.close();
   }

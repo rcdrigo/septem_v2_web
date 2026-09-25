@@ -160,7 +160,12 @@ export function DuePill({ dueAt, createdAt, completedAt, completed = false, plai
     if (!el) return;
     const r = el.getBoundingClientRect();
     const place: 'top' | 'bottom' = r.top > 240 ? 'top' : 'bottom';
-    setPos({ left: r.left, top: place === 'top' ? r.top - 12 : r.bottom + 12, place });
+    // Alinhar pela esquerda do gatilho sozinho estoura a tela quando a pílula está à
+    // direita (no 375 dá para passar dos 555px de `right`): a largura do cartão é fixa
+    // (w-72 = 288px, limitada por max-w-[calc(100vw-2rem)]). Prender dentro do viewport.
+    const largura = Math.min(288, window.innerWidth - 32);
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - largura - 8));
+    setPos({ left, top: place === 'top' ? r.top - 12 : r.bottom + 12, place });
   };
   const openSoon = () => { window.clearTimeout(timer.current); timer.current = window.setTimeout(locate, 500); };
   const openNow = () => { window.clearTimeout(timer.current); locate(); };

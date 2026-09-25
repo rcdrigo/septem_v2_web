@@ -94,7 +94,10 @@ for (const view of [{ name: 'web', width: 1280, height: 900 }, { name: 'mobile',
   await page.waitForTimeout(1000);
 
   // Abre o diálogo de personificação e escolhe um usuário.
-  await page.locator('aside button', { hasText: 'Personificar' }).first().click();
+  // O menu do usuário virou Popover: o gatilho é um <span> na barra lateral (não mais um
+  // <button>) e os itens saem num PORTAL, fora do <aside>. Abrir e clicar por papel.
+  await page.locator('aside [class*="cursor-pointer"]').last().click();
+  await page.getByRole('menuitem', { name: /Personificar/ }).click();
   await page.waitForSelector('[role=dialog]', { timeout: 8000 });
   await page.waitForTimeout(800);
   impSummaryHits = 0; // zera antes de confirmar a personificação
@@ -106,16 +109,18 @@ for (const view of [{ name: 'web', width: 1280, height: 900 }, { name: 'mobile',
   check(impersonatePost, '[web] personificação chamou o endpoint /impersonate');
   check(impSummaryHits >= 1, `[web] personificar dispara refetch do summary de pendentes (item 12) — ${impSummaryHits}`);
 
-  // Despersonificar pelo banner.
+  // Despersonificar. No desktop a saída deixou de ser um botão no banner do rodapé do
+  // sidenav e passou a ser o item "Sair da personificação" no menu do usuário (no mobile
+  // continua sendo a faixa âmbar). O que se cobra é a SAÍDA existir e refazer o summary.
   impSummaryHits = 0;
-  const sair = page.locator('aside .bg-amber-50 button', { hasText: 'Sair' });
-  if (await sair.count()) {
-    await sair.first().click();
-    await page.waitForTimeout(2500);
-    check(impSummaryHits >= 1, `[web] despersonificar dispara refetch do summary (item 12) — ${impSummaryHits}`);
-  } else {
-    check(false, '[web] banner de personificação com botão Sair não encontrado');
-  }
+  await page.locator('aside [class*="cursor-pointer"]').last().click();
+  const sair = page.getByRole('menuitem', { name: /Sair da personificação/ });
+  check(await sair.count() === 1, '[web] o menu do usuário oferece sair da personificação');
+  await sair.click();
+  await page.waitForTimeout(2500);
+  check(impSummaryHits >= 1, `[web] despersonificar dispara refetch do summary (item 12) — ${impSummaryHits}`);
+  const aindaPersonificando = await page.locator('aside').getByText(/^Personificando/).count();
+  check(aindaPersonificando === 0, '[web] e o aviso de personificação sai da barra lateral');
   await ctx.close();
 }
 

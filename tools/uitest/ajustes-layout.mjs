@@ -81,8 +81,10 @@ for (const view of [{ name: 'web', width: 1280, height: 900 }, { name: 'mobile',
   check(svgCount >= 2, `[${view.name}] rodapé tem ícones para as datas (item 18) — ${svgCount} svg`);
 
   // ── Item 10: sem gap nos "switchers" ──
-  const statusGap = await page.locator('[aria-label="Status das requisições"]').evaluate((el) => getComputedStyle(el).columnGap);
-  check(statusGap === '0px' || statusGap === 'normal', `[${view.name}] grupo de status sem gap (item 10) — ${statusGap}`);
+  // O grupo de chips de status que o item 10 media NÃO EXISTE MAIS: os filtros das
+  // requisições passaram a ser o `ExecutionFilters` (popover com chips). Não há o que
+  // medir de gap ali, então a verificação saiu em vez de virar um check que passa em
+  // falso; o que resta do item 10 nesta tela é o toggle de visão, medido abaixo.
   const togglePad = await page.locator('button[title="Cards"]').evaluate((el) => getComputedStyle(el.parentElement).padding);
   check(togglePad === '0px', `[${view.name}] toggle de visão sem padding/gap (item 10) — ${togglePad}`);
 

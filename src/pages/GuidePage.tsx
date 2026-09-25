@@ -266,7 +266,7 @@ export function GuidePage() {
         </button>
 
         {tabs.length > 1 && (
-          <nav className="flex min-w-0 gap-1 overflow-x-auto" data-testid="guide-navbar" aria-label="Áreas do guia">
+                    <nav className="flex min-w-0 overflow-x-auto" data-testid="guide-navbar" aria-label="Áreas do guia">
             {tabs.map((item) => (
               <button
                 key={item.key}

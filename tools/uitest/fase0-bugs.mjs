@@ -80,7 +80,10 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await login(page);
   if (vp.n === 'mobile') { await page.locator('button[aria-label="Abrir menu"]').click(); await page.waitForTimeout(400); }
 
-  await page.locator('aside button', { hasText: 'Personificar' }).click();
+  // O menu do usuário virou Popover: o gatilho é um <span> na barra lateral (não mais um
+  // <button>) e os itens saem num PORTAL, fora do <aside>. Abrir e clicar por papel.
+  await page.locator('aside [class*="cursor-pointer"]').last().click();
+  await page.getByRole('menuitem', { name: /Personificar/ }).click();
   await page.waitForSelector('[role=dialog]', { timeout: 8000 });
   await page.waitForTimeout(800);
   // Primeiro usuário da lista (o diálogo já exclui o próprio admin) — robusto a quais

@@ -3,6 +3,22 @@
 cd "$(dirname "$0")"
 PASS=0; FAIL=0; FAILED=""; CHECKS=0
 
+# O Chrome mora em lugar diferente por SO e há mais de uma máquina rodando esta bateria.
+# Toda sonda aceita CHROME_BIN, mas várias caem no caminho do macOS quando ele não está
+# definido — e aí nem ABREM no Linux (a suíte morre no launch, sem um único check).
+# Resolver aqui, uma vez, vale para as 94.
+if [ -z "$CHROME_BIN" ]; then
+  for c in /usr/bin/google-chrome /usr/bin/google-chrome-stable /usr/bin/chromium \
+           /usr/bin/chromium-browser "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; do
+    if [ -x "$c" ]; then CHROME_BIN="$c"; break; fi
+  done
+  export CHROME_BIN
+fi
+if [ -z "$CHROME_BIN" ]; then
+  echo "Nenhum Chrome encontrado. Defina CHROME_BIN e rode de novo." >&2; exit 1
+fi
+echo "Chrome: $CHROME_BIN"
+
 # Aquece o front antes de medir: com o Vite frio, a PRIMEIRA suíte da bateria cai por
 # timeout no /login e passa quando rodada isolada. Ver warmup.mjs.
 echo "Aquecendo o front... $(OUT_DIR=$PWD node warmup.mjs 2>&1 | tail -1)"
