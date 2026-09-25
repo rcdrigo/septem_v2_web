@@ -63,10 +63,52 @@ check(
 await page.locator('[role=dialog] aside button[aria-pressed]', { hasText: 'Pagamentos' }).click();
 await page.waitForTimeout(200);
 const categoryFiltered = await page.locator('[role=dialog] .new-request-card').allTextContents();
-check(categoryFiltered.length > 0 && categoryFiltered.every((text) => text.includes('Pagamentos')), `filtro por categoria: ${JSON.stringify(categoryFiltered)}`);
+check(categoryFiltered.length > 0 && categoryFiltered.every((text) => text.includes('Pagamentos')),
+  `filtro por categoria: ${categoryFiltered.length} cartão(ões), todos de Pagamentos`);
+
+// ── Teto de renderização × catálogo completo ─────────────────────────────────
+// Os dois vivem juntos: o catálogo chega INTEIRO (a paginação de 100 escondia serviços da
+// busca), mas pintar milhares de cartões travava o modal. O teto só limita a PINTURA — e o
+// que prova isso é achar, pela busca, um serviço que está fora dos primeiros cartões.
+await page.locator('[role=dialog] aside button[aria-pressed]', { hasText: 'Todas' }).click();
+await page.waitForTimeout(300);
+
+// O catálogo é lido pela API (padrão das outras sondas): o token do navegador pode estar
+// só em memória, e um 401 aqui viraria erro de parse em vez de diagnóstico.
+const login = await fetch('http://localhost:5000/api/v1/auth/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'X-Tenant': 'prefeitura-x' },
+  body: JSON.stringify({ identifier: 'admin@prefeitura-x.local', password: 'admin123' }),
+}).then((r) => r.json());
+const resposta = await fetch('http://localhost:5000/api/v1/services', {
+  headers: { 'X-Tenant': 'prefeitura-x', Authorization: `Bearer ${login.accessToken}` },
+});
+// O endpoint devolve um ARRAY puro (é o catálogo inteiro, sem paginação).
+const corpoCatalogo = resposta.ok ? await resposta.json() : [];
+const catalogo = (Array.isArray(corpoCatalogo) ? corpoCatalogo : corpoCatalogo.items ?? []).map((x) => x.name);
+check(catalogo.length > 0, `o catálogo completo respondeu (${resposta.status}, ${catalogo.length} serviços)`);
+const pintados = await page.locator('[role=dialog] .new-request-card').count();
+
+if (catalogo.length > pintados) {
+  const aviso = await page.locator('[data-testid=nova-requisicao-teto]').innerText().catch(() => '');
+  check(/Mostrando os primeiros/.test(aviso) && aviso.includes(String(catalogo.length)),
+    `com ${catalogo.length} serviços, a tela diz que está mostrando ${pintados} ("${aviso.slice(0, 60)}")`);
+
+  // Um serviço que NÃO está entre os pintados tem de ser encontrável pela busca.
+  const foraDoTeto = catalogo[catalogo.length - 1];
+  await page.getByLabel('Buscar serviços').fill(foraDoTeto);
+  await page.waitForTimeout(400);
+  const achados = await page.locator('[role=dialog] .new-request-card').allTextContents();
+  check(achados.length >= 1 && achados.some((t) => t.includes(foraDoTeto)),
+    `a busca encontra serviço fora dos primeiros cartões ("${foraDoTeto.slice(0, 40)}")`);
+  await page.getByLabel('Buscar serviços').fill('');
+  await page.waitForTimeout(300);
+} else {
+  check(await page.locator('[data-testid=nova-requisicao-teto]').count() === 0,
+    `catálogo com ${catalogo.length} serviços cabe na tela: nenhum aviso de teto`);
+}
 
 // busca local automática: usa o nome do primeiro serviço e reduz ao resultado correspondente
-await page.locator('[role=dialog] aside button[aria-pressed]', { hasText: 'Todas' }).click();
 const firstName = await page.locator('[role=dialog] .new-request-card strong').first().innerText();
 await page.getByLabel('Buscar serviços').fill(firstName);
 await page.waitForTimeout(100);

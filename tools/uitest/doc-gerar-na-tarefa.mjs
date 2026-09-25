@@ -123,6 +123,11 @@ const keyLista = await publicar(proc(`DocLista${rid}`, {
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
 const login = async (page) => {
   await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
+  // `networkidle` não garante que o React já pintou o formulário: sob a carga da bateria
+  // inteira (89 suítes em série) a primeira pintura passa dos 30s padrão e a suíte caía
+  // no `fill`, sempre passando quando rodada isolada. Esperar o campo torna a espera
+  // explícita — se o login realmente não vier, ela falha por motivo de verdade.
+  await page.waitForSelector('input[name=identifier]', { timeout: 60000 });
   await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
   await page.fill('input[type=password]', 'admin123');
   await page.click('button[type=submit]');

@@ -69,7 +69,12 @@ for (const view of [
   // 2) As 3 abas existem e "Informações gerais" é a ativa.
   const tabs = await page.locator('[role=tab]').allInnerTexts();
   // Fase 1: Informações gerais, E-mail, Arquivos · Fase 2 acrescentou Segurança.
-  check(tabs.length === 4, `[${view.name}] 4 abas (${tabs.map((t) => t.trim()).join(' | ')})`);
+  const nomes = tabs.map((t) => t.trim());
+  const esperadas = ['Informações gerais', 'E-mail', 'Integrações', 'Arquivos', 'Segurança'];
+  // Contar abas não prova NADA sobre quais são: a lista nomeada pega tanto a aba que
+  // sumiu quanto a que foi renomeada. "Integrações" entrou na Fase 10.
+  check(esperadas.every((e) => nomes.some((n) => n.includes(e))),
+    `[${view.name}] as ${esperadas.length} abas esperadas (${nomes.join(' | ')})`);
   check(
     (await page.locator('[role=tab][aria-selected=true]').innerText()).includes('Informações gerais'),
     `[${view.name}] aba ativa = Informações gerais`,

@@ -2,8 +2,13 @@
 # Roda TODAS as suítes de UI (web 1280 + mobile 375) e resume o resultado.
 cd "$(dirname "$0")"
 PASS=0; FAIL=0; FAILED=""; CHECKS=0
+
+# Aquece o front antes de medir: com o Vite frio, a PRIMEIRA suíte da bateria cai por
+# timeout no /login e passa quando rodada isolada. Ver warmup.mjs.
+echo "Aquecendo o front... $(OUT_DIR=$PWD node warmup.mjs 2>&1 | tail -1)"
+
 for f in *.mjs; do
-  case "$f" in debug-*) continue;; esac
+  case "$f" in debug-*|warmup.mjs) continue;; esac
   OUT=$(OUT_DIR=$PWD node "$f" 2>&1)
   N=$(echo "$OUT" | grep -cE "^✓")
   CHECKS=$((CHECKS+N))

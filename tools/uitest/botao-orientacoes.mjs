@@ -7,6 +7,9 @@ const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome'
 const page = await (await browser.newContext({ viewport: { width: 1280, height: 950 }, deviceScaleFactor: 2 })).newPage();
 page.on('pageerror', (e) => console.log('pageerror:', e.message.slice(0, 200)));
 await page.goto('http://localhost:5173/login', { waitUntil: 'networkidle' });
+// `networkidle` não garante que o React pintou: como suíte inicial da bateria, o Vite ainda
+// está compilando e o formulário aparece depois. Espera explícita, prazo folgado.
+await page.waitForSelector('input[name=identifier]', { timeout: 60000 });
 await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
 await page.fill('input[type=password]', 'admin123');
 await page.click('button[type=submit]');

@@ -152,6 +152,30 @@ for (const execId of antigas) {
     .map(([, v]) => v);
   if (!escolhida && valores.length > 0) { escolhida = execId; escolhidaValores = valores.slice(0, 10); }
 }
+// As 3 acima são as legadas MAIS RECENTES, e esse trio muda sozinho: uma execução
+// criada ontem por outra suíte vira "legada" hoje e entra na janela. Se as três da vez
+// só tiverem número e data, não há o que conferir na tela — e o check falhava por
+// sorteio de dados, não por defeito. Então, se nenhuma delas servir, procuramos mais
+// fundo APENAS para escolher a que vai à tela (a paridade já foi conferida acima).
+if (!escolhida) {
+  const maisFundo = sql(`
+    SELECT e."PublicId"
+      FROM flow_executions e
+     WHERE e."StartedAt" < now() - interval '1 day'
+       AND e."FormData" IS NOT NULL
+       AND jsonb_typeof(e."FormData"::jsonb) = 'object'
+       AND e."FormData"::jsonb <> '{}'::jsonb
+       AND e."DeletedAt" IS NULL
+     ORDER BY e."Id" DESC
+     OFFSET 3 LIMIT 20;`).split('\n').filter(Boolean);
+  for (const execId of maisFundo) {
+    const p = projecao(execId);
+    const valores = Object.entries(p)
+      .filter(([k, v]) => k.endsWith('@') && typeof v === 'string' && v.length >= 3 && v.length <= 40 && !/^\d+([.,]\d+)?$/.test(v))
+      .map(([, v]) => v);
+    if (valores.length > 0) { escolhida = execId; escolhidaValores = valores.slice(0, 10); break; }
+  }
+}
 check(!!escolhida, '[backfill] achei uma legada com valor de texto para conferir na tela');
 
 // ── 4. a solicitação legada na TELA, com o valor que está na projeção ───────

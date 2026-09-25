@@ -43,7 +43,11 @@ for (const view of [{ name: 'web', width: 1280, height: 900 }, { name: 'mobile',
   if (mobile) await page.click('button[aria-label="Abrir menu"]');
   const btnBusca = page.getByRole('button', { name: /Buscar no Septem/ }).first();
   const btnNova = page.getByRole('button', { name: /Nova requisição/ }).first();
-  await btnBusca.waitFor({ state: 'visible', timeout: 8000 });
+  // 8s não bastava quando esta é a PRIMEIRA suíte da bateria: o Vite ainda compila sob
+  // demanda e o menu leva mais tempo para aparecer. Isolada ela sempre passou; no
+  // run-all caía. O limite maior não esconde bug — se o menu não vier, ela falha do
+  // mesmo jeito, só que por motivo de verdade.
+  await btnBusca.waitFor({ state: 'visible', timeout: 30000 });
   const mhBusca = await btnBusca.evaluate((el) => getComputedStyle(el).minHeight);
   const mhNova = await btnNova.evaluate((el) => getComputedStyle(el).minHeight);
   check(mhBusca === '32px', `[${view.name}] botão Buscar min-h-8 (32px) — obtido ${mhBusca}`);

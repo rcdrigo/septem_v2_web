@@ -43,7 +43,9 @@ for (const view of [{ name: 'web', width: 1280, height: 900 }, { name: 'mobile',
   const vis = await page.evaluate(() => document.visibilityState);
   summaryHits = 0;
   await page.evaluate(() => { window.dispatchEvent(new Event('focus')); document.dispatchEvent(new Event('visibilitychange')); });
-  await page.waitForTimeout(1000);
+  // Espera o refetch ACONTECER, em vez de dormir 1s: no meio da bateria a máquina está
+  // carregada e 1s não bastava — passava isolado e falhava no lote.
+  for (let i = 0; i < 40 && summaryHits === 0; i++) await page.waitForTimeout(250);
   check(vis !== 'visible' || summaryHits >= 1, `[${view.name}] focar a aba dispara refetch do summary (item 13) — visibility=${vis}, hits=${summaryHits}`);
 
   // ── Item 14: popover de prazos não é recortado ──

@@ -132,6 +132,17 @@ const login = async (page) => {
 const ordemVisivel = async (page) => (await page.locator('article[role=link]').allInnerTexts())
   .map((t) => (/Compras F9/.test(t) ? 'A' : /Ferias F9/.test(t) ? 'B' : /Simulacao F9/.test(t) ? 'C' : '?'));
 
+/**
+ * Espera a lista ter N cards.
+ *
+ * ⚠️ Era `waitForTimeout(1400)` — e no meio da bateria isso não bastava: o filtro tem
+ * debounce, e a leitura pegava a lista INTEIRA do banco de dev (milhares de tarefas
+ * acumuladas). Passava isolado e falhava no lote, que é o pior tipo de teste.
+ */
+const esperarCards = (page, n, timeout = 20000) =>
+  page.waitForFunction((esperado) => document.querySelectorAll('article[role=link]').length === esperado,
+    n, { timeout }).catch(() => {});
+
 try {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 950 }, deviceScaleFactor: 2 });
   const page = await ctx.newPage();
@@ -164,7 +175,7 @@ try {
   await page.waitForSelector('article[role=link]', { timeout: 15000 });
   await page.click('[data-testid=abrir-filtros]');
   await page.fill('[data-testid=filtro-q]', String(rid));
-  await page.waitForTimeout(1400);
+  await esperarCards(page, 3);
   check((await ordemVisivel(page)).sort().join('') === 'ABC',
     `[item3] palavra-chave reduz a lista aos 3 processos do teste (${(await ordemVisivel(page)).join(',')})`);
 
@@ -244,7 +255,11 @@ try {
   await page.fill('[data-testid=filtro-rec-de]', hoje);
   await page.fill('[data-testid=filtro-req-de]', hoje);
   await page.fill('[data-testid=filtro-req-ate]', hoje);
-  await page.waitForTimeout(1200);
+  // Espera a DESCRIÇÃO aparecer em vez de dormir: o filtro tem debounce e, no meio da
+  // bateria, 1,2 s não bastava — falhava só no lote, que é o pior tipo de falha.
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid=filtros-aplicados]')?.textContent?.includes('Recebimento a partir de'),
+    null, { timeout: 20000 }).catch(() => {});
   check((await page.locator('[data-testid=filtros-aplicados]').innerText()).includes('Recebimento a partir de'),
     '[item4] o intervalo de recebimento é descrito acima da lista');
   const cortadosWeb = await controlesCortados(page);
@@ -252,7 +267,8 @@ try {
   await page.screenshot({ path: `${OUT}/f9-tarefas-filtros-web.png`, fullPage: true });
 
   await page.click('[data-testid=limpar-filtros]');
-  await page.waitForTimeout(1200);
+  await page.waitForFunction(() => !document.querySelector('[data-testid=filtros-aplicados]'), null,
+    { timeout: 20000 }).catch(() => {});
   check(await page.locator('[data-testid=filtros-aplicados]').count() === 0,
     '[item4] "Limpar tudo" remove a descrição e os filtros');
   // O campo tem de esvaziar junto: texto sobrando ali seria um filtro fantasma —
@@ -262,7 +278,7 @@ try {
 
   // ── Item 7: selo nas listas e no topo da tarefa ───────────────────────────
   await page.fill('[data-testid=filtro-q]', String(rid));
-  await page.waitForTimeout(1400);
+  await esperarCards(page, 3);
   check((await ordemVisivel(page)).sort().join('') === 'ABC',
     '[item4] depois de limpar, redigitar a mesma palavra volta a filtrar');
   const cardTeste = page.locator('article[role=link]').filter({ hasText: `Simulacao F9 ${rid}` }).first();
@@ -320,7 +336,9 @@ try {
   await page.waitForSelector('article[role=link]', { timeout: 15000 });
   await page.click('[data-testid=abrir-filtros]');
   await page.fill('[data-testid=filtro-q]', String(rid));
-  await page.waitForTimeout(1400);
+  // A base de dev tem milhares de tarefas: sem esperar o filtro pegar, "antes" seria a
+  // lista inteira e a comparação de +1 nunca fecharia.
+  await esperarCards(page, 3);
   const antes = await page.locator('article[role=link]').count();
   await api(token, '/api/v1/workflow/instances', 'POST', { key: keyA, data: { assunto: `foco${rid}` } });
   await page.waitForTimeout(1500);
@@ -338,7 +356,7 @@ try {
   await trocarVisibilidade('hidden');
   await page.waitForTimeout(300);
   await trocarVisibilidade('visible');
-  await page.waitForTimeout(2500);
+  await esperarCards(page, antes + 1, 15000);
   check(await page.locator('article[role=link]').count() === antes + 1,
     `[item5] ao voltar o foco da aba a lista é atualizada (${antes} → ${await page.locator('article[role=link]').count()})`);
   await ctx.close();
