@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { AlertTriangle, Eye, FileStack, FlaskConical, History, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, BookOpen, Eye, FileStack, FlaskConical, History, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react';
 import {
   useDocumentTemplates, useDocumentTemplate, useCreateDocumentTemplate,
   useUpdateDocumentTemplate, useDeleteDocumentTemplate, useUploadDocumentTemplateFile,
@@ -67,6 +67,18 @@ export function ModelosDocumentoPage() {
           <ContextHelp manual="documentos-assinaturas" section="criar-modelo-documento" label="Abrir manual de modelos de documentos" />
         </div>
         <div className="flex items-center gap-2">
+          {/* Manual TÉCNICO dos templates (chaves `qrcode`, `sum()`, `#if`…). É outro
+              documento do manual de uso que a ajuda contextual abre — quem está montando
+              um modelo precisa das chaves, e o botão ficou sem porta nenhuma. */}
+          <button
+            type="button"
+            onClick={() => openTab(routes.manualTemplates)}
+            title="Manual técnico de criação de templates"
+            data-testid="doc-manual"
+            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            <BookOpen size={15} /> <span className="hidden sm:inline">Manual</span>
+          </button>
           <button
             type="button"
             onClick={() => setCamposOpen(true)}

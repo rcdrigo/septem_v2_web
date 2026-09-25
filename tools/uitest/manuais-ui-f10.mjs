@@ -153,7 +153,10 @@ try {
   // Externo: abrir o pai, ver conteúdo, TOC dos <h2>, anterior/próximo e busca.
   await page.locator('[data-testid=guide-tab-externo]').click();
   await page.waitForTimeout(500);
-  await page.locator('[data-testid=guide-menu-item]', { hasText: tPai }).first().click();
+  // Escopado ao menu do DESKTOP: o guia renderiza a mesma árvore duas vezes (o menu
+  // lateral e o do mobile, dentro de um diálogo oculto), e o `.first()` pegava a cópia
+  // invisível — esperava eternamente por um elemento que nunca aparece.
+  await page.locator('[data-testid=guide-menu] [data-testid=guide-menu-item]', { hasText: tPai }).first().click();
   await page.waitForTimeout(700);
   const conteudo = await page.locator('[data-testid=guide-conteudo]').innerText();
   check(conteudo.includes(`corpo do painel ${rid}`), '[10c] o conteúdo do manual é renderizado');
@@ -165,7 +168,7 @@ try {
   check(await page.locator('[data-testid=guide-anterior]').count() > 0, '[10c] após avançar, existe "anterior"');
 
   // Item 22: o ícone do manual aparece no menu do guia.
-  await page.locator('[data-testid=guide-menu-item]', { hasText: tPai }).first().click();
+  await page.locator('[data-testid=guide-menu] [data-testid=guide-menu-item]', { hasText: tPai }).first().click();
   await page.waitForTimeout(500);
   check(await page.locator('[data-testid=guide-menu-item] i').count() > 0, '[item22] o ícone do manual é exibido no menu do guia');
 
@@ -182,12 +185,12 @@ try {
   check(!!tocPos && tocPos.transparent, '[item25] "Nesta página" não tem background');
 
   // Item 26: a busca abre um POPOVER de resultados (não filtra o menu lateral).
-  const menuItensAntes = await page.locator('[data-testid=guide-menu-item]').count();
+  const menuItensAntes = await page.locator('[data-testid=guide-menu] [data-testid=guide-menu-item]').count();
   await page.fill('[data-testid=guide-busca]', `externo ${rid}`);
   await page.waitForTimeout(600);
   check(await page.locator('[data-testid=guide-busca-resultados]').count() === 1, '[item26] a busca abre um popover flutuante de resultados');
   check(await page.locator('[data-testid=guide-busca-resultado]', { hasText: tExterno2 }).count() > 0, '[item26] o popover lista o manual encontrado pelo título');
-  check(await page.locator('[data-testid=guide-menu-item]').count() === menuItensAntes, '[item26] a busca NÃO filtra o menu lateral (continua completo)');
+  check(await page.locator('[data-testid=guide-menu] [data-testid=guide-menu-item]').count() === menuItensAntes, '[item26] a busca NÃO filtra o menu lateral (continua completo)');
   await page.locator('[data-testid=guide-busca-resultado]', { hasText: tExterno2 }).first().click();
   await page.waitForTimeout(500);
   check(await page.locator('[data-testid=guide-busca-resultados]').count() === 0, '[item26] escolher um resultado fecha o popover');
@@ -251,7 +254,7 @@ try {
   await m.waitForTimeout(800);
   await m.locator('[data-testid=guide-tab-externo]').click();
   await m.waitForTimeout(400);
-  await m.locator('[data-testid=guide-menu-item]', { hasText: tPai }).first().click();
+  await m.locator('[data-testid=guide-menu] [data-testid=guide-menu-item]', { hasText: tPai }).first().click();
   await m.waitForTimeout(700);
   check((await m.locator('[data-testid=guide-conteudo]').innerText()).includes(`corpo do painel ${rid}`), '[mobile] Guide renderiza o conteúdo do manual');
   check(await semOverflow(m), '[mobile] Guide sem overflow horizontal');
