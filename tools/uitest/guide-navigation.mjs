@@ -72,11 +72,16 @@ await context.route('https://guide.local/**', route => {
 const page = await context.newPage();
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
+// `:visible` na busca: a caixa de busca do guia passou a existir DUAS vezes — no menu
+// lateral do desktop e no menu do mobile —, e o `getByTestId` em modo estrito não escolhe
+// entre as duas. Só uma está visível por vez.
 async function open(path = '/guide') {
   await page.goto('https://guide.local' + path);
   await page.addStyleTag({ content: css + '\n' + componentCss });
   await page.addScriptTag({ content: script });
-  await page.getByTestId('guide-busca').waitFor();
+  // Espera a PÁGINA, não a busca: a busca do guia passou para o menu lateral, que não
+  // existe em largura de celular — e este helper também é usado em casos mobile.
+  await page.locator('.guide-page').waitFor();
 }
 async function expectHeading(title) { await page.getByRole('heading', { name: title, exact: true, level: 1 }).waitFor(); }
 try {
@@ -87,8 +92,8 @@ try {
   assert.ok(new URL(page.url()).search, 'Abrir manual deve atualizar URL');
   const parentUrl = page.url();
   await page.keyboard.press('Control+k');
-  assert.equal(await page.getByTestId('guide-busca').evaluate(el => el === document.activeElement), true);
-  await page.getByTestId('guide-busca').fill('publicacao');
+  assert.equal(await page.locator('[data-testid=guide-busca]:visible').evaluate(el => el === document.activeElement), true);
+  await page.locator('[data-testid=guide-busca]:visible').fill('publicacao');
   await page.getByTestId('guide-busca-resultado').first().waitFor();
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
