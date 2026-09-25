@@ -4,6 +4,7 @@
 // data no passado conclui. (2) MODELADOR: um campo Data/Hora tem "Tipo" (Aparência)
 // e "Restrição de data" (Validação). Web 1280 + mobile 375.
 import { chromium } from 'playwright-core';
+import { abrirFormularioDeProcessoNovo, adicionarCampo, abaDoCampo } from './lib-modelador.mjs';
 
 const BASE = 'http://localhost:5173';
 const API = 'http://localhost:5000';
@@ -104,20 +105,13 @@ try {
   const page = await ctx.newPage();
   await login(page);
   try {
-    await page.goto(`${BASE}/flows/edit?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
-    await page.waitForSelector('[data-element-id="T005"]', { timeout: 20000 });
-    await page.getByRole('button', { name: 'Formulário', exact: true }).click();
-    await page.waitForTimeout(2500);
-    // A paleta é de botões: clicar em "Data / Hora" adiciona o campo E já o
-    // seleciona, abrindo o painel de config.
-    await page.getByRole('button', { name: 'Data / Hora' }).click();
-    await page.waitForTimeout(1000);
-    await page.locator('button', { hasText: 'Aparência' }).first().click({ timeout: 5000 });
-    await page.waitForTimeout(300);
+    // Processo NOVO + catálogo do editor nativo: adicionar já seleciona o campo.
+    await abrirFormularioDeProcessoNovo(page);
+    await adicionarCampo(page, 'Data / Hora');
+    await abaDoCampo(page, 'Aparência');
     check(await page.getByText('Tipo', { exact: true }).count() > 0, '[modelador] campo de data tem "Tipo" (data/hora/ambos) na Aparência');
     check(await page.locator('option', { hasText: 'Somente data' }).count() > 0, '[modelador] o "Tipo" oferece Somente data / Somente hora');
-    await page.locator('button', { hasText: 'Validação' }).first().click({ timeout: 3000 });
-    await page.waitForTimeout(300);
+    await abaDoCampo(page, 'Validação');
     check(await page.getByText('Restrição de data').count() > 0, '[modelador] campo de data tem "Restrição de data" na Validação');
     check(await page.locator('option', { hasText: /não permitir data no futuro/i }).count() > 0, '[modelador] a restrição oferece passado/futuro');
     await page.screenshot({ path: `${OUT}/data-modelador.png`, fullPage: true });

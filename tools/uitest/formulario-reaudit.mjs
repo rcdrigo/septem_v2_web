@@ -3,6 +3,7 @@
 // variantes de regra server-side que as suítes por bloco não cobriram (cpfCnpj
 // dinâmico, CNPJ, não-passado, hora, limite de tamanho).
 import { chromium } from 'playwright-core';
+import { adicionarCampo, abaDoCampo } from './lib-modelador.mjs';
 const BASE='http://localhost:5173',API='http://localhost:5000';
 const ok=[],bad=[];const check=(c,m)=>{(c?ok:bad).push(m);};
 const api=async(t,p,m='GET',b)=>{const r=await fetch(API+p,{method:m,headers:{'Content-Type':'application/json','X-Tenant':'prefeitura-x',...(t?{Authorization:`Bearer ${t}`}:{})},body:b?JSON.stringify(b):undefined});return{status:r.status,body:await r.json().catch(()=>null)};};
@@ -44,8 +45,16 @@ const t=a.accessToken;
 // ── A) Round-trip pelo modelador ────────────────────────────────────────────
 // processo novo com diagrama e nome único
 const orig=await api(t,'/api/v1/workflow/process-definitions/teste_condicoes_ui');
-const nome=`Reaudit RT ${Math.floor(Math.random()*1e9)}`;
-const xml=orig.body.bpmnXml.replace(/(<bpmn:process\b[^>]*\bname=")[^"]*(")/,`$1${nome}$2`);
+const rt=Math.floor(Math.random()*1e9);
+const nome=`Reaudit RT ${rt}`;
+// Aproveita o diagrama do processo real (o bpmn-js precisa do DI) mas troca o formulário
+// por um NATIVO vazio: o editor de formulário só assume o formato nativo.
+const nativoVazio=JSON.stringify({format:'septem-native',schemaVersion:1,id:`fr_${rt}`,
+  tabs:[{id:`tr_${rt}`,label:'Principal',groups:[{id:`gr_${rt}`,label:'Dados',type:'group',fields:[]}]}]})
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const xml=orig.body.bpmnXml
+  .replace(/(<bpmn:process\b[^>]*\bname=")[^"]*(")/,`$1${nome}$2`)
+  .replace(/<septem:formSchema>[\s\S]*?<\/septem:formSchema>/,`<septem:formSchema>${nativoVazio}</septem:formSchema>`);
 const saved=await api(t,'/api/v1/workflow/process-definitions','POST',{bpmnXml:xml});
 const key=saved.body.key;
 
@@ -58,34 +67,33 @@ await page.click('button[type=submit]');await page.waitForURL(u=>!u.pathname.inc
 await page.goto(`${BASE}/flows/edit?key=${key}`,{waitUntil:'networkidle'});
 await page.waitForSelector('[data-element-id="T005"]',{state:'attached',timeout:20000});
 await page.getByRole('button',{name:'Formulário',exact:true}).click();
-await page.waitForTimeout(2500);
+await page.locator('[data-native-editor]').waitFor({timeout:15000});
 
+// Os campos entram pelo catálogo do editor nativo ("Adicionar campo em <grupo>"), que já
+// deixa o campo novo selecionado no painel de propriedades.
 // 1) Texto → Documento=CPF (Aparência)
-await page.getByRole('button',{name:'Texto',exact:true}).click();
-await page.waitForTimeout(700);
-await page.locator('button',{hasText:'Aparência'}).first().click();
-await page.waitForTimeout(300);
-await page.selectOption('select:has(option:text-is("CPF"))','cpf');
-await page.waitForTimeout(300);
+await adicionarCampo(page,'Texto');
+await abaDoCampo(page,'Aparência');
+await page.selectOption('[data-native-properties] select[aria-label="Documento"]','cpf');
+await page.waitForTimeout(400);
 
 // 2) Data/Hora → Restrição=não permitir passado (Validação)
-await page.getByRole('button',{name:'Data / Hora'}).click();
-await page.waitForTimeout(700);
-await page.locator('button',{hasText:'Validação'}).first().click();
-await page.waitForTimeout(300);
-await page.selectOption('select:has(option:text-is("Não permitir data no passado"))','noPast');
-await page.waitForTimeout(300);
+await adicionarCampo(page,'Data / Hora');
+await abaDoCampo(page,'Validação');
+await page.selectOption('[data-native-properties] select[aria-label="Restrição de data"]','noPast');
+await page.waitForTimeout(400);
 
 // 3) Upload → extensão dwg (Geral)
-await page.getByRole('button',{name:'Upload de arquivo'}).click();
-await page.waitForTimeout(700);
+await adicionarCampo(page,'Upload de arquivo');
 await page.locator('[data-testid=ext-picker] input').fill('dwg');
 await page.waitForTimeout(300);
 await page.locator('[data-testid=ext-picker] button',{hasText:'.dwg'}).first().click();
 await page.waitForTimeout(400);
 
 // SALVAR pelo modelador
-await page.locator('header button',{hasText:'Salvar'}).first().click();
+// `getByRole(..., exact)`: `header button` + hasText casava também com um botão de
+// cabeçalho aninhado e o clique não disparava o Salvar (nenhuma requisição saía).
+await page.getByRole('button',{name:'Salvar',exact:true}).click();
 await page.waitForTimeout(3000);
 
 // Lê o schema PERSISTIDO e confere as props

@@ -4,6 +4,7 @@
 // inválido dá erro em vermelho e BLOQUEIA concluir; o válido conclui a tarefa.
 // Web 1280 + mobile 375.
 import { chromium } from 'playwright-core';
+import { abrirFormularioDeProcessoNovo, adicionarCampo, abaDoCampo } from './lib-modelador.mjs';
 
 const BASE = 'http://localhost:5173';
 const API = 'http://localhost:5000';
@@ -120,15 +121,10 @@ try {
   await login(page);
   try {
     // Processo que já tem formulário com campos de texto (o mesmo das outras suítes).
-    await page.goto(`${BASE}/flows/edit?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
-    await page.waitForSelector('[data-element-id="T005"]', { timeout: 20000 });
-    await page.getByRole('button', { name: 'Formulário', exact: true }).click();
-    await page.waitForTimeout(2500);
-    // Clicar num campo de texto do canvas seleciona-o e abre o painel de config.
-    await page.locator('.fjs-editor-container .fjs-form-field', { hasText: 'Nome do requisitante' }).first().click({ timeout: 8000 });
-    await page.waitForTimeout(600);
-    await page.locator('button', { hasText: 'Aparência' }).first().click({ timeout: 3000 });
-    await page.waitForTimeout(400);
+    // Processo NOVO + campo de texto pelo catálogo do editor nativo.
+    await abrirFormularioDeProcessoNovo(page);
+    await adicionarCampo(page, 'Texto');
+    await abaDoCampo(page, 'Aparência');
     const temDoc = await page.getByText('Documento', { exact: true }).count();
     check(temDoc > 0, '[modelador] a aba Aparência de um campo de texto tem a opção "Documento"');
     // E de fato oferece CPF/CNPJ no select.

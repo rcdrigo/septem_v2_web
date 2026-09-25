@@ -157,9 +157,20 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
   const selectedIds = new Set((field ? [field] : group ? group.fields : tab.groups.flatMap(g => g.fields)).map(f => f.id));
   const usages = references.filter(r => r.fieldId ? selectedIds.has(r.fieldId) : selectedKeys.has(r.key) || [...selectedKeys].some(key => r.key.endsWith(`[].${key}`)));
   const invalid = invalidNativeReferences(definition, references);
+  // Campo sem CHAVE é descartado ao salvar (sem chave não há resposta para guardar), e
+  // isso acontecia em silêncio: o usuário acrescentava o campo, salvava e ele sumia.
+  // A chave nasce do NOME, então dizer "dê um nome" é a instrução útil.
+  const semNome = definition.tabs.flatMap(t => t.groups.flatMap(g => g.fields
+    .filter(f => f.kind === 'field' && !f.key)
+    .map(f => ({ aba: t.label, grupo: g.label, campo: f.label }))));
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-auto lg:flex-row lg:overflow-hidden" data-native-editor>
       <div className="min-w-0 flex-1 lg:overflow-y-auto">
+        {semNome.length > 0 && <div role="alert" data-testid="campos-sem-nome" className="border-b border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+          <p className="font-semibold">Dê um nome aos campos antes de salvar</p>
+          <p>Campo sem nome não tem chave de resposta e <strong>não é guardado</strong> ao salvar o processo.</p>
+          <ul className="mt-2 list-disc pl-5">{semNome.map((c, i) => <li key={i} className="break-words">{c.aba} · {c.grupo}: {c.campo || 'campo sem nome'}</li>)}</ul>
+        </div>}
         {invalid.length > 0 && <div role="alert" className="border-b border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"><p className="font-semibold">Corrija as referências antes de publicar</p><p>O rascunho pode ser salvo.</p><ul className="mt-2 list-disc pl-5">{invalid.map((r, i) => <li key={i} className="break-words">{r.owner} · {r.use}: {r.key}</li>)}</ul></div>}
         <nav aria-label="Abas do formulário" className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3">
           {definition.tabs.map(t => <button type="button" key={t.id} onDragEnter={() => { if (drag) setSelection({ tabId: t.id, groupId: t.groups[0].id }); }}

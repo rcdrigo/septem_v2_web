@@ -3,6 +3,7 @@
 // erro do servidor. (2) MODELADOR: o campo de anexo tem "Extensões permitidas".
 // Web 1280 + mobile 375.
 import { chromium } from 'playwright-core';
+import { abrirFormularioDeProcessoNovo, adicionarCampo, abaDoCampo } from './lib-modelador.mjs';
 
 const BASE = 'http://localhost:5173';
 const API = 'http://localhost:5000';
@@ -130,13 +131,10 @@ try {
   const page = await ctx.newPage();
   await login(page);
   try {
-    await page.goto(`${BASE}/flows/edit?key=teste_condicoes_ui`, { waitUntil: 'networkidle' });
-    await page.waitForSelector('[data-element-id="T005"]', { timeout: 20000 });
-    await page.getByRole('button', { name: 'Formulário', exact: true }).click();
-    await page.waitForTimeout(2500);
-    await page.getByRole('button', { name: 'Upload de arquivo' }).click();
-    await page.waitForTimeout(1000);
-    // O painel de config abre na aba Geral; o picker de extensões está lá.
+    // Processo NOVO: nasce com formulário nativo vazio, que é o que o editor assume.
+    await abrirFormularioDeProcessoNovo(page);
+    await adicionarCampo(page, 'Upload de arquivo');
+    // O painel de propriedades abre na aba Geral; o picker de extensões está lá.
     check(await page.locator('[data-testid=ext-picker]').count() > 0, '[modelador] campo de anexo tem "Extensões permitidas"');
     // Adiciona "dwg" (formato de arquitetura) pela busca.
     await page.locator('[data-testid=ext-picker] input').fill('dwg');
