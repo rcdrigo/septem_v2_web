@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
-  ChevronLeft,
   ChevronRight,
   Copy,
   LifeBuoy,
@@ -216,29 +215,18 @@ export function GuidePage() {
   return (
     <div className="guide-page flex h-[100dvh] min-w-0 flex-col bg-slate-50 text-slate-900">
       <header className="guide-header shrink-0 border-b border-slate-200 bg-white">
-        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 sm:px-6 lg:grid-cols-[minmax(12rem,1fr)_minmax(18rem,32rem)_minmax(12rem,1fr)]">
-          <div className="flex min-w-0 items-center gap-2.5">
-            {data?.logoUrl
-              ? <img src={data.logoUrl} alt={data.tenantName} className="h-8 max-w-36 shrink-0 object-contain sm:max-w-52" />
-              : <LifeBuoy className="shrink-0 text-slate-700" aria-hidden="true" />}
-            <span className="truncate text-base font-semibold text-slate-900">{data?.tenantName ?? 'Guia'}</span>
+        <div className="flex min-w-0 items-center gap-3 px-4 py-4 sm:px-6">
+          <button type="button" data-testid="guide-voltar-login" aria-label="Voltar ao login" title="Voltar ao login" onClick={() => navigate('/login')} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-slate-500 outline-none transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 active:bg-slate-200">
+            <ArrowLeft size={18} aria-hidden="true" />
+          </button>
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            {data?.logoUrl && <img src={data.logoUrl} alt="" className="h-9 max-w-36 shrink-0 object-contain" />}
+            <div className="min-w-0">
+              <h1 className="text-lg font-semibold leading-snug text-slate-900">Guia</h1>
+              <p className="truncate text-sm text-slate-500">{data?.tenantName ?? 'Orientações de uso'}</p>
+            </div>
           </div>
-
-          <div className="col-span-full row-start-2 min-w-0 lg:col-span-1 lg:col-start-2 lg:row-start-1">
-            <GuideSearch items={ordered} onOpen={openManual} />
-          </div>
-
-          <div className="col-start-2 row-start-1 flex shrink-0 items-center justify-end gap-1.5 lg:col-start-3 lg:row-start-1">
-            <button
-              type="button"
-              data-testid="guide-voltar-login"
-              aria-label="Voltar ao login"
-              onClick={() => navigate('/login')}
-              className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-slate-300 px-2.5 text-sm text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 active:bg-slate-100 sm:px-3"
-            >
-              <ChevronLeft size={15} aria-hidden="true" />
-              <span className="hidden xl:inline">Voltar ao login</span>
-            </button>
+          <div className="flex shrink-0 items-center justify-end gap-1.5">
             <button
               type="button"
               data-testid="guide-ajuda"
@@ -289,6 +277,7 @@ export function GuidePage() {
 
       <div className="flex min-h-0 min-w-0 flex-1">
         <aside className="hidden w-72 shrink-0 overflow-y-auto border-r border-slate-200 bg-slate-50 lg:block" data-testid="guide-menu">
+          <div className="p-4"><GuideSearch items={ordered} onOpen={openManual} sidebar /></div>
           <GuideMenu items={ordered} activeId={activeId} onOpen={openManual} welcomeId={WELCOME_ID} />
         </aside>
 
@@ -453,6 +442,7 @@ function MobileGuideMenu({
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto" data-testid="guide-menu-mobile">
+          <div className="p-4"><GuideSearch items={items} onOpen={onOpen} sidebar /></div>
           <GuideMenu items={items} activeId={activeId} onOpen={onOpen} welcomeId={WELCOME_ID} />
         </div>
       </div>

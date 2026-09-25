@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Eye, EyeOff, LayoutGrid, Loader2, Lock, Mail, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, ChevronRight, Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { useSessionStore, type AccessMode } from '@/stores/session';
 import { api, ApiError } from '@/lib/api';
 import { toast } from '@/stores/toast';
 import { Toaster } from '@/components/ui/Toaster';
-import { Dialog } from '@/components/ui/Dialog';
+import { DocumentValidationForm } from '@/components/public/DocumentValidationForm';
 import { routes } from '@/lib/routes';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { PasswordChecklist, isPasswordValid } from '@/components/PasswordChecklist';
@@ -24,6 +24,8 @@ type Step = 'credenciais' | '2fa' | 'esqueci' | 'redefinir';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const validatingDocument = location.pathname === routes.validate;
   const [searchParams] = useSearchParams();
   const requestedReturn = searchParams.get('returnUrl');
   const returnUrl = requestedReturn?.startsWith('/') && !requestedReturn.startsWith('//') ? requestedReturn : '/';
@@ -33,7 +35,7 @@ export function LoginPage() {
   const status = useSessionStore((s) => s.status);
   const bootstrap = useSessionStore((s) => s.bootstrap);
   const tenantName = tenant?.clienteNome?.trim() || 'Prefeitura Municipal';
-  useDocumentTitle('Entrar');
+  useDocumentTitle(validatingDocument ? 'Validar documento' : 'Entrar');
 
   // Branding do tenant no /login acessado direto: o bootstrap só rodava no
   // AppShell, então o painel ficava no fallback "Septem" até logar.
@@ -41,8 +43,18 @@ export function LoginPage() {
     if (status === 'idle') void bootstrap();
   }, [status, bootstrap]);
 
-  const [consultationOpen, setConsultationOpen] = useState(false);
-  const [step, setStep] = useState<Step>('credenciais');
+  const [authStep, setStep] = useState<Step>('credenciais');
+  const step = validatingDocument ? 'validacao' : authStep;
+
+  function navigateValidation(open: boolean) {
+    const params = new URLSearchParams(searchParams);
+    if (!open) {
+      params.delete('number');
+      params.delete('code');
+      setStep('credenciais');
+    }
+    navigate({ pathname: open ? routes.validate : routes.login, search: params.toString() });
+  }
   const [identifier, setIdentifier] = useState('');   // e-mail OU CPF
   const [internalIdentifier, setInternalIdentifier] = useState<string | null>(null);
   const [accessMode, setAccessMode] = useState<AccessMode>('interno');
@@ -279,13 +291,16 @@ export function LoginPage() {
           </div>
 
           <div className="login-hero-actions">
-            <button type="button" className="login-hero-action" data-testid="login-abrir-guide" onClick={() => navigate('/guide')}>
-              <strong>Precisa de ajuda?</strong>
-              <span>Domine a plataforma com nosso guia.</span>
+            <CardCentralDeServicos />
+            <button type="button" className="login-hero-action" onClick={() => navigateValidation(true)}>
+              <strong>Validar documento</strong>
+              <span className="login-action-description">Confira a autenticidade de um documento.</span>
+              <ChevronRight className="login-action-chevron" size={18} aria-hidden="true" />
             </button>
-            <button type="button" className="login-hero-action login-hero-action--wide" onClick={() => setConsultationOpen(true)}>
-              <strong>Consultar processo</strong>
-              <span>Valide seu protocolo ou os documentos emitidos ao final dos processos.</span>
+            <button type="button" className="login-hero-action" data-testid="login-abrir-guide" onClick={() => navigate(routes.guide)}>
+              <strong>Precisa de ajuda?</strong>
+              <span className="login-action-description">Domine a plataforma com nosso guia.</span>
+              <ChevronRight className="login-action-chevron" size={18} aria-hidden="true" />
             </button>
           </div>
         </aside>
@@ -295,6 +310,17 @@ export function LoginPage() {
           <div className="login-mobile-brand">
             <strong>{tenantName}</strong>
           </div>
+
+          {step === 'validacao' && (
+            <>
+              <h1 className="text-3xl font-bold text-slate-900">Validar documento</h1>
+              <p className="mt-2 text-sm text-slate-500">Informe o número do processo e o código verificador que aparecem no documento.</p>
+              <div className="mt-8" data-testid="login-validacao">
+                <DocumentValidationForm embedded initialNumber={searchParams.get('number') ?? ''} initialCode={searchParams.get('code') ?? ''} />
+              </div>
+              <div className="mt-6"><Voltar onClick={() => navigateValidation(false)} /></div>
+            </>
+          )}
 
           {step === 'credenciais' && (
             <>
@@ -311,7 +337,6 @@ export function LoginPage() {
                     value={identifier}
                     onChange={(e) => { setIdentifier(e.target.value); setInternalIdentifier(null); setAccessMode('interno'); }}
                     className={inputCls}
-                    placeholder="usuario@prefeitura.gov.br ou 000.000.000-00"
                   />
                 </Campo>
 
@@ -337,7 +362,6 @@ export function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className={`${inputCls} pr-11`}
-                    placeholder="••••••••••••"
                   />
                   <button
                     type="button"
@@ -432,7 +456,6 @@ export function LoginPage() {
                     value={identifier}
                     onChange={(e) => { setIdentifier(e.target.value); setInternalIdentifier(null); setAccessMode('interno'); }}
                     className={inputCls}
-                    placeholder="usuario@prefeitura.gov.br ou 000.000.000-00"
                   />
                 </Campo>
                 <Aviso texto={aviso} />
@@ -483,7 +506,6 @@ export function LoginPage() {
                     value={novaSenha}
                     onChange={(e) => setNovaSenha(e.target.value)}
                     className={`${inputCls} pr-11`}
-                    placeholder="••••••••••••"
                   />
                   <button
                     type="button"
@@ -513,55 +535,19 @@ export function LoginPage() {
       </div>
 
       <Toaster />
-      <Dialog open={consultationOpen} onClose={() => setConsultationOpen(false)} title="Consultar processo">
-        <p className="mb-4 text-sm text-slate-600">Escolha o que você precisa consultar.</p>
-        <div className="flex flex-col gap-3">
-          <button type="button" onClick={() => { setConsultationOpen(false); navigate(`${routes.login}?returnUrl=${encodeURIComponent(routes.requests)}`); }} className="rounded-md border border-slate-300 px-4 py-3 text-left text-sm text-slate-800 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-slate-700">
-            <strong className="block">Acompanhar minhas requisições</strong>
-            <span>Entre na sua conta para consultar o andamento.</span>
-          </button>
-          <button type="button" onClick={() => navigate(routes.validate)} className="rounded-md border border-slate-300 px-4 py-3 text-left text-sm text-slate-800 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-slate-700">
-            <strong className="block">Validar documento</strong>
-            <span>Confira a autenticidade com o número do processo e o código verificador.</span>
-          </button>
-        </div>
-      </Dialog>
-      <CardCentralDeServicos />
       </div>
     </div>
   );
 }
 
-/**
- * Card "Central de serviços" (Fase 8), abaixo do card de login.
- *
- * É um <a>, não uma div com onClick: o card inteiro é clicável e precisa
- * funcionar por teclado, abrir em nova aba pelo meio do mouse e ser lido como
- * link por leitor de tela. Uma div "clicável" perde as três coisas.
- */
+/** Entrada de serviços na lista de ações do hero. */
 function CardCentralDeServicos() {
   return (
     <a href={`${import.meta.env.BASE_URL}${routes.externalServices.replace(/^\//, '')}`}
-       className="login-services" data-testid="login-central-servicos">
-      <span className="login-services-icone" aria-hidden="true">
-        <LayoutGrid size={30} />
-      </span>
-      <span className="login-services-texto">
-        <span className="login-services-titulo">Central de serviços</span>
-        <span className="login-services-subtitulo">
-          Clique aqui para acessar os serviços disponibilizados, focados no cidadão,
-          empreendimentos e fornecedores.
-        </span>
-        {/* Convite PERMANENTE: o overlay de hover é enfeite de desktop, e num
-            aparelho sem ponteiro ele nunca aparece. Deixar o "Acessar" só no hover
-            esconderia a única pista de que o card leva a algum lugar. */}
-        <span className="login-services-chip" data-testid="login-central-chip">
-          Acessar <ArrowRight size={14} aria-hidden="true" />
-        </span>
-      </span>
-      <span className="login-services-overlay" data-testid="login-central-overlay">
-        Acessar <ArrowRight size={18} aria-hidden="true" />
-      </span>
+       className="login-hero-action" data-testid="login-central-servicos">
+      <strong>Central de serviços</strong>
+      <span className="login-action-description">Serviços para cidadãos, empresas e fornecedores.</span>
+      <ChevronRight className="login-action-chevron" size={18} aria-hidden="true" />
     </a>
   );
 }
@@ -603,7 +589,6 @@ function CampoCodigo({ value, onChange }: { value: string; onChange: (v: string)
         value={value}
         onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
         className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-center text-lg font-semibold tracking-[0.5em] focus:border-slate-900 focus:outline-none"
-        placeholder="000000"
       />
     </label>
   );

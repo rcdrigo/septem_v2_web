@@ -55,7 +55,7 @@ function contentSnippet(text: string, term: string) {
   return `${start > 0 ? '…' : ''}${text.slice(start, end).trim()}${end < text.length ? '…' : ''}`;
 }
 
-export function GuideSearch({ items, onOpen }: { items: GuideManual[]; onOpen: (id: string) => void }) {
+export function GuideSearch({ items, onOpen, sidebar = false }: { items: GuideManual[]; onOpen: (id: string) => void; sidebar?: boolean }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(-1);
@@ -82,8 +82,9 @@ export function GuideSearch({ items, onOpen }: { items: GuideManual[]; onOpen: (
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase('pt-BR') === 'k') {
+        if (!inputRef.current?.getClientRects().length) return;
         event.preventDefault();
-        inputRef.current?.focus();
+        inputRef.current.focus();
         setOpen(true);
       }
     };
@@ -118,7 +119,7 @@ export function GuideSearch({ items, onOpen }: { items: GuideManual[]; onOpen: (
   return (
     <div
       ref={containerRef}
-      className="guide-search"
+      className={`guide-search${sidebar ? ' guide-search-sidebar' : ''}`}
       onBlur={event => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
           setOpen(false);

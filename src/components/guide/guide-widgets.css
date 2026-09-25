@@ -330,3 +330,22 @@
     transition-duration: 1ms;
   }
 }
+
+/* Busca no menu: resultados acompanham a rolagem sem sair da coluna. */
+.guide-search-sidebar input {
+  padding-inline-end: 0.75rem;
+}
+
+.guide-search-sidebar > kbd {
+  display: none;
+}
+
+.guide-search-sidebar .guide-search-popover {
+  position: relative;
+  inset: auto;
+  margin-block-start: 0.5rem;
+}
+
+.guide-search-sidebar:has(.guide-search-popover) .guide-search-icon {
+  inset-block-start: 1.375rem;
+}
