@@ -1,3 +1,4 @@
+import { novoId } from '@/lib/uuid';
 import { IconPicker } from '@/components/ui/IconPicker';
 import { fetchNativeFieldUsage, type NativeFieldUsage } from '@/lib/api/forms';
 import { getFormFieldEntries, setFormFieldEntries } from '@/lib/bpmn-form-fields';
@@ -257,7 +258,7 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
                 <button type="button" className={button} onClick={() => editField(field.id, f => editNativeElement(f, ['values'], options.filter((_, i) => i !== index)))}>Remover opção {index + 1}</button>
               </div>;
             })}
-            <button type="button" className={button} onClick={() => editField(field.id, f => editNativeElement(f, ['values'], [...(Array.isArray(options) ? options : []), { label: 'Nova opção', value: crypto.randomUUID() }]))}>Adicionar opção</button>
+            <button type="button" className={button} onClick={() => editField(field.id, f => editNativeElement(f, ['values'], [...(Array.isArray(options) ? options : []), { label: 'Nova opção', value: novoId() }]))}>Adicionar opção</button>
           </div>}
           <FieldConfigPanel key={`${field.id}:${field.type}`} native field={panel} masks={masks}
             nativeTypeOptions={NATIVE_CATALOG.filter(item => (item.category === 'Apresentação') === (field.kind === 'presentation')).map(item => ({ value: item.type, label: item.label }))}

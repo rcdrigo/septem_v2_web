@@ -1,3 +1,6 @@
+// Import RELATIVO, não `@/lib/uuid`: estes módulos são empacotados por sondas de contrato
+// que chamam o esbuild SEM o tsconfig, e lá o alias `@/` não resolve.
+import { novoId } from './uuid';
 import { NATIVE_FIELD_TYPES, type NativeFormDefinition, type NativeConfig, type NativeField, type NativeGroup, type NativePresentation, type NativeTab } from './native-form';
 
 export type NativeElement = NativeField | NativePresentation;
@@ -24,14 +27,14 @@ const responseType = (type: NativeElementType): type is NativeField['type'] => N
 const key = (prefix: string, id: string) => `${prefix}_${id.replaceAll('-', '_')}`;
 
 export function createNativeGroup(type: NativeGroup['type'], label: string): NativeGroup {
-  const id = crypto.randomUUID();
+  const id = novoId();
   return type === 'table' ? { id, label, type, key: key('tabela', id), fields: [] } : { id, label, type, fields: [] };
 }
 export function createNativeTab(label: string): NativeTab {
-  return { id: crypto.randomUUID(), label, groups: [createNativeGroup('group', 'Grupo 1')] };
+  return { id: novoId(), label, groups: [createNativeGroup('group', 'Grupo 1')] };
 }
 export function createNativeElement(type: NativeElementType): NativeElement {
-  const id = crypto.randomUUID(), label = NATIVE_CATALOG.find(item => item.type === type)!.label;
+  const id = novoId(), label = NATIVE_CATALOG.find(item => item.type === type)!.label;
   return responseType(type)
     ? { id, label, type, kind: 'field', key: '', config: hasOptions(type) ? { values: [] } : {} }
     : { id, label, type, kind: 'presentation', config: {} };
@@ -153,7 +156,7 @@ export function convertNativeGroup(definition: NativeFormDefinition, groupId: st
     ...(g.type === 'table' ? [g.key] : []), ...g.fields.flatMap(f => f.kind === 'field' ? [f.key] : []),
   ])));
   let tableKey = key('tabela', group.id).slice(0, 120);
-  while (usedKeys.has(tableKey)) tableKey = key('tabela', crypto.randomUUID());
+  while (usedKeys.has(tableKey)) tableKey = key('tabela', novoId());
   if (destination?.type === 'group') destination.fields.push(...presentation);
   tab.groups[index] = { ...group, type: 'table', key: tableKey, fields: group.fields.filter((f): f is NativeField => f.kind === 'field') };
 }

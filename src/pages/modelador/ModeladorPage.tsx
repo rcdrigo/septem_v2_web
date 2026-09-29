@@ -138,6 +138,10 @@ export function ModeladorPage() {
     } else if (err instanceof ApiError && err.status === 409) {
       toast.error(err.detail ?? err.message);
     } else {
+      // O toast é genérico de propósito (não expõe interno ao usuário), mas sem rastro
+      // ninguém descobre POR QUE não salvou — foi o que aconteceu com o formulário em
+      // formato anterior, que abortava o Salvar em silêncio.
+      console.error('Falha inesperada ao salvar o processo:', err);
       toast.error('Não foi possível salvar o processo.');
     }
   }

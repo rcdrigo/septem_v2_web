@@ -33,11 +33,19 @@ def convert(schema, scope):
     if not isinstance(schema, dict): raise ValueError('Schema deve ser um objeto JSON.')
     if schema.get('format') == 'septem-native':
         return copy.deepcopy(schema)
-    if schema.get('type') != 'default' or not isinstance(schema.get('components'), list):
+    # `type` ausente é aceito: schema gravado por versões antigas (e por fixtures) vinha só
+    # com `components`, e o runtime sempre foi tolerante com isso. O que define um schema
+    # legado conversível é ter `components` como lista.
+    if schema.get('type') not in (None, 'default') or not isinstance(schema.get('components'), list):
         raise ValueError('Schema legado não reconhecido (esperado type=default e components).')
     allowed_root = {'type', 'id', 'components', 'schemaVersion', 'exporter', 'executionPlatform', 'executionPlatformVersion'}
-    if set(schema) - allowed_root:
-        raise ValueError('Configurações de raiz precisam de revisão: ' + ', '.join(sorted(set(schema) - allowed_root)))
+    # `septemGroupLayout` (abas × empilhados) foi APOSENTADO com a Fase 15/Q18: o formulário
+    # nativo é sempre em abas, não há layout a escolher. Descartar a chave na conversão é a
+    # leitura correta da decisão — e era ela que bloqueava 848 dos 1.214 snapshots.
+    descartaveis = {'septemGroupLayout'}
+    sobrando = set(schema) - allowed_root - descartaveis
+    if sobrando:
+        raise ValueError('Configurações de raiz precisam de revisão: ' + ', '.join(sorted(sobrando)))
     ids, keys = set(), set()
     def identity(old, path):
         token = f'key/{old["key"]}' if old.get('key') else path

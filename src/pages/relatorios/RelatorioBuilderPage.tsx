@@ -10,7 +10,7 @@ import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
 import { Toaster } from '@/components/ui/Toaster';
 import { ReportRunViewer } from '@/components/reports/ReportViewer';
-import { useProcessList } from '@/lib/api/process-definitions';
+import { useProcessOptions } from '@/lib/api/process-definitions';
 import { useDataSourcesList } from '@/lib/api/data-sources';
 import {
   useReport, useUpdateReport, usePublishReport, useSyncReportSchema, useReportSourceMetadata,
@@ -54,7 +54,9 @@ export function RelatorioBuilderPage() {
     { acao: 'publish' | 'sync'; choices: FieldChoice[]; issues: string[] } | null>(null);
   const [tab, setTab] = useState<'origem' | 'blocos' | 'filtros' | 'acesso' | 'preview'>('blocos');
 
-  const processes = useProcessList({ pageSize: 100 });
+  // Lista inteira, não a primeira página: com mais de 100 processos o autor não achava o
+  // que queria e a busca do combo não alcançava o que não veio (PENDENCIAS 4.2).
+  const processes = useProcessOptions();
   const sources = useDataSourcesList('report');
 
   useEffect(() => {
@@ -232,7 +234,7 @@ export function RelatorioBuilderPage() {
                 {sourceType === 'process' ? (
                   <Field label="Processo" hint="Instâncias de todas as versões; só campos marcados como visíveis no relatório.">
                     <Combobox value={processKey} onChange={setProcessKey} placeholder="Selecione o processo…"
-                      options={(processes.data?.items ?? []).map((p) => ({ value: p.key, label: p.name }))} clearLabel="— nenhum —" />
+                      options={(processes.data ?? []).map((p) => ({ value: p.key, label: p.name }))} clearLabel="— nenhum —" />
                   </Field>
                 ) : (
                   <Field label="Fonte de dados" hint="Colunas e tipos inferidos; ajuste manual abaixo.">

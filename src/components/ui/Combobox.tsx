@@ -84,6 +84,14 @@ export function Combobox({ value, options, onChange, placeholder, clearLabel, di
     ? options.filter((o) => o.label.toLowerCase().includes(query.trim().toLowerCase()))
     : options;
 
+  // Teto de PINTURA, igual ao do modal "Nova requisição". Um combo alimentado pelo catálogo
+  // inteiro pode receber milhares de opções (medido: 5.191 processos neste ambiente) e pintar
+  // tudo trava a digitação. A busca e o filtro continuam varrendo a lista INTEIRA — só a
+  // pintura tem teto, e o aviso diz o que fazer em vez de deixar a pessoa rolando às cegas.
+  const TETO_DE_OPCOES = 120;
+  const visiveis = filtered.length > TETO_DE_OPCOES ? filtered.slice(0, TETO_DE_OPCOES) : filtered;
+  const ocultas = filtered.length - visiveis.length;
+
   function pick(next: string) {
     onChange(next);
     setOpen(false);
@@ -131,7 +139,7 @@ export function Combobox({ value, options, onChange, placeholder, clearLabel, di
                 </button>
               </li>
             )}
-            {filtered.map((o) => (
+            {visiveis.map((o) => (
               <li key={o.value}>
                 <button
                   type="button"
@@ -143,6 +151,11 @@ export function Combobox({ value, options, onChange, placeholder, clearLabel, di
                 </button>
               </li>
             ))}
+            {ocultas > 0 && (
+              <li data-testid="combobox-teto" aria-live="polite" className="border-t border-slate-100 px-3 py-2 text-xs text-slate-500">
+                Mostrando {visiveis.length} de {filtered.length}. Refine a busca para ver o restante.
+              </li>
+            )}
             {filtered.length === 0 && <li className="px-3 py-2 text-slate-400">Nenhum resultado.</li>}
           </ul>
         </div>,
