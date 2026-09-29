@@ -45,6 +45,7 @@ import { PlatformAmbientePage } from './pages/platform/PlatformAmbientePage';
 import { PlatformNovoClientePage } from './pages/platform/PlatformNovoClientePage';
 import { PlatformAceitarConvitePage } from './pages/platform/PlatformAceitarConvitePage';
 import { PlatformCatalogoPage } from './pages/platform/PlatformCatalogoPage';
+import { EquipesSuportePage } from './pages/support/EquipesSuportePage';
 import { SearchX } from 'lucide-react';
 import { childPath, routes } from './lib/routes';
 
@@ -106,6 +107,7 @@ export const router = createBrowserRouter(
         { path: 'clients/:id', element: <PlatformClientePage /> },
         { path: 'environments/:tenantId', element: <PlatformAmbientePage /> },
         { path: 'process-catalog', element: <PlatformCatalogoPage /> },
+        { path: 'support/teams', element: <EquipesSuportePage escopo="septem" /> },
       ],
     },
     {
@@ -148,7 +150,8 @@ export const router = createBrowserRouter(
 
         // --- Conta / rodapé ------------------------------------------------
         { path: childPath(routes.me), element: <MeuDadosPage /> },
-        stub(childPath(routes.support), 'Suporte', { phase: 'Fase 7' }),
+        stub(childPath(routes.support), 'Suporte', { phase: 'Fase 4' }),
+        { path: childPath(routes.supportTeams), element: <EquipesSuportePage escopo="cliente" /> },
 
         // Endereço inexistente (inclusive os antigos em português, descartados na
         // Fase 1): 404 com saída, não beco sem saída.

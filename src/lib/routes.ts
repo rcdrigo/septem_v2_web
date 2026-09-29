@@ -69,6 +69,8 @@ export const routes = {
   platformClient: (id: string) => `/platform/clients/${id}`,
   /** Um ambiente na área central: modo de operação e ocorrências vencidas. */
   platformEnvironment: (tenantId: string) => `/platform/environments/${tenantId}`,
+  /** Equipes de suporte da Septem (Fase 3 do plano 26_09). */
+  platformSupportTeams: '/platform/support/teams',
 
   // --- Dentro do shell ------------------------------------------------------
   dashboard: '/dashboard',
@@ -78,6 +80,8 @@ export const routes = {
   reports: '/reports',
   orgchart: '/orgchart',
   support: '/support',
+  /** Equipes de suporte do próprio órgão (Fase 3 do plano 26_09). */
+  supportTeams: '/support/teams',
   me: '/me',
 
   // --- Admin ----------------------------------------------------------------

@@ -100,4 +100,5 @@ export const platformApi = {
       body: body !== undefined ? JSON.stringify(body) : undefined,
       ...opts,
     }),
+  del: <T = unknown>(path: string, opts?: Options) => platformFetch<T>(path, { method: 'DELETE', ...opts }),
 };
