@@ -164,7 +164,11 @@ try {
     `[web] a API gera href de serviço em inglês (${JSON.stringify(alvo?.href)})`);
 
   await page.goto(BASE + '/tasks', { waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: /Buscar no Septem/i }).first().click();
+  // Mesma armadilha do `modo-operacao`: com a lista de tarefas do dev cheia, a thread principal
+  // fica ocupada e o clique pendura no teto padrão de 30 s. Espera a lista e dá folga ao clique.
+  await page.locator('[data-testid=task-card], table tbody tr').first()
+    .waitFor({ timeout: 20000 }).catch(() => {});
+  await page.getByRole('button', { name: /Buscar no Septem/i }).first().click({ timeout: 60000 });
   await page.locator('[role=dialog] input').first().fill('compra');
   await page.waitForTimeout(1500);
   const resultado = page.locator('[role=dialog] button', { hasText: alvo.title }).first();

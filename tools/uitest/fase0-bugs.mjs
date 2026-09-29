@@ -88,8 +88,11 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   // <button>) e os itens saem num PORTAL, fora do <aside>. Abrir e clicar por papel.
   await abrirMenuDoUsuario(page);
   await page.getByRole('menuitem', { name: /Personificar/ }).click();
-  await page.waitForSelector('[role=dialog]', { timeout: 8000 });
-  await page.waitForTimeout(800);
+  // 30 s: o diálogo de personificação carrega a lista de usuários do ambiente, e no meio da
+  // bateria (máquina saturada) 8 s não bastavam — passava sozinha e caía no lote.
+  await page.waitForSelector('[role=dialog]', { timeout: 30000 });
+  // Espera a LISTA, não um tempo fixo: o botão do alvo só existe depois dela chegar.
+  await page.locator('[role=dialog] .overflow-auto button').first().waitFor({ timeout: 20000 });
   // Primeiro usuário da lista (o diálogo já exclui o próprio admin) — robusto a quais
   // usuários existem no ambiente; o que importa é o fluxo de SAIR da personificação.
   const alvoBtn = page.locator('[role=dialog] .overflow-auto button').first();

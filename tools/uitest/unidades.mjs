@@ -80,7 +80,18 @@ async function definirUnidadeDoProcesso(page, rotuloUnidade) {
   const campo = page.locator('label', { hasText: 'Unidade organizacional responsável' })
     .locator('xpath=..').locator('button').first();
   await campo.click();
-  await page.locator('button', { hasText: rotuloUnidade }).last().click();
+
+  // A lista abre em PORTAL e tem TETO DE PINTURA: com centenas de unidades no banco
+  // (246 medidas neste ambiente) a recém-criada fica fora das primeiras pintadas, e
+  // clicar por rótulo sem filtrar dava timeout. O caminho real do produto é digitar —
+  // a busca varre a lista inteira. "— nenhuma —" é o botão de limpar, não uma opção:
+  // ele está sempre pintado, então ali não se filtra.
+  const lista = page.locator('[data-testid=combobox-popover]');
+  if (rotuloUnidade !== '— nenhuma —') {
+    await lista.locator('input[placeholder="Pesquisar…"]').fill(rotuloUnidade);
+    await page.waitForTimeout(400);
+  }
+  await lista.locator('button', { hasText: rotuloUnidade }).last().click();
   await page.waitForTimeout(300);
 
   const salvou = page.waitForResponse(

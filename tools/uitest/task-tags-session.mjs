@@ -43,7 +43,13 @@ try {
     for(const css of (await readdir(join(root,'dist/assets'))).filter(f=>f.endsWith('.css'))){await page.addStyleTag({content:await readFile(join(root,'dist/assets',css),'utf8')});}
     await page.addScriptTag({path:join(dir,'bundle.js')});
     await page.getByRole('heading',{name:'Analisar compra',exact:true}).waitFor();
-    if(width<640)await page.getByRole('button',{name:'Botões de conclusão',exact:true}).click();
+    if(width<640){
+      // No 375 os botões de conclusão (onde o Tags mora) ficam num bottom sheet: esperar o
+      // sheet ABRIR antes de procurar o botão. Sem isso a busca começava com o sheet ainda
+      // fechado e, sob carga, estourava o timeout — falhava só no lote.
+      await page.getByRole('button',{name:'Botões de conclusão',exact:true}).click();
+      await page.locator('[role=dialog]').first().waitFor({state:'visible',timeout:15000}).catch(()=>{});
+    }
     try {
       await page.getByRole('button',{name:'Tags',exact:true}).waitFor({state:'visible'});
       console.log(`PASS ${width}: botão Tags visível na tarefa aberta em nova aba`);

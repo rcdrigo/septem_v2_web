@@ -96,7 +96,12 @@ try {
   await porta.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
   await porta.goto(BASE + '/tasks', { waitUntil: 'networkidle' });
-  await porta.getByRole('button', { name: 'Nova requisição' }).click();
+  // `/tasks` no banco de dev pinta milhares de linhas: sob a carga do gate a thread principal
+  // fica ocupada e o clique sintetizado pendura em "performing click action" até o teto de 30 s.
+  // Esperar a lista existir (ou desistir) e dar folga ao clique tira o sorteio da rodada.
+  await porta.locator('[data-testid=task-card], table tbody tr').first()
+    .waitFor({ timeout: 20000 }).catch(() => {});
+  await porta.getByRole('button', { name: 'Nova requisição' }).click({ timeout: 60000 });
   await porta.waitForSelector('[role=dialog]');
   check(await porta.locator('[data-testid=novas-requisicoes-bloqueadas]').isVisible(),
     'o modal "Nova requisição" avisa que o ambiente não aceita novas');
