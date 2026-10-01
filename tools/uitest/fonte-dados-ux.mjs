@@ -41,7 +41,7 @@ const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome'
 const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 })).newPage();
 page.on('pageerror', (e) => console.log('pageerror:', e.message.slice(0, 200)));
 try {
-  await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/login?returnUrl=/me', { waitUntil: 'networkidle' });
   await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
   await page.fill('input[type=password]', 'admin123');
   await page.click('button[type=submit]');
@@ -113,7 +113,9 @@ try {
   await page.waitForTimeout(800);
   await seletorPos.click();
   await page.waitForSelector('input[placeholder="Pesquisar…"]', { timeout: 5000 });
-  await page.fill('input[placeholder="Pesquisar…"]', 'Refresh');
+  // Busca pelo NOME EXATO: "Refresh" casa com todas as fontes que as rodadas anteriores criaram
+  // (169 em 01/10) — mais que o teto de 120 opções pintadas do Combobox, e a nova ficava fora.
+  await page.fill('input[placeholder="Pesquisar…"]', novoNome);
   await page.waitForTimeout(300);
   const achouNova = await openPanelOptions().filter({ hasText: novoNome }).count();
   const optsDepois = optsAntes + 1;

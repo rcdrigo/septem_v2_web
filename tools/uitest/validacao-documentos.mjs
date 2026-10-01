@@ -94,8 +94,11 @@ try {
 
     // ── 1) A página abre SEM login ────────────────────────────────────────
     // Nada de `networkidle`: o widget do Turnstile mantém conexão com a Cloudflare.
+    // `/validate` continua a mesma URL, mas a página própria saiu: o formulário de validação
+// agora é EMBUTIDO na tela de login (`DocumentValidationForm embedded`). Esperar o campo,
+// não o invólucro da página antiga.
     await page.goto(`${BASE}/validate`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-testid=validacao]', { timeout: 15000 });
+    await page.waitForSelector('[data-testid=validacao-numero]', { timeout: 15000 });
     check(await page.evaluate(() => !localStorage.getItem('septem.accessToken')),
       `[${view.name}] a validação abre sem sessão`);
     check(await page.locator('[data-testid=validacao-consultar]').isDisabled(),
@@ -161,7 +164,7 @@ try {
     const layout = await page.evaluate(() => {
       const overflow = document.documentElement.scrollWidth > document.documentElement.clientWidth + 1;
       let clipped = 0;
-      for (const el of document.querySelectorAll('[data-testid=validacao] *')) {
+      for (const el of document.querySelectorAll('[data-testid=validacao-numero] *')) {
         const r = el.getBoundingClientRect();
         if (r.width > 0 && (r.right > window.innerWidth + 1 || r.left < -1)) clipped++;
       }

@@ -144,7 +144,16 @@ try {
   await editor().getByRole('button',{name:'Excluir tag do processo: Urgente',exact:true}).click();
   await page.getByRole('heading',{name:'Excluir tag do processo?',exact:true}).waitFor();
   check('aviso explica alcance global',(await page.locator('body').innerText()).includes('todas as execuções associadas'),true);
+  // Espera o FOCO entrar na confirmação antes do Escape. Sob carga, o título aparece antes de o
+  // foco sair do editor, e o Escape fechava o editor em vez da confirmação — a sonda media a
+  // corrida do foco, não a regra (PENDENCIAS §5.5).
+  await page.waitForFunction(()=>{
+    const h=[...document.querySelectorAll('h2,h3,[role=heading]')].find(e=>e.textContent?.includes('Excluir tag do processo?'));
+    const d=h?.closest('[role=dialog],[role=alertdialog]');
+    return !!d && d.contains(document.activeElement);
+  },null,{timeout:10000}).catch(()=>{});
   await page.keyboard.press('Escape');
+  await page.getByRole('heading',{name:'Excluir tag do processo?',exact:true}).waitFor({state:'hidden',timeout:10000}).catch(()=>{});
   check('cancelar exclusão com Escape preserva editor',await editor().count(),1);
   const beforeDelete=writes().length;
   await editor().getByRole('button',{name:'Excluir tag do processo: Urgente',exact:true}).click();

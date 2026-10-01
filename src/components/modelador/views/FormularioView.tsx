@@ -1,11 +1,14 @@
 import { useSessionStore } from '@/stores/session';
 import { routes } from '@/lib/routes';
 import { useMemo, useRef, useState } from 'react';
-import { Regex, FileUp, Download, Eye, Code2 } from 'lucide-react';
+import { Regex, FileUp, FileSpreadsheet, Download, Eye, Code2 } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { ReactForm, type ReactFormHandle } from '@/components/form/ReactForm';
 import { IconButton } from '@/components/ui/IconButton';
 import { MasksDialog } from '@/components/form/MasksDialog';
+import { ImportFormDialog } from '@/components/form/ImportFormDialog';
+import { Tooltip } from '@/components/ui/Tooltip';
+import { useProcessDefinition } from '@/lib/api/process-definitions';
 import { NativeFormEditor } from '@/components/form/NativeFormEditor';
 import { useNativeProcessForm } from '@/components/form/useNativeProcessForm';
 import { useFormMasks } from '@/lib/api/forms';
@@ -19,6 +22,11 @@ export function FormularioView({ modeler, processReady = true, processKey }: Pro
   const masks = useFormMasks();
   const canAutomate = useSessionStore(s => s.can('forms:javascript'));
   const [masksOpen, setMasksOpen] = useState(false);
+  // Importar planilha SOBRESCREVE o formulário: com instâncias iniciadas isso quebraria os
+  // dados já preenchidos, então o botão fica desabilitado com a razão à mostra.
+  const [planilhaOpen, setPlanilhaOpen] = useState(false);
+  const processDef = useProcessDefinition(processKey ?? null);
+  const hasInstances = !!processDef.data?.hasInstances;
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewResult, setPreviewResult] = useState('');
   const previewRef = useRef<ReactFormHandle>(null);
@@ -53,6 +61,13 @@ export function FormularioView({ modeler, processReady = true, processKey }: Pro
         <IconButton disabled={!definition} onClick={() => { setPreviewResult(''); setPreviewOpen(true); }}><Eye size={14} /> Prévia</IconButton>
         <IconButton onClick={() => setMasksOpen(true)}><Regex size={14} /> Máscaras</IconButton>
         <IconButton disabled={!definition || importing} onClick={() => input.current?.click()}><FileUp size={14} /> {importing ? 'Importando…' : 'Importar JSON'}</IconButton>
+        {hasInstances ? (
+          <Tooltip text="Este processo já tem instâncias iniciadas. Importar sobrescreveria o formulário e quebraria os dados já preenchidos.">
+            <span data-testid="import-btn-disabled" className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-300"><FileSpreadsheet size={14} /> Importar planilha</span>
+          </Tooltip>
+        ) : (
+          <IconButton disabled={!definition} data-testid="importar-planilha" onClick={() => setPlanilhaOpen(true)}><FileSpreadsheet size={14} /> Importar planilha</IconButton>
+        )}
         <IconButton disabled={!definition} onClick={exportDefinition}><Download size={14} /> Exportar JSON</IconButton>
         <input ref={input} type="file" accept=".json,application/json" aria-label="Importar definição nativa" className="sr-only" tabIndex={-1} onChange={e => void importFile(e.target.files?.[0])} />
       </div>
@@ -62,6 +77,10 @@ export function FormularioView({ modeler, processReady = true, processKey }: Pro
     {!definition && !error && <p role="status" className="px-5 py-3 text-sm">Carregando formulário…</p>}
     {definition && <NativeFormEditor key={`${processKey}:${definition.id}:${revision}`} definition={definition} modeler={modeler} processKey={processKey} update={update} masks={maskOptions} />}
     {masksOpen && <MasksDialog onClose={() => setMasksOpen(false)} />}
+    {/* `importDefinition` é o mesmo caminho do "Importar JSON" e valida com
+        `parseNativeForm` antes de trocar o rascunho: planilha que gere formulário inválido
+        estoura aqui e o diálogo mantém a tela aberta com o erro, em vez de anunciar sucesso. */}
+    {planilhaOpen && <ImportFormDialog onClose={() => setPlanilhaOpen(false)} onApply={importDefinition} />}
     {previewOpen && definition && <Dialog open title="Prévia do formulário" width="2xl" onClose={() => setPreviewOpen(false)}>
       <p className="mb-4 text-sm text-slate-600">Teste o preenchimento e as pendências. As respostas desta prévia não serão salvas.</p>
       <ReactForm ref={previewRef} schema={definition} />

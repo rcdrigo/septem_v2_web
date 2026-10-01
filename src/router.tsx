@@ -46,6 +46,11 @@ import { PlatformNovoClientePage } from './pages/platform/PlatformNovoClientePag
 import { PlatformAceitarConvitePage } from './pages/platform/PlatformAceitarConvitePage';
 import { PlatformSuperAdminsPage } from './pages/platform/PlatformSuperAdminsPage';
 import { PlatformSuperAdminSetupPage } from './pages/platform/PlatformSuperAdminSetupPage';
+import { EquipesSuportePage } from './pages/support/EquipesSuportePage';
+import { MeusChamadosPage } from './pages/support/MeusChamadosPage';
+import { NovoChamadoPage } from './pages/support/NovoChamadoPage';
+import { ChamadoPage } from './pages/support/ChamadoPage';
+import { ProvedorDeLimites } from './components/support/LimitesDoSuporte';
 import { SearchX } from 'lucide-react';
 import { childPath, routes } from './lib/routes';
 
@@ -108,6 +113,11 @@ export const router = createBrowserRouter(
         { path: 'clients/:id', element: <PlatformClientePage /> },
         { path: 'environments/:tenantId', element: <PlatformAmbientePage /> },
           { path: 'users', element: <PlatformSuperAdminsPage /> },
+        { path: 'support/teams', element: <ProvedorDeLimites escopo="septem"><EquipesSuportePage escopo="septem" /></ProvedorDeLimites> },
+        { path: 'support/tickets', element: <ProvedorDeLimites escopo="septem"><MeusChamadosPage escopo="septem" /></ProvedorDeLimites> },
+        { path: 'support/triage', element: <ProvedorDeLimites escopo="septem"><MeusChamadosPage escopo="septem" recorte="triage" /></ProvedorDeLimites> },
+        { path: 'support/queue', element: <ProvedorDeLimites escopo="septem"><MeusChamadosPage escopo="septem" recorte="team" /></ProvedorDeLimites> },
+        { path: 'support/tickets/:id', element: <ProvedorDeLimites escopo="septem"><ChamadoPage escopo="septem" /></ProvedorDeLimites> },
       ],
     },
     {
@@ -150,7 +160,12 @@ export const router = createBrowserRouter(
 
         // --- Conta / rodapé ------------------------------------------------
         { path: childPath(routes.me), element: <MeuDadosPage /> },
-        stub(childPath(routes.support), 'Suporte', { phase: 'Fase 7' }),
+        // /support deixou de ser stub na Fase 4: é "Meus chamados".
+        { path: childPath(routes.support), element: <ProvedorDeLimites escopo="cliente"><MeusChamadosPage recorte="mine" /></ProvedorDeLimites> },
+        { path: childPath(routes.supportNew), element: <ProvedorDeLimites escopo="cliente"><NovoChamadoPage /></ProvedorDeLimites> },
+        { path: childPath(routes.supportQueue), element: <ProvedorDeLimites escopo="cliente"><MeusChamadosPage recorte="team" /></ProvedorDeLimites> },
+        { path: 'support/tickets/:id', element: <ProvedorDeLimites escopo="cliente"><ChamadoPage /></ProvedorDeLimites> },
+        { path: childPath(routes.supportTeams), element: <ProvedorDeLimites escopo="cliente"><EquipesSuportePage escopo="cliente" /></ProvedorDeLimites> },
 
         // Endereço inexistente (inclusive os antigos em português, descartados na
         // Fase 1): 404 com saída, não beco sem saída.

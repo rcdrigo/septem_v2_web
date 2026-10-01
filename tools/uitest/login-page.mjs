@@ -21,7 +21,8 @@ const layout = await page.evaluate(() => {
     headline: t.includes('Processos claros, conformidade em cada decisão.'),
     eyebrow: t.includes('PROCESSOS & COMPLIANCE'),
     welcome: t.includes('Bem-vindo de volta') && t.includes('Entre com seus dados para acessar o Septem.'),
-    cards: t.includes('Precisa de ajuda?') && t.includes('Consultar processo'),
+    // O card de consulta pública passou a se chamar "Central de serviços".
+    cards: t.includes('Precisa de ajuda?') && t.includes('Central de serviços'),
     extras: t.includes('Manter-me conectado') && t.includes('Esqueci minha senha') && t.includes('Solicitar acesso') && t.includes('Tecnologia'),
     tenant: t.includes('Prefeitura X') && t.includes('Gestão integrada'),
   };
@@ -31,7 +32,10 @@ for (const [k, v] of Object.entries(layout)) check(v, `layout: ${k}`);
 // toggle de senha (olho)
 await page.fill('input[type=password]', 'segredo123');
 await page.locator('button[aria-label="Mostrar senha"]').click();
-check(await page.locator('input[type=text][placeholder*="•"]').count() === 1, 'olho revela a senha (type=text)');
+// Pelo VALOR digitado, não pelo placeholder de bolinhas (que saiu do campo): o que se
+// cobra é o campo virar texto visível com o que a pessoa escreveu.
+check(await page.locator('input[type=text]').evaluateAll((els) => els.some((el) => el.value === 'segredo123')),
+  'olho revela a senha (campo vira type=text com o valor)');
 await page.locator('button[aria-label="Esconder senha"]').click();
 check(await page.locator('input[type=password]').count() === 1, 'olho esconde de volta (type=password)');
 

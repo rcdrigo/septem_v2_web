@@ -11,6 +11,7 @@ import { NewRequestDialog } from '@/components/requests/NewRequestDialog';
 import { GlobalSearchDialog } from '@/components/discovery/GlobalSearchDialog';
 import { useFavorites, type DiscoveryItem } from '@/lib/api/discovery';
 import { openTab } from '@/lib/nav';
+import { SinoDeNotificacoes } from '@/components/notifications/SinoDeNotificacoes';
 
 export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
   const session = useSessionStore();
@@ -52,7 +53,9 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
             {tenantName[0]}
           </div>
         )}
-        <span className="truncate text-sm font-semibold tracking-tight text-slate-900">{tenantName}</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight text-slate-900">{tenantName}</span>
+        {/* No mobile o sino fica na barra superior (a sidebar é um drawer fechado). */}
+        <span className="hidden lg:block"><SinoDeNotificacoes lado="cliente" align="left" /></span>
       </div>
 
       {/* Usuário + tipo de acesso */}
@@ -105,7 +108,8 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
       {/* Rodapé */}
       <div className="border-t border-slate-200 px-2 py-2">
         <ul className="space-y-0.5">
-          {layout.footer.filter((item) => item.kind === 'link' && session.can(item.perm)).map((item) =>
+          {layout.footer.filter((item) => item.kind === 'link' && session.can(item.perm)
+            && (item.visible ? item.visible(session) : true)).map((item) =>
             item.kind === 'link' && <li key={item.to}><LinkRow link={item} /></li>,
           )}
         </ul>

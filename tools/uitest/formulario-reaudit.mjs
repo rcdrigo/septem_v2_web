@@ -44,17 +44,30 @@ const t=a.accessToken;
 
 // ── A) Round-trip pelo modelador ────────────────────────────────────────────
 // processo novo com diagrama e nome único
-const orig=await api(t,'/api/v1/workflow/process-definitions/teste_condicoes_ui');
+// Processo MONTADO AQUI, não copiado da fixture: copiar `teste_condicoes_ui` e trocar o
+// formulário por um nativo faz o backend recusar com 422 `native-field-reference`, porque a
+// matriz de tarefas da fixture aponta para as chaves do formulário ANTIGO. Montar o próprio
+// XML (com DI, que o bpmn-js exige) também tira a sonda da dependência do estado da fixture.
 const rt=Math.floor(Math.random()*1e9);
 const nome=`Reaudit RT ${rt}`;
-// Aproveita o diagrama do processo real (o bpmn-js precisa do DI) mas troca o formulário
-// por um NATIVO vazio: o editor de formulário só assume o formato nativo.
 const nativoVazio=JSON.stringify({format:'septem-native',schemaVersion:1,id:`fr_${rt}`,
-  tabs:[{id:`tr_${rt}`,label:'Principal',groups:[{id:`gr_${rt}`,label:'Dados',type:'group',fields:[]}]}]})
-  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-const xml=orig.body.bpmnXml
-  .replace(/(<bpmn:process\b[^>]*\bname=")[^"]*(")/,`$1${nome}$2`)
-  .replace(/<septem:formSchema>[\s\S]*?<\/septem:formSchema>/,`<septem:formSchema>${nativoVazio}</septem:formSchema>`);
+  tabs:[{id:`tr_${rt}`,label:'Principal',groups:[{id:`gr_${rt}`,label:'Dados',type:'group',fields:[]}]}]});
+const xml=`<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:septem="http://septem.app/schema/1.0/bpmn" id="drt${rt}" targetNamespace="x">
+  <bpmn:process id="PRT${rt}" name="${nome}" isExecutable="true">
+    <bpmn:extensionElements><septem:formSchema>${nativoVazio}</septem:formSchema></bpmn:extensionElements>
+    <bpmn:startEvent id="SRT${rt}"><bpmn:outgoing>rt1</bpmn:outgoing></bpmn:startEvent>
+    <bpmn:userTask id="T005" name="Analisar"><bpmn:incoming>rt1</bpmn:incoming><bpmn:outgoing>rt2</bpmn:outgoing></bpmn:userTask>
+    <bpmn:endEvent id="ERT${rt}"><bpmn:incoming>rt2</bpmn:incoming></bpmn:endEvent>
+    <bpmn:sequenceFlow id="rt1" sourceRef="SRT${rt}" targetRef="T005" />
+    <bpmn:sequenceFlow id="rt2" sourceRef="T005" targetRef="ERT${rt}" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" id="DRT${rt}"><bpmndi:BPMNPlane id="PlRT${rt}" bpmnElement="PRT${rt}">
+    <bpmndi:BPMNShape id="ShSRT${rt}" bpmnElement="SRT${rt}"><dc:Bounds xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" x="150" y="100" width="36" height="36" /></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="ShT005${rt}" bpmnElement="T005"><dc:Bounds xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" x="240" y="78" width="100" height="80" /></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="ShERT${rt}" bpmnElement="ERT${rt}"><dc:Bounds xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" x="400" y="100" width="36" height="36" /></bpmndi:BPMNShape>
+  </bpmndi:BPMNPlane></bpmndi:BPMNDiagram>
+</bpmn:definitions>`;
 const saved=await api(t,'/api/v1/workflow/process-definitions','POST',{bpmnXml:xml});
 const key=saved.body.key;
 
@@ -65,7 +78,8 @@ await page.goto(BASE+'/login',{waitUntil:'networkidle'});
 await page.fill('input[name=identifier]','admin@prefeitura-x.local');await page.fill('input[type=password]','admin123');
 await page.click('button[type=submit]');await page.waitForURL(u=>!u.pathname.includes('login'));
 await page.goto(`${BASE}/flows/edit?key=${key}`,{waitUntil:'networkidle'});
-await page.waitForSelector('[data-element-id="T005"]',{state:'attached',timeout:20000});
+// 40 s: o modelador é a tela mais pesada do produto e no meio da bateria 20 s não bastavam.
+await page.waitForSelector('[data-element-id="T005"]',{state:'attached',timeout:40000});
 await page.getByRole('button',{name:'Formulário',exact:true}).click();
 await page.locator('[data-native-editor]').waitFor({timeout:15000});
 

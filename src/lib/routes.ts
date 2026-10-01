@@ -71,6 +71,14 @@ export const routes = {
   platformClient: (id: string) => `/platform/clients/${id}`,
   /** Um ambiente na área central: modo de operação e ocorrências vencidas. */
   platformEnvironment: (tenantId: string) => `/platform/environments/${tenantId}`,
+  /** Equipes de suporte da Septem (Fase 3 do plano 26_09). */
+  platformSupportTeams: '/platform/support/teams',
+  /** Fila de chamados da Septem (Fase 4; a triagem propriamente dita é a Fase 5). */
+  platformSupportTickets: '/platform/support/tickets',
+  /** Fila de triagem da Septem (Fase 5) — chamados de todos os clientes. */
+  platformSupportTriage: '/platform/support/triage',
+  /** Fila das equipes da Septem de que a pessoa participa (Fase 5). */
+  platformSupportQueue: '/platform/support/queue',
 
   // --- Dentro do shell ------------------------------------------------------
   dashboard: '/dashboard',
@@ -80,6 +88,14 @@ export const routes = {
   reports: '/reports',
   orgchart: '/orgchart',
   support: '/support',
+  /** Equipes de suporte do próprio órgão (Fase 3 do plano 26_09). */
+  supportTeams: '/support/teams',
+  /** Abrir chamado (Fase 4). */
+  supportNew: '/support/new',
+  /** Fila da equipe do cliente (Fase 5). */
+  supportQueue: '/support/queue',
+  /** Um chamado. */
+  supportTicket: (id: string) => `/support/tickets/${id}`,
   me: '/me',
 
   // --- Admin ----------------------------------------------------------------

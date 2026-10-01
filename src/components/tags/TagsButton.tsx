@@ -1,3 +1,4 @@
+import { novoId } from '@/lib/uuid';
 import { useEffect, useMemo, useState } from 'react';
 import { History, Pencil, Plus, RotateCcw, Tag, Trash2, X } from 'lucide-react';
 import { PaletteField } from '@/components/ui/PaletteField';
@@ -137,7 +138,7 @@ function TagsEditorDialog({
       return;
     }
     setDraft((current) => [...current, {
-      id: `new:${crypto.randomUUID()}`,
+      id: `new:${novoId()}`,
       name,
       originalName: name,
       color,

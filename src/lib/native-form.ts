@@ -1,3 +1,6 @@
+// Import RELATIVO, não `@/lib/uuid`: estes módulos são empacotados por sondas de contrato
+// que chamam o esbuild SEM o tsconfig, e lá o alias `@/` não resolve.
+import { novoId } from './uuid';
 /** Native definition v1. Publication version belongs to the process, not this format. */
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 export type NativeConfig = { [key: string]: JsonValue };
@@ -19,9 +22,9 @@ export type NativeFieldState = { visible: boolean; editable: boolean; required: 
 export type NativeExecutionState = { fields: Record<string, NativeFieldState>; cells: Record<string, Record<number, Record<string, NativeFieldState>>> };
 
 export function createNativeForm(): NativeFormDefinition {
-  return { format: 'septem-native', schemaVersion: 1, id: crypto.randomUUID(), tabs: [
-    { id: crypto.randomUUID(), label: 'Aba 1', groups: [
-      { id: crypto.randomUUID(), label: 'Grupo 1', type: 'group', fields: [] },
+  return { format: 'septem-native', schemaVersion: 1, id: novoId(), tabs: [
+    { id: novoId(), label: 'Aba 1', groups: [
+      { id: novoId(), label: 'Grupo 1', type: 'group', fields: [] },
     ] },
   ] };
 }

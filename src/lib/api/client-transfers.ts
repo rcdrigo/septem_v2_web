@@ -107,16 +107,48 @@ export function useCompareTransfer() {
   });
 }
 
+type ResultadoDaAplicacao = { ok: boolean; activated: { key: string; version: number }[]; details: string[] };
+type OperacaoDeAplicacao = {
+  operationId: string;
+  status: string;
+  safeError: string | null;
+  result: (ResultadoDaAplicacao & { errorCode: string | null; error: string | null }) | null;
+};
+
+/**
+ * Aplicar é um JOB (202 com operationId/statusUrl): as validações respondem na hora (409/422) e a
+ * aplicação roda depois. Aqui se acompanha a operação até terminar. Terminou "não aplicada" (o job
+ * revalida — o destino pode ter mudado na fila) → vira erro com o motivo, nunca sucesso.
+ */
+async function aguardarAplicacao(statusUrl: string, limiteMs = 180_000): Promise<ResultadoDaAplicacao> {
+  const fim = Date.now() + limiteMs;
+  for (;;) {
+    const op = await api.get<OperacaoDeAplicacao>(statusUrl);
+    if (op.status === 'completed' && op.result) {
+      if (op.result.ok) return op.result;
+      const detalhe = op.result.details?.length ? ` (${op.result.details.slice(0, 6).join(' · ')})` : '';
+      throw new Error(`${op.result.error ?? 'A transferência não foi aplicada.'}${detalhe}`);
+    }
+    if (op.status === 'failed' || op.status === 'needs_reconciliation')
+      throw new Error(op.safeError ?? 'A transferência não foi aplicada; o destino continua como estava.');
+    if (Date.now() > fim) throw new Error('A aplicação ainda está em andamento. Volte em instantes para ver o resultado.');
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+}
+
 export function useApplyTransfer() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ planId, confirmOverwriteConflicts, expectedPlanVersion }: {
+    mutationFn: async ({ planId, confirmOverwriteConflicts, expectedPlanVersion }: {
       planId: string;
       confirmOverwriteConflicts: boolean;
       expectedPlanVersion: number;
-    }) => api.post<{ ok: boolean; activated: { key: string; version: number }[]; details: string[] }>(
-      `/api/v1/client/transfers/${planId}/apply`,
-      { confirmOverwriteConflicts, expectedPlanVersion }),
+    }) => {
+      const r = await api.post<ResultadoDaAplicacao | { operationId: string; status: string; statusUrl: string }>(
+        `/api/v1/client/transfers/${planId}/apply`, { confirmOverwriteConflicts, expectedPlanVersion });
+      // 200 = plano já aplicado (o mesmo resultado); 202 = acompanhar a operação.
+      return 'statusUrl' in r ? aguardarAplicacao(r.statusUrl) : r;
+    },
     onSuccess: () => {
       // O destino mudou: a lista de processos do ambiente atual pode estar velha.
       void qc.invalidateQueries({ queryKey: ['process-definitions'] });

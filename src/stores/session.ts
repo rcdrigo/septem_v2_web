@@ -24,6 +24,8 @@ export type SessionUser = {
   perms: string[];
   hasDashboard: boolean;
   accessProfiles: { id: string; name: string }[];
+  /** Participa hoje de alguma equipe de suporte do cliente (Fase 5) — decide o item "Fila da equipe". */
+  supportTeamMember?: boolean;
   /** Nome do ator real quando esta sessão é personificada. */
   impersonatedBy?: string | null;
 };
@@ -43,6 +45,11 @@ export type Tenant = {
   modulos: string[];
   /** active | new_requests_blocked | inactive (ADM-07). */
   operatingMode?: string;
+  /**
+   * Limites de anexo FORA do workflow, publicados pelo servidor (Fase 1c). A tela LÊ daqui em
+   * vez de repetir o número: se o teto mudar no backend, o aviso na tela muda com ele.
+   */
+  arquivos?: { maxBytes: number; maxPorEnvio: number; extensoes: string[] };
 };
 
 export type SessionStatus = 'idle' | 'booting' | 'unauthenticated' | 'authenticated' | 'error';

@@ -3,8 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { ExecutionFilters, useExecutionFilters } from '@/components/execution/ExecutionFilters';
-import { AlertCircle, ArrowRight, CheckCircle2, Clock, ExternalLink, FileSignature, Inbox, LayoutGrid, LifeBuoy, RotateCw, Table as TableIcon, User, X } from 'lucide-react';
-import { useTasks, useTask, useCompleteTask, useSaveTask, useTaskSignatures, useSignAll, type TaskButton, type TaskListItem } from '@/lib/api/execution';
+import { AlertCircle, ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, Clock, ExternalLink, FileSignature, Inbox, LayoutGrid, LifeBuoy, RotateCw, Table as TableIcon, User, X } from 'lucide-react';
+import { useTasks, TASKS_PAGE_SIZE, useTask, useCompleteTask, useSaveTask, useTaskSignatures, useSignAll, type TaskButton, type TaskListItem } from '@/lib/api/execution';
 import { estaAssinado } from '@/lib/upload';
 import { CardAccess, ExecutionIndicators, ExecutionNumber, ExecutionProcessPill } from '@/components/execution/ExecutionListParts';
 import { ReactForm, FormSkeleton, type ReactFormHandle } from '@/components/form/ReactForm';
@@ -26,12 +26,24 @@ export function TarefasPage() {
   const canUseTags = useTagsAccess();
   const { filters, patch, clear } = useExecutionFilters('tasks', canUseTags);
   // Preserva links diretos para a caixa de concluídas; a lista padrão é a de pendentes.
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const situacao: 'pendentes' | 'concluidas' = params.get('caixa') === 'concluidas' ? 'concluidas' : 'pendentes';
-  const tasks = useTasks(situacao, filters);
+  const page = Math.max(1, Number(params.get('page')) || 1);
+  const tasks = useTasks(situacao, filters, page);
   const [view, setView] = useViewMode();
   const openTask = (task: TaskListItem) => openTab(routes.task(task.id));
   const items = tasks.data?.items ?? [];
+  const total = tasks.data?.total ?? items.length;
+  const totalPages = Math.max(1, Math.ceil(total / TASKS_PAGE_SIZE));
+  // A faixa descreve o que ESTÁ na tela: enquanto a página nova carrega, a anterior continua
+  // desenhada (placeholderData), e a faixa tem de continuar dizendo que é a anterior.
+  const shownPage = tasks.data?.page ?? page;
+  const firstShown = (shownPage - 1) * TASKS_PAGE_SIZE + 1;
+  const goToPage = (next: number) => setParams(current => { const value = new URLSearchParams(current); value.set('page', String(next)); return value; });
+  // Tarefas concluídas somem da caixa: se a página atual esvaziou, volta para a última que existe.
+  useEffect(() => {
+    if (tasks.data && items.length === 0 && total > 0 && page > totalPages) goToPage(totalPages);
+  }, [tasks.data, items.length, total, page, totalPages]); // eslint-disable-line react-hooks/exhaustive-deps
   const hasFilters = Boolean(filters.q || filters.number || filters.processes?.length || filters.tagNames?.length || filters.requestedFrom || filters.requestedTo || filters.receivedFrom || filters.receivedTo || filters.sort);
 
   // Sempre que a página de Tarefas entra em foco (montagem + volta de aba/janela),
@@ -68,9 +80,19 @@ export function TarefasPage() {
       <div className="flex-1 overflow-auto p-4 sm:p-6">
         {tasks.isLoading ? <TaskSkeletons /> : tasks.isError ? <ErrorState onRetry={() => tasks.refetch()} /> : items.length === 0 ? (
           <EmptyTasks filtered={hasFilters} />
-        ) : view === 'cards' ? <TaskCards tasks={items} onOpen={openTask} /> : <>
-          <div className="md:hidden"><TaskCards tasks={items} onOpen={openTask} /></div>
-          <div className="hidden md:block"><TaskTable tasks={items} onOpen={openTask} /></div>
+        ) : <>
+          {view === 'cards' ? <TaskCards tasks={items} onOpen={openTask} /> : <>
+            <div className="md:hidden"><TaskCards tasks={items} onOpen={openTask} /></div>
+            <div className="hidden md:block"><TaskTable tasks={items} onOpen={openTask} /></div>
+          </>}
+          <div data-testid="tarefas-paginacao" className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500">
+            <span data-testid="tarefas-faixa" aria-live="polite">{firstShown}–{firstShown + items.length - 1} de {total} tarefa{total === 1 ? '' : 's'}</span>
+            {totalPages > 1 && <div className="flex items-center gap-2">
+              <button type="button" aria-label="Página anterior" disabled={page <= 1} onClick={() => goToPage(page - 1)} className="flex h-11 w-11 items-center justify-center rounded border border-slate-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={14} /></button>
+              <span>{page} / {totalPages}</span>
+              <button type="button" aria-label="Próxima página" disabled={page >= totalPages} onClick={() => goToPage(page + 1)} className="flex h-11 w-11 items-center justify-center rounded border border-slate-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight size={14} /></button>
+            </div>}
+          </div>
         </>}
       </div>
     </div>

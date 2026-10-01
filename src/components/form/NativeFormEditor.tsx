@@ -1,3 +1,4 @@
+import { novoId } from '@/lib/uuid';
 import { IconPicker } from '@/components/ui/IconPicker';
 import { fetchNativeFieldUsage, type NativeFieldUsage } from '@/lib/api/forms';
 import { getFormFieldEntries, setFormFieldEntries } from '@/lib/bpmn-form-fields';
@@ -166,7 +167,10 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-auto lg:flex-row lg:overflow-hidden" data-native-editor>
       <div className="min-w-0 flex-1 lg:overflow-y-auto">
-        {semNome.length > 0 && <div role="alert" data-testid="campos-sem-nome" className="border-b border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+        {/* `role=status`, não `alert`: é orientação, não erro urgente — e um `alert` aqui
+            entrava no caminho de quem espera "nenhum alerta na tela" como sinal de que não
+            há problema. */}
+        {semNome.length > 0 && <div role="status" data-testid="campos-sem-nome" className="border-b border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
           <p className="font-semibold">Dê um nome aos campos antes de salvar</p>
           <p>Campo sem nome não tem chave de resposta e <strong>não é guardado</strong> ao salvar o processo.</p>
           <ul className="mt-2 list-disc pl-5">{semNome.map((c, i) => <li key={i} className="break-words">{c.aba} · {c.grupo}: {c.campo || 'campo sem nome'}</li>)}</ul>
@@ -254,7 +258,7 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
                 <button type="button" className={button} onClick={() => editField(field.id, f => editNativeElement(f, ['values'], options.filter((_, i) => i !== index)))}>Remover opção {index + 1}</button>
               </div>;
             })}
-            <button type="button" className={button} onClick={() => editField(field.id, f => editNativeElement(f, ['values'], [...(Array.isArray(options) ? options : []), { label: 'Nova opção', value: crypto.randomUUID() }]))}>Adicionar opção</button>
+            <button type="button" className={button} onClick={() => editField(field.id, f => editNativeElement(f, ['values'], [...(Array.isArray(options) ? options : []), { label: 'Nova opção', value: novoId() }]))}>Adicionar opção</button>
           </div>}
           <FieldConfigPanel key={`${field.id}:${field.type}`} native field={panel} masks={masks}
             nativeTypeOptions={NATIVE_CATALOG.filter(item => (item.category === 'Apresentação') === (field.kind === 'presentation')).map(item => ({ value: item.type, label: item.label }))}

@@ -7,7 +7,7 @@ import { usePlatformClients, useResendSuperAdminInvite, useSaveSuperAdmin, useSu
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { usePlatformSession } from '@/stores/platform-session';
 
-const blank: SuperAdminRow = { id: '', name: '', email: '', status: 'active', globalAccess: false, clients: [], environments: [] };
+const blank: SuperAdminRow = { id: '', version: 0, name: '', email: '', status: 'active', globalAccess: false, clients: [], environments: [] };
 
 export function PlatformSuperAdminsPage() {
   const admins = useSuperAdmins();
@@ -41,15 +41,19 @@ export function PlatformSuperAdminsPage() {
       return;
     }
     try {
-      const result = await save.mutateAsync({ ...form, id: form.id || crypto.randomUUID() });
+      const { version, ...input } = form;
+      const result = await save.mutateAsync({ ...input, id: form.id || crypto.randomUUID(), expectedVersion: form.id ? version : undefined });
       setNotice(result.created
         ? result.invitationSent
           ? 'Acesso criado. Um código foi enviado para definir a senha.'
           : 'Acesso criado, mas o envio do código falhou. Reenvie o convite na lista.'
         : 'Acesso atualizado.');
       setForm(blank);
-    } catch {
-      setError('Não foi possível salvar o acesso. Confira o e-mail e tente novamente.');
+    } catch (error) {
+      setError(error instanceof ApiError && error.status === 409
+        ? 'Este acesso foi alterado por outra pessoa. Recarregue a lista e abra a edição novamente.'
+        : 'Não foi possível salvar o acesso. Confira o e-mail e tente novamente.');
+      if (error instanceof ApiError && error.status === 409) void admins.refetch();
     }
   }
 

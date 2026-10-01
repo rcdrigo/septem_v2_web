@@ -27,25 +27,38 @@ check(modelo.status === 201, `[api] modelo de documento criado (${modelo.status}
 // Processo com um campo de ANEXO. Em vez de escrever o BPMN à mão (a fidelidade
 // estrutural do DI/namespaces é sensível e o modelador abria vazio), COPIAMOS o XML de
 // um processo real criado pelo app e trocamos só o nome e o formulário.
-const base = await api(token, '/api/v1/workflow/process-definitions/teste_condicoes_ui');
-// O EDITOR do form-js exige o envelope (type/schemaVersion) — sem ele recusa o schema
-// com "form field of type <undefined> not supported" e abre o formulário vazio. O
-// runtime (ReactForm) é tolerante, por isso os outros testes passavam sem o envelope.
-// Formulário NATIVO: o editor de formulário do modelador só assume esse formato (o
-// anterior nem abre, por decisão de produto). Um campo de anexo já nomeado — sem chave o
-// campo não é guardado ao salvar.
+// Processo MONTADO AQUI, não copiado da fixture. Copiar `teste_condicoes_ui` e trocar o
+// formulário por um nativo fazia o backend recusar com 422 `native-field-reference`: a
+// matriz de tarefas da fixture aponta para as chaves do formulário ANTIGO (`nome`…), que o
+// formulário novo não tem — e a recusa está certa. Um processo próprio, com DI (o bpmn-js
+// não monta sem BPMNDiagram) e um campo de anexo já nomeado (sem chave o campo não é
+// guardado ao salvar), evita depender do estado da fixture.
 const FORM = {
   format: 'septem-native', schemaVersion: 1, id: `fdg_${rid}`,
   tabs: [{ id: `tdg_${rid}`, label: 'Principal', groups: [{ id: `gdg_${rid}`, label: 'Dados', type: 'group', fields: [
     { id: `cdg_${rid}`, kind: 'field', type: 'filepicker', key: 'documento', label: 'Documento' },
   ] }] }],
 };
-const XML = (base.body?.bpmnXml ?? '')
-  .replace(/<septem:formSchema>[\s\S]*?<\/septem:formSchema>/, `<septem:formSchema>${JSON.stringify(FORM)}</septem:formSchema>`)
-  .replace(/(<bpmn:process[^>]*\sname=")[^"]*(")/, `$1Gera Documento ${rid}$2`);
-check(XML.includes('filepicker') && XML.includes('septem-native'), '[setup] XML base com o campo de anexo em formulário nativo');
+const XML = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:septem="http://septem.app/schema/1.0/bpmn" id="ddg${rid}" targetNamespace="x">
+  <bpmn:process id="PDG${rid}" name="Gera Documento ${rid}" isExecutable="true">
+    <bpmn:extensionElements><septem:formSchema>${JSON.stringify(FORM)}</septem:formSchema></bpmn:extensionElements>
+    <bpmn:startEvent id="SDG${rid}"><bpmn:outgoing>dg1</bpmn:outgoing></bpmn:startEvent>
+    <bpmn:userTask id="TDG${rid}" name="Analisar documento"><bpmn:incoming>dg1</bpmn:incoming><bpmn:outgoing>dg2</bpmn:outgoing></bpmn:userTask>
+    <bpmn:endEvent id="EDG${rid}"><bpmn:incoming>dg2</bpmn:incoming></bpmn:endEvent>
+    <bpmn:sequenceFlow id="dg1" sourceRef="SDG${rid}" targetRef="TDG${rid}" />
+    <bpmn:sequenceFlow id="dg2" sourceRef="TDG${rid}" targetRef="EDG${rid}" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" id="DDG${rid}"><bpmndi:BPMNPlane id="PlDG${rid}" bpmnElement="PDG${rid}">
+    <bpmndi:BPMNShape id="ShSDG${rid}" bpmnElement="SDG${rid}"><dc:Bounds xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" x="150" y="100" width="36" height="36" /></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="ShTDG${rid}" bpmnElement="TDG${rid}"><dc:Bounds xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" x="240" y="78" width="100" height="80" /></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="ShEDG${rid}" bpmnElement="EDG${rid}"><dc:Bounds xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" x="400" y="100" width="36" height="36" /></bpmndi:BPMNShape>
+  </bpmndi:BPMNPlane></bpmndi:BPMNDiagram>
+</bpmn:definitions>`;
+check(XML.includes('filepicker') && XML.includes('septem-native'), '[setup] XML com o campo de anexo em formulário nativo');
 const salvo = await api(token, '/api/v1/workflow/process-definitions', 'POST', { bpmnXml: XML });
 check(salvo.status === 201, `[api] processo com campo de anexo criado (${salvo.status})`);
+if (salvo.status !== 201) console.log('! resposta do POST:', JSON.stringify(salvo.body).slice(0, 300));
 const key = salvo.body.key;
 
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
@@ -61,7 +74,12 @@ try {
   await page.goto(`${BASE}/flows/edit?key=${key}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.djs-palette', { timeout: 20000 });
   await page.locator('header button, nav button', { hasText: 'Formulário' }).first().click();
-  await page.locator('[data-native-editor]').waitFor({ timeout: 15000 });
+  // 40 s: o modelador carrega bpmn-js + XML + editor de formulário, e no meio da bateria
+  // (máquina saturada) 15 s não bastavam — falhava só no lote.
+  await page.locator('[data-native-editor]').waitFor({ timeout: 40000 }).catch(async (e) => {
+    console.log('! editor não abriu. Tela:', (await page.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 300));
+    throw e;
+  });
 
   // Seleciona o campo de anexo na LISTA do editor nativo (o canvas do form-js não existe).
   await page.locator('[data-field-id]', { hasText: 'Documento' }).first().click();

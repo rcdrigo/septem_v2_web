@@ -5,9 +5,12 @@ import { businessHoursFromSettings, validateCalendarLocation, type BusinessHours
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApi } from '@/lib/platform-api';
+import { ApiError } from '@/lib/api';
+import { usePlatformEnvironment } from '@/lib/api/platform-clients';
 
 type Policy = { visible: boolean; editable: boolean };
 type Settings = CalendarLocation & {
+  expectedVersion: number;
   businessHours?: BusinessHoursWeek | null;
   logoUrl: string | null; heroImageUrl: string | null; systemDescription: string | null;
   businessHourStart: number; businessHourEnd: number; businessDays: string;
@@ -33,6 +36,8 @@ export function PlatformEnvironmentAdministration({ tenantId, clientId }: { tena
   const cache = useQueryClient();
   const key = ['platform', 'environment-settings', tenantId];
   const settings = useQuery({ queryKey: key, queryFn: () => platformApi.get<Settings>(`${base}/settings/`) });
+  const environment = usePlatformEnvironment(tenantId);
+  const [policyVersion, setPolicyVersion] = useState<number | null>(null);
   const queueKey = ['platform', 'suspended-deliveries', tenantId];
   const deliveries = useQuery({ queryKey: queueKey, queryFn: () => platformApi.get<{ items: Delivery[] }>(`${base}/suspended-deliveries/`) });
   const [draft, setDraft] = useState<Settings | null>(null);
@@ -57,14 +62,25 @@ export function PlatformEnvironmentAdministration({ tenantId, clientId }: { tena
   }
   const save = useMutation({ mutationFn: () => platformApi.put(`${base}/settings/`, value), onSuccess: async () => {
     await cache.invalidateQueries({ queryKey: key }); setDraft(null); setNotice('Parâmetros salvos neste ambiente.');
-  }, onError: () => setNotice('Não foi possível salvar os parâmetros. Confira os valores e tente novamente.') });
-  const savePolicies = useMutation({ mutationFn: () => platformApi.put(`${base}/settings/policies`, policies), onSuccess: async () => {
-    await cache.invalidateQueries({ queryKey: key }); setPolicyDraft(null); setNotice('Permissões dos parâmetros salvas.');
-  }, onError: () => setNotice('Não foi possível salvar as permissões.') });
+  }, onError: (error) => setNotice(error instanceof ApiError && error.status === 409
+    ? 'Os parâmetros foram alterados por outra pessoa. Recarregue a página antes de editar novamente.'
+    : 'Não foi possível salvar os parâmetros. Confira os valores e tente novamente.') });
+  const savePolicies = useMutation({ mutationFn: () => platformApi.put(`${base}/settings/policies`, {
+    policies, expectedVersion: policyVersion,
+  }), onSuccess: async () => {
+    await Promise.all([cache.invalidateQueries({ queryKey: key }), cache.invalidateQueries({ queryKey: ['platform', 'environments', tenantId] })]);
+    setPolicyDraft(null); setPolicyVersion(null); setNotice('Permissões dos parâmetros salvas.');
+  }, onError: (error) => setNotice(error instanceof ApiError && error.status === 409
+    ? 'O ambiente foi alterado por outra pessoa. Recarregue a página antes de editar as permissões novamente.'
+    : 'Não foi possível salvar as permissões.') });
   const resume = useMutation({ mutationFn: () => platformApi.post<{ resumed: number }>(`${base}/suspended-deliveries/resume`, { ids: selected }), onSuccess: async (r) => {
     await cache.invalidateQueries({ queryKey: queueKey }); setSelected([]); setNotice(`${r.resumed} mensagem(ns) autorizada(s) para retomada.`);
   }, onError: () => setNotice('Não foi possível retomar. Confirme que o cliente e o ambiente estão ativos.') });
-  const setPolicy = (name: string, patch: Partial<Policy>) => setPolicyDraft({ ...policies, [name]: { ...(policies[name] ?? { visible: true, editable: true }), ...patch } });
+  const updatePolicies = (next: Record<string, Policy>) => {
+    if (!policyDraft) setPolicyVersion(environment.data?.version ?? null);
+    setPolicyDraft(next);
+  };
+  const setPolicy = (name: string, patch: Partial<Policy>) => updatePolicies({ ...policies, [name]: { ...(policies[name] ?? { visible: true, editable: true }), ...patch } });
   return <div className="mt-8 space-y-8">
     {notice && <p role="status" className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">{notice}</p>}
     <section aria-labelledby="environment-settings-title">
@@ -95,11 +111,11 @@ export function PlatformEnvironmentAdministration({ tenantId, clientId }: { tena
         <button className={button} disabled={save.isPending || uploading || !draft}>{save.isPending ? 'Salvando…' : 'Salvar parâmetros'}</button>
       </fieldset></form>}
     </section>
-    {value && <fieldset disabled={savePolicies.isPending} aria-labelledby="settings-policies-title">
+    {value && <fieldset disabled={savePolicies.isPending || !environment.data} aria-labelledby="settings-policies-title">
       <h2 id="settings-policies-title" className="font-semibold text-slate-900">Acesso do cliente aos parâmetros</h2>
       <p className="mt-1 text-sm text-slate-500">Uma aba oculta esconde seus campos. Uma aba sem edição impede alterações em todos os seus campos.</p>
       <div className="mt-3 flex flex-wrap items-end gap-2"><label className="min-w-0 flex-1 space-y-1 text-sm"><span>Aba ou campo</span><select className={input} value={path} onChange={e => setPath(e.target.value)}>{tabs.map(([tab, label]) => <optgroup key={tab} label={label}><option value={tab}>{label} — aba inteira</option>{fields[tab].map(f => <option key={f} value={`${tab}.${f}`}>{label} — {labels[f] ?? f}</option>)}</optgroup>)}</select></label><button type="button" className={button} onClick={() => setPolicy(path, {})}>Adicionar regra</button></div>
-      <ul className="mt-3 divide-y divide-slate-200">{Object.entries(policies).map(([name, policy]) => <li key={name} className="flex flex-wrap items-center gap-4 py-3 text-sm"><span className="min-w-0 flex-1 break-all">{policyLabel(name)}</span><label className="flex items-center gap-2"><input type="checkbox" checked={policy.visible} onChange={e => setPolicy(name, { visible: e.target.checked })} />Visível</label><label className="flex items-center gap-2"><input type="checkbox" checked={policy.editable} onChange={e => setPolicy(name, { editable: e.target.checked })} />Editável</label><button type="button" className="min-h-10 text-slate-600 underline" onClick={() => { const next = { ...policies }; delete next[name]; setPolicyDraft(next); }}>Remover regra</button></li>)}</ul>
+      <ul className="mt-3 divide-y divide-slate-200">{Object.entries(policies).map(([name, policy]) => <li key={name} className="flex flex-wrap items-center gap-4 py-3 text-sm"><span className="min-w-0 flex-1 break-all">{policyLabel(name)}</span><label className="flex items-center gap-2"><input type="checkbox" checked={policy.visible} onChange={e => setPolicy(name, { visible: e.target.checked })} />Visível</label><label className="flex items-center gap-2"><input type="checkbox" checked={policy.editable} onChange={e => setPolicy(name, { editable: e.target.checked })} />Editável</label><button type="button" className="min-h-10 text-slate-600 underline" onClick={() => { const next = { ...policies }; delete next[name]; updatePolicies(next); }}>Remover regra</button></li>)}</ul>
       {!Object.keys(policies).length && <p className="my-3 text-sm text-slate-500">Nenhuma restrição adicional configurada.</p>}
       <button type="button" className={button} disabled={!policyDraft || savePolicies.isPending} onClick={() => { setNotice(''); savePolicies.mutate(); }}>Salvar permissões</button>
     </fieldset>}

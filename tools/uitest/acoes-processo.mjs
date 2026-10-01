@@ -78,7 +78,7 @@ try {
   for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }]) {
     const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h } });
     const page = await ctx.newPage();
-    await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
+    await page.goto(BASE + '/login?returnUrl=/me', { waitUntil: 'networkidle' });
     await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
     await page.fill('input[type=password]', 'admin123');
     await page.click('button[type=submit]');
@@ -171,7 +171,13 @@ try {
     await verTramitacao.click();
     await page.waitForSelector('[role=dialog]', { timeout: 8000 });
     await page.waitForTimeout(600);
-    const linha = page.locator('[role=dialog] li', { hasText: `Faltou o parecer ${rid}` }).last();
+    // Filtra pela AÇÃO e pela justificativa juntas: a justificativa de devolver também
+    // aparece na linha da TAREFA devolvida, e só a justificativa casava a linha errada
+    // (a mensagem de falha mostrava "Revisar UI … recebida em …").
+    const linha = page.locator('[role=dialog] li')
+      .filter({ hasText: 'Devolvido para tarefa já executada' })
+      .filter({ hasText: `Faltou o parecer ${rid}` })
+      .last();
     const temLinha = await linha.count() > 0 && await linha.isVisible();
     // Sem o conteúdo do diálogo na mensagem, uma falha aqui não se investiga.
     const dialogo = (await page.locator('[role=dialog]').first().innerText().catch(() => '(sem diálogo)'))

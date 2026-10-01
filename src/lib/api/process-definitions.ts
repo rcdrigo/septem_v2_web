@@ -125,6 +125,22 @@ export function useServiceCatalog() {
   });
 }
 
+/**
+ * Lista ENXUTA de processos (chave + nome), sem paginação, para SELETOR de tela de autoria.
+ *
+ * `useProcessList` tem teto de 100 por página no servidor: o combo do builder de relatórios
+ * usava `pageSize: 100` e, acima disso, o autor simplesmente não encontrava o processo — e a
+ * busca dentro do combo também não alcança o que não veio (PENDENCIAS 4.2). É o mesmo
+ * defeito já corrigido no modal "Nova requisição", com a mesma cura: pedir a lista inteira,
+ * enxuta, num endpoint próprio.
+ */
+export function useProcessOptions() {
+  return useQuery({
+    queryKey: ['process-options'] as const,
+    queryFn: () => api.get<{ key: string; name: string }[]>(`${BASE}/options`),
+  });
+}
+
 export function useProcessDefinition(key: string | null, version?: number) {
   return useQuery({
     queryKey: processKeys.detail(key ?? '', version),

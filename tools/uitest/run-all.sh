@@ -25,6 +25,21 @@ if [ -z "$CHROME_BIN" ]; then
 fi
 echo "Chrome: $CHROME_BIN"
 
+# Guarda de pré-requisito: uma bateria inteira já rodou contra a API caída e devolveu
+# "24 ok / 120" — 96 suítes acusando falha de produto quando o que faltava era o servidor.
+# Duas requisições antes de começar evitam 2h de resultado inválido.
+API=${API_URL:-http://localhost:5000}
+FRONT=${FRONT_URL:-http://localhost:5173}
+for alvo in "$API/api/tenant/config|X-Tenant: prefeitura-x" "$FRONT/|"; do
+  url=${alvo%%|*}; hdr=${alvo#*|}
+  if [ -n "$hdr" ]; then codigo=$(curl -s -o /dev/null -m 20 -w "%{http_code}" -H "$hdr" "$url")
+  else codigo=$(curl -s -o /dev/null -m 20 -w "%{http_code}" "$url"); fi
+  if [ "$codigo" != "200" ]; then
+    echo "ABORTADO: $url respondeu $codigo. Suba a API (:5000) e o Vite (:5173) antes da bateria." >&2
+    exit 2
+  fi
+done
+
 # Aquece o front antes de medir: com o Vite frio, a PRIMEIRA suíte da bateria cai por
 # timeout no /login e passa quando rodada isolada. Ver warmup.mjs.
 echo "Aquecendo o front... $(cd "$RAIZ" && OUT_DIR="$UITEST" node tools/uitest/warmup.mjs 2>&1 | tail -1)"

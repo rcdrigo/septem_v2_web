@@ -180,7 +180,13 @@ try {
     `[web] ordenação decrescente preservada sobre o filtrado (${nums.join(' ≥ ')})`);
 
   // 5. limpar o filtro devolve o total
+  // Espera o DESFECHO, não um tempo fixo: limpar refaz a consulta, e sob carga os 900 ms do
+  // helper acabavam antes da resposta — a sonda media a tabela ainda filtrada e acusava 3 de 7.
   await filtrar(page, '');
+  await page.waitForFunction(
+    (esperado) => document.querySelectorAll('table tbody tr').length === esperado,
+    MASSA.length, { timeout: 15000 },
+  ).catch(() => {});
   const voltou = await linhasVisiveis(page);
   check(voltou === MASSA.length, `[web] limpar o filtro devolve as ${MASSA.length} linhas (${voltou})`);
 

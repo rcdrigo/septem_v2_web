@@ -121,6 +121,12 @@ try {
         const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
         return [r, g, b];
       };
+      const paraRgbComAlfa = (cor) => {
+        const m = /rgba?\(([^)]+)\)/.exec(cor);
+        if (!m) return [0, 0, 0, 1];
+        const partes = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+        return [partes[0], partes[1], partes[2], partes.length > 3 ? partes[3] : 1];
+      };
       const lum = (cor) => {
         const [r, g, b] = paraRgb(cor).map((v) => {
           const c = v / 255;
@@ -128,8 +134,19 @@ try {
         });
         return 0.2126 * r + 0.7152 * g + 0.0722 * b;
       };
-      const titulo = el.querySelector('.login-services-titulo');
-      const [a, b] = [lum(getComputedStyle(titulo).color), lum(getComputedStyle(el).backgroundColor)]
+      // O card foi redesenhado (`login-hero-action`): o título é o <strong>, sem classe
+      // própria. Se o fundo do card for transparente, o contraste real é contra o fundo
+      // ancestral — subir até achar uma cor opaca evita medir contra "transparente".
+      const titulo = el.querySelector('strong') ?? el;
+      const fundoDe = (node) => {
+        for (let atual = node; atual; atual = atual.parentElement) {
+          const cor = getComputedStyle(atual).backgroundColor;
+          const [, , , alfa] = paraRgbComAlfa(cor);
+          if (alfa > 0.9) return cor;
+        }
+        return 'rgb(255,255,255)';
+      };
+      const [a, b] = [lum(getComputedStyle(titulo).color), lum(fundoDe(el))]
         .sort((x, y) => y - x);
       return Math.round(((a + 0.05) / (b + 0.05)) * 100) / 100;
     });
@@ -147,32 +164,40 @@ try {
     check(await card.evaluate((el) => el.tagName === 'A'),
       `[${view.name}] o card é um link (funciona por teclado e em nova aba)`);
 
-    // O card fica ABAIXO do card principal, como a spec pede.
-    const ordem = await page.evaluate(() => {
-      const principal = document.querySelector('.login-card')?.getBoundingClientRect();
+    // A entrada da Central saiu de baixo do card de login e passou para a coluna de
+    // apresentação (as "ações do hero"). O que se cobra deixou de ser a ordem e passou a
+    // ser o que a spec queria garantir: o visitante ENXERGA a porta sem rolar e ela não
+    // fica em cima do formulário de login.
+    const posicao = await page.evaluate(() => {
+      // `.login-card` é o INVÓLUCRO das duas colunas (apresentação + formulário), então
+      // comparar com ele daria sobreposição sempre. O que interessa é o FORMULÁRIO.
+      const form = document.querySelector('.login-form-panel')?.getBoundingClientRect();
       const central = document.querySelector('[data-testid=login-central-servicos]')?.getBoundingClientRect();
-      return principal && central ? { principal: principal.bottom, central: central.top } : null;
+      if (!form || !central) return null;
+      const sobrepoe = !(central.right <= form.left || central.left >= form.right
+                      || central.bottom <= form.top || central.top >= form.bottom);
+      return { sobrepoe, dentroDaTela: central.top >= 0 && central.bottom <= window.innerHeight + 1 };
     });
-    check(!!ordem && ordem.central >= ordem.principal - 2,
-      `[${view.name}] o card fica ABAIXO do card de login`);
+    check(!!posicao && posicao.dentroDaTela,
+      `[${view.name}] a entrada da Central aparece sem precisar rolar`);
+    check(!!posicao && !posicao.sobrepoe,
+      `[${view.name}] e não fica em cima do formulário de login`);
 
-    // O convite "Acessar" é PERMANENTE — vale nos dois tamanhos, sem depender do
-    // que o navegador declara sobre hover (o emulador do Chromium mente sobre isso).
-    const chip = page.locator('[data-testid=login-central-chip]');
-    check(await chip.isVisible() && /Acessar/i.test(await chip.innerText()),
-      `[${view.name}] o card mostra "Acessar" de forma permanente`);
-
-    // No desktop, o overlay ainda realça no hover (enfeite, não a única pista).
-    if (view.name === 'web') {
-      const overlay = page.locator('[data-testid=login-central-overlay]');
-      const antes = await overlay.evaluate((el) => getComputedStyle(el).opacity);
-      await card.hover();
-      await page.waitForTimeout(500);
-      const depois = await overlay.evaluate((el) => getComputedStyle(el).opacity);
-      check(antes === '0' && depois === '1', `[${view.name}] o overlay realça no hover (${antes} → ${depois})`);
-      await page.mouse.move(0, 0);
-      await page.waitForTimeout(400);
-    }
+    // O card foi redesenhado: o chip "Acessar" e o overlay de hover saíram, e o convite
+    // passou a ser a descrição + a seta, sempre visíveis. A substância continua a mesma —
+    // o convite NÃO pode depender de hover (o emulador do Chromium mente sobre isso) e o
+    // card tem de ser um LINK de verdade, não uma div com onClick (teclado e "abrir em
+    // nova aba" dependem disso).
+    const conteudo = await card.evaluate((el) => ({
+      tag: el.tagName,
+      href: el.getAttribute('href') ?? '',
+      descricao: el.querySelector('.login-action-description')?.textContent?.trim() ?? '',
+      seta: !!el.querySelector('.login-action-chevron'),
+    }));
+    check(conteudo.tag === 'A' && /external-services/.test(conteudo.href),
+      `[${view.name}] o card é um link de verdade para a Central (${conteudo.tag} → ${conteudo.href})`);
+    check(conteudo.descricao.length > 0 && conteudo.seta,
+      `[${view.name}] o convite é permanente: descrição + seta, sem depender de hover ("${conteudo.descricao}")`);
 
     // ── 2) Clicar leva à Central, SEM login ───────────────────────────────
     await card.click();
@@ -190,11 +215,24 @@ try {
     // ⭐ O que a fase existe para impedir.
     check(!listados.includes(keyInterno), `[${view.name}] serviço INTERNO não aparece na vitrine pública`);
 
-    // ── 4) Agrupamento por categoria, com cor ─────────────────────────────
-    const grupo = page.locator('[data-testid=central-grupo]', { hasText: nomeCategoria }).first();
-    check(await grupo.count() > 0, `[${view.name}] os serviços vêm agrupados pela categoria`);
-    const cor = await grupo.locator('span').first().evaluate((el) => getComputedStyle(el).backgroundColor).catch(() => '');
-    check(/rgb/.test(cor), `[${view.name}] a categoria mostra a cor configurada (${cor})`);
+    // ── 4) Categoria: de agrupamento visual para FILTRO, mantendo a cor ────
+    // Os serviços deixaram de vir empilhados por categoria e passaram a ser filtrados por
+    // uma lista de categorias. A substância continua: a categoria configurada aparece, com
+    // a COR dela, e escolher a categoria mostra os serviços dela — agora com um efeito
+    // mais forte para cobrar, porque filtrar é verificável.
+    const botaoCategoria = page.locator('button[aria-pressed]', { hasText: nomeCategoria }).first();
+    check(await botaoCategoria.count() > 0, `[${view.name}] a categoria aparece como filtro`);
+    const cor = await botaoCategoria.locator('span').first()
+      .evaluate((el) => getComputedStyle(el).color).catch(() => '');
+    check(/rgb/.test(cor) && cor !== 'rgb(0, 0, 0)', `[${view.name}] o filtro usa a cor configurada da categoria (${cor})`);
+    await botaoCategoria.click();
+    await page.waitForTimeout(600);
+    const naCategoria = await page.locator('[data-testid=central-servico]').evaluateAll(
+      (els) => els.map((e) => e.getAttribute('data-key')));
+    check(naCategoria.includes(keyExterno) && !naCategoria.includes(keyInterno),
+      `[${view.name}] escolher a categoria mostra os serviços dela (${naCategoria.length})`);
+    await page.locator('button[aria-pressed]', { hasText: 'Todas' }).first().click();
+    await page.waitForTimeout(600);
 
     // ── 5) O visitante sabe, antes de clicar, se precisa de conta ─────────
     const cardExterno = page.locator(`[data-testid=central-servico][data-key="${keyExterno}"]`);

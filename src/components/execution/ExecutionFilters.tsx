@@ -50,7 +50,8 @@ export function useExecutionFilters(kind: 'tasks' | 'requests', canUseTags: bool
     }
     if ('processes' in changes) next.delete('process');
     if (kind === 'tasks') next.delete('status');
-    else next.set('page', '1');
+    // Filtro novo, fatia nova: a página 3 de um conjunto não existe no próximo.
+    next.set('page', '1');
     return next;
   }, { flushSync: true });
   // Links antigos de tarefas concluídas agora abrem a caixa de tarefas em andamento.

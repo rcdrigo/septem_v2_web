@@ -100,7 +100,14 @@ export const MENU: MenuByMode = {
       },
     ],
     footer: [
-      { kind: 'link', label: 'Suporte', to: routes.support, icon: LifeBuoy },
+      { kind: 'link', label: 'Meus chamados', to: routes.support, icon: LifeBuoy },
+      // Equipes de suporte (Fase 3): fica junto de "Suporte" porque é a contraparte dele — quem
+      // atende, não quem pede. A permissão é a MESMA que o backend exige; sem ela o link não
+      // aparece, em vez de levar a uma tela que só sabe recusar.
+      // Fila da equipe (Fase 5): por CAPACIDADE, não por permissão — aparece para quem participa
+      // de equipe de suporte, e o servidor é quem diz isso (`/me`).
+      { kind: 'link', label: 'Fila da equipe', to: routes.supportQueue, icon: Inbox, visible: (s) => !!s.user?.supportTeamMember },
+      { kind: 'link', label: 'Equipes de suporte', to: routes.supportTeams, icon: Users, perm: 'support:admin' },
     ],
   },
 
@@ -116,7 +123,7 @@ export const MENU: MenuByMode = {
       },
     ],
     footer: [
-      { kind: 'link', label: 'Suporte', to: routes.support, icon: LifeBuoy },
+      { kind: 'link', label: 'Meus chamados', to: routes.support, icon: LifeBuoy },
     ],
   },
 };
