@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { BookOpen, Building2, LogOut, ShieldCheck } from 'lucide-react';
+import { Building2, LogOut, ShieldCheck, Users } from 'lucide-react';
 import { usePlatformSession } from '@/stores/platform-session';
 import { routes } from '@/lib/routes';
 
@@ -66,17 +66,6 @@ export function PlatformLayout() {
           </span>
           <nav className="flex items-center gap-1 text-sm">
             <NavLink
-              to={routes.platformCatalog}
-              data-testid="platform-nav-catalogo"
-              className={({ isActive }) =>
-                `rounded-md px-2.5 py-1.5 ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800'}`
-              }
-            >
-              <span className="flex items-center gap-1.5">
-                <BookOpen className="h-4 w-4" /> Catálogo
-              </span>
-            </NavLink>
-            <NavLink
               to={routes.platformClients}
               className={({ isActive }) =>
                 `rounded-md px-2.5 py-1.5 ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800'}`
@@ -86,6 +75,14 @@ export function PlatformLayout() {
                 <Building2 className="h-4 w-4" /> Clientes
               </span>
             </NavLink>
+            {identity?.globalAccess === true && <NavLink
+              to={routes.platformSuperAdmins}
+              className={({ isActive }) =>
+                `rounded-md px-2.5 py-1.5 ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800'}`
+              }
+            >
+              <span className="flex items-center gap-1.5"><Users className="h-4 w-4" /> Usuários</span>
+            </NavLink>}
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">
             <span className="hidden text-slate-300 sm:inline" data-testid="platform-identidade">

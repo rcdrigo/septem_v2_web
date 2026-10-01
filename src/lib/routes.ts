@@ -55,14 +55,16 @@ export const routes = {
   environmentInactive: '/environment-inactive',
 
   // --- Área central da Septem (fora do shell; não pertence a nenhum ambiente) -
-  /** Aceite do convite do admin do cliente — sem sessão, autorizado pelo token do e-mail. */
-  platformAcceptInvite: '/platform/invite',
+    /** Aceite do convite do admin do cliente — sem sessão, autorizado pelo token do e-mail. */
+    platformAcceptInvite: '/platform/invite',
+    /** Configuração da senha pessoal de um super administrador. */
+    platformSetup: '/platform/setup',
+    /** Gestão de super administradores, exclusiva ao acesso global. */
+    platformSuperAdmins: '/platform/users',
   /** Login da equipe da Septem — 2FA obrigatório, sem branding de cliente. */
   platformLogin: '/platform/login',
   /** Clientes da plataforma. */
   platformClients: '/platform/clients',
-  /** Catálogo de processos da Septem (Fase 12). */
-  platformCatalog: '/platform/process-catalog',
   /** Assistente de cadastro de cliente (provisionamento). */
   platformNewClient: '/platform/clients/new',
   /** Um cliente e seus ambientes. */

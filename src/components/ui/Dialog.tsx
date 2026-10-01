@@ -10,10 +10,11 @@ type Props = {
   footer?: ReactNode;
   width?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   bodyClassName?: string;
+  dismissible?: boolean;
 };
 
 /** Modal com foco contido, retorno ao disparador e fechamento por Escape. */
-export function Dialog({ open, onClose, title, children, footer, width = 'md', bodyClassName }: Props) {
+export function Dialog({ open, onClose, title, children, footer, width = 'md', bodyClassName, dismissible = true }: Props) {
   const widthClass =
     width === 'sm' ? 'max-w-md'
     : width === 'lg' ? 'max-w-2xl'
@@ -22,7 +23,7 @@ export function Dialog({ open, onClose, title, children, footer, width = 'md', b
     : 'max-w-lg';
 
   return (
-    <BaseDialog.Root open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+    <BaseDialog.Root open={open} onOpenChange={(next) => { if (!next && dismissible) onClose(); }}>
       <BaseDialog.Portal>
         <BaseDialog.Backdrop className="fixed inset-0 z-[1000] bg-slate-900/40" />
         <BaseDialog.Viewport className="fixed inset-0 z-[1000] flex items-center justify-center px-4 py-4">
@@ -34,13 +35,13 @@ export function Dialog({ open, onClose, title, children, footer, width = 'md', b
           >
             <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-3">
               <BaseDialog.Title className="text-base font-semibold text-slate-900">{title}</BaseDialog.Title>
-              <BaseDialog.Close
+              {dismissible && <BaseDialog.Close
                 type="button"
                 className="relative rounded p-1 text-slate-400 before:absolute before:-inset-2 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 active:bg-slate-200"
                 aria-label="Fechar"
               >
                 <X size={18} />
-              </BaseDialog.Close>
+              </BaseDialog.Close>}
             </div>
             <div className={bodyClassName ?? 'min-h-0 flex-1 overflow-y-auto px-5 py-4'}>{children}</div>
             {footer && <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">{footer}</div>}

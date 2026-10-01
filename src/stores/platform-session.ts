@@ -21,6 +21,7 @@ export type PlatformIdentity = {
   name: string;
   email: string;
   roles: string[];
+  globalAccess: boolean;
 };
 
 export type PlatformStatus = 'idle' | 'booting' | 'unauthenticated' | 'authenticated';

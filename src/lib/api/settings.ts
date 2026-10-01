@@ -1,3 +1,5 @@
+import type { BusinessHoursWeek } from '@/lib/business-calendar';
+import type { CalendarLocation } from '@/lib/business-calendar';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
@@ -7,7 +9,7 @@ import { api } from '@/lib/api';
  * Segredos (senha SMTP / secret key do S3) NUNCA chegam no front — só os flags
  * `passwordSet` / `secretKeySet`. Ao salvar, campo em branco = "não altera".
  */
-export type SettingsGeneral = {
+export type SettingsGeneral = CalendarLocation & {
   tenantId: string;
   host: string | null;
   clienteNome: string;
@@ -19,6 +21,7 @@ export type SettingsGeneral = {
   businessHourStart: number;
   businessHourEnd: number;
   businessDays: string;
+  businessHours?: BusinessHoursWeek | null;
 };
 
 export type SettingsEmail = {
@@ -56,31 +59,41 @@ export type SettingsSecurity = {
 };
 
 export type SettingsOpenRouter = {
-  apiKeySet: boolean;
+  apiKeySet?: boolean;
   model: string | null;
   siteUrl: string | null;
   maxTokens: number;
 };
 export type OpenRouterPayload = Omit<SettingsOpenRouter, 'apiKeySet'> & { apiKey: string | null };
 
+export type SettingsPolicy = {
+  visible: boolean;
+  editable: boolean;
+};
+
 export function useSaveOpenRouter() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (p: OpenRouterPayload) => api.put('/api/v1/settings/openrouter', p),
+    mutationFn: (p: OpenRouterPayload) => {
+      const settings = qc.getQueryData<Settings>(KEY);
+      return api.put('/api/v1/settings/openrouter', sanitizeSettingsPayload('openrouter', p, settings?.policies));
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
 }
 
 export type Settings = {
-  general: SettingsGeneral;
-  email: SettingsEmail;
-  storage: SettingsStorage;
-  security: SettingsSecurity;
-  openRouter: SettingsOpenRouter;
-  updatedAt: string;
+  general?: SettingsGeneral;
+  email?: SettingsEmail;
+  storage?: SettingsStorage;
+  security?: SettingsSecurity;
+  openRouter?: SettingsOpenRouter;
+  updatedAt?: string;
+  /** Overrides returned by SettingsVisibilityFilter. Missing paths remain visible/editable. */
+  policies?: Record<string, SettingsPolicy>;
 };
 
-export type GeneralPayload = {
+export type GeneralPayload = CalendarLocation & {
   clienteNome: string;
   ambienteNome: string;
   logoUrl: string | null;
@@ -90,6 +103,7 @@ export type GeneralPayload = {
   businessHourStart: number;
   businessHourEnd: number;
   businessDays: string;
+  businessHours?: BusinessHoursWeek | null;
 };
 
 export type EmailPayload = {
@@ -123,6 +137,65 @@ export type StoragePayload = {
 
 const KEY = ['settings'];
 
+const DEFAULT_POLICY: SettingsPolicy = { visible: true, editable: true };
+
+function policyAt(policies: Record<string, SettingsPolicy> | undefined, path: string): SettingsPolicy {
+  if (!policies) return DEFAULT_POLICY;
+  const key = Object.keys(policies).find((candidate) => candidate.toLowerCase() === path.toLowerCase());
+  return key ? policies[key] : DEFAULT_POLICY;
+}
+
+export function settingsSectionVisible(
+  policies: Record<string, SettingsPolicy> | undefined,
+  section: string,
+): boolean {
+  return policyAt(policies, section).visible;
+}
+
+export function settingsSectionEditable(
+  policies: Record<string, SettingsPolicy> | undefined,
+  section: string,
+): boolean {
+  const sectionPolicy = policyAt(policies, section);
+  return sectionPolicy.visible && sectionPolicy.editable;
+}
+
+export function settingsFieldPolicy(
+  policies: Record<string, SettingsPolicy> | undefined,
+  section: string,
+  field?: string,
+): SettingsPolicy {
+  const sectionPolicy = policyAt(policies, section);
+  if (!field) return sectionPolicy;
+  const fieldPolicy = policyAt(policies, `${section}.${field}`);
+  const secretStatusField = field === 'password' ? 'passwordSet'
+    : field === 'secretKey' ? 'secretKeySet'
+    : field === 'apiKey' ? 'apiKeySet' : undefined;
+  const statusPolicy = secretStatusField ? policyAt(policies, `${section}.${secretStatusField}`) : DEFAULT_POLICY;
+  // Existing restrictions remain effective when the three legacy fields become one editor.
+  const legacyCalendar = field === 'businessHours'
+    ? ['businessHourStart', 'businessHourEnd', 'businessDays'].map(name => policyAt(policies, `${section}.${name}`))
+    : [];
+  return {
+    visible: sectionPolicy.visible && fieldPolicy.visible && statusPolicy.visible && legacyCalendar.every(policy => policy.visible),
+    editable: sectionPolicy.editable && fieldPolicy.editable && statusPolicy.editable && legacyCalendar.every(policy => policy.editable),
+  };
+}
+
+/** Removes hidden/read-only fields before a settings mutation is sent to the API. */
+export function sanitizeSettingsPayload<T extends object>(
+  section: string,
+  payload: T,
+  policies: Record<string, SettingsPolicy> | undefined,
+): Partial<T> {
+  const result: Partial<T> = {};
+  for (const key of Object.keys(payload) as Array<keyof T>) {
+    const permission = settingsFieldPolicy(policies, section, String(key));
+    if (permission.visible && permission.editable) result[key] = payload[key];
+  }
+  return result;
+}
+
 export function useSettings() {
   return useQuery({ queryKey: KEY, queryFn: () => api.get<Settings>('/api/v1/settings') });
 }
@@ -130,7 +203,10 @@ export function useSettings() {
 export function useSaveGeneral() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (p: GeneralPayload) => api.put('/api/v1/settings/general', p),
+    mutationFn: (p: GeneralPayload) => {
+      const settings = qc.getQueryData<Settings>(KEY);
+      return api.put('/api/v1/settings/general', sanitizeSettingsPayload('general', p, settings?.policies));
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
 }
@@ -154,7 +230,10 @@ export function useIntegrations() {
 export function useSaveEmail() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (p: EmailPayload) => api.put('/api/v1/settings/email', p),
+    mutationFn: (p: EmailPayload) => {
+      const settings = qc.getQueryData<Settings>(KEY);
+      return api.put('/api/v1/settings/email', sanitizeSettingsPayload('email', p, settings?.policies));
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
 }
@@ -167,7 +246,10 @@ export function useTestEmail() {
 export function useSaveStorage() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (p: StoragePayload) => api.put('/api/v1/settings/storage', p),
+    mutationFn: (p: StoragePayload) => {
+      const settings = qc.getQueryData<Settings>(KEY);
+      return api.put('/api/v1/settings/storage', sanitizeSettingsPayload('storage', p, settings?.policies));
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
 }
@@ -180,7 +262,10 @@ export function useTestStorage() {
 export function useSaveSecurity() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (p: SettingsSecurity) => api.put('/api/v1/settings/security', p),
+    mutationFn: (p: SettingsSecurity) => {
+      const settings = qc.getQueryData<Settings>(KEY);
+      return api.put('/api/v1/settings/security', sanitizeSettingsPayload('security', p, settings?.policies));
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
 }

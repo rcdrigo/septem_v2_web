@@ -22,16 +22,37 @@ async function login(page) {
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 }
 
-// aria-label dos botões = nome completo do dia (o texto visível é abreviado).
+// A seleção em lote escolhe destinos; os resumos comprovam a semana configurada.
 const DIAS = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'];
-
-/** Deixa exatamente os dias `want` (1..7) marcados — independe do estado anterior. */
-async function setDays(page, want) {
-  for (let d = 1; d <= 7; d++) {
-    const btn = page.getByRole('button', { name: DIAS[d - 1], exact: true });
-    const on = (await btn.getAttribute('aria-pressed')) === 'true';
-    if (on !== want.includes(d)) await btn.click();
+async function selectDays(page, want) {
+  for (let day = 1; day <= 7; day++) {
+    const button = page.getByTestId(`business-hours-select-${day}`);
+    if (((await button.getAttribute('aria-pressed')) === 'true') !== want.includes(day)) await button.click();
   }
+}
+async function setWeek(page, want, start, end) {
+  const editor = page.getByTestId('business-hours-editor');
+  const expanded = editor.locator('button[aria-expanded=true]');
+  if (await expanded.count()) await expanded.click();
+  const removeModel = editor.getByRole('button', { name: /Remover período \d+ de Modelo/ });
+  while (await removeModel.count()) await removeModel.first().click();
+  const withoutHours = [1, 2, 3, 4, 5, 6, 7].filter(day => !want.includes(day));
+  if (withoutHours.length) {
+    await selectDays(page, withoutHours);
+    await page.getByTestId('business-hours-apply').click();
+  }
+  await editor.getByRole('button', { name: 'Adicionar período', exact: true }).click();
+  await editor.getByRole('textbox', { name: 'Modelo, período 1, início', exact: true }).fill(start);
+  await editor.getByRole('textbox', { name: 'Modelo, período 1, fim', exact: true }).fill(end);
+  await selectDays(page, want);
+  await page.getByTestId('business-hours-apply').click();
+}
+async function weekMatches(page, want, start, end) {
+  for (let day = 1; day <= 7; day++) {
+    const summary = await page.getByTestId(`business-hours-day-${day}`).innerText();
+    if (!summary.includes(DIAS[day - 1]) || !summary.includes(want.includes(day) ? `${start}–${end}` : 'Sem horas úteis')) return false;
+  }
+  return true;
 }
 
 /** Mede overflow horizontal e recorte dos campos — critério objetivo de layout. */
@@ -83,9 +104,8 @@ for (const view of [
   // 3) Formulário carregou os valores do backend (não vazio).
   const cliente = await page.locator('input[name=clienteNome]').inputValue();
   check(cliente.length > 0, `[${view.name}] campo "Nome do cliente" pré-carregado ("${cliente}")`);
-  await setDays(page, [1, 2, 3, 4, 5]);
-  const dias = await page.locator('button[aria-pressed=true]').count();
-  check(dias === 5, `[${view.name}] seletor de dias úteis marca exatamente seg–sex — obtido ${dias}`);
+  await setWeek(page, [1, 2, 3, 4, 5], '08:00', '18:00');
+  check(await weekMatches(page, [1, 2, 3, 4, 5], '08:00', '18:00'), `[${view.name}] resumos confirmam seg–sex e fim de semana sem horas úteis`);
 
   // 3.1) As abas cabem inteiras no viewport (no mobile a barra não pode cortar "Arquivos").
   const tabsClipped = await page.evaluate(() =>
@@ -103,20 +123,19 @@ for (const view of [
   await page.screenshot({ path: `${OUT}/parametros-geral-${view.name}.png`, fullPage: true });
 
   // 5) Validação client-side: fim <= início não salva.
-  await page.selectOption('select[name=businessHourStart]', '18');
-  await page.selectOption('select[name=businessHourEnd]', '9');
+  await page.getByTestId('business-hours-day-1').click();
+  await page.getByRole('textbox', { name: 'Segunda-feira, período 1, início', exact: true }).fill('18:00');
+  await page.getByRole('textbox', { name: 'Segunda-feira, período 1, fim', exact: true }).fill('09:00');
   await page.getByRole('button', { name: 'Salvar' }).click();
   await page.waitForTimeout(500);
-  const erroHorario = await page.getByText('O fim do expediente deve ser depois do início.').count();
+  const erroHorario = await page.getByText(/o fim deve ser depois do início, no mesmo dia\./).count();
   check(erroHorario > 0, `[${view.name}] bloqueia expediente com fim antes do início`);
 
   // 6) Edição real: muda nome/cor/expediente/dias e salva.
   const novoNome = `Prefeitura Municipal (${view.name})`;
   await page.fill('input[name=clienteNome]', novoNome);
   await page.fill('input[name=primaryColor]', '#0d9488');
-  await page.selectOption('select[name=businessHourStart]', '9');
-  await page.selectOption('select[name=businessHourEnd]', '17');
-  await setDays(page, [1, 2, 3, 4, 5, 6]); // adiciona sábado
+  await setWeek(page, [1, 2, 3, 4, 5, 6], '09:15', '17:30'); // sábado e minutos
   await page.fill('input[name=heroImageUrl]', 'https://picsum.photos/id/1015/1200/900');
   await page.fill('textarea[name=systemDescription]', 'Portal de serviços do município.');
   await page.getByRole('button', { name: 'Salvar' }).click();
@@ -136,13 +155,8 @@ for (const view of [
     `[${view.name}] nome persistido após reload`,
   );
   check(
-    (await page.locator('select[name=businessHourStart]').inputValue()) === '9' &&
-      (await page.locator('select[name=businessHourEnd]').inputValue()) === '17',
-    `[${view.name}] expediente 09:00–17:00 persistido`,
-  );
-  check(
-    (await page.locator('button[aria-pressed=true]').count()) === 6,
-    `[${view.name}] sábado persistido (6 dias úteis)`,
+    await weekMatches(page, [1, 2, 3, 4, 5, 6], '09:15', '17:30'),
+    `[${view.name}] minutos, sábado e domingo sem horas úteis persistidos após reload`,
   );
   check(
     (await page.locator('textarea[name=systemDescription]').inputValue()) === 'Portal de serviços do município.',
@@ -198,16 +212,14 @@ for (const view of [
   await page.fill('input[name=primaryColor]', ORIG.cor);
   await page.fill('input[name=heroImageUrl]', '');
   await page.fill('textarea[name=systemDescription]', '');
-  await page.selectOption('select[name=businessHourStart]', '8');
-  await page.selectOption('select[name=businessHourEnd]', '18');
-  await setDays(page, [1, 2, 3, 4, 5]); // volta para seg–sex
+  await setWeek(page, [1, 2, 3, 4, 5], '08:00', '18:00'); // volta para seg–sex
   await page.getByRole('button', { name: 'Salvar' }).click();
   await page.waitForSelector('text=Parâmetros salvos.', { timeout: 10000 });
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid=form-geral]');
   check(
     (await page.locator('input[name=clienteNome]').inputValue()) === ORIG.cliente &&
-      (await page.locator('button[aria-pressed=true]').count()) === 5,
+      await weekMatches(page, [1, 2, 3, 4, 5], '08:00', '18:00'),
     '[cleanup] seed restaurado (Prefeitura X, seg–sex 08–18)',
   );
   await ctx.close();

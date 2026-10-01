@@ -1,3 +1,6 @@
+import type { BusinessHoursWeek } from '@/lib/business-calendar';
+import type { CalendarLocation } from '@/lib/business-calendar';
+import type { InitialEnvironmentSettings, InitialEnvironmentSecrets } from '@/pages/platform/ClientInitialSettingsFields';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApi } from '@/lib/platform-api';
 
@@ -8,12 +11,15 @@ export type PlatformClientRow = {
   name: string;
   createdAt: string;
   environments: number;
+  status: string;
 };
 
 export type PlatformEnvironment = {
   tenantId: string;
   displayName: string;
   host: string;
+  url?: string | null;
+  databaseName?: string | null;
   /** production | staging | demo — a finalidade aparece em todo detalhe (ADM-01). */
   purpose: string;
   operatingMode: string;
@@ -23,10 +29,13 @@ export type PlatformEnvironment = {
   operationId?: string | null;
 };
 
-export type PlatformClientDetail = {
+export type PlatformClientDetail = CalendarLocation & {
+  businessHours?: BusinessHoursWeek | null;
   id: string;
   name: string;
   createdAt: string;
+  status: string;
+  canManageClient: boolean;
   environments: PlatformEnvironment[];
   /** Operações que ainda não viraram ambiente — os primeiros segundos do provisionamento. */
   pendingOperations?: { operationId: string; target: string; status: string; currentStep: string | null }[];
@@ -65,6 +74,7 @@ export function usePlatformClient(id: string | undefined) {
 /** Detalhe de um ambiente na área central, com a versão para o expectedVersion. */
 export type PlatformEnvironmentDetail = PlatformEnvironment & {
   clientName: string | null;
+  clientId?: string | null;
   version: number;
 };
 
@@ -216,16 +226,20 @@ export type NovoAmbienteInput = {
   seedDummyData: boolean;
 };
 
-export type NovoClienteInput = {
+export type NovoClienteInput = CalendarLocation & {
+  businessHours: BusinessHoursWeek;
+  initialSettings?: Omit<InitialEnvironmentSettings, 'storageMode'>;
+  initialSecrets?: InitialEnvironmentSecrets;
   name: string;
   primaryColor?: string;
+  managedBySeptem?: boolean;
   adminName?: string;
   adminEmail?: string;
   features?: string[];
   production?: NovoAmbienteInput;
   staging?: NovoAmbienteInput | null;
-  /** Processos do catálogo a instalar nos dois ambientes (Fase 12). */
-  catalogProcessKeys?: string[];
+  /** Processos publicados em origens de tenant, instalados nos ambientes novos. */
+  initialProcessSelections?: { sourceTenantId: string; processKey: string; version: number }[];
 };
 
 export function useCreateClient() {
@@ -266,7 +280,10 @@ export function useOperation(operationId: string | undefined, acompanhar: boolea
     enabled: !!operationId,
     // Enquanto não termina, reconsulta: o provisionamento leva minutos e o cartão precisa
     // andar sozinho. Parado o trabalho, para de perguntar.
-    refetchInterval: acompanhar ? 3000 : false,
+      refetchInterval: acompanhar ? (query) => {
+        const status = query.state.data?.status;
+        return !status || status === 'queued' || status === 'running' ? 3000 : false;
+      } : false,
   });
 }
 
@@ -354,5 +371,94 @@ export function useVerifyDomain(tenantId: string) {
     mutationFn: (domainId: string) => platformApi.post<EnvironmentDomainRow>(
       `/environments/${tenantId}/domains/${domainId}/verify`, {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['platform', 'environments', tenantId, 'domains'] }),
+  });
+}
+
+
+export type PlatformClientMetrics = {
+  internalUsers: number;
+  externalUsers: number;
+  productionEnvironments: number;
+};
+
+export type PlatformClientHistoryItem = {
+  id: string;
+  actorName: string | null;
+  occurredAt: string;
+  type: string;
+  environmentId: string | null;
+  result: string | null;
+  metadataJson: string | null;
+};
+
+export type SuperAdminRow = {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+  globalAccess: boolean;
+  clients: string[];
+  environments: string[];
+};
+
+export type SuperAdminInput = Omit<SuperAdminRow, 'id'>;
+
+export function usePlatformClientMetrics(clientId: string | undefined) {
+  return useQuery({
+    queryKey: ['platform', 'clients', clientId ?? '', 'metrics'] as const,
+    queryFn: () => platformApi.get<PlatformClientMetrics>(`/clients/${clientId}/metrics`),
+    enabled: !!clientId,
+  });
+}
+
+export function usePlatformClientHistory(clientId: string | undefined) {
+  return useQuery({
+    queryKey: ['platform', 'clients', clientId ?? '', 'history'] as const,
+    queryFn: () => platformApi.get<{ items: PlatformClientHistoryItem[] }>(`/clients/${clientId}/history`),
+    enabled: !!clientId,
+  });
+}
+
+export function useSetPlatformClientStatus(clientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (status: 'active' | 'inactive') =>
+      platformApi.post(`/clients/${clientId}/status`, { status }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: platformClientKeys.all });
+      void qc.invalidateQueries({ queryKey: platformClientKeys.detail(clientId) });
+      void qc.invalidateQueries({ queryKey: ['platform', 'clients', clientId, 'metrics'] });
+    },
+  });
+}
+
+export function useSuperAdmins() {
+  return useQuery({
+    queryKey: ['platform', 'super-admins'] as const,
+    queryFn: () => platformApi.get<{ items: SuperAdminRow[] }>('/super-admins'),
+  });
+}
+
+export function useSaveSuperAdmin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: SuperAdminInput & { id: string }) =>
+      platformApi.put<{ id: string; created: boolean; invitationSent: boolean }>(`/super-admins/${id}`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['platform', 'super-admins'] }),
+  });
+}
+
+export function useResendSuperAdminInvite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => platformApi.post<{ invitationSent: boolean }>('/super-admins/' + id + '/invite', {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['platform', 'super-admins'] }),
+  });
+}
+
+export function useCompleteSuperAdminSetup() {
+  return useMutation({
+    mutationFn: (body: { email: string; code: string; password: string }) =>
+      platformApi.post('/auth/setup', body, { anonymous: true }),
   });
 }

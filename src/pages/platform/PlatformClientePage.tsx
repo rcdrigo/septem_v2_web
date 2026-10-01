@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useQueries } from '@tanstack/react-query';
 import { ArrowLeft, Loader2 } from 'lucide-react';
+import { Dialog } from '@/components/ui/Dialog';
 import { CartaoProvisionamento } from '@/components/platform/CartaoProvisionamento';
-import { useAdminInvites, useResendInvite } from '@/lib/api/platform-clients';
+import { useAdminInvites, useResendInvite, usePlatformClientMetrics, usePlatformClientHistory, useSetPlatformClientStatus } from '@/lib/api/platform-clients';
 import {
   MODE_LABEL,
   PURPOSE_LABEL,
@@ -10,6 +13,9 @@ import {
 } from '@/lib/api/platform-clients';
 import { routes } from '@/lib/routes';
 import { useDocumentTitle } from '@/lib/use-document-title';
+import { PlatformCatalogInventory } from './PlatformCatalogInventory';
+import { platformApi } from '@/lib/platform-api';
+import type { OperationDetail } from '@/lib/api/platform-clients';
 
 /**
  * Detalhe do cliente e seus ambientes. Cliente, finalidade e modo aparecem em todo
@@ -22,10 +28,42 @@ export function PlatformClientePage() {
   // aparece na tela no momento em que o job o reserva.
   const { data, isLoading, isError, error } = usePlatformClient(id);
   const convites = useAdminInvites(id);
+  const metrics = usePlatformClientMetrics(id);
+  const history = usePlatformClientHistory(id);
+  const changeStatus = useSetPlatformClientStatus(id ?? '');
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [dismissedOperations, setDismissedOperations] = useState<string[]>([]);
   const reenviar = useResendInvite(id ?? '');
   useDocumentTitle(data ? `${data.name} · área central` : 'Cliente · área central');
 
   const naoEncontrado = isError && (error as { status?: number } | undefined)?.status === 404;
+  const environments = data?.environments ?? [];
+  const operations = data ? [
+    ...(data.pendingOperations ?? []).map((operation) => ({
+      operationId: operation.operationId,
+      target: operation.target,
+      status: operation.status,
+    })),
+    ...environments.filter((environment) => environment.operationId && environment.provisioningState !== 'ready')
+      .map((environment) => ({
+        operationId: environment.operationId!,
+        target: environment.displayName || environment.tenantId,
+        status: environment.provisioningState,
+      })),
+  ].filter((operation, index, all) => all.findIndex((candidate) => candidate.operationId === operation.operationId) === index) : [];
+  const operationQueries = useQueries({ queries: operations.map((operation) => ({
+    queryKey: ['platform', 'operations', operation.operationId],
+    queryFn: () => platformApi.get<OperationDetail>(`/operations/${operation.operationId}`),
+  })) });
+  const provisioningRunning = operationQueries.some((query, index) => {
+    if (query.isError) return operations[index]?.status === 'queued' || operations[index]?.status === 'running';
+    if (!query.data) return true;
+    return query.data.status === 'queued' || query.data.status === 'running';
+  });
+  const activeOperations = operations.filter((_, index) => operationQueries[index]?.data?.status !== 'completed');
+  const modalOperations = provisioningRunning
+    ? activeOperations
+    : activeOperations.filter((operation) => !dismissedOperations.includes(operation.operationId));
 
   return (
     <section>
@@ -53,14 +91,43 @@ export function PlatformClientePage() {
 
       {data && (
         <>
-          <h1 className="text-lg font-semibold text-slate-900" data-testid="platform-cliente-nome">
-            {data.name}
-          </h1>
-          <p className="mb-4 text-sm text-slate-500">
-            {data.environments.length} ambiente{data.environments.length === 1 ? '' : 's'}
-          </p>
+          <Dialog
+            open={modalOperations.length > 0}
+            onClose={() => setDismissedOperations(operations.map((operation) => operation.operationId))}
+            title="Provisionamento de ambiente"
+            width="lg"
+            dismissible={!provisioningRunning}
+            footer={provisioningRunning
+              ? <span className="mr-auto text-xs text-slate-500">Mantenha esta janela aberta enquanto uma etapa estiver em execução.</span>
+              : <span className="mr-auto text-xs text-slate-500">A operação falhou e pode ser retomada pelo cartão de progresso.</span>}
+          >
+            <p className="text-sm text-slate-600">O progresso é salvo no servidor e continuará acompanhado se você atualizar a página.</p>
+            <div className="mt-4 grid gap-3" data-testid="provisioning-modal-content">
+              {modalOperations.map((operation) => <CartaoProvisionamento key={operation.operationId} operationId={operation.operationId} titulo={operation.target} />)}
+            </div>
+            {provisioningRunning && <span className="sr-only" data-testid="provisioning-modal-not-dismissible">Fechamento indisponível durante a execução</span>}
+            {!provisioningRunning && <span className="sr-only" data-testid="fechar-modal-provisionamento">Você pode fechar o acompanhamento</span>}
+          </Dialog>
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div><h1 className="text-lg font-semibold text-slate-900" data-testid="platform-cliente-nome">{data.name}</h1><p className="text-sm text-slate-500">{environments.length} ambiente{environments.length === 1 ? '' : 's'}</p></div>
+            <div className="flex items-center gap-3">
+              <span className={data.status === 'active' ? 'text-sm font-medium text-emerald-700' : 'text-sm font-medium text-amber-700'}>{data.status === 'active' ? 'Ativo' : 'Inativado'}</span>
+              {data.canManageClient && <button type="button" disabled={changeStatus.isPending} onClick={() => { setStatusError(null); void changeStatus.mutateAsync(data.status === 'active' ? 'inactive' : 'active').catch(() => setStatusError('Não foi possível alterar o estado do cliente. Atualize a página e tente novamente.')); }} className="min-h-10 rounded-md border border-slate-300 px-3 text-sm text-slate-700 disabled:opacity-50">{changeStatus.isPending ? 'Salvando…' : data.status === 'active' ? 'Inativar cliente' : 'Reativar cliente'}</button>}
+            </div>
+          </div>
+          {statusError && <p role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{statusError}</p>}
+          {metrics.isLoading && <p className="mb-3 text-sm text-slate-500">Carregando métricas de produção…</p>}
+          {metrics.isError && <p role="alert" className="mb-3 text-sm text-red-700">Não foi possível carregar as métricas.</p>}
+          {metrics.data && <section className="mb-5 border-y border-slate-200 py-3" aria-label="Usuários ativos em produção">
+            <h2 className="text-sm font-semibold text-slate-900">Usuários ativos em produção</h2>
+            <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-3">
+              <div><dt className="text-slate-500">Internos</dt><dd className="font-medium tabular-nums text-slate-900">{metrics.data.internalUsers}</dd></div>
+              <div><dt className="text-slate-500">Externos</dt><dd className="font-medium tabular-nums text-slate-900">{metrics.data.externalUsers}</dd></div>
+              <div><dt className="text-slate-500">Ambientes de produção</dt><dd className="font-medium tabular-nums text-slate-900">{metrics.data.productionEnvironments}</dd></div>
+            </dl>
+          </section>}
 
-          {(convites.data?.items.length ?? 0) > 0 && (
+          {(convites.data?.items?.length ?? 0) > 0 && (
             <div className="mb-4 rounded-lg border border-slate-200 bg-white p-4" data-testid="convites">
               <h2 className="text-sm font-semibold text-slate-900">Convite do administrador</h2>
               {convites.data!.items.slice(0, 1).map((c) => {
@@ -100,13 +167,13 @@ export function PlatformClientePage() {
             </div>
           )}
 
-          {data.environments.length === 0 && (data.pendingOperations?.length ?? 0) === 0 ? (
+          {environments.length === 0 && (data.pendingOperations?.length ?? 0) === 0 ? (
             <p className="rounded-md border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
               Este cliente ainda não tem ambientes.
             </p>
           ) : (
             <ul className="grid gap-3 sm:grid-cols-2" data-testid="platform-ambientes">
-              {data.environments.map((a) => (
+              {environments.map((a) => (
                 <li key={a.tenantId} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                   <Link
                     to={routes.platformEnvironment(a.tenantId)}
@@ -115,7 +182,9 @@ export function PlatformClientePage() {
                   >
                     {a.displayName || a.tenantId}
                   </Link>
-                  <p className="break-all text-xs text-slate-500">{a.host}</p>
+                  <p className="break-all text-xs text-slate-500">{a.url || a.host}</p>
+                  {a.databaseName && <p className="mt-1 text-xs text-slate-500">Banco: {a.databaseName}</p>}
+                  <a href={a.url || ('https://' + a.host)} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs font-medium text-slate-700 underline underline-offset-2">Abrir ambiente</a>
                   {a.provisioningState !== 'ready' && a.operationId && (
                     <div className="mt-3">
                       <CartaoProvisionamento operationId={a.operationId} titulo="Provisionamento" />
@@ -139,6 +208,22 @@ export function PlatformClientePage() {
               ))}
             </ul>
           )}
+
+          {environments.length > 0 && <PlatformCatalogInventory key={data.id} destinationClientId={data.id} />}
+
+          <section className="mt-6 border-t border-slate-200 pt-4">
+            <h2 className="text-sm font-semibold text-slate-900">Histórico do cliente</h2>
+            {history.isLoading && <p className="mt-2 text-sm text-slate-500">Carregando histórico…</p>}
+            {history.isError && <p role="alert" className="mt-2 text-sm text-red-700">Não foi possível carregar o histórico.</p>}
+            {history.data?.items?.length === 0 && <p className="mt-2 text-sm text-slate-500">Ainda não há alterações registradas.</p>}
+            {(history.data?.items?.length ?? 0) > 0 && <ol className="mt-2 divide-y divide-slate-200">
+              {history.data!.items.map((item) => <li key={item.id} className="grid gap-1 py-2 text-sm sm:grid-cols-[1fr_auto]">
+                <span className="text-slate-800">{item.type}{item.environmentId ? ' · ' + item.environmentId : ''}{item.result ? ' · ' + item.result : ''}</span>
+                <time className="text-xs text-slate-500" dateTime={item.occurredAt}>{new Date(item.occurredAt).toLocaleString()}</time>
+                <span className="text-xs text-slate-500 sm:col-span-2">{item.actorName || 'Sistema'}</span>
+              </li>)}
+            </ol>}
+          </section>
         </>
       )}
     </section>

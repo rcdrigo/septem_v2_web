@@ -1,4 +1,8 @@
-import { useEffect, useState } from 'react';
+import { BusinessHoursEditor } from '@/components/business-calendar/BusinessHoursEditor';
+import { CalendarLocationFields } from '@/components/business-calendar/CalendarLocationFields';
+import { validateBusinessHours } from '@/components/business-calendar/business-hours';
+import { businessHoursFromSettings, validateCalendarLocation } from '@/lib/business-calendar';
+import { Children, createContext, isValidElement, useContext, useEffect, useState } from 'react';
 import { Save, Building2, Mail, HardDrive, Loader2, Send, PlugZap, ShieldCheck } from 'lucide-react';
 import { toast } from '@/stores/toast';
 import { useDocumentTitle } from '@/lib/use-document-title';
@@ -8,15 +12,17 @@ import { ApiError } from '@/lib/api';
 import {
   useSettings,
   useSaveOpenRouter,
+  settingsFieldPolicy,
+  settingsSectionEditable,
+  settingsSectionVisible,
   type SettingsOpenRouter,
+  type SettingsPolicy,
   useSaveGeneral,
   useSaveEmail,
   useTestEmail,
   useSaveStorage,
   useTestStorage,
   useSaveSecurity,
-  parseDays,
-  WEEKDAYS,
   type GeneralPayload,
   type EmailPayload,
   type SettingsEmail,
@@ -28,6 +34,17 @@ import { ContextHelp } from '@/components/guide/ContextHelp';
 
 // Merge: as duas abas novas convivem — `integracoes` (fase 10) e `openrouter` (agente de IA).
 type TabKey = 'geral' | 'email' | 'arquivos' | 'seguranca' | 'integracoes' | 'openrouter';
+
+const POLICY_SECTION: Record<TabKey, string> = {
+  geral: 'general',
+  email: 'email',
+  integracoes: 'integrations',
+  arquivos: 'storage',
+  openrouter: 'openrouter',
+  seguranca: 'security',
+};
+
+const PolicyScopeContext = createContext<{ section: string; policies?: Record<string, SettingsPolicy> } | null>(null);
 
 const TABS: Array<{ key: TabKey; label: string; icon: typeof Building2 }> = [
   { key: 'geral', label: 'Informações gerais', icon: Building2 },
@@ -47,6 +64,10 @@ export function ParametrosPage() {
   useDocumentTitle('Parâmetros do sistema');
   const [tab, setTab] = useState<TabKey>('geral');
   const { data, isLoading } = useSettings();
+  const visibleTabs = TABS.filter((item) =>
+    settingsSectionVisible(data?.policies, POLICY_SECTION[item.key]),
+  );
+  const activeTab = visibleTabs.find((item) => item.key === tab) ?? visibleTabs[0];
 
   return (
     <div className="flex h-full flex-col">
@@ -56,26 +77,24 @@ export function ParametrosPage() {
           <ContextHelp manual="parametros-seguranca" section="configurar-parametros" label="Abrir manual de parâmetros e segurança" />
         </div>
         <p className="mt-0.5 text-sm text-slate-500">Identidade, expediente, e-mail, arquivos, integrações, segurança e agente de IA.</p>
-        {/* Merge: as classes responsivas são da fase 10 e ficam — com SEIS abas, `overflow-x-auto`
-            sozinho empurrava as últimas fora da tela em 375px, e há suíte de UI medindo isso. */}
         <nav className="-mb-4 mt-3 flex flex-wrap gap-1 sm:flex-nowrap sm:overflow-x-auto" role="tablist" aria-label="Seções de parâmetros">
-          {TABS.map((t) => {
-            const Icon = t.icon;
-            const active = tab === t.key;
+          {visibleTabs.map((item) => {
+            const Icon = item.icon;
+            const active = activeTab?.key === item.key;
             return (
               <button
-                key={t.key}
+                key={item.key}
                 type="button"
                 role="tab"
                 aria-selected={active}
-                onClick={() => setTab(t.key)}
+                onClick={() => setTab(item.key)}
                 className={`flex shrink-0 items-center gap-1.5 border-b-2 px-2 py-2 text-xs font-medium transition-colors sm:px-3 sm:text-sm ${
                   active
                     ? 'border-slate-900 text-slate-900'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Icon size={15} className="hidden sm:block" /> {t.label}
+                <Icon size={15} className="hidden sm:block" /> {item.label}
               </button>
             );
           })}
@@ -88,15 +107,38 @@ export function ParametrosPage() {
             <Loader2 size={15} className="animate-spin" /> Carregando parâmetros...
           </p>
         )}
-        {data && tab === 'geral' && <GeralTab data={data.general} />}
-        {data && tab === 'email' && <EmailTab data={data.email} />}
-        {data && tab === 'arquivos' && <ArquivosTab data={data.storage} />}
-        {data && tab === 'openrouter' && <OpenRouterTab data={data.openRouter} />}
-        {data && tab === 'seguranca' && <SegurancaTab data={data.security} />}
-        {tab === 'integracoes' && <IntegracoesTab />}
+        {!isLoading && visibleTabs.length === 0 && (
+          <p className="text-sm text-slate-500">Nenhuma seção de parâmetros está disponível para este ambiente.</p>
+        )}
+        {data && activeTab?.key === 'geral' && data.general && (
+          <PolicyScope section={POLICY_SECTION.geral} policies={data.policies}><GeralTab data={data.general} /></PolicyScope>
+        )}
+        {data && activeTab?.key === 'email' && data.email && (
+          <PolicyScope section={POLICY_SECTION.email} policies={data.policies}><EmailTab data={data.email} /></PolicyScope>
+        )}
+        {data && activeTab?.key === 'arquivos' && data.storage && (
+          <PolicyScope section={POLICY_SECTION.arquivos} policies={data.policies}><ArquivosTab data={data.storage} /></PolicyScope>
+        )}
+        {data && activeTab?.key === 'openrouter' && data.openRouter && (
+          <PolicyScope section={POLICY_SECTION.openrouter} policies={data.policies}><OpenRouterTab data={data.openRouter} /></PolicyScope>
+        )}
+        {data && activeTab?.key === 'seguranca' && data.security && (
+          <PolicyScope section={POLICY_SECTION.seguranca} policies={data.policies}><SegurancaTab data={data.security} /></PolicyScope>
+        )}
+        {data && activeTab?.key === 'integracoes' && (
+          <PolicyScope section={POLICY_SECTION.integracoes} policies={data.policies}><IntegracoesTab /></PolicyScope>
+        )}
       </div>
     </div>
   );
+}
+
+function PolicyScope({ section, policies, children }: {
+  section: string;
+  policies?: Record<string, SettingsPolicy>;
+  children: React.ReactNode;
+}) {
+  return <PolicyScopeContext.Provider value={{ section, policies }}>{children}</PolicyScopeContext.Provider>;
 }
 
 /**
@@ -143,6 +185,8 @@ function IntegracoesTab() {
 
 function EmailTab({ data }: { data: SettingsEmail }) {
   const save = useSaveEmail();
+  const policies = useCurrentPolicies();
+  const canEdit = settingsSectionEditable(policies, 'email');
   const test = useTestEmail();
 
   const [form, setForm] = useState<EmailPayload>(() => ({ ...data, password: null }));
@@ -287,11 +331,12 @@ function EmailTab({ data }: { data: SettingsEmail }) {
             placeholder="destinatario@exemplo.gov.br"
             className={inputCls}
             name="testTo"
+            disabled={!canEdit || !settingsFieldPolicy(policies, 'email', 'testTo').editable}
           />
           <button
             type="button"
             onClick={onTest}
-            disabled={test.isPending}
+            disabled={test.isPending || !canEdit || !settingsFieldPolicy(policies, 'email', 'testTo').editable}
             className="flex shrink-0 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
           >
             {test.isPending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} Enviar teste
@@ -301,7 +346,7 @@ function EmailTab({ data }: { data: SettingsEmail }) {
 
       <button
         type="submit"
-        disabled={save.isPending}
+        disabled={save.isPending || !canEdit}
         className="flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-60"
       >
         {save.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Salvar
@@ -312,6 +357,7 @@ function EmailTab({ data }: { data: SettingsEmail }) {
 
 function SegurancaTab({ data }: { data: SettingsSecurity }) {
   const save = useSaveSecurity();
+  const canEdit = settingsSectionEditable(useCurrentPolicies(), 'security');
   const [form, setForm] = useState<SettingsSecurity>(data);
 
   useEffect(() => setForm(data), [data]);
@@ -385,7 +431,7 @@ function SegurancaTab({ data }: { data: SettingsSecurity }) {
 
       <button
         type="submit"
-        disabled={save.isPending}
+        disabled={save.isPending || !canEdit}
         className="flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-60"
       >
         {save.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Salvar
@@ -396,6 +442,8 @@ function SegurancaTab({ data }: { data: SettingsSecurity }) {
 
 function ArquivosTab({ data }: { data: SettingsStorage }) {
   const save = useSaveStorage();
+  const policies = useCurrentPolicies();
+  const canEdit = settingsSectionEditable(policies, 'storage');
   const test = useTestStorage();
 
   const [form, setForm] = useState<StoragePayload>(() => ({ ...data, secretKey: null }));
@@ -505,10 +553,10 @@ function ArquivosTab({ data }: { data: SettingsStorage }) {
       </Card>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={save.isPending} className="flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-60">
+        <button type="submit" disabled={save.isPending || !canEdit} className="flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-60">
           {save.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Salvar
         </button>
-        <button type="button" onClick={onTest} disabled={test.isPending} className="flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60">
+        <button type="button" onClick={onTest} disabled={test.isPending || !canEdit} className="flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60">
           {test.isPending ? <Loader2 size={16} className="animate-spin" /> : <PlugZap size={16} />} Testar conexão
         </button>
       </div>
@@ -523,34 +571,31 @@ function detalhe(err: unknown): string | undefined {
 
 function GeralTab({ data }: { data: GeneralPayload & { tenantId: string; host: string | null } }) {
   const save = useSaveGeneral();
+  const policies = useCurrentPolicies();
+  const canEdit = settingsSectionEditable(policies, 'general');
+  const calendarPolicy = settingsFieldPolicy(policies, 'general', 'businessHours');
+  const locationFields = ['stateCode', 'cityCode', 'cityName', 'timeZoneId'];
+  const locationVisible = locationFields.every(field => settingsFieldPolicy(policies, 'general', field).visible);
+  const locationEditable = locationFields.every(field => settingsFieldPolicy(policies, 'general', field).editable);
   const refreshTenant = useSessionStore((s) => s.refreshTenant);
 
   const [form, setForm] = useState<GeneralPayload>(() => pick(data));
-  const [days, setDays] = useState<number[]>(() => parseDays(data.businessDays));
 
   // Se outra aba/salvamento atualizar o cache, refletir aqui.
   useEffect(() => {
     setForm(pick(data));
-    setDays(parseDays(data.businessDays));
   }, [data]);
 
   const set = <K extends keyof GeneralPayload>(k: K, v: GeneralPayload[K]) => setForm((f) => ({ ...f, [k]: v }));
 
-  const toggleDay = (d: number) =>
-    setDays((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d].sort()));
-
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (days.length === 0) {
-      toast.error('Selecione ao menos um dia útil.');
-      return;
-    }
-    if (form.businessHourEnd <= form.businessHourStart) {
-      toast.error('O fim do expediente deve ser depois do início.');
-      return;
-    }
+    const calendarProblem = calendarPolicy.editable ? validateBusinessHours(businessHoursFromSettings(form))[0] : null;
+    const locationChanged = locationFields.some(field => form[field as keyof GeneralPayload] !== data[field as keyof GeneralPayload]);
+    const locationProblem = locationEditable && locationChanged ? validateCalendarLocation(form) : null;
+    if (calendarProblem || locationProblem) { toast.error(calendarProblem || locationProblem || 'Confira o calendário.'); return; }
     try {
-      await save.mutateAsync({ ...form, businessDays: days.join(',') });
+      await save.mutateAsync(form);
       await refreshTenant(); // logo/nome/cor mudam no topo sem precisar recarregar
       toast.success('Parâmetros salvos.');
     } catch (err) {
@@ -637,63 +682,18 @@ function GeralTab({ data }: { data: GeneralPayload & { tenantId: string; host: s
         </div>
       </Card>
 
-      <Card title="Expediente" hint="Base para prazos das tarefas: contam apenas horas dentro do expediente, nos dias úteis.">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Início" required>
-            <select
-              value={form.businessHourStart}
-              onChange={(e) => set('businessHourStart', Number(e.target.value))}
-              className={inputCls}
-              name="businessHourStart"
-            >
-              {Array.from({ length: 24 }, (_, h) => (
-                <option key={h} value={h}>{`${String(h).padStart(2, '0')}:00`}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Fim" required>
-            <select
-              value={form.businessHourEnd}
-              onChange={(e) => set('businessHourEnd', Number(e.target.value))}
-              className={inputCls}
-              name="businessHourEnd"
-            >
-              {Array.from({ length: 24 }, (_, i) => i + 1).map((h) => (
-                <option key={h} value={h}>{`${String(h).padStart(2, '0')}:00`}</option>
-              ))}
-            </select>
-          </Field>
-        </div>
-        <div className="mt-4">
-          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">Dias úteis</p>
-          <div className="flex flex-wrap gap-1.5">
-            {WEEKDAYS.map((d) => {
-              const on = days.includes(d.value);
-              return (
-                <button
-                  key={d.value}
-                  type="button"
-                  aria-pressed={on}
-                  aria-label={d.label}
-                  onClick={() => toggleDay(d.value)}
-                  className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
-                    on
-                      ? 'border-slate-900 bg-slate-900 text-white'
-                      : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {d.short}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </Card>
+        {calendarPolicy.visible && <Card title="Horas úteis" hint="As alterações valem somente para novos cálculos neste ambiente. Os vencimentos já calculados são preservados.">
+          <BusinessHoursEditor value={businessHoursFromSettings(form)} onChange={businessHours => set('businessHours', businessHours)} disabled={!calendarPolicy.editable} />
+        </Card>}
+        {locationVisible && <Card title="Calendário de feriados">
+          <CalendarLocationFields value={form} onChange={location => setForm(current => ({ ...current, ...location }))} disabled={!locationEditable} required={!!form.stateCode || !!form.cityCode} />
+          {!form.cityCode && <p className="mt-3 text-sm text-amber-800">Complete a localização para considerar feriados. Até lá, o cálculo continua usando a semana configurada.</p>}
+        </Card>}
 
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
-          disabled={save.isPending}
+          disabled={save.isPending || !canEdit}
           className="flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-60"
         >
           {save.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Salvar
@@ -708,7 +708,7 @@ function GeralTab({ data }: { data: GeneralPayload & { tenantId: string; host: s
 }
 
 const inputCls =
-  'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-500';
+  'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500';
 
 function Card({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -720,16 +720,47 @@ function Card({ title, hint, children }: { title: string; hint?: string; childre
   );
 }
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({ label, required, children, field }: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+  field?: string;
+}) {
+  const scope = useContext(PolicyScopeContext);
+  const name = field ?? findNamedControl(children);
+  const policy = scope
+    ? settingsFieldPolicy(scope.policies, scope.section, name)
+    : { visible: true, editable: true };
+  if (!policy.visible) return null;
+
   return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-        {label}
-        {required && <span className="ml-0.5 text-rose-500">*</span>}
-      </span>
-      {children}
-    </label>
+    <fieldset disabled={!policy.editable} className={`m-0 min-w-0 border-0 p-0 ${policy.editable ? '' : 'opacity-60'}`}>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+          {label}
+          {required && <span className="ml-0.5 text-rose-500">*</span>}
+        </span>
+        {children}
+      </label>
+    </fieldset>
   );
+}
+
+function findNamedControl(children: React.ReactNode): string | undefined {
+  let found: string | undefined;
+  Children.forEach(children, (child) => {
+    if (found || !isValidElement<{ name?: string; children?: React.ReactNode }>(child)) return;
+    if (typeof child.props.name === 'string') {
+      found = child.props.name;
+      return;
+    }
+    found = findNamedControl(child.props.children);
+  });
+  return found;
+}
+
+function useCurrentPolicies() {
+  return useContext(PolicyScopeContext)?.policies;
 }
 
 function pick(d: GeneralPayload): GeneralPayload {
@@ -743,11 +774,18 @@ function pick(d: GeneralPayload): GeneralPayload {
     businessHourStart: d.businessHourStart,
     businessHourEnd: d.businessHourEnd,
     businessDays: d.businessDays,
+    businessHours: businessHoursFromSettings(d),
+    stateCode: d.stateCode,
+    cityCode: d.cityCode,
+    cityName: d.cityName,
+    timeZoneId: d.timeZoneId,
   };
 }
 
 function OpenRouterTab({ data }: { data: SettingsOpenRouter }) {
   const save = useSaveOpenRouter();
+  const policies = useCurrentPolicies();
+  const canEdit = settingsSectionEditable(policies, 'openrouter');
   const [form, setForm] = useState(data);
   const [apiKey, setApiKey] = useState('');
   const [clearKey, setClearKey] = useState(false);
@@ -769,32 +807,33 @@ function OpenRouterTab({ data }: { data: SettingsOpenRouter }) {
   return (
     <form onSubmit={onSubmit} className="max-w-3xl space-y-5" data-testid="form-openrouter">
       <Card title="Agente de IA — OpenRouter" hint="Configuração deste ambiente para gerar JavaScript no chat dos formulários. As alterações valem na próxima solicitação, sem reiniciar a aplicação.">
-        <fieldset disabled={save.isPending} className="grid gap-4 sm:grid-cols-2">
-          <Field label={data.apiKeySet ? 'Chave da API (configurada)' : 'Chave da API'}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field field="apiKey" label={data.apiKeySet ? 'Chave da API (configurada)' : 'Chave da API'}>
             <input type="password" name="openRouterApiKey" autoComplete="new-password" maxLength={4096}
               value={apiKey} disabled={clearKey} onChange={(e) => setApiKey(e.target.value)} className={inputCls}
               placeholder={data.apiKeySet ? '•••••••• (em branco mantém a atual)' : 'Chave do OpenRouter'} />
           </Field>
-          <Field label="Modelo" required>
+          <Field field="model" label="Modelo" required>
             <input required name="openRouterModel" maxLength={200} value={form.model ?? ''}
               onChange={(e) => setForm({ ...form, model: e.target.value })} className={inputCls} placeholder="provedor/modelo" />
           </Field>
-          <Field label="URL do site (opcional)">
+          <Field field="siteUrl" label="URL do site (opcional)">
             <input type="url" name="openRouterSiteUrl" maxLength={2048} value={form.siteUrl ?? ''}
               onChange={(e) => setForm({ ...form, siteUrl: e.target.value || null })} className={inputCls} placeholder="https://seu-site.com.br" />
           </Field>
-          <Field label="Limite de tokens da resposta" required>
+          <Field field="maxTokens" label="Limite de tokens da resposta" required>
             <input required type="number" name="openRouterMaxTokens" min={1} max={1000000} step={1} value={form.maxTokens}
               onChange={(e) => setForm({ ...form, maxTokens: Number(e.target.value) })} className={inputCls} />
           </Field>
-          {data.apiKeySet && <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2">
-            <input type="checkbox" checked={clearKey} onChange={(e) => { setClearKey(e.target.checked); setApiKey(''); }} />
+          {data.apiKeySet && settingsFieldPolicy(policies, 'openrouter', 'apiKey').visible && <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2">
+            <input type="checkbox" disabled={!settingsFieldPolicy(policies, 'openrouter', 'apiKey').editable || save.isPending}
+              checked={clearKey} onChange={(e) => { setClearKey(e.target.checked); setApiKey(''); }} />
             Remover a chave salva ao salvar (desativa o agente)
           </label>}
-        </fieldset>
+        </div>
         <p className="mt-4 text-xs text-slate-500">A chave é armazenada cifrada e não é devolvida ao navegador. Use o identificador do modelo no OpenRouter, com suporte a respostas estruturadas (JSON Schema).</p>
       </Card>
-      <button type="submit" disabled={save.isPending} className="flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60">
+      <button type="submit" disabled={save.isPending || !canEdit} className="flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60">
         {save.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Salvar
       </button>
     </form>

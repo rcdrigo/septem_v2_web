@@ -44,7 +44,8 @@ import { PlatformClientePage } from './pages/platform/PlatformClientePage';
 import { PlatformAmbientePage } from './pages/platform/PlatformAmbientePage';
 import { PlatformNovoClientePage } from './pages/platform/PlatformNovoClientePage';
 import { PlatformAceitarConvitePage } from './pages/platform/PlatformAceitarConvitePage';
-import { PlatformCatalogoPage } from './pages/platform/PlatformCatalogoPage';
+import { PlatformSuperAdminsPage } from './pages/platform/PlatformSuperAdminsPage';
+import { PlatformSuperAdminSetupPage } from './pages/platform/PlatformSuperAdminSetupPage';
 import { SearchX } from 'lucide-react';
 import { childPath, routes } from './lib/routes';
 
@@ -94,8 +95,9 @@ export const router = createBrowserRouter(
     // Ambiente inativado: fora do shell, sem bootstrap de tenant e sem menu.
     { path: routes.environmentInactive, element: <AmbienteInativoPage /> },
     { path: routes.platformLogin, element: <PlatformLoginPage /> },
-    // Aceite do convite: fora da guarda, porque quem chega ainda não tem credencial.
-    { path: routes.platformAcceptInvite, element: <PlatformAceitarConvitePage /> },
+      // Aceite do convite: fora da guarda, porque quem chega ainda não tem credencial.
+      { path: routes.platformAcceptInvite, element: <PlatformAceitarConvitePage /> },
+      { path: routes.platformSetup, element: <PlatformSuperAdminSetupPage /> },
     {
       path: '/platform',
       element: <PlatformLayout />,
@@ -105,7 +107,7 @@ export const router = createBrowserRouter(
         { path: 'clients/new', element: <PlatformNovoClientePage /> },
         { path: 'clients/:id', element: <PlatformClientePage /> },
         { path: 'environments/:tenantId', element: <PlatformAmbientePage /> },
-        { path: 'process-catalog', element: <PlatformCatalogoPage /> },
+          { path: 'users', element: <PlatformSuperAdminsPage /> },
       ],
     },
     {

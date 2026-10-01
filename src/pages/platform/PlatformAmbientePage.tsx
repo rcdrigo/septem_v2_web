@@ -20,6 +20,7 @@ import {
 } from '@/lib/api/platform-clients';
 import { routes } from '@/lib/routes';
 import { useDocumentTitle } from '@/lib/use-document-title';
+import { PlatformEnvironmentAdministration } from './PlatformEnvironmentAdministration';
 
 /**
  * Detalhe do ambiente na área central: é daqui que o super admin bloqueia novas
@@ -174,7 +175,7 @@ export function PlatformAmbientePage() {
             <AcaoModo
               ativa={modo === 'inactive'}
               titulo="Inativar completamente"
-              descricao="Ninguém acessa o ambiente e nenhum efeito automático dispara."
+              descricao="Clientes não acessam e efeitos automáticos param; o acesso autorizado da Septem permanece."
               icone={<Ban className="h-4 w-4" />}
               onClick={() => void aplicar('inactive')}
               testid="modo-inactive"
@@ -182,6 +183,10 @@ export function PlatformAmbientePage() {
               perigosa
             />
           </div>
+
+          {ambiente.data.provisioningState === 'ready' && (
+            <PlatformEnvironmentAdministration key={ambiente.data.tenantId} tenantId={ambiente.data.tenantId} clientId={ambiente.data.clientId} />
+          )}
 
           <div className="mt-8" data-testid="dominios">
             <h2 className="text-sm font-semibold text-slate-900">Endereços</h2>

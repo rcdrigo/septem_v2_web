@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { uid } from '@/lib/uid';
 
-export type ToastKind = 'success' | 'error' | 'info' | 'warning';
+export type ToastKind = 'success' | 'error' | 'info' | 'warning' | 'neutral';
 
 export type Toast = {
   id: string;
@@ -36,6 +36,7 @@ export const toast = {
   error: (msg: string) => pushAndAutoDismiss('error', msg),
   info: (msg: string) => pushAndAutoDismiss('info', msg),
   warning: (msg: string) => pushAndAutoDismiss('warning', msg),
+  neutral: (msg: string) => pushAndAutoDismiss('neutral', msg),
 };
 
 function pushAndAutoDismiss(kind: ToastKind, message: string) {

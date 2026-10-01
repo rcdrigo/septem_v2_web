@@ -35,6 +35,9 @@ export function LoginPage() {
   const status = useSessionStore((s) => s.status);
   const bootstrap = useSessionStore((s) => s.bootstrap);
   const tenantName = tenant?.clienteNome?.trim() || 'Prefeitura Municipal';
+  const tenantAccent = tenant?.primaryColor && /^#[0-9a-f]{6}$/i.test(tenant.primaryColor)
+    ? tenant.primaryColor
+    : undefined;
   useDocumentTitle(validatingDocument ? 'Validar documento' : 'Entrar');
 
   // Branding do tenant no /login acessado direto: o bootstrap só rodava no
@@ -273,10 +276,12 @@ export function LoginPage() {
           </div>
 
           <div className="login-tenant-brand">
+            {tenant?.logoUrl && <img src={tenant.logoUrl} alt="" className="h-10 max-w-36 shrink-0 rounded bg-white/95 p-1 object-contain" />}
             <div>
               <strong>{tenantName}</strong>
               <span>Gestão integrada</span>
             </div>
+            {tenantAccent && <span aria-hidden="true" className="ml-auto h-1 w-6 shrink-0 self-center rounded-full" style={{ backgroundColor: tenantAccent }} />}
           </div>
 
           <div className="login-hero-copy">
@@ -308,7 +313,9 @@ export function LoginPage() {
         {/* ── Formulário (direita) ─────────────────────────────────────────── */}
         <main className="login-form-panel" data-step={step}>
           <div className="login-mobile-brand">
+            {tenant?.logoUrl && <img src={tenant.logoUrl} alt="" className="h-9 max-w-32 shrink-0 rounded bg-white/95 p-1 object-contain" />}
             <strong>{tenantName}</strong>
+            {tenantAccent && <span aria-hidden="true" className="ml-auto h-1 w-6 shrink-0 self-center rounded-full" style={{ backgroundColor: tenantAccent }} />}
           </div>
 
           {step === 'validacao' && (

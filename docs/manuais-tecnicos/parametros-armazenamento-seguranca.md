@@ -33,11 +33,17 @@ Use imagens hospedadas em endereço estável e acessível pelos usuários extern
 
 A **URL da imagem de destaque** e a **Descrição do sistema** compõem a apresentação do portal. Escreva uma descrição curta, institucional e compreensível. Confira contraste, recorte e carregamento em desktop e celular.
 
-### Expediente
+### Calendário de horas úteis
 
-Defina hora inicial, hora final e dias úteis. Esses valores formam a base para tarefas configuradas para respeitar horas úteis. O horário final deve ser posterior ao inicial.
+Defina os períodos de cada dia da semana, com horas e minutos. Um dia pode ter mais de um período, como **08:00–12:00 e 14:00–18:00**; o intervalo entre eles não entra no cálculo. Um dia sem períodos não conta horas úteis. Os períodos não podem se sobrepor nem atravessar a meia-noite.
 
-Antes de mudar o expediente, avalie prazos em andamento e simule tarefas com alertas. Feriados específicos não são configurados nesta tela.
+Para preencher rapidamente, selecione os dias que compartilham os mesmos horários e aplique os períodos de uma vez. Depois, ajuste os dias individualmente, por exemplo para usar **09:00–12:00** somente no sábado.
+
+O calendário padrão do cliente é copiado na criação de cada ambiente. As alterações nesta tela valem somente para o ambiente atual e para novos cálculos: não sincronizam os outros ambientes nem alteram vencimentos já calculados. O admin do cliente faz essa edição na administração do seu ambiente, sem acesso à área dos super admins.
+
+Estado, município e fuso horário identificam a localidade usada no cálculo. Clientes existentes devem completar a localização antes de utilizar o novo cálculo com feriados. Os horários seguem o fuso do cliente, independentemente do fuso do usuário.
+
+Os feriados nacionais, estaduais e municipais aplicáveis são consultados ao calcular o prazo de uma tarefa que respeita horas úteis, inclusive nas datas seguintes necessárias para completar esse prazo. Um feriado exclui o dia inteiro. Se a consulta estiver indisponível, o cálculo usa a semana padrão; o vencimento gerado também é preservado. Feriados não representam um status de aberto ou fechado do cliente e não são consultados durante seu cadastro. Recessos e horários especiais por data não fazem parte desta etapa.
 
 ## Aba E-mail
 

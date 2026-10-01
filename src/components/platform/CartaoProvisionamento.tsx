@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, RotateCw } from 'lucide-react';
 import { useOperation, useRetryOperation, type OperationStep } from '@/lib/api/platform-clients';
 
@@ -13,17 +14,22 @@ const ROTULO: Record<string, string> = {
   'criar-banco': 'Criando o banco',
   migrar: 'Aplicando a estrutura',
   'cadastros-essenciais': 'Cadastros essenciais',
+  'configuracao-inicial': 'Configuração inicial',
+  armazenamento: 'Verificando armazenamento',
   funcionalidades: 'Funcionalidades contratadas',
   'processos-do-catalogo': 'Processos do catálogo',
   'dados-ficticios': 'Dados fictícios',
   'vinculo-do-admin': 'Vínculo do administrador',
   prontidao: 'Verificando prontidão',
+  dns: 'Configurando endereço',
+  https: 'Verificando HTTPS',
   'convite-do-admin': 'Convite do administrador',
 };
 
 export function CartaoProvisionamento({ operationId, titulo }: { operationId: string; titulo: string }) {
   const { data } = useOperation(operationId, true);
   const retry = useRetryOperation();
+  const [retryError, setRetryError] = useState<string | null>(null);
 
   const emAndamento = data?.status === 'running' || data?.status === 'queued';
   const pronto = data?.status === 'completed';
@@ -65,12 +71,13 @@ export function CartaoProvisionamento({ operationId, titulo }: { operationId: st
           type="button"
           data-testid="operacao-retomar"
           disabled={retry.isPending}
-          onClick={() => void retry.mutateAsync(operationId)}
+          onClick={() => { setRetryError(null); void retry.mutateAsync(operationId).catch(() => setRetryError('Não foi possível retomar o provisionamento. Confira a configuração e tente novamente.')); }}
           className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-md border border-slate-300 px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
         >
           <RotateCw className="h-3.5 w-3.5" /> Retomar de onde parou
         </button>
       )}
+      {retryError && <p role="alert" className="mt-2 text-xs text-red-700">{retryError}</p>}
     </article>
   );
 }

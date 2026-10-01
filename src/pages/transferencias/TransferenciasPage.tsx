@@ -198,7 +198,7 @@ export function TransferenciasPage() {
         {passo === 0 && (
           <fieldset className="grid gap-2" data-testid="transf-tipos">
             <legend className="mb-1 text-sm font-medium text-slate-800">O que você quer fazer?</legend>
-            {(Object.keys(TRANSFER_KIND_LABEL) as TransferKind[]).map((k) => (
+            {(['promote', 'sync_to_staging'] as TransferKind[]).map((k) => (
               <label key={k} className="flex items-start gap-2 rounded-md border border-slate-200 p-2 text-sm">
                 <input type="radio" name="kind" value={k} checked={kind === k}
                        data-testid={`transf-tipo-${k}`}

@@ -6,17 +6,19 @@ const ICONS: Record<ToastKind, typeof CheckCircle2> = {
   error: XCircle,
   info: Info,
   warning: TriangleAlert,
+  neutral: Info,
 };
 
-const COLORS: Record<ToastKind, { ring: string; icon: string }> = {
-  success: { ring: 'border-emerald-200 bg-emerald-50', icon: 'text-emerald-600' },
-  error: { ring: 'border-rose-200 bg-rose-50', icon: 'text-rose-600' },
-  info: { ring: 'border-sky-200 bg-sky-50', icon: 'text-sky-600' },
-  warning: { ring: 'border-amber-200 bg-amber-50', icon: 'text-amber-600' },
+const COLORS: Record<ToastKind, { ring: string; foreground: string }> = {
+  success: { ring: 'border-emerald-200 bg-emerald-50', foreground: 'text-emerald-800' },
+  error: { ring: 'border-rose-200 bg-rose-50', foreground: 'text-rose-800' },
+  info: { ring: 'border-sky-200 bg-sky-50', foreground: 'text-sky-800' },
+  warning: { ring: 'border-yellow-200 bg-yellow-50', foreground: 'text-yellow-800' },
+  neutral: { ring: 'border-gray-200 bg-gray-50', foreground: 'text-gray-800' },
 };
 
 /**
- * Stack de toasts no canto inferior-direito. Cada toast tem auto-dismiss
+ * Stack de toasts centralizada no topo da página. Cada toast tem auto-dismiss
  * (TTL gerenciado pelo store).
  */
 export function Toaster() {
@@ -25,23 +27,24 @@ export function Toaster() {
 
   return (
     <div
-      className="pointer-events-none fixed bottom-4 right-4 z-[1100] flex w-[360px] flex-col gap-2"
+      className="pointer-events-none fixed top-4 left-1/2 z-[1100] flex w-max max-w-[calc(100%-2rem)] -translate-x-1/2 flex-col items-center gap-2"
       aria-live="polite"
     >
       {toasts.map((t) => {
-        const Icon = ICONS[t.kind];
-        const colors = COLORS[t.kind];
+        const Icon = ICONS[t.kind] ?? ICONS.neutral;
+        const colors = COLORS[t.kind] ?? COLORS.neutral;
         return (
           <div
             key={t.id}
             role="status"
             className={[
-              'pointer-events-auto flex items-start gap-3 rounded-md border bg-white px-3 py-2 shadow-lg transition-all',
+              'pointer-events-auto flex max-w-full items-start gap-3 rounded-md border px-3 py-2 shadow-lg transition-all',
               colors.ring,
+              colors.foreground,
             ].join(' ')}
           >
-            <Icon size={18} className={colors.icon + ' mt-0.5 shrink-0'} />
-            <div className="flex-1 text-sm text-slate-800">{t.message}</div>
+            <Icon size={18} className="mt-0.5 shrink-0" />
+            <div className="min-w-0 flex-1 break-words text-sm font-bold">{t.message}</div>
             {t.actionLabel && (
               <button
                 type="button"
@@ -49,7 +52,7 @@ export function Toaster() {
                   t.onAction?.();
                   dismiss(t.id);
                 }}
-                className="text-xs font-semibold text-slate-700 hover:underline"
+                className="shrink-0 text-xs font-bold hover:underline"
               >
                 {t.actionLabel}
               </button>
@@ -58,7 +61,7 @@ export function Toaster() {
               type="button"
               aria-label="Fechar"
               onClick={() => dismiss(t.id)}
-              className="text-slate-400 hover:text-slate-600"
+              className="mt-0.5 shrink-0 hover:opacity-75"
             >
               <X size={14} />
             </button>

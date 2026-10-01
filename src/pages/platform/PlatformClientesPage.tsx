@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { usePlatformSession } from '@/stores/platform-session';
 import { Building2, Loader2 } from 'lucide-react';
 import { usePlatformClients } from '@/lib/api/platform-clients';
 import { routes } from '@/lib/routes';
@@ -7,6 +8,7 @@ import { useDocumentTitle } from '@/lib/use-document-title';
 /** Clientes da plataforma — leitura (Fase 2a). O cadastro nasce na Fase 11a. */
 export function PlatformClientesPage() {
   const { data, isLoading, isError } = usePlatformClients();
+  const globalAccess = usePlatformSession((state) => state.identity?.globalAccess === true);
   useDocumentTitle('Clientes · área central');
 
   return (
@@ -17,13 +19,13 @@ export function PlatformClientesPage() {
           <span className="text-sm text-slate-500" data-testid="platform-clientes-total">
             {data ? `${data.total} cliente${data.total === 1 ? '' : 's'}` : ''}
           </span>
-          <Link
+          {globalAccess && <Link
             to={routes.platformNewClient}
             data-testid="novo-cliente"
             className="inline-flex min-h-11 items-center rounded-md bg-slate-900 px-3 text-sm font-medium text-white hover:bg-slate-800"
           >
             Novo cliente
-          </Link>
+          </Link>}
         </span>
       </header>
 
@@ -44,8 +46,7 @@ export function PlatformClientesPage() {
           data-testid="platform-clientes-vazio"
           className="rounded-md border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500"
         >
-          Nenhum cliente cadastrado ainda. O cadastro de clientes e o provisionamento de ambientes chegam na
-          fase de provisionamento.
+          Nenhum cliente está disponível neste escopo.
         </p>
       )}
 
@@ -61,8 +62,9 @@ export function PlatformClientesPage() {
                   <Building2 className="h-4 w-4 text-slate-400" />
                   {c.name}
                 </span>
-                <span className="text-sm text-slate-500">
-                  {c.environments} ambiente{c.environments === 1 ? '' : 's'}
+                <span className="flex items-center justify-between gap-3 text-sm text-slate-500">
+                  <span>{c.environments} ambiente{c.environments === 1 ? '' : 's'}</span>
+                  <span className={c.status === 'active' ? 'text-emerald-700' : 'text-amber-700'}>{c.status === 'active' ? 'Ativo' : 'Inativado'}</span>
                 </span>
               </Link>
             </li>

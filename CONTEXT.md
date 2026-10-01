@@ -107,6 +107,18 @@ Classificação do uso do ambiente como produção, homologação ou demonstraç
 Dados de teste opcionais em ambientes de homologação ou demonstração. Ambientes de produção começam apenas com os cadastros essenciais.
 _Evitar_: Dummy data.
 
+## Linguagem — Horas úteis
+
+**Calendário padrão de horas úteis do cliente**:
+Definição inicial dos períodos úteis do cliente, copiada para cada ambiente na sua criação.
+_Evitar_: Status de aberto ou fechado do cliente.
+
+**Calendário de horas úteis do ambiente**:
+Calendário utilizado no cálculo de horas das tarefas de processo e em regras de negócio daquele ambiente. Origina-se do padrão do cliente e pode ser alterado independentemente dos demais ambientes.
+
+**Período útil**:
+Faixa de horário de um dia da semana considerada no cálculo de horas úteis. Um mesmo dia pode conter múltiplos períodos, separados por intervalos não contabilizados.
+
 ## Linguagem — Suporte
 
 **Chamado**:
