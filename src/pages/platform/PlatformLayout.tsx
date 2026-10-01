@@ -1,8 +1,11 @@
 import { useEffect } from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { BookOpen, Building2, LifeBuoy, LogOut, ShieldCheck } from 'lucide-react';
+import { BookOpen, Building2, Inbox, LifeBuoy, LogOut, ShieldCheck } from 'lucide-react';
 import { usePlatformSession } from '@/stores/platform-session';
 import { routes } from '@/lib/routes';
+import { SinoDeNotificacoes } from '@/components/notifications/SinoDeNotificacoes';
+import { Toaster } from '@/components/ui/Toaster';
+import { ConfirmDialogHost } from '@/components/ui/ConfirmDialog';
 
 /**
  * Casca da área central. Deliberadamente **não** reaproveita o `AppShell`: aquele
@@ -46,7 +49,7 @@ export function PlatformLayout() {
 
   // Triagem que cai na raiz da área central vai para o próprio lugar, não para uma recusa.
   if (!ehSuperAdmin && ehSuporte && location.pathname === '/platform')
-    return <Navigate to={routes.platformSupportTeams} replace />;
+    return <Navigate to={papeis.includes('support_triage') ? routes.platformSupportTriage : routes.platformSupportQueue} replace />;
 
   if (!podeEntrar)
     return (
@@ -77,7 +80,12 @@ export function PlatformLayout() {
             <ShieldCheck className="h-5 w-5 text-emerald-400" />
             Septem · área central
           </span>
-          <nav className="flex items-center gap-1 text-sm">
+          {/* flex-wrap: com os itens de suporte a navegação cresce, e no 375 ela precisa quebrar
+              linha em vez de empurrar a página para o lado. */}
+          <nav className="flex flex-wrap items-center gap-1 text-sm">
+            {/* Catálogo e Clientes são do super admin. Quem só faz triagem não vê links que só
+                levariam a uma recusa. */}
+            {ehSuperAdmin && (<>
             <NavLink
               to={routes.platformCatalog}
               data-testid="platform-nav-catalogo"
@@ -99,6 +107,33 @@ export function PlatformLayout() {
                 <Building2 className="h-4 w-4" /> Clientes
               </span>
             </NavLink>
+            </>)}
+            {(ehSuperAdmin || papeis.includes('support_triage')) && (
+              <NavLink
+                to={routes.platformSupportTriage}
+                data-testid="platform-nav-triagem"
+                className={({ isActive }) =>
+                  `rounded-md px-2.5 py-1.5 ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800'}`
+                }
+              >
+                <span className="flex items-center gap-1.5">
+                  <LifeBuoy className="h-4 w-4" /> Triagem
+                </span>
+              </NavLink>
+            )}
+            {(ehSuperAdmin || ehSuporte) && (
+              <NavLink
+                to={routes.platformSupportQueue}
+                data-testid="platform-nav-fila"
+                className={({ isActive }) =>
+                  `rounded-md px-2.5 py-1.5 ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800'}`
+                }
+              >
+                <span className="flex items-center gap-1.5">
+                  <Inbox className="h-4 w-4" /> Fila
+                </span>
+              </NavLink>
+            )}
             <NavLink
               to={routes.platformSupportTeams}
               data-testid="platform-nav-suporte"
@@ -107,11 +142,12 @@ export function PlatformLayout() {
               }
             >
               <span className="flex items-center gap-1.5">
-                <LifeBuoy className="h-4 w-4" /> Suporte
+                <LifeBuoy className="h-4 w-4" /> Equipes
               </span>
             </NavLink>
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">
+            <SinoDeNotificacoes lado="septem" tom="escuro" />
             <span className="hidden text-slate-300 sm:inline" data-testid="platform-identidade">
               {identity?.name}
             </span>
@@ -129,6 +165,10 @@ export function PlatformLayout() {
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         <Outlet />
       </main>
+      {/* Avisos e confirmações da área central. Sem eles, todo toast (sucesso, erro, 409) sumia
+          em silêncio e todo `confirm()` ficava pendurado — a auditoria de 30/09 achou. */}
+      <Toaster />
+      <ConfirmDialogHost />
     </div>
   );
 }

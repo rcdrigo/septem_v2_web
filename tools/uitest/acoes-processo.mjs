@@ -78,7 +78,7 @@ try {
   for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }]) {
     const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h } });
     const page = await ctx.newPage();
-    await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
+    await page.goto(BASE + '/login?returnUrl=/me', { waitUntil: 'networkidle' });
     await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
     await page.fill('input[type=password]', 'admin123');
     await page.click('button[type=submit]');

@@ -5,6 +5,22 @@ let failures = 0;
 function check(ok, msg) { if (!ok) failures++; console.log(`${ok ? '✓' : '✗ FALHOU'} ${msg}`); }
 
 const BASE = 'http://localhost:5173';
+
+// Processo do ITEM 3 criado A CADA RODADA, com o XML exato do caso do dono (tarefa 2 = `bpmn:Task`
+// genérico). Antes a suíte usava o `tres_tarefas_bug` fixo do banco de dev, salvo ANTES da correção do
+// parser — o grafo dele não tem a tarefa 2 (só S → T1 → E) e o processo encerra na tarefa 1. A suíte
+// passava em falso porque uma "tarefa 2" antiga (#104) aparecia na caixa inteira; com a caixa paginada
+// (PENDENCIAS 5.7) o falso positivo sumiu. Salvar de novo pelo produto prova a correção de verdade.
+const KEY3 = `tres_tarefas_${Math.floor(Math.random() * 1e9)}`;
+{
+  const H = { 'Content-Type': 'application/json', 'X-Tenant': 'prefeitura-x' };
+  const auth = await (await fetch('http://localhost:5000/api/v1/auth/login', { method: 'POST', headers: H,
+    body: JSON.stringify({ identifier: 'admin@prefeitura-x.local', password: 'admin123' }) })).json();
+  const xml = `<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:septem="http://septem.app/schema/1.0/bpmn" id="d_${KEY3}" targetNamespace="x"><bpmn:process id="P_${KEY3}" name="Tres Tarefas Bug" isExecutable="true"><bpmn:extensionElements><septem:processConfig status="published" /><septem:formSchema>{"type":"default","schemaVersion":17,"components":[{"type":"textfield","key":"nome","label":"Nome"}]}</septem:formSchema></bpmn:extensionElements><bpmn:startEvent id="S"><bpmn:outgoing>F1</bpmn:outgoing></bpmn:startEvent><bpmn:userTask id="T1" name="tarefa 1"><bpmn:incoming>F1</bpmn:incoming><bpmn:outgoing>F2</bpmn:outgoing></bpmn:userTask><bpmn:task id="T2" name="tarefa 2"><bpmn:incoming>F2</bpmn:incoming><bpmn:outgoing>F3</bpmn:outgoing></bpmn:task><bpmn:endEvent id="E"><bpmn:incoming>F3</bpmn:incoming></bpmn:endEvent><bpmn:sequenceFlow id="F1" sourceRef="S" targetRef="T1" /><bpmn:sequenceFlow id="F2" sourceRef="T1" targetRef="T2" /><bpmn:sequenceFlow id="F3" sourceRef="T2" targetRef="E" /></bpmn:process></bpmn:definitions>`;
+  const r = await fetch('http://localhost:5000/api/v1/workflow/process-definitions/', { method: 'POST',
+    headers: { ...H, Authorization: `Bearer ${auth.accessToken}` }, body: JSON.stringify({ key: KEY3, bpmnXml: xml }) });
+  if (r.status !== 201) throw new Error(`não criou o processo do item 3: ${r.status} ${await r.text()}`);
+}
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
 
 // No mobile o footer de conclusão fica oculto atrás do acionador "Botões de
@@ -28,7 +44,7 @@ async function acionarConclusao(page) {
 }
 
 async function login(page, email = 'admin@prefeitura-x.local', pass = 'admin123') {
-  await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/login?returnUrl=/me', { waitUntil: 'networkidle' });
   await page.fill('input[name=identifier]', email);
   await page.fill('input[type=password]', pass);
   await page.getByRole('button', { name: 'Entrar' }).click();
@@ -131,7 +147,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
 }
 
 // ══ ITEM 3 — Fluxo com 3 tarefas percorrido do início ao fim (web + mobile) ══
-// Usa o processo legado 'tres_tarefas_bug' (tarefa 2 = bpmn:Task genérico), que
+// Usa o processo KEY3 (tarefa 2 = bpmn:Task genérico, criado no topo da suíte), que
 // era exatamente o caso do dono: concluía ao terminar a tarefa 1.
 for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }]) {
   const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 2 });
@@ -139,7 +155,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await login(page);
 
   // inicia o serviço pela UI
-  await page.goto(BASE + '/services/tres_tarefas_bug', { waitUntil: 'networkidle' });
+  await page.goto(BASE + `/services/${KEY3}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('h1', { timeout: 15000 });
   await page.waitForTimeout(800);
   await acionarConclusao(page);
@@ -176,7 +192,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await login(page);
 
   // (a) INÍCIO → "Solicitação iniciada com sucesso"
-  await page.goto(BASE + '/services/tres_tarefas_bug', { waitUntil: 'networkidle' });
+  await page.goto(BASE + `/services/${KEY3}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('h1', { timeout: 15000 });
   await page.waitForTimeout(800);
   await acionarConclusao(page);
@@ -209,7 +225,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   await login(page);
 
   // inicia um serviço (a tarefa de início é executada por MIM)
-  await page.goto(BASE + '/services/tres_tarefas_bug', { waitUntil: 'networkidle' });
+  await page.goto(BASE + `/services/${KEY3}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('h1', { timeout: 15000 });
   await page.waitForTimeout(800);
   await acionarConclusao(page);
@@ -284,7 +300,7 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
   const page = await ctx.newPage();
 
   // login (deslogado)
-  await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/login?returnUrl=/me', { waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
   check(/Entrar/.test(await page.title()), `item7: /login → "${await page.title()}"`);
 
@@ -294,8 +310,8 @@ for (const vp of [{ n: 'web', w: 1280, h: 900 }, { n: 'mobile', w: 375, h: 812 }
     ['/reports', /Consultas/i],
     ['/admin/flows', /Processos/i],
     ['/admin/reports', /Relatórios/i],
-    ['/flows/edit?key=tres_tarefas_bug', /Tres Tarefas Bug/i],   // modelador: nome do processo
-    ['/services/tres_tarefas_bug', /tarefa 1/i],                        // início: nome da TAREFA de início (ver servico-nome-inicio)
+    [`/flows/edit?key=${KEY3}`, /Tres Tarefas Bug/i],   // modelador: nome do processo
+    [`/services/${KEY3}`, /tarefa 1/i],                        // início: nome da TAREFA de início (ver servico-nome-inicio)
     ['/reports/edit?key=painel_de_despesas', /Painel de Despesas/i], // builder: nome do relatório
   ];
   for (const [rota, esperado] of rotas) {

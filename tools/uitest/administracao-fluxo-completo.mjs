@@ -224,12 +224,42 @@ check((naHomologacao.body?.versions ?? []).length >= 2,
   `5) EFEITO: a homologação ganhou versão nova e preservou a anterior (${(naHomologacao.body?.versions ?? []).length} versões)`);
 
 // ── 6. BLOQUEAR novas solicitações ───────────────────────────────────────────
+/**
+ * Rede de segurança: daqui em diante esta suíte BLOQUEIA e INATIVA o ambiente compartilhado. Se ela
+ * morrer no meio, o ambiente ficaria bloqueado e derrubaria em cascata toda suíte seguinte que abre
+ * solicitação (aconteceu em 01/10: 15 suítes caíram atrás desta). Então, morrendo por qualquer
+ * motivo, ela devolve o ambiente a "ativo" pela API antes de sair.
+ */
+async function reativarProdPelaApi() {
+  const login = await api(null, null, '/api/v1/platform/auth/login', 'POST', { email: 'super@septem.local', password: 'super123' });
+  if (login.status >= 300) return;
+  const codigo = (await api(null, null, '/api/v1/platform/auth/dev/last-code?email=super@septem.local')).body?.code;
+  const token = (await api(null, null, '/api/v1/platform/auth/2fa', 'POST', { email: 'super@septem.local', code: codigo })).body?.accessToken;
+  const amb = (await api(null, token, `/api/v1/platform/environments/${PROD}`)).body;
+  if (amb?.operatingMode && amb.operatingMode !== 'active')
+    await api(null, token, `/api/v1/platform/environments/${PROD}/mode`, 'POST', { mode: 'active', expectedVersion: amb.version });
+}
+for (const evento of ['uncaughtException', 'unhandledRejection']) {
+  process.on(evento, async (erro) => {
+    console.error(erro);
+    try { await reativarProdPelaApi(); console.log('↺ ambiente devolvido a "ativo" depois da falha'); } catch { /* nada a fazer */ }
+    process.exit(1);
+  });
+}
+
 async function definirModo(modo) {
-  await page.goto(`${BASE}/platform/environments/${PROD}`, { waitUntil: 'networkidle' });
+  // `ERR_ABORTED`: a navegação anterior ainda terminando aborta o `goto` (visto no gate de 01/10).
+  await page.goto(`${BASE}/platform/environments/${PROD}`, { waitUntil: 'networkidle' })
+    .catch(() => page.goto(`${BASE}/platform/environments/${PROD}`, { waitUntil: 'networkidle' }));
   await page.waitForSelector('[data-testid=ambiente-modo]', { timeout: 20000 });
   const botao = page.locator(`[data-testid=modo-${modo}]`);
   if (!(await botao.isDisabled())) {
     await botao.click();
+    // Trocar o modo pede CONFIRMAÇÃO com cliente · finalidade · modo atual (spec de administração).
+    const dialogo = page.getByRole('dialog');
+    await dialogo.waitFor({ timeout: 10000 });
+    check(/ · .* · modo atual: /.test(await dialogo.innerText()), `a confirmação de "${modo}" mostra cliente, finalidade e modo`);
+    await dialogo.getByRole('button', { name: 'Mudar o modo', exact: true }).click();
     await page.waitForFunction(
       (m) => document.querySelector('[data-testid=modo-' + m + ']')?.getAttribute('aria-pressed') === 'true',
       modo, { timeout: 20000 }).catch(() => {});

@@ -144,7 +144,7 @@ const keyLote = criadoLote.body.key;
 
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
 const login = async (page) => {
-  await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/login?returnUrl=/me', { waitUntil: 'networkidle' });
   await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
   await page.fill('input[type=password]', 'admin123');
   await page.click('button[type=submit]');

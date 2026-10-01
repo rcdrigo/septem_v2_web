@@ -101,4 +101,10 @@ export const platformApi = {
       ...opts,
     }),
   del: <T = unknown>(path: string, opts?: Options) => platformFetch<T>(path, { method: 'DELETE', ...opts }),
+  /**
+   * Envio de arquivo. Sem `Content-Type`: quem define o boundary do multipart é o próprio
+   * `fetch`, e fixar o header à mão produz um corpo que o servidor não consegue ler.
+   */
+  postForm: <T = unknown>(path: string, form: FormData) =>
+    platformFetch<T>(path, { method: 'POST', body: form }),
 };

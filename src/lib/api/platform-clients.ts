@@ -78,7 +78,8 @@ export function usePlatformEnvironment(tenantId: string | undefined) {
 
 /** Ocorrências que venceram durante a inativação e esperam decisão (Q20). */
 export type OverdueSchedule = {
-  id: number;
+  /** Id PÚBLICO (Guid) — o sequencial do banco não sai da API. */
+  id: string;
   alertId: string;
   taskName: string;
   dueAt: string | null;
@@ -132,7 +133,7 @@ export function useChangeMode(tenantId: string) {
 export function useDecideSchedule(tenantId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, decision }: { id: number; decision: 'execute' | 'discard' }) =>
+    mutationFn: ({ id, decision }: { id: string; decision: 'execute' | 'discard' }) =>
       platformApi.post(`/environments/${tenantId}/overdue-schedules/${id}`, { decision }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['platform', 'environments', tenantId, 'overdue'] }),
   });
@@ -348,11 +349,36 @@ export function useAddDomain(tenantId: string) {
   });
 }
 
+/** Resposta 202 de um comando que virou job: acompanhar pelo `statusUrl`. */
+export type OperacaoAceita = { operationId: string; status: string; statusUrl: string };
+
+/**
+ * Espera uma operação (job) terminar, perguntando ao servidor. Concluída → resolve; falhou ou
+ * parou para reconciliação → rejeita com o erro seguro que o servidor mandou.
+ */
+export async function aguardarOperacao(operationId: string, limiteMs = 120_000): Promise<OperationDetail> {
+  const fim = Date.now() + limiteMs;
+  for (;;) {
+    const op = await platformApi.get<OperationDetail>(`/operations/${operationId}`);
+    if (op.status === 'completed') return op;
+    if (op.status === 'failed' || op.status === 'needs_reconciliation')
+      throw new Error(op.safeError ?? 'A operação não terminou.');
+    if (Date.now() > fim) throw new Error('A operação ainda está em andamento. Acompanhe pela lista em instantes.');
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+}
+
+/**
+ * Verificar domínio é um JOB (202): o botão fica "verificando" até a operação terminar, e só
+ * então a lista mostra o resultado — verificado ou o motivo de não ter verificado.
+ */
 export function useVerifyDomain(tenantId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (domainId: string) => platformApi.post<EnvironmentDomainRow>(
-      `/environments/${tenantId}/domains/${domainId}/verify`, {}),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['platform', 'environments', tenantId, 'domains'] }),
+    mutationFn: async (domainId: string) => {
+      const aceito = await platformApi.post<OperacaoAceita>(`/environments/${tenantId}/domains/${domainId}/verify`, {});
+      return aguardarOperacao(aceito.operationId);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['platform', 'environments', tenantId, 'domains'] }),
   });
 }

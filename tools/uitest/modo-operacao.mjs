@@ -42,6 +42,9 @@ async function entrarNaCentral(page) {
   await page.waitForSelector('[data-testid=platform-clientes-lista]', { timeout: 15000 });
 }
 
+/** Texto de cada confirmação de troca de modo vista — conferido no fim (cliente, finalidade, modo). */
+const confirmacoesDeModo = [];
+
 /** Troca o modo pela própria tela da central — é o caminho do usuário real. */
 async function definirModo(page, modo) {
   await page.goto(`${BASE}/platform/environments/${ALVO}`, { waitUntil: 'networkidle' });
@@ -49,6 +52,12 @@ async function definirModo(page, modo) {
   const botao = page.locator(`[data-testid=modo-${modo}]`);
   if (await botao.isDisabled()) return;            // já está nesse modo
   await botao.click();
+  // Trocar o modo pede CONFIRMAÇÃO com cliente, finalidade e modo atual (spec de administração).
+  const dialogo = page.getByRole('dialog');
+  await dialogo.waitFor({ timeout: 10000 });
+  const texto = await dialogo.innerText();
+  confirmacoesDeModo.push(texto);
+  await dialogo.getByRole('button', { name: 'Mudar o modo', exact: true }).click();
   await page.waitForFunction(
     (m) => document.querySelector('[data-testid=modo-' + m + ']')?.getAttribute('aria-pressed') === 'true',
     modo, { timeout: 10000 });
@@ -220,6 +229,11 @@ try {
 
   if (temFila > 0) {
     await page.locator('[data-testid=ocorrencias-vencidas] li button', { hasText: 'Descartar' }).first().click();
+    // Descartar é para sempre: confirma, com o contexto do ambiente.
+    const confirmar = page.getByRole('dialog');
+    await confirmar.waitFor({ timeout: 10000 });
+    check(/modo atual/.test(await confirmar.innerText()), 'descartar ocorrência pede confirmação com o contexto do ambiente');
+    await confirmar.getByRole('button', { name: 'Descartar', exact: true }).click();
     await page.waitForTimeout(800);
     const depoisDeDecidir = await page.locator('[data-testid=ocorrencias-vencidas] li').count();
     check(depoisDeDecidir === temFila - 1,
@@ -276,6 +290,9 @@ try {
     console.log('! reativação de segurança falhou:', e.message.slice(0, 80));
   }
 }
+
+check(confirmacoesDeModo.length > 0 && confirmacoesDeModo.every((t) => /\S.* · (Produção|Ambiente de homologação|Demonstração) · modo atual: \S/.test(t)),
+  `toda troca de modo pediu confirmação com cliente, finalidade e modo (${confirmacoesDeModo.length} vista(s): "${(confirmacoesDeModo[0] ?? '').replace(/\s+/g, ' ').slice(0, 120)}")`);
 
 console.log(failures === 0 ? 'PASSOU' : `FALHOU: ${failures} caso(s)`);
 await browser.close();

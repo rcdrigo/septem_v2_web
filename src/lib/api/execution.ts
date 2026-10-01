@@ -18,7 +18,8 @@ export type TaskListItem = MyTask | ExecutedTask;
 /** Faceta de um botão de processo: nome + quantas tarefas ele tem nos filtros atuais. */
 export type ProcessFacet = { key: string; name: string; count: number };
 export type TagNameFacet = { name: string; count: number; available: boolean };
-export type TasksResult = { items: TaskListItem[]; processes: ProcessFacet[]; tagNames?: TagNameFacet[] };
+/** `total` conta o conjunto filtrado inteiro; `page`/`pageSize` só vêm quando a lista foi paginada. */
+export type TasksResult = { items: TaskListItem[]; total: number; page?: number | null; pageSize?: number | null; processes: ProcessFacet[]; tagNames?: TagNameFacet[] };
 /** Filtros da lista de tarefas (Fase 9) — todos resolvidos no servidor. */
 export type TaskFilters = {
   q?: string;
@@ -160,10 +161,15 @@ function taskFilterParams(status: 'pendentes' | 'concluidas', filters: TaskFilte
   return qs;
 }
 
-export function useTasks(status: 'pendentes' | 'concluidas', filters: TaskFilters = {}) {
+/** Tamanho da página da caixa de tarefas — paginada no servidor (a lista inteira chegava a MBs). */
+export const TASKS_PAGE_SIZE = 50;
+
+export function useTasks(status: 'pendentes' | 'concluidas', filters: TaskFilters = {}, page = 1) {
   const internalMode = useTagsAccess();
   const search = useDebouncedSearch(filters.q, filters.number);
   const qs = taskFilterParams(status, { ...filters, ...search }, internalMode);
+  qs.set('page', String(page));
+  qs.set('pageSize', String(TASKS_PAGE_SIZE));
   return useQuery({
     queryKey: [...execKeys.tasks, status, internalMode ? 'interno' : 'externo', qs.toString()],
     queryFn: () => api.get<TasksResult>(

@@ -39,14 +39,17 @@ try { for(const width of [375,1280]) {
  const stamp=await page.getByTestId('report-timestamp').boundingBox();assert.ok(Math.abs(stamp.x+stamp.width-(width-24))<2);
  if(width>=640)assert.ok(Math.abs(triggerBounds.y+triggerBounds.height/2-stamp.y-stamp.height/2)<2,'Timestamp centralizado verticalmente');
  await page.screenshot({path:join(out,`report-${width}.png`)});
+ const resposta=pred=>page.waitForResponse(r=>r.url().endsWith('/run')&&pred(r.request().postDataJSON()),{timeout:20000});
  await trigger.click();const popup=page.getByTestId('report-filters');
  const choose=async label=>{if(width<640&&await popup.getByRole('button',{name:'Todos os filtros'}).isVisible())await popup.getByRole('button',{name:'Todos os filtros'}).click();await popup.getByRole('navigation').getByRole('button',{name:label,exact:true}).click();};
- await choose('Palavra-chave');await popup.getByRole('textbox',{name:'Palavra-chave',exact:true}).fill('teste');
- await page.waitForResponse(r=>r.url().endsWith('/run')&&r.request().postDataJSON().filters.q==='teste');
- await choose('Situação');await popup.getByLabel('Aberto',{exact:true}).check();
- await page.waitForResponse(r=>r.url().endsWith('/run')&&r.request().postDataJSON().filters.status==='Aberto');
- await choose('Período');await popup.getByLabel('Mínimo de Período').fill('2026-09-01');await popup.getByLabel('Máximo de Período').fill('2026-09-24');
- await page.waitForResponse(r=>r.url().endsWith('/run')&&r.request().postDataJSON().filters.period==='2026-09-01..2026-09-24');
+ // Espera registrada ANTES da ação, com folga: fazer a ação e só depois esperar perde a resposta
+ // rápida, e o teto de 8 s não cobre a máquina carregada pela bateria (PENDENCIAS §5.5).
+ await choose('Palavra-chave');
+ await Promise.all([resposta(r=>r.filters.q==='teste'),popup.getByRole('textbox',{name:'Palavra-chave',exact:true}).fill('teste')]);
+ await choose('Situação');
+ await Promise.all([resposta(r=>r.filters.status==='Aberto'),popup.getByLabel('Aberto',{exact:true}).check()]);
+ await choose('Período');await popup.getByLabel('Mínimo de Período').fill('2026-09-01');
+ await Promise.all([resposta(r=>r.filters.period==='2026-09-01..2026-09-24'),popup.getByLabel('Máximo de Período').fill('2026-09-24')]);
  await choose('Pedidos · Valor');await popup.getByLabel('Mínimo de Pedidos · Valor').fill('20');
  await page.screenshot({path:join(out,`popover-${width}.png`)});
  const bounds=await popup.boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=width&&bounds.y+bounds.height<=900);
@@ -58,10 +61,9 @@ try { for(const width of [375,1280]) {
  await page.getByRole('button',{name:'Limpar filtros',exact:true}).click();
  assert.equal(await header.getByRole('button',{name:'Obter dados mais recentes'}).isDisabled(),true,'Obrigatório vazio impede atualização');
  await page.getByText('Preencha os filtros obrigatórios para atualizar o relatório.').waitFor();
- await trigger.click();await choose('Palavra-chave');await popup.getByRole('textbox',{name:'Palavra-chave',exact:true}).fill('final');await page.keyboard.press('Escape');
- await page.waitForResponse(r=>r.url().endsWith('/run')&&r.request().postDataJSON().filters.q==='final');
- await header.getByRole('button',{name:'Obter dados mais recentes'}).click();
- await page.waitForResponse(r=>r.url().endsWith('/run')&&r.request().postDataJSON().refresh===true);
+ await trigger.click();await choose('Palavra-chave');
+ await Promise.all([resposta(r=>r.filters.q==='final'),(async()=>{await popup.getByRole('textbox',{name:'Palavra-chave',exact:true}).fill('final');await page.keyboard.press('Escape');})()]);
+ await Promise.all([resposta(r=>r.refresh===true),header.getByRole('button',{name:'Obter dados mais recentes'}).click()]);
  assert.equal(calls.at(-1).refresh,true);assert.deepEqual(calls.at(-1).filters,{q:'final'});
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'Sem overflow');
  assert.deepEqual(errors,[]);await page.close();console.log(`PASS ${width}: filtros globais e locais, chips, ações e timestamp`);

@@ -26,7 +26,7 @@ check(!!instanceId, `[setup] existe requisição em andamento para testar (${ins
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
 
 async function login(page) {
-  await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/login?returnUrl=/me', { waitUntil: 'networkidle' });
   await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
   await page.fill('input[type=password]', 'admin123');
   await page.click('button[type=submit]');
@@ -40,7 +40,14 @@ for (const view of [{ name: 'web', width: 1280, height: 900 }, { name: 'mobile',
   await login(page);
 
   // ── Itens 8 e 9: botões do menu (Buscar / Nova requisição) ──
-  if (mobile) await page.click('button[aria-label="Abrir menu"]');
+  if (mobile) {
+    await page.click('button[aria-label="Abrir menu"]');
+    await page.waitForFunction(() => {
+      // Drawer DESLIZADO para dentro (PENDENCIAS §5.5 / gotcha de fase0-bugs).
+      const a = document.querySelector('aside');
+      return !!a && a.getBoundingClientRect().left >= 0;
+    }, null, { timeout: 15000 }).catch(() => {});
+  }
   const btnBusca = page.getByRole('button', { name: /Buscar no Septem/ }).first();
   const btnNova = page.getByRole('button', { name: /Nova requisição/ }).first();
   // 8s não bastava quando esta é a PRIMEIRA suíte da bateria: o Vite ainda compila sob

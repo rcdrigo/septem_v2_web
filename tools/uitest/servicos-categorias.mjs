@@ -21,7 +21,9 @@ await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 
 // ── 1. Nova requisição: modal, categorias, busca e abertura ──────────────────
 await page.goto(BASE + '/tasks', { waitUntil: 'networkidle' });
-await page.getByRole('button', { name: 'Nova requisição' }).click();
+// `/tasks` pinta milhares de tarefas no dev: espera a lista e dá folga ao clique (PENDENCIAS §5.5).
+await page.locator('[data-testid=task-card], table tbody tr').first().waitFor({ timeout: 20000 }).catch(() => {});
+await page.getByRole('button', { name: 'Nova requisição' }).click({ timeout: 60000 });
 await page.waitForSelector('[role=dialog]');
 await page.waitForTimeout(500);
 await page.screenshot({ path: `${OUT}/nova-requisicao-desktop.png` });
@@ -128,8 +130,14 @@ await servicePage.close();
 
 // mobile
 await page.setViewportSize({ width: 375, height: 812 });
-await page.getByRole('button', { name: 'Abrir menu' }).click();
-await page.getByRole('button', { name: 'Nova requisição' }).click();
+await page.getByRole('button', { name: 'Abrir menu' }).click({ timeout: 60000 });
+// Espera o drawer DESLIZAR para dentro (borda esquerda em x>=0) antes de clicar dentro dele — o
+// gotcha de fase0-bugs: sob carga o clique chegava com o aside ainda fora da tela.
+await page.waitForFunction(() => {
+  const a = document.querySelector('aside');
+  return !!a && a.getBoundingClientRect().left >= 0;
+}, null, { timeout: 15000 }).catch(() => {});
+await page.getByRole('button', { name: 'Nova requisição' }).click({ timeout: 60000 });
 await page.waitForTimeout(300);
 const mobOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
 check(!mobOverflow, 'modal Nova requisição mobile sem scroll horizontal');

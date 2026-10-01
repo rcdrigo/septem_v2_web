@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Dialog as BaseDialog } from '@base-ui/react/dialog';
 import { X } from 'lucide-react';
 
@@ -14,6 +14,21 @@ type Props = {
 
 /** Modal com foco contido, retorno ao disparador e fechamento por Escape. */
 export function Dialog({ open, onClose, title, children, footer, width = 'md', bodyClassName }: Props) {
+  // Foco devolvido a quem abriu (acessibilidade). A biblioteca faria isso — mas quase todo diálogo do
+  // app é DESMONTADO ao fechar (`{aberto && <Dialogo/>}`), antes de ela conseguir; o foco caía no
+  // <body> e quem navega por teclado perdia o lugar (a sonda do suporte pegou em 30/09). Quem tinha o
+  // foco é lido NA RENDERIZAÇÃO da abertura — antes de o foco entrar no diálogo.
+  const disparador = useRef<Element | null>(null);
+  if (open && disparador.current === null && typeof document !== 'undefined') disparador.current = document.activeElement;
+  useEffect(() => {
+    if (!open) return;
+    return () => {
+      const el = disparador.current as HTMLElement | null;
+      disparador.current = null;
+      if (el && el.isConnected && el !== document.body) window.setTimeout(() => el.focus(), 0);
+    };
+  }, [open]);
+
   const widthClass =
     width === 'sm' ? 'max-w-md'
     : width === 'lg' ? 'max-w-2xl'

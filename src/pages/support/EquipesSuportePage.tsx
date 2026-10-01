@@ -21,6 +21,9 @@ import { Field, TextInput, TextArea } from '@/components/ui/Field';
 import { Combobox } from '@/components/ui/Combobox';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
+import { ApiError } from '@/lib/api';
+import { useLimites } from '@/components/support/LimitesDoSuporte';
+import { avisarErro } from '@/lib/avisos';
 
 /**
  * Equipes de suporte (Fase 3 — SUP-04). **Uma tela para os dois lados:** o cliente em
@@ -234,6 +237,7 @@ function DialogoEquipe({
   equipe?: SupportTeam;
   onClose: () => void;
 }) {
+  const limites = useLimites();
   const [name, setName] = useState(equipe?.name ?? '');
   const [description, setDescription] = useState(equipe?.description ?? '');
   const [active, setActive] = useState(equipe?.active ?? true);
@@ -245,15 +249,23 @@ function DialogoEquipe({
     e.preventDefault();
     try {
       if (equipe) {
-        await alterar.mutateAsync({ id: equipe.id, name, description: description || null, active });
+        await alterar.mutateAsync({ id: equipe.id, name, description: description || null, active, expectedVersion: equipe.version });
         toast.success(`Equipe "${name}" atualizada.`);
       } else {
         await criar.mutateAsync({ name, description: description || null });
         toast.success(`Equipe "${name}" criada.`);
       }
       onClose();
-    } catch {
-      toast.error(equipe ? 'Falha ao atualizar a equipe.' : 'Falha ao criar a equipe.');
+    } catch (err) {
+      // O servidor diz o porquê: outra pessoa editou antes (versão), ou a equipe ainda tem trabalho.
+      const corpo = err instanceof ApiError ? err.body : undefined;
+      if (corpo?.error === 'stale_version') {
+        avisarErro(err, 'A equipe foi alterada por outra pessoa. Recarregue para ver a versão atual.');
+      } else if (typeof corpo?.detail === 'string') {
+        toast.error(corpo.detail);
+      } else {
+        toast.error(equipe ? 'Falha ao atualizar a equipe.' : 'Falha ao criar a equipe.');
+      }
     }
   }
 
@@ -261,10 +273,10 @@ function DialogoEquipe({
     <Dialog open onClose={onClose} title={equipe ? 'Editar equipe' : 'Nova equipe'}>
       <form onSubmit={submit} className="flex flex-col gap-3" data-testid="form-equipe">
         <Field label="Nome" help="Como a equipe aparece na fila e no chamado.">
-          <TextInput name="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} required autoFocus />
+          <TextInput name="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={limites.teamName} required autoFocus />
         </Field>
         <Field label="Descrição" help="Opcional — o que esta equipe atende.">
-          <TextArea name="description" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} rows={3} />
+          <TextArea name="description" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={limites.teamDescription} rows={3} />
         </Field>
         {equipe && (
           <label className="flex items-center gap-2 text-sm text-slate-700">

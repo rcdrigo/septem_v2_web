@@ -20,6 +20,7 @@ import {
 } from '@/lib/api/platform-clients';
 import { routes } from '@/lib/routes';
 import { useDocumentTitle } from '@/lib/use-document-title';
+import { confirm } from '@/components/ui/ConfirmDialog';
 
 /**
  * Detalhe do ambiente na área central: é daqui que o super admin bloqueia novas
@@ -48,8 +49,26 @@ export function PlatformAmbientePage() {
   const salvarFeatures = useSaveFeatures(tenantId ?? '');
   useDocumentTitle(ambiente.data ? `${ambiente.data.displayName} · área central` : 'Ambiente · área central');
 
+  /**
+   * "Cliente, finalidade e modo em todos os detalhes e CONFIRMAÇÕES" (spec de administração,
+   * 03-entregas). Trocar o modo derruba ou libera o ambiente inteiro de um cliente: nunca num clique só.
+   */
+  function contexto() {
+    const d = ambiente.data!;
+    return `${d.clientName ?? 'Cliente'} · ${PURPOSE_LABEL[d.purpose] ?? d.purpose} · modo atual: ${MODE_LABEL[d.operatingMode] ?? d.operatingMode}`;
+  }
+
   async function aplicar(mode: string) {
     setAviso(null);
+    if (!ambiente.data) return;
+    const ok = await confirm({
+      title: `Mudar para "${MODE_LABEL[mode] ?? mode}"?`,
+      message: `${contexto()}. ${mode === 'inactive' ? 'Ninguém do cliente acessa o ambiente até ele ser reativado.' : mode === 'new_requests_blocked' ? 'Novas solicitações ficam bloqueadas; as existentes continuam.' : 'O ambiente volta a funcionar normalmente.'}`,
+      confirmLabel: 'Mudar o modo',
+      cancelLabel: 'Voltar',
+      destructive: mode === 'inactive',
+    });
+    if (!ok) return;
     try {
       const r = await trocar.mutateAsync({ mode, expectedVersion: ambiente.data?.version });
       if (r.overdueSchedules > 0)
@@ -57,6 +76,19 @@ export function PlatformAmbientePage() {
     } catch {
       setAviso('Não foi possível trocar o modo. Recarregue a página e tente de novo.');
     }
+  }
+
+  /** Executar ou descartar ocorrência vencida — descartar é para sempre: confirma, com o contexto. */
+  async function decidirOcorrencia(id: string, tarefa: string, decision: 'execute' | 'discard') {
+    if (!ambiente.data) return;
+    const ok = await confirm({
+      title: decision === 'execute' ? 'Executar esta ocorrência?' : 'Descartar esta ocorrência?',
+      message: `${contexto()}. Tarefa "${tarefa}". ${decision === 'discard' ? 'O alerta não será mais enviado.' : 'O alerta sai no próximo ciclo.'}`,
+      confirmLabel: decision === 'execute' ? 'Executar' : 'Descartar',
+      cancelLabel: 'Voltar',
+      destructive: decision === 'discard',
+    });
+    if (ok) await decidir.mutateAsync({ id, decision });
   }
 
   const modo = ambiente.data?.operatingMode;
@@ -219,10 +251,10 @@ export function PlatformAmbientePage() {
                     type="button"
                     data-testid={`verificar-${d.host}`}
                     disabled={verificarDominio.isPending}
-                    onClick={() => void verificarDominio.mutateAsync(d.id)}
+                    onClick={() => void verificarDominio.mutateAsync(d.id).catch(() => { /* o motivo aparece na linha do domínio */ })}
                     className="min-h-9 rounded-md border border-slate-300 px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                   >
-                    Verificar
+                    {verificarDominio.isPending && verificarDominio.variables === d.id ? 'Verificando…' : 'Verificar'}
                   </button>
                 </li>
               ))}
@@ -334,14 +366,14 @@ export function PlatformAmbientePage() {
                     <span className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => void decidir.mutateAsync({ id: o.id, decision: 'execute' })}
+                        onClick={() => void decidirOcorrencia(o.id, o.taskName, 'execute')}
                         className="min-h-9 rounded-md border border-slate-300 px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                       >
                         Executar
                       </button>
                       <button
                         type="button"
-                        onClick={() => void decidir.mutateAsync({ id: o.id, decision: 'discard' })}
+                        onClick={() => void decidirOcorrencia(o.id, o.taskName, 'discard')}
                         className="min-h-9 rounded-md border border-slate-300 px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                       >
                         Descartar

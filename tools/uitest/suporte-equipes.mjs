@@ -51,7 +51,7 @@ const browser = await chromium.launch({
 });
 
 const login = async (page, email, senha) => {
-  await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/login?returnUrl=/me', { waitUntil: 'networkidle' });
   await page.fill('input[name=identifier]', email);
   await page.fill('input[name=password]', senha);
   await page.click('button[type=submit]');
@@ -164,6 +164,26 @@ try {
     await editada.waitFor({ timeout: 10000 });
     check((await editada.locator('[data-testid=equipe-situacao]').innerText()).trim() === 'Inativa',
       `[${vp.n}] renomeia e desativa a equipe`);
+
+    // ── 5b) Conflito: outra pessoa edita com o diálogo aberto ─────────────────
+    // A tela leu a versão ao abrir; alguém salva antes pela API; o "Salvar" da tela leva 409 e
+    // AVISA — e a edição da outra pessoa fica (antes da Fase 8, a última sobrescrevia em silêncio).
+    await editada.locator('[data-testid=editar-equipe]').click();
+    await page.waitForSelector('[data-testid=form-equipe]');
+    const lista = (await api(token, '/api/v1/support/teams/')).body;
+    const atual = lista.find((t) => t.name === novoNome);
+    const outra = await api(token, `/api/v1/support/teams/${atual.id}`, 'PATCH',
+      { description: 'Editada por outra pessoa.', expectedVersion: atual.version });
+    await page.fill('[data-testid=form-equipe] textarea[name=description]', 'Minha edição atrasada.');
+    await page.getByRole('button', { name: 'Salvar' }).click();
+    const avisou = await page.getByText('alterada por outra pessoa').first().waitFor({ timeout: 10000 }).then(() => true).catch(() => false);
+    // O aviso do 409 OFERECE recarregar (requisito transversal), em vez de só mandar recarregar.
+    const ofereceRecarregar = await page.getByRole('button', { name: 'Recarregar' }).first().isVisible().catch(() => false);
+    check(ofereceRecarregar, `[${vp.n}] o aviso do conflito traz o botão "Recarregar"`);
+    const depois = (await api(token, '/api/v1/support/teams/')).body.find((t) => t.id === atual.id);
+    check(outra.status === 200 && avisou && depois.description === 'Editada por outra pessoa.',
+      `[${vp.n}] edição com versão velha: a tela avisa o conflito e NÃO sobrescreve a outra pessoa (${outra.status}, "${depois.description}")`);
+    await page.keyboard.press('Escape');
 
     await ctx.close();
   }

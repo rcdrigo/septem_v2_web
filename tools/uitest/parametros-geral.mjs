@@ -15,7 +15,7 @@ const ORIG = { cliente: 'Prefeitura X', ambiente: 'Septem', cor: '#0ea5e9' };
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
 
 async function login(page) {
-  await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/login?returnUrl=/me', { waitUntil: 'networkidle' });
   await page.fill('input[name=identifier]', 'admin@prefeitura-x.local');
   await page.fill('input[type=password]', 'admin123');
   await page.click('button[type=submit]');
@@ -59,7 +59,14 @@ for (const view of [
   await login(page);
 
   // 1) Chegar pelo MENU (não por URL direta) — prova que o item existe.
-  if (mobile) await page.click('button[aria-label="Abrir menu"]');
+  if (mobile) {
+    await page.click('button[aria-label="Abrir menu"]');
+    await page.waitForFunction(() => {
+      // Drawer DESLIZADO para dentro (PENDENCIAS §5.5 / gotcha de fase0-bugs).
+      const a = document.querySelector('aside');
+      return !!a && a.getBoundingClientRect().left >= 0;
+    }, null, { timeout: 15000 }).catch(() => {});
+  }
   await page.getByRole('button', { name: 'Configurações' }).first().click();
   await page.getByRole('link', { name: 'Parâmetros do sistema' }).first().click();
   await page.waitForURL(/\/admin\/settings/, { timeout: 10000 });
@@ -161,7 +168,7 @@ for (const view of [
 
   // 9) Ponta a ponta: a descrição salva aparece na TELA DE LOGIN (config público).
   await page.evaluate(() => localStorage.clear());
-  await page.goto(BASE + '/login', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/login?returnUrl=/me', { waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
   check(
     (await page.getByTestId('login-descricao').count()) === 1 &&

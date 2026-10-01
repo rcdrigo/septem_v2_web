@@ -118,7 +118,12 @@ try {
     // (c) Busca global pelo número — a renumeração reescreveu a coluna que ela usa.
     if (vp.n === 'web') {
       await page.goto(BASE + '/tasks', { waitUntil: 'networkidle' });
-      await page.getByRole('button', { name: /Buscar no Septem/i }).first().click();
+      // Mesma armadilha de `rotas-ingles` e `modo-operacao`: `/tasks` pinta milhares de tarefas no
+      // dev, a thread principal fica ocupada e o clique pendura no teto de 30 s. Espera a lista e
+      // dá folga ao clique (PENDENCIAS §5.5).
+      await page.locator('[data-testid=task-card], table tbody tr').first()
+        .waitFor({ timeout: 20000 }).catch(() => {});
+      await page.getByRole('button', { name: /Buscar no Septem/i }).first().click({ timeout: 60000 });
       await page.locator('[role=dialog] input').first().fill(String(numero));
       await page.waitForTimeout(1500);
       const achou = await page.locator('[role=dialog]').innerText();

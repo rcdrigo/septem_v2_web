@@ -9,6 +9,7 @@ import { useSessionStore } from '@/stores/session';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { MENU } from './menu/menu-config';
 import { routes } from '@/lib/routes';
+import { SinoDeNotificacoes } from '@/components/notifications/SinoDeNotificacoes';
 
 /** Busca recursiva do rótulo do menu que casa com o pathname (p/ título da aba). */
 function findMenuLabel(node: unknown, path: string): string | null {
@@ -73,7 +74,8 @@ export function AppShell() {
           >
             <Menu size={20} />
           </button>
-          <span className="truncate text-sm font-semibold text-slate-900">{tenant?.clienteNome ?? 'Septem'}</span>
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{tenant?.clienteNome ?? 'Septem'}</span>
+          <SinoDeNotificacoes lado="cliente" />
         </div>
 
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
