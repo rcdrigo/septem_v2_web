@@ -169,7 +169,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ status: 'booting', error: undefined });
     try {
       // /tenant/config é não-autenticado — sempre tenta.
-      const tenant = await api.get<Tenant>('/api/tenant/config', { anonymous: true });
+      const config = await api.get<Tenant | { redirectUrl: string }>('/api/tenant/config', { anonymous: true });
+      if ('redirectUrl' in config) {
+        // O servidor identifica o CentralHost e decide a entrada na área central.
+        window.location.replace(config.redirectUrl);
+        return;
+      }
+      const tenant = config;
       cacheTenant(tenant);
       // O 403 do /tenant/config já teria acionado o handler global; isto cobre o caso do
       // ambiente que responde mas está bloqueado — o modo entra na store para as telas
