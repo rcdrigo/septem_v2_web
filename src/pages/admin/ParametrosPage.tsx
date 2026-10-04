@@ -794,8 +794,7 @@ function OpenRouterTab({ data }: { data: SettingsOpenRouter }) {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await save.mutateAsync({ model: form.model, siteUrl: form.siteUrl, maxTokens: form.maxTokens,
-        apiKey: clearKey ? '' : apiKey || null });
+      await save.mutateAsync({ model: form.model, apiKey: clearKey ? '' : apiKey || null });
       setApiKey('');
       setClearKey(false);
       toast.success('OpenRouter salvo. As próximas solicitações usarão esta configuração.');
@@ -806,24 +805,16 @@ function OpenRouterTab({ data }: { data: SettingsOpenRouter }) {
 
   return (
     <form onSubmit={onSubmit} className="max-w-3xl space-y-5" data-testid="form-openrouter">
-      <Card title="Agente de IA — OpenRouter" hint="Configuração deste ambiente para gerar JavaScript no chat dos formulários. As alterações valem na próxima solicitação, sem reiniciar a aplicação.">
+      <Card title="OpenRouter" hint="Chave e modelo padrão para os agentes deste ambiente. Cada agente pode definir seu próprio modelo. As alterações valem na próxima solicitação.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field field="apiKey" label={data.apiKeySet ? 'Chave da API (configurada)' : 'Chave da API'}>
             <input type="password" name="openRouterApiKey" autoComplete="new-password" maxLength={4096}
               value={apiKey} disabled={clearKey} onChange={(e) => setApiKey(e.target.value)} className={inputCls}
               placeholder={data.apiKeySet ? '•••••••• (em branco mantém a atual)' : 'Chave do OpenRouter'} />
           </Field>
-          <Field field="model" label="Modelo" required>
+          <Field field="model" label="Modelo padrão" required>
             <input required name="openRouterModel" maxLength={200} value={form.model ?? ''}
               onChange={(e) => setForm({ ...form, model: e.target.value })} className={inputCls} placeholder="provedor/modelo" />
-          </Field>
-          <Field field="siteUrl" label="URL do site (opcional)">
-            <input type="url" name="openRouterSiteUrl" maxLength={2048} value={form.siteUrl ?? ''}
-              onChange={(e) => setForm({ ...form, siteUrl: e.target.value || null })} className={inputCls} placeholder="https://seu-site.com.br" />
-          </Field>
-          <Field field="maxTokens" label="Limite de tokens da resposta" required>
-            <input required type="number" name="openRouterMaxTokens" min={1} max={1000000} step={1} value={form.maxTokens}
-              onChange={(e) => setForm({ ...form, maxTokens: Number(e.target.value) })} className={inputCls} />
           </Field>
           {data.apiKeySet && settingsFieldPolicy(policies, 'openrouter', 'apiKey').visible && <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2">
             <input type="checkbox" disabled={!settingsFieldPolicy(policies, 'openrouter', 'apiKey').editable || save.isPending}

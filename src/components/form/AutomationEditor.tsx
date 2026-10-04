@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { diffLines } from 'diff';
 import { Code2, History, MessageSquare, Play, Save, Upload } from 'lucide-react';
-import { automationApi, type AutomationState, type Conversation, type Revision } from '@/lib/form-automation/api';
+import { automationApi, type AgentConfiguration, type AutomationState, type Conversation, type Revision } from '@/lib/form-automation/api';
 import { nativeFields, parseNativeForm } from '@/lib/native-form';
 import { automationReferences, validateAutomation } from '@/lib/form-automation/validation';
 import type { AutomationSource } from '@/lib/form-automation/runtime';
@@ -32,6 +32,14 @@ export function AutomationEditor({ processKey, onClose }: { processKey: string; 
   const [restoredFrom, setRestoredFrom] = useState<number | null>(null);
   const [changelog, setChangelog] = useState('');
   const [prompt, setPrompt] = useState('');
+  const [agent, setAgent] = useState<AgentConfiguration | null>(null);
+  const [agentModel, setAgentModel] = useState('');
+  const [agentTokens, setAgentTokens] = useState('');
+  const [agentError, setAgentError] = useState('');
+  const [agentMessage, setAgentMessage] = useState('');
+  const agentDirty = !!agent && (agentModel.trim() !== (agent.model ?? '') || agentTokens !== (agent.maxTokens?.toString() ?? ''));
+  const tokenLimit = agentTokens.trim() ? Number(agentTokens) : null;
+  const agentInvalid = (tokenLimit !== null && (!Number.isSafeInteger(tokenLimit) || tokenLimit < 1 || tokenLimit > 1000000)) || agentModel.trim().length > 200 || /\s/.test(agentModel.trim());
   const [proposal, setProposal] = useState<{ taskId: string; code: string; base: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -61,19 +69,20 @@ export function AutomationEditor({ processKey, onClose }: { processKey: string; 
   useEffect(() => {
     if (!can) return;
     let cancelled = false;
-    Promise.all([client.load(), client.history(), client.conversations()]).then(([data, rows, chats]) => {
+    Promise.all([client.load(), client.history(), client.conversations(), client.agentConfiguration()]).then(([data, rows, chats, configuration]) => {
       if (cancelled) return;
       setState(data); setScripts(data.scripts); setHistory(rows); setConversations(chats);
+      setAgent(configuration); setAgentModel(configuration.model ?? ''); setAgentTokens(configuration.maxTokens?.toString() ?? '');
     }).catch(e => { if (!cancelled) setError(e.message); });
     return () => { cancelled = true; };
   }, [client, can]);
   useEffect(() => {
-    if (!dirty && !proposal) return;
+    if (!dirty && !proposal && !agentDirty) return;
     const beforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); };
     window.addEventListener('beforeunload', beforeUnload);
     return () => window.removeEventListener('beforeunload', beforeUnload);
-  }, [dirty, proposal]);
-  const close = () => { if ((!dirty && !proposal) || window.confirm('Descartar alterações não salvas?')) onClose?.(); };
+  }, [dirty, proposal, agentDirty]);
+  const close = () => { if ((!dirty && !proposal && !agentDirty) || window.confirm('Descartar alterações não salvas?')) onClose?.(); };
   function edit(code: string) {
     setScripts(prev => prev.some(s => s.taskId === selected) ? prev.map(s => s.taskId === selected ? { ...s, code } : s) : [...prev, { taskId: selected, code }]);
   }
@@ -100,8 +109,27 @@ export function AutomationEditor({ processKey, onClose }: { processKey: string; 
       setHistory(await client.history()); setMessage(`Conjunto v${result.version} publicado.`);
     } catch (e) { await failure(e); } finally { setBusy(false); }
   }
+  async function saveAgent() {
+    if (!agent || agentInvalid) return;
+    setBusy(true); setAgentError(''); setAgentMessage('');
+    try {
+      const saved = await client.saveAgentConfiguration({ expectedVersion: agent.version, model: agentModel.trim() || null, maxTokens: tokenLimit });
+      setAgent({ ...agent, ...saved }); setAgentModel(saved.model ?? ''); setAgentTokens(saved.maxTokens?.toString() ?? '');
+      setAgentMessage('Configuração salva para o agente de formulários deste ambiente.');
+    } catch (e) {
+      setAgentError(e instanceof ApiError ? (e.body as { error?: string })?.error ?? e.message : (e as Error).message);
+    } finally { setBusy(false); }
+  }
+  async function reloadAgent() {
+    if (agentDirty && !window.confirm('Descartar alterações da configuração do agente e carregar os valores salvos?')) return;
+    setBusy(true); setAgentError(''); setAgentMessage('');
+    try {
+      const configuration = await client.agentConfiguration();
+      setAgent(configuration); setAgentModel(configuration.model ?? ''); setAgentTokens(configuration.maxTokens?.toString() ?? '');
+    } catch (e) { setAgentError((e as Error).message); } finally { setBusy(false); }
+  }
   async function ask() {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || agentDirty) return;
     setBusy(true); setError('');
     const base = current, taskId = selected;
     try {
@@ -160,10 +188,30 @@ export function AutomationEditor({ processKey, onClose }: { processKey: string; 
       </section>
       <section className="min-w-0 space-y-3 rounded border bg-slate-50 p-3">
         <h3 className="font-medium"><MessageSquare size={15} className="inline" /> Agente · OpenRouter</h3>
+        <details className="space-y-3 text-sm">
+          <summary className="cursor-pointer font-medium">Configuração do agente</summary>
+          <p className="text-slate-600">Vale para o agente de formulários em todos os processos deste ambiente.</p>
+          <label className="block">Modelo específico (opcional)
+            <input className="mt-1 w-full rounded border p-2" value={agentModel} disabled={busy} maxLength={200} onChange={e => { setAgentModel(e.target.value); setAgentMessage(''); }} placeholder="Ex.: fornecedor/modelo" />
+          </label>
+          <p className="break-words text-xs text-slate-600">Deixe vazio para usar o padrão do sistema: {agent?.defaultModel || 'não configurado'}.</p>
+          <label className="block">Limite de tokens por resposta (opcional)
+            <input type="number" min={1} max={1000000} step={1} className="mt-1 w-full rounded border p-2" value={agentTokens} disabled={busy} onChange={e => { setAgentTokens(e.target.value); setAgentMessage(''); }} placeholder="Usar o limite do modelo" />
+          </label>
+          <p className="text-xs text-slate-600">Deixe vazio para não definir um limite adicional. Em modelos com raciocínio, o limite também pode incluir os tokens de pensamento.</p>
+          {agentInvalid && <p role="alert" className="text-xs text-rose-700">Use um identificador de modelo sem espaços e, se definir tokens, um número inteiro entre 1 e 1.000.000.</p>}
+          <div className="flex flex-wrap gap-2">
+            <button className={button} disabled={busy || !agent || !agentDirty || agentInvalid} onClick={saveAgent}>Salvar configuração do agente</button>
+            <button className={button} disabled={busy} onClick={reloadAgent}>Recarregar configuração</button>
+          </div>
+          {agentError && <p role="alert" className="text-sm text-rose-700">{agentError}</p>}
+          {agentMessage && <p role="status" className="text-sm text-emerald-700">{agentMessage}</p>}
+        </details>
+        {agentDirty && <p role="status" className="text-xs text-amber-800">Salve a configuração do agente antes de gerar uma proposta.</p>}
         <select aria-label="Conversa" className="w-full rounded border p-2 text-sm" value={conversation?.id ?? ''} disabled={busy} onChange={e => setConversation(conversations.find(c => c.id === e.target.value) ?? null)}><option value="">Nova conversa</option>{conversations.map(c => <option key={c.id} value={c.id}>{c.messages[0]?.content.slice(0, 65) || c.id}</option>)}</select>
         <div className="max-h-72 space-y-3 overflow-auto" aria-live="polite">{conversation?.messages.map((m, i) => <div key={i} className="rounded border bg-white p-2 text-sm"><p className="text-xs font-medium text-slate-500">{m.role === 'user' ? 'Solicitação' : 'Agente'} · {label(m.taskId)}{m.model && ` · ${m.model}`}</p><p className="whitespace-pre-wrap">{m.content}</p></div>)}</div>
         <textarea aria-label="Pedido ao agente" className="w-full rounded border p-2 text-sm" rows={4} value={prompt} disabled={busy} onChange={e => setPrompt(e.target.value)} placeholder="Descreva o comportamento desejado para o escopo selecionado…" />
-        <button className={primary} disabled={busy || !prompt.trim()} onClick={ask}>{busy ? 'Aguarde…' : 'Gerar proposta'}</button>
+        <button className={primary} disabled={busy || agentDirty || !prompt.trim()} onClick={ask}>{busy ? 'Aguarde…' : 'Gerar proposta'}</button>
         {proposal && <div className="space-y-2"><p className="text-sm font-medium">Proposta para {label(proposal.taskId)}</p><CodeDiff before={codeOf(scripts, proposal.taskId)} after={proposal.code} /><textarea aria-label="Editar proposta" className="w-full rounded border p-2 font-mono text-xs" rows={8} value={proposal.code} onChange={e => setProposal({ ...proposal, code: e.target.value })} />
           <button disabled={busy} className={button} onClick={() => { if (codeOf(scripts, proposal.taskId) !== proposal.base && !window.confirm('O código mudou após o pedido. Aplicar a proposta sobre sua edição atual?')) return; setScripts(prev => prev.some(s => s.taskId === proposal.taskId) ? prev.map(s => s.taskId === proposal.taskId ? { ...s, code: proposal.code } : s) : [...prev, { taskId: proposal.taskId, code: proposal.code }]); setSelected(proposal.taskId); setProposal(null); setTab('diff'); }}>Aplicar ao editor</button><button disabled={busy} className={button} onClick={() => setProposal(null)}>Descartar proposta</button>
         </div>}

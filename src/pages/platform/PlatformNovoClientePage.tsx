@@ -196,6 +196,6 @@ function validateSettings(settings: InitialEnvironmentSettings, secrets: Initial
   if (settings.storageMode === 'dedicated' && (!settings.s3BucketName?.trim() || !settings.s3AccessKey?.trim() || !secrets.s3SecretKey?.trim())) return 'No grupo Armazenamento, informe bucket, chave de acesso e chave secreta para usar armazenamento dedicado.';
   if (settings.smtpPort < 1 || settings.smtpPort > 65535) return 'No grupo E-mail, informe uma porta entre 1 e 65535.';
   if (settings.smtpFromAddress && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.smtpFromAddress)) return 'No grupo E-mail, informe um endereço de remetente válido.';
-  if (settings.s3UrlExpirationMinutes < 1 || settings.openRouterMaxTokens < 1) return 'A validade das URLs e o limite de tokens devem ser maiores que zero.';
+  if (settings.s3UrlExpirationMinutes < 1) return 'A validade das URLs deve ser maior que zero.';
   return null;
 }

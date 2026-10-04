@@ -98,9 +98,9 @@ Homologue login válido, senha incorreta, bloqueio, recuperação e autenticaç�
 Essa integração alimenta o agente que propõe JavaScript para formulários.
 
 - **Chave da API** é cifrada e não retorna ao navegador.
-- **Modelo** usa o identificador `provedor/modelo` e precisa suportar respostas estruturadas.
-- **URL do site** é opcional.
-- **Limite de tokens** controla o tamanho máximo da resposta.
+- **Modelo padrão** usa o identificador `provedor/modelo`; o agente de formulários precisa de suporte a respostas estruturadas.
+- Modelo específico e limite opcional de tokens ficam na configuração de cada agente. Se o modelo estiver vazio, usa-se o padrão do sistema; sem limite de tokens, o provedor aplica seu próprio padrão.
+- A URL do ambiente é enviada automaticamente a partir do tenant.
 - **Remover a chave salva** desativa o agente ao salvar.
 
 Alterações valem nas próximas solicitações, sem reiniciar a aplicação. O código gerado nunca deve ser publicado sem revisão, prévia e simulação.

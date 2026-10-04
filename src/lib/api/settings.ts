@@ -61,8 +61,6 @@ export type SettingsSecurity = {
 export type SettingsOpenRouter = {
   apiKeySet?: boolean;
   model: string | null;
-  siteUrl: string | null;
-  maxTokens: number;
 };
 export type OpenRouterPayload = Omit<SettingsOpenRouter, 'apiKeySet'> & { apiKey: string | null };
 

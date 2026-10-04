@@ -110,6 +110,8 @@ O envio simulado valida o formulário e não cria uma requisição.
 
 ## Agente OpenRouter
 
+Em **Configuração do agente**, é possível salvar um modelo específico e um limite de tokens por resposta para o agente de formulários deste ambiente. Ambos são opcionais: modelo vazio usa o padrão dos parâmetros do sistema; tokens vazios não enviam um limite adicional ao OpenRouter. Salve a configuração antes de gerar propostas.
+
 Escolha uma conversa ou crie outra, selecione o escopo e descreva o comportamento. O agente devolve uma proposta e uma comparação. Revise e edite antes de **Aplicar ao editor**.
 
 Aplicar não publica. A proposta passa a fazer parte do rascunho e deve seguir validação, prévia, salvamento e publicação. As conversas vinculadas ficam registradas com a versão.

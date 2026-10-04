@@ -51,6 +51,15 @@ check('lint detecta indefinido',(await page.evaluate(()=>window.lint('form.set("
 check('lint aceita API',(await page.evaluate(()=>window.lint('await fetch("/api");form.hide("grupo");'))).errors,[]);
 check('lint detecta sintaxe',(await page.evaluate(()=>window.lint('const ='))).errors.length,1);
 let head=0,published=null,scripts=[{taskId:'',code:'form.hide("grupo");'}],saved=[],revs=[];
+let agentConfig={version:0,model:null,maxTokens:null,defaultModel:'configured/default'};
+await page.route('http://audit.local/api/v1/form-automations/agent-configuration',async r=>{
+  if(r.request().method()==='PUT'){
+    const body=r.request().postDataJSON();
+    check('configuração envia versão atual',body.expectedVersion,agentConfig.version);
+    agentConfig={...agentConfig,version:agentConfig.version+1,model:body.model,maxTokens:body.maxTokens};
+  }
+  await r.fulfill({contentType:'application/json',body:JSON.stringify(agentConfig)});
+});
 const base='http://audit.local/api/v1/workflow/process-definitions/test/automation';
 await page.route(base+'**',async r=>{const url=r.request().url(),body=r.request().postDataJSON();let result;
 if(url.endsWith('/revisions'))result=revs;
@@ -61,6 +70,27 @@ else if(url.endsWith('/chat'))result={id:'chat',version:2,messages:[{role:'user'
 else result={head,publishedVersion:published,scripts,tasks:[{id:'T1',name:'Interna'}],schema};
 await r.fulfill({contentType:'application/json',body:JSON.stringify(result)});});
 await page.evaluate(()=>window.editor());await page.getByLabel('Código JavaScript',{exact:true}).waitFor();
+await page.getByText('Configuração do agente',{exact:true}).click();
+check('modelo do agente inicia herdado',await page.getByLabel('Modelo específico (opcional)',{exact:true}).inputValue(),'');
+check('tokens do agente iniciam sem limite adicional',await page.getByLabel('Limite de tokens por resposta (opcional)',{exact:true}).inputValue(),'');
+await page.getByLabel('Modelo específico (opcional)',{exact:true}).fill('vendor/specific');
+await page.getByLabel('Limite de tokens por resposta (opcional)',{exact:true}).fill('4096');
+await page.getByRole('button',{name:'Salvar configuração do agente',exact:true}).click();
+await page.getByText('Configuração salva para o agente de formulários deste ambiente.').waitFor();
+check('modelo específico salvo',agentConfig.model,'vendor/specific');
+check('limite opcional salvo',agentConfig.maxTokens,4096);
+await page.getByLabel('Limite de tokens por resposta (opcional)',{exact:true}).fill('0');
+check('limite inválido impede salvar',await page.getByRole('button',{name:'Salvar configuração do agente',exact:true}).isDisabled(),true);
+await page.getByLabel('Modelo específico (opcional)',{exact:true}).fill('');
+await page.getByLabel('Limite de tokens por resposta (opcional)',{exact:true}).fill('');
+await page.getByRole('button',{name:'Salvar configuração do agente',exact:true}).click();
+await page.getByText('Configuração salva para o agente de formulários deste ambiente.').waitFor();
+check('modelo volta a herdar o padrão',agentConfig.model,null);
+check('limite pode ser removido',agentConfig.maxTokens,null);
+await page.getByRole('button',{name:'Recarregar configuração',exact:true}).click();
+await page.waitForFunction(()=>!document.querySelector('input[placeholder="Ex.: fornecedor/modelo"]').disabled);
+check('recarregar preserva modelo herdado',await page.getByLabel('Modelo específico (opcional)',{exact:true}).inputValue(),'');
+
 await page.getByLabel('Pedido ao agente').fill('Preencha tipo');await page.getByRole('button',{name:'Gerar proposta',exact:true}).click();await page.getByLabel('Editar proposta').waitFor();check('agente não salva automaticamente',saved.length,0);
 check('proposta não altera editor sem revisão',await page.getByLabel('Código JavaScript',{exact:true}).inputValue(),'form.hide("grupo");');
 await page.getByRole('button',{name:'Aplicar ao editor',exact:true}).click();await page.getByRole('button',{name:'Salvar rascunho',exact:true}).click();await page.getByText('Rascunho v1 salvo.',{exact:false}).waitFor();check('conversa vinculada ao save',saved[0].conversationIds,['chat']);check('salvar não publica',published,null);

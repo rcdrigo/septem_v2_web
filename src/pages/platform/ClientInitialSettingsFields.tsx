@@ -37,8 +37,6 @@ export type InitialEnvironmentSettings = {
   turnstileSiteKey: string | null;
   portalUrl: string | null;
   openRouterModel: string | null;
-  openRouterSiteUrl: string | null;
-  openRouterMaxTokens: number;
   policies: Record<string, InitialPolicy>;
   /** Estado da tela; o wizard remove esta propriedade do snapshot enviado à API. */
   storageMode: 'shared' | 'dedicated';
@@ -82,7 +80,7 @@ const policyFields: Record<(typeof tabs)[number][0], string[]> = {
   storage: ['maxUploadMb', 'bucketName', 'region', 'endpoint', 'accessKey', 'secretKeySet', 'cdnUrl', 'useSignedUrls', 'urlExpirationMinutes', 'storageClass', 'encryption', 'blockedExtensions'],
   security: ['twoFactorMode', 'maxLoginAttempts', 'lockoutMinutes'],
   public: ['turnstileSiteKey', 'turnstileSecret', 'portalUrl'],
-  openRouter: ['apiKeySet', 'model', 'siteUrl', 'maxTokens'],
+  openRouter: ['apiKeySet', 'model'],
 };
 
 const fieldLabels: Record<string, string> = {
@@ -97,7 +95,7 @@ const fieldLabels: Record<string, string> = {
   blockedExtensions: 'Extensões bloqueadas', twoFactorMode: 'Autenticação em dois fatores',
   maxLoginAttempts: 'Tentativas de login', lockoutMinutes: 'Tempo de bloqueio',
   turnstileSiteKey: 'Chave pública do captcha', turnstileSecret: 'Chave secreta do captcha', portalUrl: 'URL do portal',
-  apiKeySet: 'Chave da API', model: 'Modelo', siteUrl: 'URL do site', maxTokens: 'Limite de tokens',
+  apiKeySet: 'Chave da API', model: 'Modelo padrão',
 };
 
 const inputClass = 'min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200 disabled:bg-slate-50 disabled:text-slate-500';
@@ -216,9 +214,7 @@ export function ClientInitialSettingsFields({ value, onChange, storageDefaults, 
           </div>}
 
           {key === 'openRouter' && <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Modelo"><TextInput value={value.openRouterModel ?? ''} placeholder="openai/gpt-4o-mini" onChange={openRouterModel => update({ openRouterModel: openRouterModel || null })} /></Field>
-            <Field label="URL do site"><TextInput type="url" value={value.openRouterSiteUrl ?? ''} onChange={openRouterSiteUrl => update({ openRouterSiteUrl: openRouterSiteUrl || null })} /></Field>
-            <Field label="Limite de tokens"><NumberInput value={value.openRouterMaxTokens} min={1} max={100000} onChange={openRouterMaxTokens => update({ openRouterMaxTokens })} /></Field>
+            <Field label="Modelo padrão"><TextInput value={value.openRouterModel ?? ''} placeholder="openai/gpt-4o-mini" onChange={openRouterModel => update({ openRouterModel: openRouterModel || null })} /></Field>
             <SecretField label="Chave da API OpenRouter" value={secrets.openRouterApiKey ?? ''} onChange={v => updateSecret('openRouterApiKey', v)} />
           </div>}
 
