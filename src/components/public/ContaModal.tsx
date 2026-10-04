@@ -6,7 +6,7 @@ import { TurnstileWidget } from '@/components/public/TurnstileWidget';
 import { ApiError } from '@/lib/api';
 import { useSessionStore } from '@/stores/session';
 
-type Etapa = 'login' | 'cadastro' | 'codigo';
+type Etapa = 'login' | 'cadastro' | 'codigo' | '2fa';
 
 /**
  * Cadastro e login do cidadão DENTRO da página do formulário (Fase 8, passos 7 e 8).
@@ -19,6 +19,9 @@ export function ContaModal({ etapaInicial, siteKey, onClose }: {
   etapaInicial: Etapa; siteKey: string | null; onClose: () => void;
 }) {
   const login = useSessionStore((s) => s.login);
+  const completeTwoFactor = useSessionStore((s) => s.completeTwoFactor);
+  const [maskedEmail, setMaskedEmail] = useState('');
+  const [trustDevice, setTrustDevice] = useState(false);
   const [etapa, setEtapa] = useState<Etapa>(etapaInicial);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -39,8 +42,9 @@ export function ContaModal({ etapaInicial, siteKey, onClose }: {
     try {
       const r = await login(form.email, form.password, true);
       if (r.kind === 'two-factor') {
-        // Conta com 2FA não cabe neste modal: a tela de login trata o desafio inteiro.
-        setErro('Sua conta usa verificação em duas etapas. Entre pela tela de login.');
+        setMaskedEmail(r.maskedEmail);
+        setCodigo('');
+        setEtapa('2fa');
         return;
       }
       onClose();
@@ -71,15 +75,28 @@ export function ContaModal({ etapaInicial, siteKey, onClose }: {
       await confirmarCadastro(form.email, codigo);
       // Entra pelo MESMO caminho do login normal: menos um jeito de autenticar para
       // manter, e a sessão nasce igual à de qualquer outra pessoa.
-      await login(form.email, form.password, true);
-      onClose();
+      const result = await login(form.email, form.password, true);
+      if (result.kind === 'two-factor') {
+        setMaskedEmail(result.maskedEmail);
+        setCodigo('');
+        setEtapa('2fa');
+      } else onClose();
     } catch (e) {
       setErro(detalhe(e) ?? 'Código inválido ou expirado.');
     } finally { setOcupado(false); }
   }
 
+  async function confirmarMfa() {
+    setOcupado(true); setErro(null);
+    try {
+      await completeTwoFactor(form.email, codigo.trim(), trustDevice, true);
+      onClose();
+    } catch (error) { setErro(detalhe(error) ?? 'Código inválido ou expirado.'); }
+    finally { setOcupado(false); }
+  }
+
   const titulo = etapa === 'login' ? 'Entrar na conta'
-    : etapa === 'cadastro' ? 'Criar conta' : 'Confirme seu e-mail';
+    : etapa === 'cadastro' ? 'Criar conta' : etapa === '2fa' ? 'Verificação em duas etapas' : 'Confirme seu e-mail';
 
   return (
     <Dialog open onClose={onClose} title={titulo} width="md">
@@ -119,6 +136,19 @@ export function ContaModal({ etapaInicial, siteKey, onClose }: {
           </>
         )}
 
+        {etapa === '2fa' && (
+          <>
+            <p className="text-sm text-slate-600">Enviamos um código para <strong>{maskedEmail}</strong>. Confirme para entrar sem sair desta página.</p>
+            <label className="flex flex-col gap-1 text-sm text-slate-700">Código
+              <input value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" data-testid="conta-mfa-codigo" className="rounded-md border border-slate-300 px-3 py-2" />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={trustDevice} onChange={(e) => setTrustDevice(e.target.checked)} /> Confiar neste dispositivo por 1 mês
+            </label>
+            <Acao onClick={confirmarMfa} ocupado={ocupado} desabilitado={codigo.length !== 6} testid="conta-mfa-confirmar">Confirmar e entrar</Acao>
+            <Alternar testid="conta-mfa-voltar" onClick={() => { setErro(null); setCodigo(''); setEtapa('login'); }}>Voltar ao login</Alternar>
+          </>
+        )}
         {etapa === 'codigo' && (
           <>
             <p className="text-sm text-slate-600">

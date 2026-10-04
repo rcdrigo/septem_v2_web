@@ -1,6 +1,5 @@
 import type { BusinessHoursWeek } from '@/lib/business-calendar';
 import type { CalendarLocation } from '@/lib/business-calendar';
-import type { InitialEnvironmentSettings, InitialEnvironmentSecrets } from '@/pages/platform/ClientInitialSettingsFields';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApi } from '@/lib/platform-api';
 
@@ -224,23 +223,24 @@ export type NovoAmbienteInput = {
   dbName?: string;
   host?: string;
   displayName?: string;
-  seedDummyData: boolean;
+  seedDummyData?: boolean;
 };
 
-export type NovoClienteInput = CalendarLocation & {
-  businessHours: BusinessHoursWeek;
-  initialSettings?: Omit<InitialEnvironmentSettings, 'storageMode'>;
-  initialSecrets?: InitialEnvironmentSecrets;
+export type NovoClienteInput = {
+  initialSettings?: {
+    logoUrl?: string | null;
+    heroImageUrl?: string | null;
+    systemDescription?: string | null;
+    policies?: Record<string, { visible: boolean; editable: boolean }>;
+  };
   name: string;
   primaryColor?: string;
   managedBySeptem?: boolean;
   adminName?: string;
   adminEmail?: string;
   features?: string[];
-  production?: NovoAmbienteInput;
-  staging?: NovoAmbienteInput | null;
-  /** Processos publicados em origens de tenant, instalados nos ambientes novos. */
-  initialProcessSelections?: { sourceTenantId: string; processKey: string; version: number }[];
+  production: NovoAmbienteInput;
+  staging: NovoAmbienteInput;
 };
 
 export function useCreateClient() {

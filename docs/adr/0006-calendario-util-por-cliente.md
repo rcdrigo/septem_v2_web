@@ -1,5 +1,7 @@
 # Calendário padrão do cliente com cópias independentes por ambiente
 
+Revisão de 4 de outubro de 2026: o [ADR 0008](0008-localizacao-configurada-por-ambiente.md) substitui a exigência de localização no cadastro central e seu escopo por cliente. Ler essas regras históricas conforme a revisão; os demais princípios de calendários independentes e preservação de vencimentos permanecem.
+
 A configuração atual de expediente pertence ao ambiente; a decisão para sua evolução é definir um calendário padrão de horas úteis no cliente e copiá-lo ao criar cada ambiente. As cópias são independentes: editar o calendário em produção, por exemplo, afeta somente produção, sem alterar homologação nem o padrão do cliente. Isso permite começar com os horários do cliente e ajustar cada ambiente sem propagar mudanças. Alterações afetam somente novos cálculos e preservam vencimentos já calculados, evitando mudanças implícitas nos prazos de tarefas em andamento.
 
 A checagem de feriados ocorre ao calcular as horas úteis das tarefas, usando a cidade e o estado do cliente, e não no cadastro do cliente. O calendário serve ao cálculo de horas úteis e às regras de negócio que o utilizem, sem representar status de aberto ou fechado.

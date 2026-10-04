@@ -11,7 +11,6 @@ import { useDocumentTitle } from '@/lib/use-document-title';
  * mantém de pé com o ambiente inativado — branding e modo, nada de banco ou diagnóstico.
  */
 type Status = {
-  clienteNome: string;
   ambienteNome: string;
   logoUrl?: string | null;
   primaryColor: string;
@@ -50,7 +49,7 @@ export function AmbienteInativoPage() {
     <div className="grid min-h-screen place-items-center bg-slate-100 px-4 py-10">
       <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
         {status?.logoUrl ? (
-          <img src={status.logoUrl} alt={status.clienteNome} className="mx-auto mb-4 max-h-16" />
+          <img src={status.logoUrl} alt={status.ambienteNome} className="mx-auto mb-4 max-h-16" />
         ) : (
           <CircleSlash className="mx-auto mb-4 h-10 w-10 text-slate-400" />
         )}
@@ -59,8 +58,8 @@ export function AmbienteInativoPage() {
           Ambiente indisponível
         </h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          {status?.clienteNome
-            ? `O ambiente ${status.ambienteNome || ''} de ${status.clienteNome} está inativado no momento.`
+          {status?.ambienteNome
+            ? `O sistema ${status.ambienteNome} está inativado no momento.`
             : 'Este ambiente está inativado no momento.'}{' '}
           Entre em contato com a Septem para mais informações.
         </p>

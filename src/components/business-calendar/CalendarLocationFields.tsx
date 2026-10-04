@@ -16,8 +16,8 @@ export function CalendarLocationFields({ value, onChange, disabled, required = t
   const cities = useQuery({ queryKey: ['locations', 'cities', value.stateCode], queryFn: () => api.get<{ items: LocationOption[] }>(`/api/v1/locations/states/${encodeURIComponent(value.stateCode ?? '')}/cities`, { anonymous: true }), enabled: !!value.stateCode, staleTime: 86_400_000 });
   const selectedCityMissing = !!value.cityCode && !cities.data?.items.some(city => city.code === value.cityCode);
   return <fieldset disabled={disabled} className="min-w-0 space-y-3">
-    <legend className="text-sm font-semibold text-slate-900">Localização do cliente</legend>
-    <p className="text-sm leading-6 text-slate-600">A cidade e o estado identificam os feriados usados nos próximos cálculos de horas úteis. A localização pertence ao cliente e vale para seus ambientes.</p>
+    <legend className="text-sm font-semibold text-slate-900">Localização do ambiente</legend>
+    <p className="text-sm leading-6 text-slate-600">A cidade e o estado identificam os feriados usados nos próximos cálculos de horas úteis. A localização e o calendário valem somente para este ambiente.</p>
     <div className="grid gap-4 sm:grid-cols-2">
       <label htmlFor={`${id}-state`} className="space-y-1 text-sm font-medium text-slate-700"><span>Estado</span><select id={`${id}-state`} required={required} className={input} value={value.stateCode ?? ''} disabled={disabled || states.isLoading || states.isError} onChange={event => {
         const stateCode = event.target.value;

@@ -1,6 +1,6 @@
 # 02 — Dados, contratos e processamento
 
-Propostas técnicas a alinhar ao backend; regras normativas em [01-dominio.md](01-dominio.md).
+Propostas técnicas a alinhar ao backend; regras normativas em [01-dominio.md](01-dominio.md). O cadastro revisado está consolidado em [04-cadastro-simplificado.md](04-cadastro-simplificado.md).
 
 ## Modelo lógico e localização
 
@@ -10,14 +10,15 @@ IDs opacos, instantes UTC e versões para concorrência. O catálogo central man
 | --- | --- |
 | Client | Central: id, name, version |
 | ClientAdminBinding | Central: clientId, identityId; vínculo ao cliente, não a um único ambiente |
-| Environment | Central: id, clientId, displayName, purpose, databaseName, connectionSecretRef, logoRef, provisioningStatus, operatingMode, clientCanEditCredentials, version |
+| Environment | Central: id, clientId, displayName, description, primaryColor, purpose, databaseName, connectionSecretRef, logoRef, heroRef, provisioningStatus, operatingMode, permittedIntegrationKinds, initialDefaultsVersion, version |
+| EnvironmentCalendar | Banco do ambiente: períodos úteis, fuso, estado e município inicialmente vazios; edição pelo administrador do ambiente |
 | EnvironmentDomain | Central: id, environmentId, host, kind (platform/custom), verificationStatus, tlsStatus, lastCheckedAt, safeError |
 | FeatureDefinition | Central: key estável, label, implementedCapability, requiredIntegrationKinds |
 | EnvironmentFeature | Central: environmentId, featureKey, enabled, version |
 | CatalogProcessVersion | Central: processId, versionId, definição imutável, dependências versionadas, autor/data |
 | EnvironmentArtifactVersion | Banco do ambiente: artifactId, kind, versionId, conteúdo, dependencyVersions, originCatalogId?, originVersion?, previousVersionId? |
 | ProcessExecution | Banco do ambiente: id, processVersionId, dependencyVersions, status, blockedReason?, checkpoint |
-| IntegrationConfiguration | Por ambiente: kind, accountOwner (septem/client), status, secretRef, version; segredo não retornado |
+| IntegrationConfiguration | Por ambiente: kind, accountOwner (septem/client), status, secretRef, resourceRefs, version; valores iniciais preservados, segredo não retornado |
 | ProvisioningJob / Step | Central: id, environmentId, requestKey, payloadHash, status, steps, resourceRefs, attempts, safeError, timestamps |
 | TransferPlan / Job | Central: id, actor, source, destination, kind, artifactSelections, resolvedDependencies, sourceVersions, targetVersions, diff, conflicts, status, resultVersionRefs |
 | AdminInvite | Central: identityId, clientId, tokenHash, expiresAt, deliveryStatus; token de uso único |
@@ -35,10 +36,10 @@ Jobs retornam 202 com `{ operationId, status, statusUrl }`; consultas retornam p
 
 | Operação | Contrato principal |
 | --- | --- |
-| GET/POST `/api/v1/admin/clients` | Listar/criar cliente; criação aceita primeiro admin e pedido de produção com homologação opcional, retorna clientId e operationIds por ambiente |
+| GET/POST `/api/v1/admin/clients` | Listar/criar cliente; nome do cliente, identidade opcional, subdomínio, featureKeys, permittedIntegrationKinds e septemManaged; primeiro admin somente quando septemManaged=false. Sempre produção e homologação; nomes dos bancos e provedores são definidos pelo servidor; não aceita seleção de processos nem dados fictícios. Retorna clientId e operationIds por ambiente |
 | GET `/api/v1/admin/clients/{id}` | Cliente, admins e ambientes autorizados |
 | POST `/api/v1/admin/clients/{id}/environments` | displayName, purpose, platformHost, customHost?, logoRef, databaseName, featureKeys, catalogProcessVersionIds, seedDummyData, clientCanEditCredentials |
-| PATCH `/api/v1/admin/environments/{id}` | displayName, logoRef, clientCanEditCredentials, expectedVersion; não aceita renomear base ou converter finalidade |
+| PATCH `/api/v1/admin/environments/{id}` | displayName, description, primaryColor, logoRef, heroRef, permittedIntegrationKinds, expectedVersion; não aceita renomear base, converter finalidade ou desativar MFA |
 | PUT `/api/v1/admin/environments/{id}/features` | featureKeys habilitadas e expectedVersion; somente super admin |
 | POST `/api/v1/admin/environments/{id}/mode` | mode, expectedVersion; só altera modo operacional |
 | GET/POST `/api/v1/admin/environments/{id}/overdue-schedules` | Listar ocorrências / decidir occurrenceIds, action execute/discard; somente super admin |
@@ -62,15 +63,25 @@ Jobs retornam 202 com `{ operationId, status, statusUrl }`; consultas retornam p
 
 Cadastro de logo precisa de upload próprio autenticado, validação de formato/tamanho e referência pertencente ao cadastro; não exigir workflow fictício. Definir limites de arquivo no contrato compartilhado antes de implementar upload.
 
+O cadastro de novos clientes não recebe configurações iniciais dos provedores nem segredos da Septem do frontend. O servidor resolve appsettings e persiste os valores iniciais de cada ambiente ou referências protegidas equivalentes; mudar appsettings não altera esses ambientes. Origem da conta é distinta de permittedIntegrationKinds. As três permissões começam desmarcadas; sua revogação não substitui a integração ativa.
+
+O endpoint de criação de ambientes adicionais permanece um fluxo distinto do cadastro simplificado de novo cliente; seus campos anteriores não tornam opcionais os dois ambientes iniciais.
+
+Status público e respostas destinadas ao ambiente apresentam somente identidade do sistema, sem nome central do cliente. Edição de calendário e identidade, incluindo cor principal, pelo admin do cliente não depende das permissões de integração. Rejeitar mutações da política de segurança tanto por super admins quanto por admins do cliente. MFA é obrigatório para todos os usuários autenticados; dispositivo confiável dispensa novos desafios por um mês após MFA bem-sucedido. Validar expiração no servidor sem renovação pelo simples uso; ao expirar, exigir nova autenticação com MFA na próxima ação autenticada, inclusive com sessão ainda aberta.
+
+Substituição de SMTP usa configuração candidata protegida e teste de envio antes de ativação. Teste malsucedido preserva a configuração anterior. A configuração candidata testada deve ser a mesma ativada, com controle de versão para evitar troca concorrente. Credenciais e resultados de teste não expõem segredos. Indisponibilidade posterior permite correção pela Septem na área central, preservando MFA.
+
+Validar calendário antes de iniciar processos em qualquer canal, incluindo API, automações e agentes. Configuração incompleta gera erro acionável e orientação para completar calendário no ambiente; não confundir com inativação total, pois acesso de configuração continua disponível. Calendário completo exige estado, município, fuso e pelo menos um período válido de funcionamento. Após a configuração inicial, rejeitar alterações incompletas e manter a última configuração válida, sem interromper processos em andamento ou recalcular vencimentos anteriores.
+
 ## Provisionamento durável
 
-1. Validar autorização e entrada, reservar nomes/hosts únicos e persistir cliente/ambientes/jobs antes de executar efeitos externos.
+1. Validar autorização, entrada e unicidade do nome do cliente, gerar/reservar nomes dos bancos (`nome_do_cliente`, `nome_do_cliente_hml`) e hosts (produção e `hml-`), e persistir cliente, produção, homologação e jobs antes de executar efeitos externos. Rejeitar colisão de qualquer banco, mesmo com cliente de nome diferente, sem gerar sufixos alternativos. Garantir reservas únicas no servidor sob concorrência; checagem antecipada na interface não substitui essa garantia.
 2. Criar banco exclusivo, aplicar migrações e cadastros essenciais; registrar checkpoint e propriedade do recurso.
-3. Aplicar branding, funcionalidades e cópias das versões selecionadas. Aplicar seed somente se permitido e uma única vez por versão do seed.
+3. Aplicar identidade, funcionalidades e padrões iniciais de provedores; provisionar recursos isolados e registrar referências. Não replicar processos do catálogo nem instalar dados fictícios neste cadastro.
 4. Configurar roteamento e HTTPS do subdomínio; preparar domínio próprio separadamente.
-5. Preparar identidade/vínculo/convite e verificar critérios de prontidão. Marcar pronto e enfileirar entrega do convite.
+5. Quando septemManaged=false, preparar identidade/vínculo/convite sem duplicação entre ambientes. Verificar prontidão por ambiente e enfileirar convite quando produção ficar pronta, sem esperar homologação. Falha de entrega tem reenvio independente.
 
-Workers usam exclusão por ambiente e leases recuperáveis; uma interrupção pode ser retomada. Não executar operação concorrente de criação sobre o mesmo banco. Cada adaptador externo deve identificar recursos já criados pelo job. Não remover banco com dados como compensação automática. Produção e homologação não compartilham transação de sucesso.
+Workers usam exclusão por ambiente e leases recuperáveis; uma interrupção pode ser retomada. Não executar operação concorrente de criação sobre o mesmo banco. Cada adaptador externo deve identificar recursos já criados pelo job. Não remover banco com dados como compensação automática. Produção pronta permanece disponível se homologação falhar; apresentar conclusão parcial e retomar somente o ambiente que falhou. O cadastro somente é concluído integralmente quando ambos estiverem prontos.
 
 ## Transferência consistente
 

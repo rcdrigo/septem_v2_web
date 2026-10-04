@@ -6,20 +6,15 @@ import { ApiError } from '@/lib/api';
 import { routes } from '@/lib/routes';
 import { useDocumentTitle } from '@/lib/use-document-title';
 
-/**
- * Login da equipe da Septem. Duas etapas SEMPRE: senha e código por e-mail.
- *
- * Não há "confiar neste dispositivo" nem modo configurável — a conta que enxerga
- * todos os clientes não ganha atalho (Q5). A tela não mostra o branding de nenhum
- * cliente: aqui não existe tenant.
- */
+/** Login central com MFA e confiança limitada a um mês após confirmar o código. */
 export function PlatformLoginPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const pedido = params.get('returnUrl');
-  const returnUrl = pedido?.startsWith('/platform') ? pedido : routes.platformClients;
+  const returnUrl = pedido?.startsWith('/platform/') && !pedido.includes('\\') ? pedido : routes.platformClients;
 
   const status = usePlatformSession((s) => s.status);
+  const reauthenticationRequired = usePlatformSession((s) => s.reauthenticationRequired);
   const bootstrap = usePlatformSession((s) => s.bootstrap);
   const login = usePlatformSession((s) => s.login);
   const completeTwoFactor = usePlatformSession((s) => s.completeTwoFactor);
@@ -29,6 +24,7 @@ export function PlatformLoginPage() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [codigo, setCodigo] = useState('');
+  const [trustDevice, setTrustDevice] = useState(false);
   const [mascarado, setMascarado] = useState('');
   const [aviso, setAviso] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -73,8 +69,9 @@ export function PlatformLoginPage() {
     setAviso(null);
     setEnviando(true);
     try {
-      const { maskedEmail } = await login(email.trim(), senha);
-      setMascarado(maskedEmail);
+      const result = await login(email.trim(), senha);
+      if ('kind' in result) return;
+      setMascarado(result.maskedEmail);
       setEtapa('2fa');
     } catch (err) {
       tratar(err, 'Não foi possível entrar.');
@@ -88,7 +85,7 @@ export function PlatformLoginPage() {
     setAviso(null);
     setEnviando(true);
     try {
-      await completeTwoFactor(email.trim(), codigo.trim());
+      await completeTwoFactor(email.trim(), codigo.trim(), trustDevice);
     } catch (err) {
       tratar(err, 'Não foi possível validar o código.');
     } finally {
@@ -107,6 +104,7 @@ export function PlatformLoginPage() {
           </div>
         </div>
 
+        {reauthenticationRequired && <p role="status" className="mb-4 rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-200">O período de confiança deste dispositivo terminou. Entre novamente e confirme o código por e-mail.</p>}
         {aviso && (
           <p role="alert" data-testid="platform-login-aviso" className="mb-4 rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
             {aviso}
@@ -154,7 +152,7 @@ export function PlatformLoginPage() {
               {enviando && <Loader2 className="h-4 w-4 animate-spin" />} Continuar
             </button>
             <p className="text-center text-xs text-slate-500">
-              Um código de verificação será enviado por e-mail. Sempre.
+              A verificação por e-mail é obrigatória, salvo durante o mês de confiança deste dispositivo.
             </p>
           </form>
         ) : (
@@ -174,6 +172,10 @@ export function PlatformLoginPage() {
                 className="rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-center text-lg tracking-[0.4em] text-slate-100 outline-none"
                 placeholder="000000"
               />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-300">
+              <input type="checkbox" checked={trustDevice} onChange={(e) => setTrustDevice(e.target.checked)} />
+              Confiar neste dispositivo por 1 mês
             </label>
             <button
               type="submit"

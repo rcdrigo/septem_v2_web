@@ -1,3 +1,5 @@
+import { CalendarSetupNotice } from '@/components/business-calendar/CalendarSetupNotice';
+import { tenantSystemName } from '@/lib/tenant-meta';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, Lock, Search, Unlock, Workflow } from 'lucide-react';
 import { FALLBACK_COLOR, groupByCategory, NamedIcon, tintOf } from '@/components/catalog/category-catalog';
@@ -25,7 +27,7 @@ export function CentralServicosPage() {
   const { data, isLoading, isError } = usePublicServices();
   const [busca, setBusca] = useState('');
   const [categoria, setCategoria] = useState('all');
-  // O tenant já vem do bootstrap (é ele que dá logo e nome do cliente), e o
+  // O tenant já vem do bootstrap (é ele que dá logo e nome do sistema), e o
   // bootstrap acontece antes do login — a Central pode contar com ele.
   const tenant = useSessionStore((estado) => estado.tenant);
   // Rota FORA do AppShell e sem login: precisa disparar o bootstrap por conta
@@ -61,10 +63,11 @@ export function CentralServicosPage() {
                 <h1 className="text-lg font-semibold leading-snug text-slate-900">Central de serviços</h1>
                 <ContextHelp manual="jornada-solicitante-externo" section="localizar-servico" label="Abrir manual da jornada do solicitante externo" />
               </div>
-              <p className="truncate text-sm text-slate-500">{tenant?.clienteNome ?? 'Serviços disponíveis'}</p>
+              <p className="truncate text-sm text-slate-500">{tenantSystemName(tenant)}</p>
             </div>
           </div>
 
+          <CalendarSetupNotice />
           {tenant?.operatingMode === 'new_requests_blocked' && (
             <p
               role="alert"

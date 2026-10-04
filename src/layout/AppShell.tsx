@@ -1,3 +1,4 @@
+import { tenantSystemName } from '@/lib/tenant-meta';
 import { useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Menu, UserCog } from 'lucide-react';
@@ -74,7 +75,7 @@ export function AppShell() {
           >
             <Menu size={20} />
           </button>
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{tenant?.clienteNome ?? 'Septem'}</span>
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{tenantSystemName(tenant)}</span>
           <SinoDeNotificacoes lado="cliente" />
         </div>
 

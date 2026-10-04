@@ -110,3 +110,49 @@ Usa React real com APIs/modeler simulados, seguindo o harness de E2. `modelador-
 A limpeza foi desativada. `python3 tools/uitest/native-migration.py` verifica conversão conservadora, identidade, respostas e XML. O guia operacional vigente é `docs/specs/formularios-nativos-migracao.md`.
 
 `npm run test:native-migration` inclui validação pelo parser nativo real. `native-migration-postgres.py` altera fixtures e aplica a migração: executar exclusivamente em cópia descartável do banco de integração, com `PGDATABASE` iniciado por `native_migration_test_`. O teste não deve ser usado no banco do operador.
+
+## Cadastro simplificado e MFA mensal
+
+As sondas `client-onboarding`, `client-branding`, `client-access-policy`,
+`session-renewal` e `platform-session-policy` usam os componentes e stores reais
+com respostas HTTP controladas para validar contratos, falhas e concorrência.
+`client-onboarding-integration` conecta o navegador ao servidor real e PostgreSQL.
+No host isolado, apenas os adapters de DNS/publicação e recursos externos são
+substituídos pelos adapters da `SeptemApiFactory`; não há interceptação de
+respostas no navegador. As migrations, reservas, jobs, autenticação e consultas
+às configurações executam no backend.
+
+Para executar a integração sem usar bancos ou contas de clientes, primeiro
+conclua os testes .NET. Inicie um PostgreSQL **descartável** em loopback, com
+permissão de criar bancos, e informe sua conexão. A fábrica cria bancos próprios
+com sufixos exclusivos. O host exige consentimento explícito para usar essa
+instância local e a sonda valida seu marcador antes de criar clientes.
+
+```bash
+# Na raiz de septem_v2_web; PostgreSQL temporário já iniciado nesta porta.
+export SEPTEM_TEST_POSTGRES='Host=127.0.0.1;Port=55438;Username=postgres;Database=postgres'
+export SEPTEM_UI_TEST_ISOLATED=1
+export ASPNETCORE_TEST_CONTENTROOT_SEPTEM_API="$(cd ../septem_v2/src/Septem.Api && pwd)"
+dotnet run --project tools/uitest/isolated-api-host/UiHost.csproj --no-launch-profile
+```
+
+Em outros terminais na raiz do frontend:
+
+```bash
+VITE_API_PROXY_TARGET=http://127.0.0.1:5058 npm run dev -- --host 127.0.0.1 --port 5173
+API_URL=http://127.0.0.1:5058 FRONT_URL=http://127.0.0.1:5173 npm run test:client-onboarding-integration
+```
+
+O projeto do host usa `../septem_v2` como backend adjacente. Um checkout diferente
+pode ser indicado com `-p:BackendRoot=/caminho/absoluto/do/backend` e com o content
+root correspondente. Use `CHROME_BIN` se o Chrome estiver em outro caminho.
+Capturas e registros de fixtures ficam no diretório temporário do sistema, ou
+em `OUT_DIR`. O teste usa 1280×900 e 375×812 e verifica overflow e controles
+cortados. Ao terminar, encerre os dois hosts e o PostgreSQL temporário.
+
+`run-all.sh` também aceita `API_URL`, `FRONT_URL`, `OUT_DIR` e `SUITE_TIMEOUT`.
+O limite de duração funciona em macOS com Python quando GNU timeout não está
+instalado. Suítes históricas que fixam a porta 5000, `/usr/bin/google-chrome` ou
+login sem MFA precisam ser adaptadas antes de usar essa instância isolada como
+alvo da bateria completa; uma falha de pré-requisito não comprova defeito do
+produto.

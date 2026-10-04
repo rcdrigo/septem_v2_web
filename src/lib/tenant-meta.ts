@@ -2,7 +2,7 @@ import type { Tenant } from '@/stores/session';
 
 /**
  * Aplica as meta tags de compartilhamento (Open Graph) a partir dos Parâmetros do
- * sistema: quem cola a URL do portal no WhatsApp/Teams vê o nome do cliente, a
+ * sistema: quem cola a URL do portal no WhatsApp/Teams vê o nome do sistema, a
  * descrição e a imagem de destaque do tenant — não "Septem".
  *
  * Nota: crawlers que não executam JS (WhatsApp, Slack) só leem meta tags do HTML
@@ -10,7 +10,7 @@ import type { Tenant } from '@/stores/session';
  * deixamos a fonte da verdade certa e o título/preview corretos no navegador.
  */
 export function applyTenantMeta(tenant: Tenant): void {
-  const title = `${tenant.clienteNome} — ${tenant.ambienteNome}`;
+  const title = tenantSystemName(tenant);
   const description = tenant.systemDescription ?? 'Portal de serviços e processos.';
   const image = tenant.heroImageUrl ?? tenant.logoUrl ?? '';
 
@@ -36,4 +36,8 @@ function setMeta(attr: 'name' | 'property', key: string, value: string): void {
     document.head.appendChild(el);
   }
   el.content = value;
+}
+
+export function tenantSystemName(tenant?: { ambienteNome?: string } | null): string {
+  return tenant?.ambienteNome?.trim() || 'Septem';
 }

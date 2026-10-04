@@ -12,7 +12,6 @@ import { api } from '@/lib/api';
 export type SettingsGeneral = CalendarLocation & {
   tenantId: string;
   host: string | null;
-  clienteNome: string;
   ambienteNome: string;
   logoUrl: string | null;
   primaryColor: string;
@@ -92,7 +91,6 @@ export type Settings = {
 };
 
 export type GeneralPayload = CalendarLocation & {
-  clienteNome: string;
   ambienteNome: string;
   logoUrl: string | null;
   primaryColor: string;
@@ -114,6 +112,8 @@ export type EmailPayload = {
   password: string | null;
   fromAddress: string | null;
   fromName: string | null;
+  /** Required for the server to test the candidate before activation. */
+  testTo?: string;
 };
 
 export type StoragePayload = {
@@ -143,41 +143,25 @@ function policyAt(policies: Record<string, SettingsPolicy> | undefined, path: st
   return key ? policies[key] : DEFAULT_POLICY;
 }
 
-export function settingsSectionVisible(
-  policies: Record<string, SettingsPolicy> | undefined,
-  section: string,
-): boolean {
+export function settingsSectionVisible(policies: Record<string, SettingsPolicy> | undefined, section: string): boolean {
+  const key = section.toLowerCase();
+  if (key === 'general' || key === 'public') return true;
+  if (key === 'security') return false;
+  if (['email', 'storage', 'openrouter'].includes(key)) {
+    const path = Object.keys(policies ?? {}).find(path => path.toLowerCase() === key);
+    return !!path && !!policies?.[path].visible && !!policies[path].editable;
+  }
   return policyAt(policies, section).visible;
 }
 
-export function settingsSectionEditable(
-  policies: Record<string, SettingsPolicy> | undefined,
-  section: string,
-): boolean {
-  const sectionPolicy = policyAt(policies, section);
-  return sectionPolicy.visible && sectionPolicy.editable;
+export function settingsSectionEditable(policies: Record<string, SettingsPolicy> | undefined, section: string): boolean {
+  if (section.toLowerCase() === 'security') return false;
+  if (section.toLowerCase() === 'general' || section.toLowerCase() === 'public') return true;
+  return settingsSectionVisible(policies, section) && policyAt(policies, section).editable;
 }
 
-export function settingsFieldPolicy(
-  policies: Record<string, SettingsPolicy> | undefined,
-  section: string,
-  field?: string,
-): SettingsPolicy {
-  const sectionPolicy = policyAt(policies, section);
-  if (!field) return sectionPolicy;
-  const fieldPolicy = policyAt(policies, `${section}.${field}`);
-  const secretStatusField = field === 'password' ? 'passwordSet'
-    : field === 'secretKey' ? 'secretKeySet'
-    : field === 'apiKey' ? 'apiKeySet' : undefined;
-  const statusPolicy = secretStatusField ? policyAt(policies, `${section}.${secretStatusField}`) : DEFAULT_POLICY;
-  // Existing restrictions remain effective when the three legacy fields become one editor.
-  const legacyCalendar = field === 'businessHours'
-    ? ['businessHourStart', 'businessHourEnd', 'businessDays'].map(name => policyAt(policies, `${section}.${name}`))
-    : [];
-  return {
-    visible: sectionPolicy.visible && fieldPolicy.visible && statusPolicy.visible && legacyCalendar.every(policy => policy.visible),
-    editable: sectionPolicy.editable && fieldPolicy.editable && statusPolicy.editable && legacyCalendar.every(policy => policy.editable),
-  };
+export function settingsFieldPolicy(policies: Record<string, SettingsPolicy> | undefined, section: string, _field?: string): SettingsPolicy {
+  return { visible: settingsSectionVisible(policies, section), editable: settingsSectionEditable(policies, section) };
 }
 
 /** Removes hidden/read-only fields before a settings mutation is sent to the API. */
@@ -189,7 +173,7 @@ export function sanitizeSettingsPayload<T extends object>(
   const result: Partial<T> = {};
   for (const key of Object.keys(payload) as Array<keyof T>) {
     const permission = settingsFieldPolicy(policies, section, String(key));
-    if (permission.visible && permission.editable) result[key] = payload[key];
+    if (String(key) !== 'clienteNome' && permission.visible && permission.editable) result[key] = payload[key];
   }
   return result;
 }
@@ -236,9 +220,9 @@ export function useSaveEmail() {
   });
 }
 
-/** Envia um e-mail de teste com a config JÁ SALVA (salve antes de testar). */
+/** Testa a configuração candidata sem ativá-la. A ativação também exige teste no servidor. */
 export function useTestEmail() {
-  return useMutation({ mutationFn: (to: string) => api.post('/api/v1/settings/email/test', { to }) });
+  return useMutation({ mutationFn: (body: { to: string; candidate: EmailPayload }) => api.post('/api/v1/settings/email/test', body) });
 }
 
 export function useSaveStorage() {

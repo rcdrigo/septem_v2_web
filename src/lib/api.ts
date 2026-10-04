@@ -79,6 +79,7 @@ let inactiveHandler: (() => void) | null = null;
  * o que ele disse, em vez de inventar uma segunda versão da mesma frase.
  */
 export const FEATURE_DISABLED = 'feature_disabled';
+export const MFA_REAUTHENTICATION_REQUIRED = 'mfa_reauthentication_required';
 
 export function onEnvironmentInactive(handler: () => void) {
   inactiveHandler = handler;
@@ -86,13 +87,16 @@ export function onEnvironmentInactive(handler: () => void) {
 
 let tokenProvider: () => string | null = () => null;
 let refreshHandler: (rejectedToken?: string | null) => Promise<string | null> = async () => null;
+let reauthenticationHandler: (rejectedToken?: string | null) => Promise<void> = async () => {};
 let logoutHandler: (rejectedToken?: string | null) => Promise<void> = async () => {};
 
 export function configureApi(opts: {
+  reauthenticate?: (rejectedToken?: string | null) => Promise<void>;
   getAccessToken: () => string | null;
   refresh: (rejectedToken?: string | null) => Promise<string | null>;
   logout: (rejectedToken?: string | null) => Promise<void>;
 }) {
+  reauthenticationHandler = opts.reauthenticate ?? opts.logout;
   tokenProvider = opts.getAccessToken;
   refreshHandler = opts.refresh;
   logoutHandler = opts.logout;
@@ -130,12 +134,22 @@ async function request(path: string, options: ApiOptions = {}): Promise<Response
 
   let resp = await fetch(`${BASE_URL}${path}`, { ...rest, headers: finalHeaders });
 
+  async function requireMfa(response: Response) {
+    if (response.status !== 401 || anonymous) return;
+    const error = await readError(response.clone());
+    if (error.body?.error !== MFA_REAUTHENTICATION_REQUIRED) return;
+    await reauthenticationHandler(finalHeaders.get('Authorization')?.replace(/^Bearer /, '') ?? null);
+    throw error;
+  }
+  await requireMfa(resp);
+
   if (resp.status === 401 && !anonymous && !skipRefresh) {
     const rejectedToken = finalHeaders.get('Authorization')?.replace(/^Bearer /, '') ?? null;
     const newToken = await refreshHandler(rejectedToken);
     if (newToken) {
       finalHeaders.set('Authorization', `Bearer ${newToken}`);
       resp = await fetch(`${BASE_URL}${path}`, { ...rest, headers: finalHeaders });
+      await requireMfa(resp);
     } else {
       // Só ausência/rejeição definitiva do refresh retorna null. Falhas transitórias
       // são propagadas sem encerrar a sessão. A expiração não revoga outra sessão.

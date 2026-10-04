@@ -24,8 +24,8 @@ export function businessHoursFromSettings(settings: {
 }
 
 export function validateCalendarLocation(location: CalendarLocation): string | null {
-  if (!location.stateCode || !location.cityCode || !location.cityName) return 'Selecione o estado e o município do cliente.';
-  if (!location.timeZoneId) return 'Confira o fuso horário do cliente.';
+  if (!location.stateCode || !location.cityCode || !location.cityName) return 'Selecione o estado e o município deste ambiente.';
+  if (!location.timeZoneId) return 'Confira o fuso horário deste ambiente.';
   try { new Intl.DateTimeFormat('pt-BR', { timeZone: location.timeZoneId }); }
   catch { return 'Selecione um fuso horário válido.'; }
   return null;

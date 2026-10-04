@@ -16,18 +16,21 @@ type Settings = CalendarLocation & {
   businessHourStart: number; businessHourEnd: number; businessDays: string;
   twoFactorMode: string; maxLoginAttempts: number; lockoutMinutes: number; maxUploadMb: number;
   policies: Record<string, Policy> | null;
+  smtpHost: string | null; smtpPort: number; smtpUseSsl: boolean; smtpAuthMode: string;
+  smtpUser: string | null; smtpFromAddress: string | null; smtpFromName: string | null;
+  smtpPasswordSet?: boolean;
 };
 type Delivery = { id: number; publicId: string; attempts: number; lastError: string | null };
-const tabs = [['general', 'Geral'], ['email', 'E-mail'], ['storage', 'Armazenamento'], ['security', 'Segurança'], ['public', 'Área pública'], ['openRouter', 'Inteligência artificial']];
-const fields: Record<string, string[]> = {
-  general: ['clienteNome', 'ambienteNome', 'logoUrl', 'primaryColor', 'heroImageUrl', 'systemDescription', 'businessHours', 'stateCode', 'cityCode', 'timeZoneId'],
-  email: ['host', 'port', 'useSsl', 'authMode', 'user', 'passwordSet', 'fromAddress', 'fromName'],
-  storage: ['maxUploadMb', 'bucketName', 'region', 'endpoint', 'accessKey', 'secretKeySet', 'baseFolder', 'cdnUrl', 'useSignedUrls', 'urlExpirationMinutes', 'storageClass', 'encryption', 'blockedExtensions'],
-  security: ['twoFactorMode', 'maxLoginAttempts', 'lockoutMinutes'],
-  public: ['turnstileSiteKey', 'turnstileSecret', 'portalUrl'], openRouter: ['apiKeySet', 'model'],
+const integrationOptions = [['email', 'Servidor de e-mail'], ['storage', 'Servidor de armazenamento'], ['openRouter', 'Provedor de IA']] as const;
+const enabled = (policies: Record<string, Policy>, name: string) => {
+  const key = Object.keys(policies).find(key => key.toLowerCase() === name.toLowerCase());
+  return !!key && !!policies[key].visible && !!policies[key].editable;
 };
-const labels: Record<string, string> = { clienteNome: 'Nome do cliente', ambienteNome: 'Nome do ambiente', logoUrl: 'Logo', primaryColor: 'Cor principal', heroImageUrl: 'Imagem de destaque', systemDescription: 'Descrição', businessHours: 'Horas úteis', stateCode: 'Estado', cityCode: 'Município', timeZoneId: 'Fuso horário', businessHourStart: 'Início do expediente', businessHourEnd: 'Fim do expediente', businessDays: 'Dias úteis', host: 'Servidor', port: 'Porta', useSsl: 'Usar TLS', authMode: 'Autenticação', user: 'Usuário', passwordSet: 'Senha', fromAddress: 'E-mail remetente', fromName: 'Nome remetente', bucketName: 'Bucket', region: 'Região', endpoint: 'Endereço do serviço', accessKey: 'Chave de acesso', secretKeySet: 'Chave secreta', baseFolder: 'Pasta base', cdnUrl: 'URL da CDN', useSignedUrls: 'URLs assinadas', urlExpirationMinutes: 'Validade da URL', storageClass: 'Classe de armazenamento', encryption: 'Criptografia', maxUploadMb: 'Limite de upload', blockedExtensions: 'Extensões bloqueadas', twoFactorMode: 'Autenticação em dois fatores', maxLoginAttempts: 'Tentativas de login', lockoutMinutes: 'Tempo de bloqueio', turnstileSiteKey: 'Chave pública do captcha', turnstileSecret: 'Chave secreta do captcha', portalUrl: 'URL do portal', apiKeySet: 'Chave da API', model: 'Modelo padrão' };
-const policyLabel = (path: string) => { const [tab, field] = path.split('.'); return `${tabs.find(([key]) => key === tab)?.[1] ?? tab}${field ? ` — ${labels[field] ?? field}` : ''}`; };
+const mutableSettings = (value: Settings | undefined) => {
+  if (!value) return undefined;
+  const { twoFactorMode: _mfa, maxLoginAttempts: _attempts, lockoutMinutes: _lockout, policies: _policies, smtpPasswordSet: _password, ...rest } = value;
+  return rest;
+};
 const input = 'min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm disabled:opacity-50';
 const button = 'min-h-10 rounded-md border border-slate-300 px-3 text-sm font-medium hover:bg-slate-50 disabled:opacity-50';
 
@@ -42,11 +45,15 @@ export function PlatformEnvironmentAdministration({ tenantId, clientId }: { tena
   const deliveries = useQuery({ queryKey: queueKey, queryFn: () => platformApi.get<{ items: Delivery[] }>(`${base}/suspended-deliveries/`) });
   const [draft, setDraft] = useState<Settings | null>(null);
   const [policyDraft, setPolicyDraft] = useState<Record<string, Policy> | null>(null);
-  const [path, setPath] = useState('general');
+  const [smtpDraft, setSmtpDraft] = useState<Partial<Settings> | null>(null);
+  const [smtpPassword, setSmtpPassword] = useState('');
+  const [smtpTestTo, setSmtpTestTo] = useState('');
   const [selected, setSelected] = useState<number[]>([]);
   const [notice, setNotice] = useState('');
   const [uploading, setUploading] = useState(false);
   const value = draft ?? settings.data;
+  const smtpValue = settings.data ? { ...settings.data, ...smtpDraft } : undefined;
+  const updateEmail = (patch: Partial<Settings>) => setSmtpDraft(current => ({ ...current, ...patch }));
   const policies = policyDraft ?? settings.data?.policies ?? {};
   const update = (patch: Partial<Settings>) => setDraft(current => { const baseValue = current ?? settings.data; return baseValue ? { ...baseValue, ...patch } : current; });
   async function upload(kind: 'logo' | 'hero', file: File) {
@@ -60,7 +67,7 @@ export function PlatformEnvironmentAdministration({ tenantId, clientId }: { tena
     } catch { setNotice('Não foi possível enviar a imagem. Use PNG, JPEG, GIF ou WebP.'); }
     finally { setUploading(false); }
   }
-  const save = useMutation({ mutationFn: () => platformApi.put(`${base}/settings/`, value), onSuccess: async () => {
+  const save = useMutation({ mutationFn: () => platformApi.put(`${base}/settings/`, mutableSettings(value)), onSuccess: async () => {
     await cache.invalidateQueries({ queryKey: key }); setDraft(null); setNotice('Parâmetros salvos neste ambiente.');
   }, onError: (error) => setNotice(error instanceof ApiError && error.status === 409
     ? 'Os parâmetros foram alterados por outra pessoa. Recarregue a página antes de editar novamente.'
@@ -80,7 +87,10 @@ export function PlatformEnvironmentAdministration({ tenantId, clientId }: { tena
     if (!policyDraft) setPolicyVersion(environment.data?.version ?? null);
     setPolicyDraft(next);
   };
-  const setPolicy = (name: string, patch: Partial<Policy>) => updatePolicies({ ...policies, [name]: { ...(policies[name] ?? { visible: true, editable: true }), ...patch } });
+  const saveEmail = useMutation({ mutationFn: () => platformApi.put(`${base}/settings/`, {
+      ...mutableSettings(settings.data), ...smtpDraft, smtpPassword: smtpPassword || null, smtpTestTo,
+    }), onSuccess: async () => { await cache.invalidateQueries({ queryKey: key }); setSmtpDraft(null); setSmtpPassword(''); setNotice('SMTP testado e ativado neste ambiente.'); },
+      onError: (error) => setNotice(error instanceof ApiError ? (error.body as { detail?: string })?.detail || 'O teste do SMTP falhou. A configuração anterior foi mantida.' : 'Não foi possível testar e ativar o SMTP.') });
   return <div className="mt-8 space-y-8">
     {notice && <p role="status" className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">{notice}</p>}
     <section aria-labelledby="environment-settings-title">
@@ -88,17 +98,13 @@ export function PlatformEnvironmentAdministration({ tenantId, clientId }: { tena
       <p className="mt-1 text-sm text-slate-500">As alterações se aplicam somente a este ambiente.</p>
       {settings.isLoading && <p className="mt-3 text-sm">Carregando parâmetros…</p>}
       {settings.isError && <p role="alert" className="mt-3 text-sm text-red-700">Não foi possível carregar os parâmetros.</p>}
-      {value && <form className="mt-4 space-y-4" onSubmit={e => { e.preventDefault(); const calendarProblem = validateBusinessHours(businessHoursFromSettings(value))[0]; const locationChanged = ['stateCode', 'cityCode', 'cityName', 'timeZoneId'].some(field => value[field as keyof Settings] !== settings.data?.[field as keyof Settings]); const locationProblem = locationChanged ? validateCalendarLocation(value) : null; if (calendarProblem || locationProblem) { setNotice(calendarProblem || locationProblem || 'Confira o calendário.'); return; } setNotice(''); save.mutate(); }}><fieldset disabled={save.isPending} className="space-y-4">
+      {value && <form className="mt-4 space-y-4" onSubmit={e => { e.preventDefault(); const calendarProblem = validateBusinessHours(businessHoursFromSettings(value))[0]; const locationChanged = ['stateCode', 'cityCode', 'cityName', 'timeZoneId'].some(field => value[field as keyof Settings] !== settings.data?.[field as keyof Settings]); const locationProblem = (locationChanged || !!settings.data?.cityCode) ? validateCalendarLocation(value) : null; if (calendarProblem || locationProblem) { setNotice(calendarProblem || locationProblem || 'Confira o calendário.'); return; } setNotice(''); save.mutate(); }}><fieldset disabled={save.isPending} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           {(['logoUrl', 'heroImageUrl', 'systemDescription'] as const).map((field, i) => <label key={field} className="space-y-1 text-sm">
             <span>{['URL do logo', 'URL da imagem de destaque', 'Descrição do sistema'][i]}</span>
             <input className={input} value={value[field] ?? ''} onChange={e => update({ [field]: e.target.value })} />
           </label>)}
-          {(['maxLoginAttempts', 'lockoutMinutes', 'maxUploadMb'] as const).map((field, i) => <label key={field} className="space-y-1 text-sm">
-            <span>{['Máximo de tentativas de login', 'Bloqueio após tentativas (minutos)', 'Limite de upload (MB)'][i]}</span>
-            <input type="number" required min={i === 0 ? 3 : 1} className={input} value={value[field]} onChange={e => update({ [field]: Number(e.target.value) })} />
-          </label>)}
-          <label className="space-y-1 text-sm"><span>Autenticação em dois fatores</span><select className={input} value={value.twoFactorMode} onChange={e => update({ twoFactorMode: e.target.value })}><option value="off">Desativada</option><option value="internal">Usuários internos</option><option value="all">Todos os usuários</option></select></label>
+          <label className="space-y-1 text-sm"><span>Limite de upload (MB)</span><input type="number" required min={1} className={input} value={value.maxUploadMb} onChange={e => update({ maxUploadMb: Number(e.target.value) })} /></label>
         </div>
         <section className="space-y-3 border-t border-slate-200 pt-5">
           <h3 className="font-semibold text-slate-900">Horas úteis deste ambiente</h3>
@@ -106,19 +112,33 @@ export function PlatformEnvironmentAdministration({ tenantId, clientId }: { tena
           <BusinessHoursEditor value={businessHoursFromSettings(value)} onChange={businessHours => update({ businessHours })} />
         </section>
         <CalendarLocationFields value={value} onChange={update} required={!!value.stateCode || !!value.cityCode} />
-        {!value.cityCode && <p className="text-sm text-amber-800">Complete a localização do cliente para considerar feriados nos próximos cálculos.</p>}
+        {!value.cityCode && <p className="text-sm text-amber-800">Processos somente podem ser iniciados após configurar estado, município, fuso e horário de funcionamento.</p>}
         {clientId && <div className="grid gap-4 sm:grid-cols-2">{(['logo', 'hero'] as const).map(kind => <label key={kind} className="space-y-1 text-sm"><span>{kind === 'logo' ? 'Enviar logo' : 'Enviar imagem de destaque'}</span><input type="file" accept="image/png,image/jpeg,image/gif,image/webp" disabled={uploading} className="block w-full min-w-0 text-sm" onChange={e => { const file = e.target.files?.[0]; if (file) void upload(kind, file); e.target.value = ''; }} /></label>)}</div>}
         <button className={button} disabled={save.isPending || uploading || !draft}>{save.isPending ? 'Salvando…' : 'Salvar parâmetros'}</button>
       </fieldset></form>}
     </section>
-    {value && <fieldset disabled={savePolicies.isPending || !environment.data} aria-labelledby="settings-policies-title">
-      <h2 id="settings-policies-title" className="font-semibold text-slate-900">Acesso do cliente aos parâmetros</h2>
-      <p className="mt-1 text-sm text-slate-500">Uma aba oculta esconde seus campos. Uma aba sem edição impede alterações em todos os seus campos.</p>
-      <div className="mt-3 flex flex-wrap items-end gap-2"><label className="min-w-0 flex-1 space-y-1 text-sm"><span>Aba ou campo</span><select className={input} value={path} onChange={e => setPath(e.target.value)}>{tabs.map(([tab, label]) => <optgroup key={tab} label={label}><option value={tab}>{label} — aba inteira</option>{fields[tab].map(f => <option key={f} value={`${tab}.${f}`}>{label} — {labels[f] ?? f}</option>)}</optgroup>)}</select></label><button type="button" className={button} onClick={() => setPolicy(path, {})}>Adicionar regra</button></div>
-      <ul className="mt-3 divide-y divide-slate-200">{Object.entries(policies).map(([name, policy]) => <li key={name} className="flex flex-wrap items-center gap-4 py-3 text-sm"><span className="min-w-0 flex-1 break-all">{policyLabel(name)}</span><label className="flex items-center gap-2"><input type="checkbox" checked={policy.visible} onChange={e => setPolicy(name, { visible: e.target.checked })} />Visível</label><label className="flex items-center gap-2"><input type="checkbox" checked={policy.editable} onChange={e => setPolicy(name, { editable: e.target.checked })} />Editável</label><button type="button" className="min-h-10 text-slate-600 underline" onClick={() => { const next = { ...policies }; delete next[name]; updatePolicies(next); }}>Remover regra</button></li>)}</ul>
-      {!Object.keys(policies).length && <p className="my-3 text-sm text-slate-500">Nenhuma restrição adicional configurada.</p>}
-      <button type="button" className={button} disabled={!policyDraft || savePolicies.isPending} onClick={() => { setNotice(''); savePolicies.mutate(); }}>Salvar permissões</button>
-    </fieldset>}
+    {smtpValue && <section aria-labelledby="smtp-settings-title">
+        <h2 id="smtp-settings-title" className="font-semibold text-slate-900">Servidor de e-mail</h2>
+        <p className="mt-1 text-sm text-slate-600">Usado por notificações e autenticação. O servidor candidato será testado antes da ativação; uma falha mantém a configuração anterior.</p>
+        <form className="mt-4 space-y-4" onSubmit={e => { e.preventDefault(); setNotice(''); saveEmail.mutate(); }}><fieldset disabled={saveEmail.isPending || save.isPending} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {(['smtpHost', 'smtpUser', 'smtpFromAddress', 'smtpFromName'] as const).map((field, i) => <label key={field} className="space-y-1 text-sm"><span>{['Servidor (host)', 'Usuário SMTP', 'E-mail remetente', 'Nome remetente'][i]}</span><input type={field === 'smtpFromAddress' ? 'email' : 'text'} className={input} value={smtpValue[field] ?? ''} onChange={e => updateEmail({ [field]: e.target.value || null })} /></label>)}
+            <label className="space-y-1 text-sm"><span>Porta SMTP</span><input type="number" required min={1} max={65535} className={input} value={smtpValue.smtpPort} onChange={e => updateEmail({ smtpPort: Number(e.target.value) })} /></label>
+            <label className="space-y-1 text-sm"><span>Autenticação SMTP</span><select className={input} value={smtpValue.smtpAuthMode} onChange={e => updateEmail({ smtpAuthMode: e.target.value })}><option value="login">Login</option><option value="plain">Plain</option><option value="none">Sem autenticação</option></select></label>
+            <label className="space-y-1 text-sm"><span>Senha SMTP</span><input type="password" autoComplete="new-password" className={input} value={smtpPassword} placeholder="Em branco mantém a senha atual" onChange={e => setSmtpPassword(e.target.value)} /></label>
+            <label className="space-y-1 text-sm"><span>Destino do teste de e-mail</span><input type="email" required className={input} value={smtpTestTo} onChange={e => setSmtpTestTo(e.target.value)} /></label>
+          </div>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={smtpValue.smtpUseSsl} onChange={e => updateEmail({ smtpUseSsl: e.target.checked })} />Usar TLS/SSL</label>
+          <button className={button} disabled={saveEmail.isPending}>{saveEmail.isPending ? 'Testando SMTP…' : 'Testar e ativar SMTP'}</button>
+        </fieldset></form>
+      </section>}
+      {value && <fieldset disabled={savePolicies.isPending || !environment.data} aria-labelledby="settings-policies-title" className="space-y-4">
+        <h2 id="settings-policies-title" className="font-semibold text-slate-900">Configurações permitidas ao cliente</h2>
+        <p className="text-sm text-slate-600">Desmarcar oculta a aba e impede alterações, mantendo a configuração e o serviço ativos. Identidade e calendário permanecem editáveis.</p>
+        {integrationOptions.map(([name, label]) => <label key={name} className="flex items-center gap-3 text-sm"><input type="checkbox" checked={enabled(policies, name)} onChange={e => updatePolicies(Object.fromEntries(integrationOptions.map(([key]) => [key, { visible: key === name ? e.target.checked : enabled(policies, key), editable: key === name ? e.target.checked : enabled(policies, key) }]))) } />{label}</label>)}
+        <button type="button" className={button} disabled={!policyDraft || savePolicies.isPending} onClick={() => { setNotice(''); savePolicies.mutate(); }}>Salvar permissões</button>
+      </fieldset>}
+      <p className="text-sm text-slate-600">Autenticação em dois fatores obrigatória para todos os usuários. A política de segurança não pode ser editada.</p>
     <section aria-labelledby="suspended-messages-title">
       <h2 id="suspended-messages-title" className="font-semibold text-slate-900">Mensagens suspensas</h2>
       <p className="mt-1 text-sm text-slate-500">Selecione as mensagens que devem voltar à fila. O envio exige cliente e ambiente ativos.</p>

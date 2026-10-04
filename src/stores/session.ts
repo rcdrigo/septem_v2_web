@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { applyTenantMeta } from '@/lib/tenant-meta';
-import { api, ApiError, configureApi, onEnvironmentInactive } from '@/lib/api';
+import { api, ApiError, MFA_REAUTHENTICATION_REQUIRED, configureApi, onEnvironmentInactive } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
 
 /**
@@ -32,7 +32,8 @@ export type SessionUser = {
 
 export type Tenant = {
   tenantId: string;
-  clienteNome: string;
+  /** Calendário completo, publicado pelo servidor. */
+  calendarReady?: boolean;
   ambienteNome: string;
   logoUrl?: string;
   primaryColor: string;
@@ -57,6 +58,7 @@ export type SessionStatus = 'idle' | 'booting' | 'unauthenticated' | 'authentica
 type SessionState = {
   status: SessionStatus;
   error?: string;
+  reauthenticationRequired: boolean;
   user: SessionUser | null;
   tenant: Tenant | null;
   accessToken: string | null;
@@ -153,11 +155,12 @@ async function applyTokens(
   set({ accessToken: tokens.accessToken, refreshToken: keepConnected ? tokens.refreshToken : null });
 
   const user = await api.get<MeResponse>('/api/v1/me');
-  set({ status: 'authenticated', user });
+  set({ status: 'authenticated', user, reauthenticationRequired: false });
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
   status: 'idle',
+  reauthenticationRequired: false,
   user: null,
   tenant: readCachedTenant(),
   accessToken: localStorage.getItem(ACCESS_KEY),
@@ -278,6 +281,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           set({ accessToken: latest, refreshToken: localStorage.getItem(REFRESH_KEY) });
           return latest;
         }
+        if (err.body?.error === MFA_REAUTHENTICATION_REQUIRED && localStorage.getItem(REFRESH_KEY) === refreshToken)
+          await requireReauthentication(accessToken);
         return null;
       }
     };
@@ -292,7 +297,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     // Limpa antes da chamada de rede para uma renovação pendente não reabrir a sessão.
     localStorage.removeItem(ACCESS_KEY);
     localStorage.removeItem(REFRESH_KEY);
-    set({ accessToken: null, refreshToken: null, user: null, status: 'unauthenticated', isImpersonating: false });
+    set({ accessToken: null, refreshToken: null, user: null, status: 'unauthenticated', isImpersonating: false, reauthenticationRequired: false });
     queryClient.clear();
     try {
       if (refreshToken)
@@ -328,8 +333,19 @@ onEnvironmentInactive(() => {
   window.location.replace(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/environment-inactive`);
 });
 
+async function requireReauthentication(rejectedToken?: string | null) {
+  const current = localStorage.getItem(ACCESS_KEY);
+  if (current && current !== rejectedToken) return;
+  localStorage.removeItem(ACCESS_KEY);
+  localStorage.removeItem(REFRESH_KEY);
+  localStorage.removeItem(DEVICE_KEY);
+  useSessionStore.setState({ accessToken: null, refreshToken: null, user: null, status: 'unauthenticated', isImpersonating: false, reauthenticationRequired: true });
+  queryClient.clear();
+}
+
 // Liga o api.ts à store para token + refresh + logout (quebra ciclo de import).
 configureApi({
+  reauthenticate: requireReauthentication,
   getAccessToken: () => useSessionStore.getState().accessToken,
   refresh: (rejectedToken) => useSessionStore.getState().refresh(rejectedToken),
   logout: async (rejectedToken) => {

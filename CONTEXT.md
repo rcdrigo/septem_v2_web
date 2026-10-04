@@ -60,12 +60,34 @@ Registro das alterações de tags, identificando o que mudou, quem fez a altera�
 Organização contratante que pode possuir um ou mais ambientes.
 _Evitar_: Ambiente como sinônimo de cliente.
 
+**Nome do cliente**:
+Identificação única da organização contratante utilizada na área administrativa da plataforma. É distinta do nome apresentado aos usuários do sistema.
+
 **Ambiente**:
 Instância de uso de um cliente, com URL, dados, módulos e configuração próprios, como produção ou homologação.
 _Evitar_: Cliente como sinônimo de ambiente.
 
-**Nome do ambiente**:
-Nome exibido na aplicação daquele ambiente, como Septem (padrão) ou SGI.
+**Nome do sistema**:
+Nome apresentado aos usuários de um ambiente, como Septem ou SGI, independentemente de sua finalidade e do nome da organização contratante.
+_Evitar_: Nome do ambiente quando houver ambiguidade com sua finalidade.
+
+**Identidade do sistema**:
+Apresentação de um ambiente aos seus usuários, composta por nome e descrição do sistema, cor principal, logo e imagem de destaque.
+
+**Administração inicial pela Septem**:
+Modalidade de cadastro em que nenhum administrador do cliente é criado inicialmente. Não representa restrição adicional às permissões de um administrador do cliente.
+
+**Permissão de configuração de integração**:
+Concessão ao administrador do cliente para alterar a configuração de e-mail, armazenamento ou IA de um ambiente. É distinta da disponibilidade da funcionalidade e da titularidade da conta do provedor.
+
+**Configuração de calendário do ambiente**:
+Definição do horário de funcionamento e da localização utilizada nas regras de horas úteis daquele ambiente, abrangendo estado, município, fuso e períodos úteis. É independente da configuração dos demais ambientes do cliente.
+
+**Dispositivo confiável**:
+Dispositivo reconhecido após autenticação em dois fatores bem-sucedida, com dispensa temporária de novos desafios durante um mês. A confiança não equivale à desativação do segundo fator.
+
+**Configuração inicial do ambiente**:
+Conjunto de padrões utilizado ao criar um ambiente e preservado independentemente de alterações posteriores nos padrões para novos clientes.
 
 **Área administrativa da plataforma**:
 Área acessível apenas aos super admins internos para administrar clientes e criar seus ambientes.
@@ -109,12 +131,9 @@ _Evitar_: Dummy data.
 
 ## Linguagem — Horas úteis
 
-**Calendário padrão de horas úteis do cliente**:
-Definição inicial dos períodos úteis do cliente, copiada para cada ambiente na sua criação.
-_Evitar_: Status de aberto ou fechado do cliente.
-
 **Calendário de horas úteis do ambiente**:
-Calendário utilizado no cálculo de horas das tarefas de processo e em regras de negócio daquele ambiente. Origina-se do padrão do cliente e pode ser alterado independentemente dos demais ambientes.
+Calendário utilizado no cálculo de horas das tarefas de processo e em regras de negócio daquele ambiente, com localização, fuso e períodos úteis próprios. É independente dos demais ambientes do cliente.
+_Evitar_: Status de aberto ou fechado do cliente.
 
 **Período útil**:
 Faixa de horário de um dia da semana considerada no cálculo de horas úteis. Um mesmo dia pode conter múltiplos períodos, separados por intervalos não contabilizados.

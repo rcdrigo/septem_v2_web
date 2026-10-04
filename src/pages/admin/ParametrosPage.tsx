@@ -3,7 +3,7 @@ import { CalendarLocationFields } from '@/components/business-calendar/CalendarL
 import { validateBusinessHours } from '@/components/business-calendar/business-hours';
 import { businessHoursFromSettings, validateCalendarLocation } from '@/lib/business-calendar';
 import { Children, createContext, isValidElement, useContext, useEffect, useState } from 'react';
-import { Save, Building2, Mail, HardDrive, Loader2, Send, PlugZap, ShieldCheck } from 'lucide-react';
+import { Save, Building2, Mail, HardDrive, Loader2, Send, PlugZap } from 'lucide-react';
 import { toast } from '@/stores/toast';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { useSessionStore } from '@/stores/session';
@@ -22,18 +22,16 @@ import {
   useTestEmail,
   useSaveStorage,
   useTestStorage,
-  useSaveSecurity,
   type GeneralPayload,
   type EmailPayload,
   type SettingsEmail,
   type StoragePayload,
   type SettingsStorage,
-  type SettingsSecurity,
 } from '@/lib/api/settings';
 import { ContextHelp } from '@/components/guide/ContextHelp';
 
 // Merge: as duas abas novas convivem — `integracoes` (fase 10) e `openrouter` (agente de IA).
-type TabKey = 'geral' | 'email' | 'arquivos' | 'seguranca' | 'integracoes' | 'openrouter';
+type TabKey = 'geral' | 'email' | 'arquivos' | 'integracoes' | 'openrouter';
 
 const POLICY_SECTION: Record<TabKey, string> = {
   geral: 'general',
@@ -41,7 +39,6 @@ const POLICY_SECTION: Record<TabKey, string> = {
   integracoes: 'integrations',
   arquivos: 'storage',
   openrouter: 'openrouter',
-  seguranca: 'security',
 };
 
 const PolicyScopeContext = createContext<{ section: string; policies?: Record<string, SettingsPolicy> } | null>(null);
@@ -52,7 +49,6 @@ const TABS: Array<{ key: TabKey; label: string; icon: typeof Building2 }> = [
   { key: 'integracoes', label: 'Integrações', icon: PlugZap },
   { key: 'arquivos', label: 'Arquivos', icon: HardDrive },
   { key: 'openrouter', label: 'OpenRouter', icon: PlugZap },
-  { key: 'seguranca', label: 'Segurança', icon: ShieldCheck },
 ];
 
 /**
@@ -76,7 +72,7 @@ export function ParametrosPage() {
           <h1 className="text-lg font-semibold text-slate-900">Parâmetros do sistema</h1>
           <ContextHelp manual="parametros-seguranca" section="configurar-parametros" label="Abrir manual de parâmetros e segurança" />
         </div>
-        <p className="mt-0.5 text-sm text-slate-500">Identidade, expediente, e-mail, arquivos, integrações, segurança e agente de IA.</p>
+        <p className="mt-0.5 text-sm text-slate-500">Identidade, calendário e integrações disponíveis neste ambiente.</p>
         <nav className="-mb-4 mt-3 flex flex-wrap gap-1 sm:flex-nowrap sm:overflow-x-auto" role="tablist" aria-label="Seções de parâmetros">
           {visibleTabs.map((item) => {
             const Icon = item.icon;
@@ -102,6 +98,7 @@ export function ParametrosPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-4 sm:p-6">
+        <p className="mb-4 text-sm text-slate-600">Autenticação em dois fatores obrigatória para todos os usuários. Um dispositivo confiável dispensa novos desafios por um mês.</p>
         {isLoading && (
           <p className="flex items-center gap-2 text-sm text-slate-400">
             <Loader2 size={15} className="animate-spin" /> Carregando parâmetros...
@@ -121,9 +118,6 @@ export function ParametrosPage() {
         )}
         {data && activeTab?.key === 'openrouter' && data.openRouter && (
           <PolicyScope section={POLICY_SECTION.openrouter} policies={data.policies}><OpenRouterTab data={data.openRouter} /></PolicyScope>
-        )}
-        {data && activeTab?.key === 'seguranca' && data.security && (
-          <PolicyScope section={POLICY_SECTION.seguranca} policies={data.policies}><SegurancaTab data={data.security} /></PolicyScope>
         )}
         {data && activeTab?.key === 'integracoes' && (
           <PolicyScope section={POLICY_SECTION.integracoes} policies={data.policies}><IntegracoesTab /></PolicyScope>
@@ -208,9 +202,9 @@ function EmailTab({ data }: { data: SettingsEmail }) {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await save.mutateAsync({ ...form, password: novaSenha.length > 0 ? novaSenha : null });
+      await save.mutateAsync({ ...form, password: novaSenha.length > 0 ? novaSenha : null, testTo: destino });
       setNovaSenha('');
-      toast.success('Configuração de e-mail salva.');
+      toast.success('Configuração de e-mail testada e ativada.');
     } catch (err) {
       toast.error(detalhe(err) ?? 'Não foi possível salvar a configuração de e-mail.');
     }
@@ -222,7 +216,7 @@ function EmailTab({ data }: { data: SettingsEmail }) {
       return;
     }
     try {
-      await test.mutateAsync(destino);
+      await test.mutateAsync({ to: destino, candidate: { ...form, password: novaSenha.length > 0 ? novaSenha : null } });
       toast.success(`E-mail de teste enviado para ${destino}.`);
     } catch (err) {
       toast.error(detalhe(err) ?? 'Falha ao enviar o e-mail de teste.');
@@ -231,7 +225,7 @@ function EmailTab({ data }: { data: SettingsEmail }) {
 
   return (
     <form onSubmit={onSubmit} className="max-w-3xl space-y-5" data-testid="form-email">
-      <Card title="Servidor SMTP" hint="Usado por todos os e-mails do sistema (avisos de tarefa, prazos e eventos dos processos).">
+      <Card title="Servidor SMTP" hint="Usado por notificações e códigos de autenticação. Ao salvar, a configuração é testada antes de ser ativada; uma falha mantém a anterior.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Servidor (host)">
             <input
@@ -322,10 +316,12 @@ function EmailTab({ data }: { data: SettingsEmail }) {
         </div>
       </Card>
 
-      <Card title="Enviar e-mail de teste" hint="Salve a configuração antes de testar: o envio usa o que está gravado.">
+      <Card title="Enviar e-mail de teste" hint="O teste usa os valores deste formulário, sem alterar o servidor ativo.">
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
             type="email"
+            required
+            aria-label="Destino do teste de e-mail"
             value={destino}
             onChange={(e) => setDestino(e.target.value)}
             placeholder="destinatario@exemplo.gov.br"
@@ -349,92 +345,7 @@ function EmailTab({ data }: { data: SettingsEmail }) {
         disabled={save.isPending || !canEdit}
         className="flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-60"
       >
-        {save.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Salvar
-      </button>
-    </form>
-  );
-}
-
-function SegurancaTab({ data }: { data: SettingsSecurity }) {
-  const save = useSaveSecurity();
-  const canEdit = settingsSectionEditable(useCurrentPolicies(), 'security');
-  const [form, setForm] = useState<SettingsSecurity>(data);
-
-  useEffect(() => setForm(data), [data]);
-
-  const set = <K extends keyof SettingsSecurity>(k: K, v: SettingsSecurity[K]) =>
-    setForm((f) => ({ ...f, [k]: v }));
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      await save.mutateAsync(form);
-      toast.success('Configuração de segurança salva.');
-    } catch (err) {
-      toast.error(detalhe(err) ?? 'Não foi possível salvar a configuração de segurança.');
-    }
-  }
-
-  return (
-    <form onSubmit={onSubmit} className="max-w-3xl space-y-5" data-testid="form-seguranca">
-      <Card
-        title="Verificação em duas etapas"
-        hint="No login, além da senha, o usuário digita um código enviado para o e-mail dele. Exige o servidor de e-mail configurado na aba E-mail."
-      >
-        <Field label="Quando exigir o código">
-          <select
-            value={form.twoFactorMode}
-            onChange={(e) => set('twoFactorMode', e.target.value as SettingsSecurity['twoFactorMode'])}
-            className={inputCls}
-            name="twoFactorMode"
-          >
-            <option value="off">Nunca (desligado)</option>
-            <option value="internal">Somente funcionários (usuários internos)</option>
-            <option value="all">Todos os usuários</option>
-          </select>
-        </Field>
-        <p className="mt-2 text-xs text-slate-500">
-          Quem marcar "confiar neste dispositivo" não é desafiado de novo naquele aparelho — e pode
-          removê-lo a qualquer momento em Meus dados.
-        </p>
-      </Card>
-
-      <Card title="Bloqueio por tentativas" hint="Protege contra tentativa de adivinhar a senha. A tela avisa quantas tentativas restam.">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Tentativas até bloquear" required>
-            <input
-              type="number"
-              min={3}
-              max={20}
-              value={form.maxLoginAttempts}
-              onChange={(e) => set('maxLoginAttempts', Number(e.target.value))}
-              className={inputCls}
-              name="maxLoginAttempts"
-            />
-          </Field>
-          <Field label="Minutos de bloqueio" required>
-            <input
-              type="number"
-              min={1}
-              max={1440}
-              value={form.lockoutMinutes}
-              onChange={(e) => set('lockoutMinutes', Number(e.target.value))}
-              className={inputCls}
-              name="lockoutMinutes"
-            />
-          </Field>
-        </div>
-        <p className="mt-3 text-xs text-slate-500">
-          Redefinir a senha ("Esqueci minha senha") libera a conta na hora, sem esperar o bloqueio expirar.
-        </p>
-      </Card>
-
-      <button
-        type="submit"
-        disabled={save.isPending || !canEdit}
-        className="flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-60"
-      >
-        {save.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Salvar
+        {save.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Testar e ativar
       </button>
     </form>
   );
@@ -592,7 +503,7 @@ function GeralTab({ data }: { data: GeneralPayload & { tenantId: string; host: s
     e.preventDefault();
     const calendarProblem = calendarPolicy.editable ? validateBusinessHours(businessHoursFromSettings(form))[0] : null;
     const locationChanged = locationFields.some(field => form[field as keyof GeneralPayload] !== data[field as keyof GeneralPayload]);
-    const locationProblem = locationEditable && locationChanged ? validateCalendarLocation(form) : null;
+    const locationProblem = locationEditable && (locationChanged || !!data.cityCode) ? validateCalendarLocation(form) : null;
     if (calendarProblem || locationProblem) { toast.error(calendarProblem || locationProblem || 'Confira o calendário.'); return; }
     try {
       await save.mutateAsync(form);
@@ -607,17 +518,7 @@ function GeralTab({ data }: { data: GeneralPayload & { tenantId: string; host: s
     <form onSubmit={onSubmit} className="max-w-3xl space-y-5" data-testid="form-geral">
       <Card title="Identidade" hint="Aparece no cabeçalho, na tela de login e nos e-mails enviados pelo sistema.">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Nome do cliente" required>
-            <input
-              value={form.clienteNome}
-              onChange={(e) => set('clienteNome', e.target.value)}
-              required
-              maxLength={120}
-              className={inputCls}
-              name="clienteNome"
-            />
-          </Field>
-          <Field label="Nome do ambiente" required>
+          <Field label="Nome do sistema" required>
             <input
               value={form.ambienteNome}
               onChange={(e) => set('ambienteNome', e.target.value)}
@@ -687,7 +588,7 @@ function GeralTab({ data }: { data: GeneralPayload & { tenantId: string; host: s
         </Card>}
         {locationVisible && <Card title="Calendário de feriados">
           <CalendarLocationFields value={form} onChange={location => setForm(current => ({ ...current, ...location }))} disabled={!locationEditable} required={!!form.stateCode || !!form.cityCode} />
-          {!form.cityCode && <p className="mt-3 text-sm text-amber-800">Complete a localização para considerar feriados. Até lá, o cálculo continua usando a semana configurada.</p>}
+          {!form.cityCode && <p className="mt-3 text-sm text-amber-800">Processos somente podem ser iniciados após configurar estado, município, fuso e horário de funcionamento.</p>}
         </Card>}
 
       <div className="flex flex-wrap items-center gap-3">
@@ -765,7 +666,6 @@ function useCurrentPolicies() {
 
 function pick(d: GeneralPayload): GeneralPayload {
   return {
-    clienteNome: d.clienteNome,
     ambienteNome: d.ambienteNome,
     logoUrl: d.logoUrl,
     primaryColor: d.primaryColor,

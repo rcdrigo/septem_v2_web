@@ -1,3 +1,4 @@
+import { tenantSystemName } from '@/lib/tenant-meta';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, TriangleAlert } from 'lucide-react';
@@ -27,14 +28,16 @@ export function LoginPage() {
   const location = useLocation();
   const validatingDocument = location.pathname === routes.validate;
   const [searchParams] = useSearchParams();
-  const requestedReturn = searchParams.get('returnUrl');
-  const returnUrl = requestedReturn?.startsWith('/') && !requestedReturn.startsWith('//') ? requestedReturn : '/';
+  const from = (location.state as { from?: { pathname?: string; search?: string; hash?: string } } | null)?.from;
+  const requestedReturn = searchParams.get('returnUrl') ?? (from?.pathname ? `${from.pathname}${from.search ?? ''}${from.hash ?? ''}` : null);
+  const returnUrl = requestedReturn?.startsWith('/') && !requestedReturn.startsWith('//') && !requestedReturn.includes('\\') ? requestedReturn : '/';
   const tenant = useSessionStore((s) => s.tenant);
   const login = useSessionStore((s) => s.login);
   const completeTwoFactor = useSessionStore((s) => s.completeTwoFactor);
   const status = useSessionStore((s) => s.status);
+  const reauthenticationRequired = useSessionStore((s) => s.reauthenticationRequired);
   const bootstrap = useSessionStore((s) => s.bootstrap);
-  const tenantName = tenant?.clienteNome?.trim() || 'Prefeitura Municipal';
+  const tenantName = tenantSystemName(tenant);
   const tenantAccent = tenant?.primaryColor && /^#[0-9a-f]{6}$/i.test(tenant.primaryColor)
     ? tenant.primaryColor
     : undefined;
@@ -332,8 +335,9 @@ export function LoginPage() {
           {step === 'credenciais' && (
             <>
               <h1 className="text-3xl font-bold text-slate-900">Bem-vindo de volta</h1>
-              <p className="mt-2 text-sm text-slate-500">Entre com seus dados para acessar o Septem.</p>
+              <p className="mt-2 text-sm text-slate-500">Entre com seus dados para acessar {tenantName}.</p>
 
+              {reauthenticationRequired && <p role="status" className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">O período de confiança deste dispositivo terminou. Entre novamente e confirme o código enviado por e-mail.</p>}
               <form onSubmit={entrar} className="mt-8 space-y-5" data-testid="form-credenciais">
                 <Campo label="CPF ou e-mail" icon={Mail}>
                   <input
@@ -437,7 +441,7 @@ export function LoginPage() {
                     onChange={(e) => setTrustDevice(e.target.checked)}
                     className="h-4 w-4 rounded border-slate-400 accent-slate-900"
                   />
-                  Confiar neste dispositivo (não pedir código de novo)
+                  Confiar neste dispositivo por 1 mês
                 </label>
 
                 <Enviar submitting={submitting}>Confirmar</Enviar>

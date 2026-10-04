@@ -1,3 +1,4 @@
+import { tenantSystemName } from '@/lib/tenant-meta';
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { ChevronDown, ChevronUp, FileSearch, Plus, Search, Workflow } from 'lucide-react';
@@ -18,7 +19,7 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
   // Item que depende de funcionalidade não contratada some do menu (ADM-04).
   const temFuncionalidade = useFeatureCheck();
   const tenant = session.tenant;
-  const tenantName = tenant?.clienteNome ?? 'Septem V2';
+  const tenantName = tenantSystemName(tenant);
   const layout = MENU[session.effectiveMode()];
   const [newRequestOpen, setNewRequestOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);

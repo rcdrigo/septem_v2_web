@@ -1,4 +1,4 @@
-import { ApiError } from '@/lib/api';
+import { ApiError, MFA_REAUTHENTICATION_REQUIRED } from '@/lib/api';
 
 /**
  * Cliente HTTP da ÁREA CENTRAL (`/api/v1/platform/*`) — separado do `api.ts` de
@@ -19,19 +19,25 @@ export const PLATFORM_PREFIX = '/api/v1/platform';
 type Options = RequestInit & {
   /** Não injeta Authorization (login, 2fa, refresh, logout). */
   anonymous?: boolean;
+  /** Lê bytes de imagens autenticadas para prévias na área central. */
+  responseType?: 'blob';
   /** Evita o retry em 401 — usado pelo próprio refresh, para não entrar em laço. */
   skipRefresh?: boolean;
 };
 
 let tokenProvider: () => string | null = () => null;
-let refreshHandler: () => Promise<string | null> = async () => null;
-let logoutHandler: () => Promise<void> = async () => {};
+let refreshHandler: (rejectedToken?: string | null) => Promise<string | null> = async () => null;
+let logoutHandler: (rejectedToken?: string | null) => Promise<void> = async () => {};
+
+let reauthenticationHandler: (rejectedToken?: string | null) => Promise<void> = async () => {};
 
 export function configurePlatformApi(opts: {
+  reauthenticate?: (rejectedToken?: string | null) => Promise<void>;
   getAccessToken: () => string | null;
-  refresh: () => Promise<string | null>;
-  logout: () => Promise<void>;
+  refresh: (rejectedToken?: string | null) => Promise<string | null>;
+  logout: (rejectedToken?: string | null) => Promise<void>;
 }) {
+  reauthenticationHandler = opts.reauthenticate ?? opts.logout;
   tokenProvider = opts.getAccessToken;
   refreshHandler = opts.refresh;
   logoutHandler = opts.logout;
@@ -53,7 +59,7 @@ async function readError(resp: Response): Promise<ApiError> {
 }
 
 export async function platformFetch<T = unknown>(path: string, options: Options = {}): Promise<T> {
-  const { anonymous, skipRefresh, headers, ...rest } = options;
+  const { anonymous, skipRefresh, responseType, headers, ...rest } = options;
   const finalHeaders = new Headers(headers);
   if (!finalHeaders.has('Content-Type') && rest.body && typeof rest.body === 'string')
     finalHeaders.set('Content-Type', 'application/json');
@@ -64,23 +70,34 @@ export async function platformFetch<T = unknown>(path: string, options: Options 
 
   const resp = await fetch(`${BASE_URL}${PLATFORM_PREFIX}${path}`, { ...rest, headers: finalHeaders });
 
+  async function requireMfa(response: Response) {
+    if (response.status !== 401 || anonymous) return;
+    const error = await readError(response.clone());
+    if (error.body?.error !== MFA_REAUTHENTICATION_REQUIRED) return;
+    await reauthenticationHandler(finalHeaders.get('Authorization')?.replace(/^Bearer /, '') ?? null);
+    throw error;
+  }
+  await requireMfa(resp);
   if (resp.status === 401 && !anonymous && !skipRefresh) {
-    const novo = await refreshHandler();
+    const rejectedToken = finalHeaders.get('Authorization')?.replace(/^Bearer /, '') ?? null;
+    const novo = await refreshHandler(rejectedToken);
     if (novo) {
       finalHeaders.set('Authorization', `Bearer ${novo}`);
       const retry = await fetch(`${BASE_URL}${PLATFORM_PREFIX}${path}`, { ...rest, headers: finalHeaders });
+      await requireMfa(retry);
       if (!retry.ok) throw await readError(retry);
-      return (await readBody(retry)) as T;
+      return (responseType === 'blob' ? await retry.blob() : await readBody(retry)) as T;
     }
-    await logoutHandler();
+    await logoutHandler(rejectedToken);
     throw await readError(resp);
   }
 
   if (!resp.ok) throw await readError(resp);
-  return (await readBody(resp)) as T;
+  return (responseType === 'blob' ? await resp.blob() : await readBody(resp)) as T;
 }
 
 export const platformApi = {
+  getBlob: (path: string, opts?: Options) => platformFetch<Blob>(path, { method: 'GET', ...opts, responseType: 'blob' }),
   get: <T = unknown>(path: string, opts?: Options) => platformFetch<T>(path, { method: 'GET', ...opts }),
   patch: <T = unknown>(path: string, body?: unknown, opts?: Options) =>
     platformFetch<T>(path, {

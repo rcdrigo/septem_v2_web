@@ -1,3 +1,5 @@
+import { ApiError } from '@/lib/api';
+import { CalendarSetupNotice } from '@/components/business-calendar/CalendarSetupNotice';
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { Play } from 'lucide-react';
@@ -21,6 +23,7 @@ import { ContextHelp } from '@/components/guide/ContextHelp';
  */
 export function ServicoFormPage() {
   const { processKey } = useParams();
+  const calendarBlocked = useSessionStore((s) => s.tenant?.calendarReady) === false;
   const token = useSessionStore((s) => s.accessToken);
   const detail = useProcessDefinition(processKey ?? null);
   const form = useProcessForm(processKey ?? null);
@@ -42,9 +45,10 @@ export function ServicoFormPage() {
   const taskName = formEscolhido.data?.startTaskName || processName;
   useDocumentTitle(taskName);
 
-  if (!token) return <Navigate to={routes.login} replace />;
+  if (!token) return <Navigate to={`${routes.login}?returnUrl=${encodeURIComponent(routes.service(processKey ?? ''))}`} replace />;
 
   async function submit(button?: TaskButton) {
+    if (calendarBlocked) return;
     const { data, errors, formState } = await fillRef.current?.submit() ?? { data: {}, errors: {} };
     if (errors._automation || ((button?.validateForm ?? true) && Object.keys(errors).length)) { toast.error(errors._automation ? 'O envio foi bloqueado pela automação.' : 'Preencha os campos obrigatórios.'); return; }
     try {
@@ -53,7 +57,12 @@ export function ServicoFormPage() {
         isTest: canSimulate && isTest,
       });
       setDone({ nextTaskForMe: r.nextTaskForMe, executionId: r.executionId });
-    } catch { toast.error('Não foi possível iniciar o processo.'); }
+    } catch (error) {
+      if (error instanceof ApiError && error.body?.error === 'calendar_not_configured') {
+        toast.error('Configure o calendário deste ambiente antes de iniciar processos.');
+        void useSessionStore.getState().refreshTenant();
+      } else toast.error('Não foi possível iniciar o processo.');
+    }
   }
 
   // Cabeçalho no MESMO padrão das demais tarefas: tarefa em destaque e processo
@@ -66,7 +75,7 @@ export function ServicoFormPage() {
         loadingLabel: 'Iniciando…',
         icon: <Play size={15} aria-hidden="true" />,
         onClick: () => submit(),
-        disabled: start.isPending || formEscolhido.isLoading,
+        disabled: calendarBlocked || start.isPending || formEscolhido.isLoading,
         loading: start.isPending,
       }]
     : buttons.map((button) => ({
@@ -75,7 +84,7 @@ export function ServicoFormPage() {
         hint: button.hint,
         icon: button.icon ? <i className={button.icon} aria-hidden="true" /> : undefined,
         onClick: () => submit(button),
-        disabled: start.isPending || formEscolhido.isLoading,
+        disabled: calendarBlocked || start.isPending || formEscolhido.isLoading,
         loading: start.isPending,
         loadingLabel: 'Iniciando…',
         style: button.primaryColor ? { backgroundColor: button.primaryColor, color: button.textColor ?? '#fff' } : undefined,
@@ -98,6 +107,7 @@ export function ServicoFormPage() {
         <>
           {/* Cada grupo renderiza seu próprio card (sem container único). */}
           <main className="flex-1 overflow-auto p-4 sm:p-6">
+            <CalendarSetupNotice />
             {formEscolhido.data?.documentationUrl && <DocBanner url={formEscolhido.data.documentationUrl} />}
             {formEscolhido.isLoading ? <FormSkeleton /> : <ReactForm key={processKey ?? 'form'} ref={fillRef} automationScripts={formEscolhido.data?.automationScripts} schema={formEscolhido.data?.formSchema} data={formEscolhido.data?.data ?? undefined} optionsByField={formEscolhido.data?.fieldOptions} uploadContext={{ processKey: processKey ?? undefined }} />}
           </main>

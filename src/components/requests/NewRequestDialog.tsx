@@ -1,3 +1,4 @@
+import { CalendarSetupNotice } from '@/components/business-calendar/CalendarSetupNotice';
 import { useMemo, useState } from 'react';
 import { AlertCircle, ArrowRight, Inbox, RotateCw, Search, Workflow } from 'lucide-react';
 import { CategoryButton } from '@/components/catalog/CategoryButton';
@@ -19,6 +20,7 @@ export function NewRequestDialog({ onClose }: { onClose: () => void }) {
   // Ambiente com novas requisições bloqueadas (ADM-07): avisamos AQUI, na porta de
   // entrada. Deixar a pessoa escolher o serviço e preencher o formulário inteiro para
   // levar 403 no envio seria trabalho jogado fora.
+  const calendarBlocked = useSessionStore((s) => s.tenant?.calendarReady) === false;
   const bloqueado = useSessionStore((s) => s.tenant?.operatingMode) === 'new_requests_blocked';
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState(ALL_CATEGORIES);
@@ -53,7 +55,7 @@ export function NewRequestDialog({ onClose }: { onClose: () => void }) {
   const ocultos = filtered.length - visiveis.length;
 
   function start(service: ProcessListItem) {
-    if (bloqueado) return;   // a guarda de verdade é do servidor; aqui é só não abrir à toa
+    if (bloqueado || calendarBlocked) return;   // a guarda de verdade é do servidor; aqui é só não abrir à toa
     openTab(routes.service(service.key));
     onClose();
   }
@@ -69,6 +71,7 @@ export function NewRequestDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <Dialog open onClose={onClose} title="Nova requisição" width="2xl" bodyClassName="min-h-0 flex-1 overflow-hidden">
+      <CalendarSetupNotice />
       {bloqueado && (
         <p
           role="alert"
@@ -139,7 +142,7 @@ export function NewRequestDialog({ onClose }: { onClose: () => void }) {
             ) : (
               <>
                 <div className="grid min-w-0 gap-3 lg:grid-cols-2">
-                  {visiveis.map((service) => <ServiceCard key={service.key} service={service} favorite={favoriteKeys.has(service.key)} favoritePending={toggleFavorite.isPending && toggleFavorite.variables?.key === service.key} onFavorite={() => toggle(service)} onStart={() => start(service)} />)}
+                  {visiveis.map((service) => <ServiceCard key={service.key} service={service} disabled={bloqueado || calendarBlocked} favorite={favoriteKeys.has(service.key)} favoritePending={toggleFavorite.isPending && toggleFavorite.variables?.key === service.key} onFavorite={() => toggle(service)} onStart={() => start(service)} />)}
                 </div>
                 {ocultos > 0 && (
                   <p
@@ -161,11 +164,11 @@ export function NewRequestDialog({ onClose }: { onClose: () => void }) {
 }
 
 
-function ServiceCard({ service, favorite, favoritePending, onFavorite, onStart }: { service: ProcessListItem; favorite: boolean; favoritePending: boolean; onFavorite: () => void; onStart: () => void }) {
+function ServiceCard({ service, disabled, favorite, favoritePending, onFavorite, onStart }: { service: ProcessListItem; disabled: boolean; favorite: boolean; favoritePending: boolean; onFavorite: () => void; onStart: () => void }) {
   const color = service.categoryColor ?? FALLBACK_COLOR;
   const description = descriptionText(service.description);
   return (
-    <article role="link" tabIndex={0} onClick={onStart} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onStart(); } }} className="new-request-card group relative flex min-h-40 min-w-0 cursor-pointer flex-col rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700">
+    <article role="link" aria-disabled={disabled} tabIndex={disabled ? -1 : 0} onClick={disabled ? undefined : onStart} onKeyDown={(event) => { if (!disabled && event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onStart(); } }} className="new-request-card group relative flex min-h-40 min-w-0 cursor-pointer flex-col rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700">
       <div className="flex min-w-0 items-start justify-between gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: tintOf(color), color }}><NamedIcon name={service.icon} fallback={<Workflow size={17} />} /></span>
         <FavoriteButton favorite={favorite} disabled={favoritePending} onToggle={onFavorite} />

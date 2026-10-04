@@ -9,6 +9,9 @@ Origem: [requisitos consolidados](../../requisitos-administracao.md). Vocabulár
 1. [Domínio, regras e permissões](01-dominio.md)
 2. [Dados, contratos e processamento](02-contratos.md)
 3. [Interface, entregas e critérios de aceite](03-entregas-e-aceite.md)
+4. [Cadastro simplificado — decisões consolidadas](04-cadastro-simplificado.md)
+
+A entrevista de 4 de outubro de 2026 consolidou o cadastro e os padrões de integração. As decisões do documento 04 prevalecem sobre detalhes anteriores; não há decisões de desenho abertas. A implementação depende da confirmação final do entendimento compartilhado e da verificação dos contratos do backend.
 
 As regras confirmadas são normativas. Entidades, estados técnicos, endpoints, concorrência e estratégias de execução descritos nestas specs são propostas de implementação, não APIs já existentes. Ajustá-los às convenções do backend preservando os critérios de aceite.
 
@@ -27,7 +30,8 @@ Antes de E1, verificar no backend os contratos atuais de tenant, identidade, per
 Interpretações técnicas propostas para tornar os fluxos executáveis:
 
 - Permissão de editar credenciais é uma política por ambiente. O vínculo de admin ao cliente concede alcance sobre todos os ambientes, mas não permissões centrais.
-- Convite criado e disponível compõe a prontidão; falha na entrega de e-mail gera pendência de reenvio, sem recriar ou invalidar o ambiente pronto.
+- Convite criado e disponível compõe a prontidão quando houver primeiro administrador indicado; enfileirar entrega quando produção ficar pronta, sem aguardar homologação. Falha na entrega gera pendência de reenvio, sem recriar ou invalidar o ambiente pronto.
+- Produção e homologação são obrigatórias no cadastro, com operações independentes; falha parcial não reverte o ambiente pronto. Prontidão técnica permite configuração, mas não autoriza iniciar processos com calendário incompleto.
 - Transferências não atravessam clientes. Conflitos de conteúdo aceitos pelo usuário não dispensam validação estrutural, autorização ou checagem de versão concorrente.
 - Inativação impede novas ações imediatamente no servidor; ações externas já enviadas não podem ser desfeitas pela troca de estado. Registrar seu resultado antes de pausar o próximo passo.
 - A documentação detalha comportamento-alvo; capacidade existente deve ser verificada durante cada entrega, sem presumir implementado o que consta apenas nos requisitos.

@@ -2,7 +2,7 @@
 
 ## ADM-01 — Cliente, ambiente e acesso
 
-Um cliente possui um ou mais ambientes independentes: produção, homologação ou demonstração. Nome exibido (Septem por padrão, SGI ou outro) é diferente da finalidade e do nome físico do banco. Logo e URL pertencem à configuração do ambiente.
+Um cliente possui ambientes independentes; seu cadastro inicial sempre cria produção e homologação. Nome do cliente é identificação central da organização; o ambiente apresenta nome e descrição do sistema, cor principal, logo e imagem de destaque. Nome do sistema é diferente da finalidade e do nome físico do banco. Os padrões vêm de appsettings, sem fixar outro padrão na documentação.
 
 | Papel | Alcance |
 | --- | --- |
@@ -14,33 +14,39 @@ A área central é exclusiva de super admins. Alterar headers, URLs ou IDs não 
 
 ## ADM-02 — Cadastro e criação conjunta
 
-O cadastro informa nome do cliente, nome exibido, finalidade, subdomínio, domínio próprio opcional, logo, nome do banco, funcionalidades, processos do catálogo, política de edição de credenciais e nome/e-mail do primeiro admin. Produção pode ser acompanhada de homologação no mesmo cadastro.
+O cadastro tem três passos definidos em [04-cadastro-simplificado.md](04-cadastro-simplificado.md): cliente e identidade, parametrização do sistema e revisão. Entre os campos de identidade, somente nome do cliente é obrigatório; não permitir dois clientes com o mesmo nome. Criar sempre produção e homologação; remover escolha de finalidade, banco manual, seleção de processos, dados fictícios e preenchimento manual de provedores. Funcionalidades existentes começam todas marcadas. Três permissões independentes de e-mail, armazenamento e IA começam desmarcadas.
 
-Sugerir nome de banco a partir de cliente e finalidade, com unicidade garantida pelo servidor. Permitir edição antes da criação; depois o nome é imutável. Validar nomes e hosts sem interpolá-los em comandos. Nome exibido continua editável. Colisão de banco ou domínio não autoriza reaproveitar recurso de outro ambiente.
+Gerar os bancos automaticamente pelo snake_case do nome do cliente, removendo acentos: `nome_do_cliente` em produção e `nome_do_cliente_hml` em homologação, sem edição manual e com nomes imutáveis após criação. Validar unicidade do nome do cliente e de ambos os bancos antes do provisionamento; rejeitar colisão mesmo com nomes de clientes diferentes, informar o conflito e não acrescentar identificadores automaticamente. Garantir unicidade das reservas no servidor sob concorrência. Validar nomes e hosts sem interpolá-los em comandos. Colisão não autoriza reaproveitar recurso de outro ambiente.
 
-Homologação nasce com as mesmas funcionalidades e processos selecionados para produção, mas banco, URL, dados e credenciais separados. Dados fictícios são opcionais em homologação/demonstração e proibidos em produção, inclusive pela API. Cadastros essenciais são distintos de dados fictícios. Produção não é obtida convertendo outro ambiente.
+Homologação e produção recebem as mesmas escolhas iniciais de identidade, funcionalidades e permissões, preservando configuração própria por ambiente e bancos/dados separados. Instalar somente cadastros essenciais, sem dados fictícios nem processos do catálogo nesse fluxo. Produção não é obtida convertendo outro ambiente.
 
-Criação conjunta gera operações independentes. Sucesso de um ambiente não é revertido pela falha do outro. A identidade inicial do admin deve ter alcance nos ambientes do cliente sem gerar usuários ou convites duplicados a cada retry.
+Administração inicial pela Septem começa marcada e significa somente não criar administrador do cliente. Desmarcar exige nome/e-mail e convite para concluir o cadastro. Quando existir, a identidade administrativa tem alcance nos dois ambientes, sem duplicação de vínculos ou convites em retries. Enviar o convite quando produção estiver pronta, sem aguardar homologação. Se homologação falhar, manter produção disponível, apresentar conclusão parcial e permitir retomar somente homologação.
+
+Estado e município começam vazios e são editados somente nos ambientes, junto do horário de funcionamento. Administradores autorizados do cliente sempre podem editar horário, nome e descrição do sistema, cor principal, logo e imagem; a política de integrações não restringe esses campos. Processos somente podem ser iniciados após configurar estado, município, fuso e pelo menos um período válido de funcionamento; mostrar aviso e validar no servidor. Depois da configuração inicial, rejeitar alterações incompletas, preservando a última configuração válida, processos em andamento e vencimentos já calculados.
 
 ## ADM-03 — Provisionamento e prontidão
 
 Executar em segundo plano, persistindo etapas, progresso e erros. Repetir uma tentativa deve reutilizar os recursos pertencentes à mesma operação e não duplicar bancos, seeds, processos ou convites.
 
-Pronto exige subdomínio acessível por HTTPS, base preparada, branding aplicado, funcionalidades configuradas, processos selecionados instalados e convite disponível. Enviar o convite automaticamente após a verificação; falha de e-mail permite reenvio independente. Integrações sem credenciais podem permanecer pendentes, com aviso explícito.
+Pronto exige subdomínio acessível por HTTPS, base preparada, branding aplicado e funcionalidades configuradas; convite disponível somente quando um administrador foi indicado. Não exigir processos selecionados no cadastro simplificado. Falha de e-mail permite reenvio independente sem recriar o ambiente. Integrações podem apresentar pendências distintas. Prontidão técnica permite acesso para configuração, mas não autoriza iniciar processos com calendário incompleto. Conclusão do cadastro exige os dois ambientes prontos; produção pode ser utilizada durante falha parcial de homologação.
 
-Todo ambiente recebe subdomínio da plataforma. Domínio próprio é adicional: apresentar instruções de DNS, verificar vínculo ao ambiente e HTTPS. Aguardar domínio próprio não impede prontidão pelo subdomínio. Não declarar sucesso de DNS ou certificado apenas porque a configuração foi solicitada.
+Sugerir subdomínio de produção a partir do cliente e permitir edição; homologação deriva dele com prefixo `hml-`. Verificar e reservar os dois hosts antes do provisionamento. Domínio próprio é adicional: apresentar instruções de DNS, verificar vínculo ao ambiente e HTTPS. Aguardar domínio próprio não impede prontidão pelo subdomínio. Não declarar sucesso de DNS ou certificado apenas porque a configuração foi solicitada.
 
 ## ADM-04 — Funcionalidades e integrações
 
-Catálogo de funcionalidades representa capacidades implementadas, como modelos de documentos, assinatura eletrônica, dashboards e agentes de IA. Somente super admins concedem/revogam disponibilidade por ambiente; novas capacidades requerem desenvolvimento.
+Catálogo de funcionalidades representa capacidades implementadas, como modelos de documentos, assinatura eletrônica, dashboards e agentes de IA. Somente super admins concedem/revogam disponibilidade por ambiente; novas capacidades requerem desenvolvimento. Funcionalidades existentes começam marcadas nos novos cadastros; novas funcionalidades não são concedidas automaticamente aos clientes existentes.
 
 Desabilitação é permitida mesmo com processos dependentes e preserva dados. No ponto de uso, mostrar: “Esta funcionalidade foi desabilitada. Entre em contato com a Septem para resolução.” O backend também impede sua execução. Uma etapa automática para no ponto afetado, registra motivo e pode ser retomada após resolução, sem pular etapas nem repetir efeitos concluídos.
 
-Contas de integração podem ser da Septem ou do cliente, configuradas por ambiente. Isso não determina quem pode editar credenciais. Quando permitido, admins do cliente podem substituir segredos sem ler valores já salvos. Quando proibido, o cliente recebe apenas status e orientação de contato, nunca os segredos. Configuração ausente aparece como “Falta configurar”. Segredos não integram transferências, logs, comparações ou versões de artefatos.
+Contas da Septem são o padrão; contas próprias do cliente são substituições opcionais quando autorizadas. Titularidade e custo são independentes da permissão de edição. Quando permitido, admins do cliente podem substituir segredos sem ler valores já salvos. Quando proibido, ocultar a aba e negar edição pela API. Revogação preserva a configuração ativa; retornar ao serviço da Septem exige ação explícita. Configuração ausente pode gerar aviso operacional “Falta configurar”, sem expor segredos. Segredos não integram transferências, logs, comparações ou versões de artefatos.
+
+Aplicar os valores iniciais de appsettings na criação e preservá-los por ambiente: novos padrões afetam somente novos clientes. Recursos isolados dos provedores são provisionados automaticamente conforme o [ADR 0007](../../adr/0007-integracoes-isoladas-com-padroes-iniciais.md).
+
+A política de segurança é fixa e não editável em nenhuma das áreas. O segundo fator é obrigatório para todos os usuários autenticados, incluindo externos e administradores das duas áreas, e usa o SMTP configurado no ambiente. Validar SMTP candidato antes da ativação, mantendo o anterior em falhas; indisponibilidade posterior exige correção pela Septem sem desativar MFA. Confiar no dispositivo após MFA bem-sucedido dispensa novos desafios por um mês; simples uso não renova o prazo. Após expirar, exigir nova autenticação com MFA na próxima ação autenticada, inclusive com sessão ainda aberta.
 
 ## ADM-05 — Catálogo e processos do ambiente
 
-Serviço é o nome amigável de processo, não uma entidade separada. Super admins modelam processos no catálogo central; a criação replica as versões selecionadas para o ambiente. O cliente pode personalizá-las conforme as permissões da aplicação.
+Serviço é o nome amigável de processo, não uma entidade separada. Super admins modelam processos no catálogo central; o cadastro simplificado não seleciona nem replica processos. Fluxos posteriores de instalação e atualização continuam distintos do cadastro. O cliente pode personalizar processos disponíveis conforme as permissões da aplicação.
 
 Alterações no catálogo não modificam cópias automaticamente. Oferecer comparação e atualização opcional. Preservar identificação da origem e das versões para identificar mudanças; catálogo e cópia não compartilham registros mutáveis.
 

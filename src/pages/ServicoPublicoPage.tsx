@@ -1,3 +1,4 @@
+import { CalendarSetupNotice } from '@/components/business-calendar/CalendarSetupNotice';
 import { isNativeForm } from '@/lib/native-form-runtime';
 import { nativeFields } from '@/lib/native-form';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -54,7 +55,7 @@ export function ServicoPublicoPage() {
   const camposDeAnexo = useMemo(() => coletarAnexos(schema), [schema]);
 
   async function enviar() {
-    if (!processKey) return;
+    if (!processKey || tenant?.calendarReady === false) return;
     const { data: valores, errors, formState } = await formRef.current?.submit() ?? { data: {}, errors: {} };
     if (Object.keys(errors).length) { setErro('Preencha os campos obrigatórios.'); return; }
 
@@ -67,6 +68,11 @@ export function ServicoPublicoPage() {
       // Ambiente com novas requisições bloqueadas (ADM-07): o pedido do cidadão está
       // certo — quem não está aceitando é o órgão. Dizer "tente novamente" mandaria
       // alguém reenviar um formulário que vai ser recusado de novo.
+      if (corpo?.error === 'calendar_not_configured') {
+        setErro('Os processos apenas podem ser iniciados após a configuração do calendário deste ambiente.');
+        void useSessionStore.getState().refreshTenant();
+        return;
+      }
       if (corpo?.error === 'new_requests_blocked') {
         setErro('Este órgão não está recebendo novos pedidos no momento. Tente mais tarde.');
         return;
@@ -104,6 +110,7 @@ export function ServicoPublicoPage() {
 
   return (
     <Moldura>
+      <CalendarSetupNotice />
       <h1 className="text-2xl font-bold text-slate-900" data-testid="servico-titulo">{data.name}</h1>
       {data.description && (
         <div className="mt-1 text-sm text-slate-500" dangerouslySetInnerHTML={{ __html: data.description }} />
@@ -184,7 +191,7 @@ export function ServicoPublicoPage() {
           // Anônimo → bloqueado até o captcha devolver um token.
           // Exige conta → liberado depois do login (pelos modais desta página).
           // Anônimo → liberado quando o captcha devolve um token.
-          disabled={enviando || (data.requiresLogin ? !autenticado : !token)}
+          disabled={tenant?.calendarReady === false || enviando || (data.requiresLogin ? !autenticado : !token)}
           className="inline-flex items-center justify-center gap-2 self-start rounded-md bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {enviando ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}

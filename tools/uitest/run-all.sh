@@ -42,7 +42,29 @@ done
 
 # Aquece o front antes de medir: com o Vite frio, a PRIMEIRA suíte da bateria cai por
 # timeout no /login e passa quando rodada isolada. Ver warmup.mjs.
-echo "Aquecendo o front... $(cd "$RAIZ" && OUT_DIR="$UITEST" node tools/uitest/warmup.mjs 2>&1 | tail -1)"
+echo "Aquecendo o front... $(cd "$RAIZ" && OUT_DIR="${OUT_DIR:-$UITEST}" node tools/uitest/warmup.mjs 2>&1 | tail -1)"
+
+# GNU timeout is absent on stock macOS. Keep the same bound and exit124 semantics.
+run_bounded() {
+  if command -v timeout >/dev/null 2>&1; then timeout "$@"
+  elif command -v gtimeout >/dev/null 2>&1; then gtimeout "$@"
+  else
+    python3 - "$@" <<'PYTIMEOUT'
+import os, signal, subprocess, sys
+process = subprocess.Popen(sys.argv[2:], start_new_session=True)
+try:
+    sys.exit(process.wait(timeout=float(sys.argv[1])))
+except subprocess.TimeoutExpired:
+    os.killpg(process.pid, signal.SIGTERM)
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+    sys.exit(124)
+PYTIMEOUT
+  fi
+}
 
 # Há DUAS convenções de sonda no diretório e a bateria tem de entender as duas:
 #   - `PASSOU (n checks)` no fim, com um `✓` por check e `✗` no que falhou, sem exit≠0;
@@ -56,15 +78,15 @@ for f in *.mjs; do
   case "$f" in pendente-*) PENDENTES="$PENDENTES ${f%.mjs}"; continue;; esac
   # Teto por suíte: uma sonda que espera uma promessa que nunca resolve (aconteceu com
   # `script-task-modeler`, parada no `await saved`) travava a BATERIA INTEIRA, sem teto.
-  OUT=$(cd "$RAIZ" && OUT_DIR="$UITEST" timeout "${SUITE_TIMEOUT:-600}" node "tools/uitest/$f" 2>&1); RC=$?
+  OUT=$(cd "$RAIZ" && OUT_DIR="${OUT_DIR:-$UITEST}" run_bounded "${SUITE_TIMEOUT:-600}" node "tools/uitest/$f" 2>&1); RC=$?
   if [ "$RC" -eq 124 ]; then OUT="$OUT
 FALHOU: estourou o teto de ${SUITE_TIMEOUT:-600}s (suíte travada)"; fi
-  N=$(echo "$OUT" | grep -cE "^✓|^PASS ")
+  N=$(echo "$OUT" | grep -cE "^✓|^PASS([[:space:]]|:)")
   CHECKS=$((CHECKS+N))
   VERDE=0
   if [ "$RC" -eq 0 ] \
      && ! echo "$OUT" | grep -qE "^(FALHOU|✗|FAIL )" \
-     && echo "$OUT" | grep -qE "^(PASSOU|PASS )"; then
+     && echo "$OUT" | grep -qE "^(PASSOU|PASS([[:space:]]|:))"; then
     VERDE=1
   fi
   if [ "$VERDE" -eq 1 ]; then

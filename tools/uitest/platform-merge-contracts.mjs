@@ -61,7 +61,7 @@ try {
       if(path.endsWith('/settings/policies')) {environmentVersion++;return route.fulfill({json:{policies:request.postDataJSON().policies}});}
       if(path.endsWith('/settings/')) {
         if(method==='PUT')settingsVersion++;
-        return route.fulfill({json:{expectedVersion:settingsVersion,logoUrl:null,heroImageUrl:null,systemDescription:'Original',businessHourStart:8,businessHourEnd:18,businessDays:'1,2,3,4,5',twoFactorMode:'off',maxLoginAttempts:5,lockoutMinutes:15,maxUploadMb:20,policies:{general:{visible:true,editable:true}}}});
+        return route.fulfill({json:{expectedVersion:settingsVersion,logoUrl:null,heroImageUrl:null,systemDescription:'Original',businessHourStart:8,businessHourEnd:18,businessDays:'1,2,3,4,5',twoFactorMode:'off',maxLoginAttempts:5,lockoutMinutes:15,maxUploadMb:20,smtpHost:'smtp.test',smtpPort:587,smtpUseSsl:true,smtpAuthMode:'login',smtpUser:'user',smtpFromAddress:'sender@example.test',smtpFromName:'Sistema',policies:{general:{visible:true,editable:true}}}});
       }
       if(path.endsWith('/environments/tenant'))return route.fulfill({json:{tenantId:'tenant',displayName:'Teste',version:environmentVersion}});
       if(path.endsWith('/super-admins'))return route.fulfill({json:{items:[{id:'admin',version:adminVersion,name:'Admin original',email:'admin@example.test',status:'active',globalAccess:true,clients:[],environments:[]}]}});
@@ -76,10 +76,10 @@ try {
     const page=await context.newPage();page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));
     async function open(mode) {await page.goto('https://platform.test/?mode='+mode);await page.addStyleTag({content:css});await page.addScriptTag({path:join(dir,'app.js')});}
     await open('settings');
-    await page.getByText('Remover regra',{exact:true}).click();
+    await page.getByRole('checkbox',{name:'Servidor de e-mail',exact:true}).check();
     await page.getByRole('button',{name:'Salvar permissões',exact:true}).click();
     await page.getByRole('status').filter({hasText:'Permissões dos parâmetros salvas.'}).waitFor();
-    assert.deepEqual(writes.at(-1).body,{policies:{},expectedVersion:31},'policy writes use master environment version, not tenant settings version');
+    assert.deepEqual(writes.at(-1).body,{policies:{email:{visible:true,editable:true},storage:{visible:false,editable:false},openRouter:{visible:false,editable:false}},expectedVersion:31},'policy writes use master environment version, not tenant settings version');
     await page.getByLabel('Descrição do sistema',{exact:true}).fill('Alterado');
     await page.getByRole('button',{name:'Salvar parâmetros',exact:true}).click();
     await page.getByRole('status').filter({hasText:'Parâmetros salvos neste ambiente.'}).waitFor();

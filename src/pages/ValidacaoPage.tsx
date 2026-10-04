@@ -1,3 +1,4 @@
+import { tenantSystemName } from '@/lib/tenant-meta';
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { DocumentValidationForm } from '@/components/public/DocumentValidationForm';
@@ -35,7 +36,7 @@ export function ValidacaoPage() {
               <ContextHelp manual="validacao-documentos" section="validar-documento" label="Abrir manual de validação de documentos" />
             </div>
             <p className="text-sm text-slate-500">
-              Confira a autenticidade de um documento emitido {tenant?.clienteNome ? `por ${tenant.clienteNome}` : 'por este órgão'}.
+              Confira a autenticidade de um documento emitido pelo sistema {tenantSystemName(tenant)}.
             </p>
           </div>
         </div>

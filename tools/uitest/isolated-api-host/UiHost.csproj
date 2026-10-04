@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <BackendRoot Condition="'$(BackendRoot)' == ''">../../../../septem_v2</BackendRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(BackendRoot)/tests/Septem.Integration.Tests/Septem.Integration.Tests.csproj" />
+  </ItemGroup>
+</Project>
