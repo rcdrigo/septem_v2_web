@@ -27,7 +27,7 @@
   --radius-md: 0.5rem;
 
   /* Login · hero-panel aprovado */
-  --color-login-page: oklch(96.83% 0.0069 247.9);
+  --color-login-page: #283751;
   --color-login-paper: oklch(97.89% 0.0029 264.54);
   --color-login-hero: oklch(33.6% 0.0524 260.52);
   --color-login-hero-deep: oklch(26.08% 0.0471 261.24);
@@ -55,9 +55,9 @@
   --text-login-tenant: 0.8125rem;
   --text-login-tenant-meta: 0.625rem;
   --text-login-eyebrow: 0.5625rem;
-  --text-login-title-mobile: 1.4375rem;
-  --text-login-title-tablet: 1.875rem;
-  --text-login-title-max: 2.125rem;
+  --text-login-title-mobile: 1.25rem;
+  --text-login-title-tablet: 1.5rem;
+  --text-login-title-max: 1.75rem;
   --text-login-action-mobile: 0.6875rem;
   --text-login-action-compact: 0.75rem;
   --text-login-action-title: 0.8125rem;

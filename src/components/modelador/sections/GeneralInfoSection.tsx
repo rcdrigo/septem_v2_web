@@ -38,6 +38,7 @@ export function GeneralInfoSection({ modeler, element }: Props) {
   // Setor (raia) para tarefas humanas e atividade de início.
   const elementType = element?.businessObject?.$type;
   const isTask = elementType === 'bpmn:UserTask' || elementType === 'bpmn:StartEvent';
+  const hasSequential = elementType !== 'bpmn:Lane' && elementType !== 'bpmn:Participant';
   const lanes = useMemo(
     () => (isTask ? getProcessLanes(modeler) : []),
     [isTask, modeler, element, lanesTick],
@@ -67,14 +68,16 @@ export function GeneralInfoSection({ modeler, element }: Props) {
 
   return (
     <Section title="Informações gerais">
-      {/* Ordem pedida (Fase 5b): Sigla → Nome → Setor. */}
-      <Field label="Sigla" help="Identificador curto usado em integrações e relatórios. Exemplo: aprovacao_gerente.">
-        <TextInput
-          value={alias}
-          onChange={(e) => setAliasLocal(e.target.value)}
-          onBlur={commitAlias}
-        />
-      </Field>
+      {/* Sequencial → Nome → Setor. */}
+      {hasSequential && (
+        <Field label="Sequencial" help="Indica a sequência lógica das tarefas no processo. Use, por exemplo, 005, 010, 015 ou T01, T02, T03.">
+          <TextInput
+            value={alias}
+            onChange={(e) => setAliasLocal(e.target.value)}
+            onBlur={commitAlias}
+          />
+        </Field>
+      )}
       <Field label="Nome" help="Nome exibido para identificar o elemento no processo.">
         <TextInput
           value={name}

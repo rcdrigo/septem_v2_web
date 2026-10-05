@@ -258,11 +258,11 @@ A toolbar permite configurar todos os elementos acima, mas a execução atual n�
 
 ### Início
 
-Use **Início** como ponto de entrada do processo. Ele representa o formulário enviado pelo requisitante e aparece como a primeira coluna de **Tarefas × Campos**.
+Use **Início** como ponto de entrada do processo. Ele representa o formulário enviado pelo requisitante e aparece em **Tarefas × Campos**, ordenado pelo sequencial e pelo nome junto às tarefas humanas.
 
 O painel permite configurar:
 
-- **Informações gerais:** sigla, nome, setor e descrição;
+- **Informações gerais:** sequencial, nome, setor e descrição;
 - **Configuração do formulário:** campos ocultos, visíveis ou editáveis e fontes por campo;
 - **Botões de ação:** o primeiro botão sugerido é **Enviar requisição**;
 - **Assinaturas:** documentos que precisam ser assinados antes do envio;
@@ -282,7 +282,7 @@ Use **Tarefa humana** quando uma pessoa precisar analisar, decidir, preencher, a
 
 Configure, nesta ordem:
 
-1. nome e sigla que identifiquem a ação;
+1. sequencial que indique a sequência lógica e nome que identifique a ação;
 2. setor, quando o diagrama usar raias;
 3. campos que o executor consulta ou edita;
 4. botões e a validação exigida por cada resultado;
@@ -398,14 +398,16 @@ Selecione **Analisar documentação** no canvas. O painel à direita apresenta s
 
 Essa seção é reutilizada pela maioria dos elementos.
 
+Raias e piscinas exibem nome e descrição, sem o campo **Sequencial**.
+
 | Campo | Finalidade | Como preencher |
 |---|---|---|
-| **Sigla** | Identificador curto usado em integrações e relatórios. | Use um valor estável e reconhecível, como `analise_documental`. |
+| **Sequencial** | Indica a sequência lógica das tarefas no processo. | Use uma sequência como `005`, `010`, `015` ou `T01`, `T02`, `T03`. |
 | **Nome** | Texto exibido no diagrama e nas tarefas. | Escreva uma ação, como **Analisar documentação**. |
 | **Setor** | Relaciona o Início ou a tarefa humana a uma raia do processo. | Selecione uma raia existente; use atualizar se acabou de criá-la. |
 | **Descrição** | Registra uma explicação opcional sobre o elemento. | Informe objetivo, critério de conclusão ou orientação para manutenção do fluxo. |
 
-A sigla não deve ser alterada sem verificar referências externas. O nome pode ser mais legível para usuários, enquanto a sigla permanece estável para integrações.
+O sequencial e o nome são exibidos juntos em **Tarefas × Campos**. As colunas seguem a ordem alfabética do sequencial e, em caso de empate, do nome da tarefa. Essa ordenação organiza a matriz; a execução continua seguindo as conexões do fluxo.
 
 <a id="processos-formulario-elemento"></a>
 
@@ -723,6 +725,8 @@ Ao trocar o tipo de uma regra, os valores específicos anteriores são limpos. S
 ## Definindo o uso dos campos em cada tarefa
 
 Abra **Tarefas × Campos** para controlar a exposição dos dados. As linhas representam campos do formulário e as colunas representam o início e as tarefas humanas.
+
+Cada coluna exibe o sequencial e o nome da tarefa, em ordem alfabética pelo sequencial e depois pelo nome. Quando não houver sequencial, apenas o nome é exibido.
 
 | Estado | Comportamento esperado |
 |---|---|

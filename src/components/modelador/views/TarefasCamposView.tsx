@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Eye, EyeOff, Pencil } from 'lucide-react';
 import { selectFieldGroups, useFormStore } from '@/stores/form';
 import { useEnsureFormFields } from '@/lib/use-ensure-form-fields';
+import { getAlias } from '@/lib/bpmn-helpers';
 import {
   getFormFieldEntries,
   findFieldEntry,
@@ -123,7 +124,7 @@ export function TarefasCamposView({ modeler }: Props) {
                   title={t.id}
                 >
                   <div className="flex flex-col items-center gap-1">
-                    <span className="truncate">{t.label}</span>
+                    <span>{t.sequential ? `${t.sequential} — ${t.label}` : t.label}</span>
                     <span className="text-[10px] font-normal text-slate-400">{t.kind}</span>
                     <BulkToggle title="Aplicar a todos os campos do formulário" onPick={(v) => setMany(t.id, allFieldIds, v)} />
                   </div>
@@ -244,6 +245,7 @@ function EmptyState({ text }: { text: string }) {
 
 type TaskInfo = {
   id: string;
+  sequential: string;
   label: string;
   kind: string;
   element: any;
@@ -264,15 +266,17 @@ function listHumanTasks(modeler: any): TaskInfo[] {
     seen.add(id);
     out.push({
       id,
+      sequential: getAlias(el).trim(),
       label: el.businessObject.name || el.businessObject.id,
       kind: type === 'bpmn:StartEvent' ? 'Início' : 'Tarefa humana',
       element: el,
     });
   });
-  // Início primeiro; depois por id (estável entre renders).
+  // Ordena pelo sequencial e pelo nome exibidos, inclusive o Início.
   out.sort((a, b) => {
-    if (a.kind !== b.kind) return a.kind === 'Início' ? -1 : 1;
-    return a.id.localeCompare(b.id);
+    return a.sequential.localeCompare(b.sequential, 'pt-BR')
+      || a.label.localeCompare(b.label, 'pt-BR')
+      || a.id.localeCompare(b.id);
   });
   return out;
 }

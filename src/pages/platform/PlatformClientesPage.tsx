@@ -64,7 +64,7 @@ export function PlatformClientesPage() {
                 </span>
                 <span className="flex items-center justify-between gap-3 text-sm text-slate-500">
                   <span>{c.environments} ambiente{c.environments === 1 ? '' : 's'}</span>
-                  <span className={c.status === 'active' ? 'text-emerald-700' : 'text-amber-700'}>{c.status === 'active' ? 'Ativo' : 'Inativado'}</span>
+                  <span className={c.status === 'active' ? 'text-emerald-700' : 'text-amber-700'}>{c.status === 'active' ? 'Ativo' : c.status === 'removing' ? 'Removendo' : 'Inativado'}</span>
                 </span>
               </Link>
             </li>

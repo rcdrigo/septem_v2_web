@@ -1,4 +1,4 @@
-// Informações gerais da tarefa e do início: Sigla (era "Apelido") como 1º campo,
+// Informações gerais da tarefa e do início: Sequencial como 1º campo,
 // Nome como 2º e Setor pesquisável com as raias. Testa ordem, rename e round-trip.
 // Modelador é desktop (canvas some no mobile) → web 1280.
 import { chromium } from 'playwright-core';
@@ -69,9 +69,9 @@ try {
 
   // Ordem e rename (os rótulos vêm MAIÚSCULOS por CSS → checar minúsculo).
   const secTxt = (await page.locator('text=Informações gerais').first().locator('xpath=ancestor::section[1]').innerText().catch(() => '')).toLowerCase();
-  const iSigla = secTxt.indexOf('sigla'), iNome = secTxt.indexOf('nome'), iSetor = secTxt.indexOf('setor');
-  check(iSigla >= 0 && iNome > iSigla && iSetor > iNome, `[web] ordem Sigla → Nome → Setor (${iSigla},${iNome},${iSetor})`);
-  check(!secTxt.includes('apelido'), '[web] "Apelido" foi renomeado para "Sigla"');
+  const iSequencial = secTxt.indexOf('sequencial'), iNome = secTxt.indexOf('nome'), iSetor = secTxt.indexOf('setor');
+  check(iSequencial >= 0 && iNome > iSequencial && iSetor > iNome, `[web] ordem Sequencial → Nome → Setor (${iSequencial},${iNome},${iSetor})`);
+  check(!secTxt.includes('apelido'), '[web] rótulo Sequencial substitui o antigo Apelido');
 
   // Setor: o dropdown lista as raias do processo. Escopa às OPÇÕES do dropdown
   // (ul li button) — os rótulos das raias no canvas são SVG, não confundem.
@@ -82,21 +82,21 @@ try {
   const temJur = await page.locator('ul li button', { hasText: 'Jurídico' }).count();
   check(temFin > 0 && temJur > 0, '[web] o Setor lista as raias do processo (Financeiro, Jurídico)');
 
-  // Seleciona Financeiro + preenche a Sigla, e SALVA.
+  // Seleciona Financeiro + preenche o Sequencial, e SALVA.
   await page.locator('ul li button', { hasText: 'Financeiro' }).last().click();
   await page.waitForTimeout(300);
-  const siglaInput = page.locator('label:has-text("Sigla")').locator('xpath=..').locator('input').first();
-  await siglaInput.fill('analise_fin');
-  await siglaInput.blur();
+  const sequencialInput = page.locator('label:has-text("Sequencial")').locator('xpath=..').locator('input').first();
+  await sequencialInput.fill('010');
+  await sequencialInput.blur();
   await page.waitForTimeout(300);
   await page.locator('header button', { hasText: 'Salvar' }).first().click();
   await page.waitForTimeout(3000);
 
-  // ROUND-TRIP: Sigla e Setor sobrevivem no schema persistido (efeito, não só a tela).
+  // ROUND-TRIP: Sequencial e Setor sobrevivem no schema persistido (efeito, não só a tela).
   const det = await api(token, `/api/v1/workflow/process-definitions/${key}`);
   const x = det.body.bpmnXml || '';
   check(/value="Financeiro"/.test(x), '[web] round-trip: o Setor (Financeiro) sobrevive ao Salvar');
-  check(/value="analise_fin"/.test(x), '[web] round-trip: a Sigla sobrevive ao Salvar');
+  check(/value="010"/.test(x), '[web] round-trip: o Sequencial sobrevive ao Salvar');
   await page.screenshot({ path: `${OUT}/info-tarefa.png`, fullPage: true });
 
   // O Início usa a mesma seção e também deve permitir configurar o Setor.
@@ -104,7 +104,7 @@ try {
   await page.mouse.click(bs.x + bs.width / 2, bs.y + bs.height / 2);
   await page.waitForTimeout(700);
   const inicio = (await page.locator('text=Informações gerais').first().locator('xpath=ancestor::section[1]').innerText().catch(() => '')).toLowerCase();
-  check(inicio.includes('sigla') && inicio.includes('nome'), '[web] início ainda mostra Sigla/Nome (seção não quebra)');
+  check(inicio.includes('sequencial') && inicio.includes('nome'), '[web] início ainda mostra Sequencial/Nome (seção não quebra)');
   check(inicio.includes('setor'), '[web] Setor também aparece na tarefa de início');
 
   const setorInicioBtn = page.locator('label:has-text("Setor")').locator('xpath=..').locator('button').first();

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQueries } from '@tanstack/react-query';
 import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ClientRemovalButton, ClientRemovalProgress } from '@/components/platform/ClientRemoval';
 import { Dialog } from '@/components/ui/Dialog';
 import { CartaoProvisionamento } from '@/components/platform/CartaoProvisionamento';
 import { useAdminInvites, useResendInvite, usePlatformClientMetrics, usePlatformClientHistory, useSetPlatformClientStatus } from '@/lib/api/platform-clients';
@@ -28,9 +29,17 @@ export function PlatformClientePage() {
   // Enquanto houver operação em andamento, o detalhe se atualiza sozinho: o ambiente
   // aparece na tela no momento em que o job o reserva.
   const { data, isLoading, isError, error } = usePlatformClient(id);
-  const convites = useAdminInvites(id);
-  const metrics = usePlatformClientMetrics(id);
-  const history = usePlatformClientHistory(id);
+  const [removalOperationId, setRemovalOperationId] = useState<string | null>(() => id ? sessionStorage.getItem(`septem-client-removal:${id}`) : null);
+  const removalId = removalOperationId ?? data?.removalOperationId;
+  function trackRemoval(operationId: string) {
+    if (id) sessionStorage.setItem(`septem-client-removal:${id}`, operationId);
+    setRemovalOperationId(operationId);
+  }
+  useEffect(() => { setRemovalOperationId(id ? sessionStorage.getItem(`septem-client-removal:${id}`) : null); }, [id]);
+  useEffect(() => { if (data?.removalOperationId && id) sessionStorage.setItem(`septem-client-removal:${id}`, data.removalOperationId); }, [data?.removalOperationId, id]);
+  const convites = useAdminInvites(removalId ? undefined : id);
+  const metrics = usePlatformClientMetrics(removalId ? undefined : id);
+  const history = usePlatformClientHistory(removalId ? undefined : id);
   const changeStatus = useSetPlatformClientStatus(id ?? '');
   const [statusError, setStatusError] = useState<string | null>(null);
   const [dismissedOperations, setDismissedOperations] = useState<string[]>([]);
@@ -100,19 +109,20 @@ export function PlatformClientePage() {
         </p>
       )}
 
-      {naoEncontrado && (
+      {naoEncontrado && !removalId && (
         <p data-testid="platform-cliente-404" className="rounded-md border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-600">
           Cliente não encontrado.
         </p>
       )}
 
-      {isError && !naoEncontrado && (
+      {isError && !naoEncontrado && !removalId && (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           Não foi possível carregar este cliente.
         </p>
       )}
 
-      {data && (
+      {removalId && <ClientRemovalProgress operationId={removalId} />}
+      {data && !removalId && (
         <>
           <Dialog
             open={modalOperations.length > 0}
@@ -136,9 +146,10 @@ export function PlatformClientePage() {
           </Dialog>
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div><h1 className="text-lg font-semibold text-slate-900" data-testid="platform-cliente-nome">{data.name}</h1><p className="text-sm text-slate-500">{environments.length} ambiente{environments.length === 1 ? '' : 's'}</p></div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <span className={data.status === 'active' ? 'text-sm font-medium text-emerald-700' : 'text-sm font-medium text-amber-700'}>{data.status === 'active' ? 'Ativo' : 'Inativado'}</span>
               {data.canManageClient && <button type="button" disabled={changeStatus.isPending} onClick={() => { setStatusError(null); void changeStatus.mutateAsync(data.status === 'active' ? 'inactive' : 'active').catch(() => setStatusError('Não foi possível alterar o estado do cliente. Atualize a página e tente novamente.')); }} className="min-h-10 rounded-md border border-slate-300 px-3 text-sm text-slate-700 disabled:opacity-50">{changeStatus.isPending ? 'Salvando…' : data.status === 'active' ? 'Inativar cliente' : 'Reativar cliente'}</button>}
+              {data.canManageClient && <ClientRemovalButton clientId={data.id} onAccepted={trackRemoval} />}
             </div>
           </div>
           {statusError && <p role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{statusError}</p>}

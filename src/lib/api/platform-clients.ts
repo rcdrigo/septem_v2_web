@@ -35,6 +35,7 @@ export type PlatformClientDetail = CalendarLocation & {
   createdAt: string;
   status: string;
   canManageClient: boolean;
+  removalOperationId?: string | null;
   environments: PlatformEnvironment[];
   /** Operações que ainda não viraram ambiente — os primeiros segundos do provisionamento. */
   pendingOperations?: { operationId: string; target: string; status: string; currentStep: string | null; purpose?: string; host?: string }[];
@@ -49,6 +50,7 @@ export function usePlatformClients() {
   return useQuery({
     queryKey: platformClientKeys.all,
     queryFn: () => platformApi.get<{ items: PlatformClientRow[]; total: number }>('/clients/'),
+    refetchInterval: (query) => query.state.data?.items.some(client => client.status === 'removing') ? 3000 : false,
   });
 }
 
@@ -62,7 +64,7 @@ export function usePlatformClient(id: string | undefined) {
     refetchInterval: (q) => {
       const d = q.state.data as PlatformClientDetail | undefined;
       if (!d) return false;
-      const andando = (d.pendingOperations?.length ?? 0) > 0
+      const andando = d.status === 'removing' || (d.pendingOperations?.length ?? 0) > 0
         || d.environments.some((a) => a.provisioningState !== 'ready');
       return andando ? 3000 : false;
     },
