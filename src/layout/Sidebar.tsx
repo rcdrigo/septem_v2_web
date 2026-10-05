@@ -1,3 +1,4 @@
+import { useBrandImage } from '@/lib/use-brand-image';
 import { tenantSystemName } from '@/lib/tenant-meta';
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
@@ -20,6 +21,7 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
   const temFuncionalidade = useFeatureCheck();
   const tenant = session.tenant;
   const tenantName = tenantSystemName(tenant);
+  const logoUrl = useBrandImage(tenant?.logoUrl, tenant?.tenantId);
   const layout = MENU[session.effectiveMode()];
   const [newRequestOpen, setNewRequestOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -47,8 +49,8 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
     >
       {/* Logo do cliente */}
       <div className="flex items-center gap-2.5 border-b border-slate-200 px-4 py-3.5">
-        {tenant?.logoUrl ? (
-          <img src={tenant.logoUrl} alt={tenantName} className="h-8 w-auto" />
+        {logoUrl ? (
+          <img src={logoUrl} alt={`Logo de ${tenantName}`} className="h-8 max-w-24 shrink-0 object-contain" />
         ) : (
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-900 text-sm font-bold text-white">
             {tenantName[0]}

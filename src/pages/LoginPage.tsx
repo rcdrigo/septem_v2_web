@@ -271,18 +271,20 @@ export function LoginPage() {
           {/* Fundo do hero vindo dos Parâmetros do sistema (Fase 1): sobreposição
               escura mantém o texto legível por cima da imagem. */}
           {heroImageUrl && <div className="login-hero-overlay bg-slate-900/75" aria-hidden="true" />}
-          <div className="login-corner-bands login-corner-bands--top-right" aria-hidden="true">
-            <i /><i /><i />
-          </div>
-          <div className="login-corner-bands login-corner-bands--bottom-left" aria-hidden="true">
-            <i /><i /><i />
-          </div>
+          {!tenant?.heroImageUrl && <>
+            <div className="login-corner-bands login-corner-bands--top-right" aria-hidden="true">
+              <i /><i /><i />
+            </div>
+            <div className="login-corner-bands login-corner-bands--bottom-left" aria-hidden="true">
+              <i /><i /><i />
+            </div>
+          </>}
 
           <div className="login-hero-copy">
-            <span className="login-hero-eyebrow">{tenantName}</span>
-            <h2 data-testid="login-descricao">
+            <h2 className="login-hero-title">{tenantName}</h2>
+            <p className="login-hero-subtitle" data-testid="login-descricao">
               {tenant?.systemDescription?.trim() || 'Processos claros, conformidade em cada decisão.'}
-            </h2>
+            </p>
           </div>
 
           <div className="login-hero-actions">
@@ -334,20 +336,6 @@ export function LoginPage() {
                   />
                 </Campo>
 
-                {canChooseAccess && (
-                  <fieldset disabled={submitting} className="space-y-2">
-                    <legend className="text-sm font-medium text-slate-700">Acessar como</legend>
-                    <div className="flex gap-4">
-                      {(['interno', 'externo'] as const).map((mode) => (
-                        <label key={mode} className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-slate-700">
-                          <input type="radio" name="accessMode" value={mode} checked={accessMode === mode} onChange={() => setAccessMode(mode)} className="accent-slate-900" />
-                          {mode === 'interno' ? 'Interno' : 'Externo'}
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-                )}
-
                 <Campo label="Senha" icon={Lock}>
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -366,6 +354,20 @@ export function LoginPage() {
                     {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                   </button>
                 </Campo>
+
+                {canChooseAccess && (
+                  <fieldset disabled={submitting} className="space-y-2">
+                    <legend className="text-sm font-medium text-slate-700">Acessar como</legend>
+                    <div className="flex gap-4">
+                      {(['interno', 'externo'] as const).map((mode) => (
+                        <label key={mode} className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-slate-700">
+                          <input type="radio" name="accessMode" value={mode} checked={accessMode === mode} onChange={() => setAccessMode(mode)} className="accent-slate-900" />
+                          {mode === 'interno' ? 'Interno' : 'Externo'}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
 
                 <Aviso texto={aviso} />
 

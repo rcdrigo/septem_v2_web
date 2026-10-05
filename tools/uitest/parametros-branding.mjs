@@ -31,9 +31,15 @@ try {
   for (const width of [1280, 375]) {
     const context = await browser.newContext({ viewport: { width, height: 1000 } });
     let general = { tenantId: 'cliente', host: 'cliente.test', ambienteNome: 'Portal de serviços', logoUrl: null, heroImageUrl: null, primaryColor: '#0ea5e9', systemDescription: 'Serviços do município.', businessHourStart: 8, businessHourEnd: 18, businessDays: '1,2,3,4,5', stateCode: null, cityCode: null, cityName: null, timeZoneId: null };
-    const uploads = [], saves = [];
+    const uploads = [], saves = [], otherSaves = [];
+    let policies = Object.fromEntries(['email', 'storage', 'openrouter'].map(section => [section,{visible:true,editable:true}]));
+    const sections = {
+      email: {host:'smtp.test',port:587,useSsl:true,authMode:'none',user:null,passwordSet:false,fromAddress:'teste@cliente.test',fromName:'Cliente'},
+      storage: {bucketName:'teste',region:null,endpoint:null,accessKey:null,secretKeySet:false,baseFolder:null,cdnUrl:null,useSignedUrls:true,urlExpirationMinutes:15,storageClass:'STANDARD',encryption:null,maxUploadMb:20,blockedExtensions:'exe'},
+      openRouter: {model:'test/model',apiKeySet:false},
+    };
     let releaseUpload, failUpload = false, refreshes = 0;
-    await context.route('https://settings.test/**', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#root{height:auto!important;min-height:100%}#root>div{height:auto!important}#root>div>div{overflow:visible!important}</style><div id="root"></div>' }));
+    await context.route('https://settings.test/**', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#root{height:100%;margin:0}</style><div id="root"></div>' }));
     await context.route('https://api.test/**', async route => {
       const request = route.request(), path = new URL(request.url()).pathname;
       const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' };
@@ -51,7 +57,11 @@ try {
       }
       if (path.includes('/branding/assets/')) return route.fulfill({ headers, contentType: 'image/png', body: png });
       if (path === '/api/tenant/config') { refreshes++; return route.fulfill({ headers, json: { tenantId: 'cliente', ...general } }); }
-      if (path === '/api/v1/settings') return route.fulfill({ headers, json: { general, policies: {} } });
+      if (request.method() === 'PUT' && path.startsWith('/api/v1/settings/')) {
+        otherSaves.push({path,payload:request.postDataJSON()});
+        return route.fulfill({headers,json:{ok:true}});
+      }
+      if (path === '/api/v1/settings') return route.fulfill({ headers, json: { general, ...sections, policies } });
       if (path.endsWith('/locations/states')) return route.fulfill({ headers, json: { items: [] } });
       return route.fulfill({ headers, json: {} });
     });
@@ -77,6 +87,23 @@ try {
     const identity = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Identidade do sistema', exact: true }) }).first();
     assert.equal(await identity.locator('textarea[name=systemDescription]').count(), 1, 'description belongs to identity');
     assert.equal(await identity.getByRole('heading', { name: 'Tela de login', exact: true }).count(), 1, 'login is grouped under identity');
+    assert.equal(await page.getByRole('heading', { name: 'Horários úteis', exact: true }).count(), 0, 'hours card has only one main heading');
+    assert.equal(await page.locator('legend:not(.sr-only)').filter({hasText:'Localização do ambiente'}).count(), 0, 'holiday card has no repeated visible title');
+    const headerSave = page.locator('header').getByRole('button', {name:'Salvar',exact:true});
+    assert.equal(await headerSave.count(), 1);
+    assert.equal(await page.getByTestId('form-geral').locator('button[type=submit]').count(), 0);
+    assert.equal(await headerSave.evaluate(button => button.form === document.querySelector('[data-testid=form-geral]')), true, 'header action retains native form validation');
+    const initialSave = await headerSave.boundingBox();
+    await page.getByTestId('settings-content').evaluate(el => {el.scrollTop = el.scrollHeight;});
+    assert.deepEqual(await headerSave.boundingBox(), initialSave, 'saving stays in the same visible header position after scrolling');
+    await page.screenshot({ path: join(tmpdir(), `septem-settings-calendar-${width}.png`) });
+    await page.getByRole('heading', {name:'Horas úteis',exact:true}).evaluate(el => el.scrollIntoView({block:'start'}));
+    await page.screenshot({ path: join(tmpdir(), `septem-settings-hours-${width}.png`) });
+    await page.getByTestId('settings-content').evaluate(el => {el.scrollTop = 0;});
+    await page.getByLabel('Nome do sistema', {exact:false}).fill('');
+    await headerSave.click();
+    assert.equal(saves.length, 0, 'header save enforces required fields');
+    await page.getByLabel('Nome do sistema', {exact:false}).fill('Portal de serviços');
     for (const kind of ['logo', 'hero']) {
       releaseUpload = undefined;
       const input = page.locator(`input[name=${kind === 'logo' ? 'logoUrl' : 'heroImageUrl'}]`);
@@ -93,6 +120,10 @@ try {
         kind === 'logo' ? 'Prévia: logo do sistema' : 'Prévia: imagem de destaque');
       assert.equal(await input.inputValue(), '', 'same file can be selected again');
     }
+    assert.equal(await page.getByRole('button', {name:'Remover imagem',exact:true}).count(), 2);
+    assert.equal(await page.getByRole('button', {name:'Remover imagem',exact:true}).first().locator('svg.lucide-trash-2').count(), 1);
+    await page.getByRole('button', {name:'Remover imagem',exact:true}).first().scrollIntoViewIfNeeded();
+    await page.screenshot({path:join(tmpdir(), `septem-settings-removal-${width}.png`)});
     assert.ok(uploads.every(u => u.headers.authorization === 'Bearer tenant-token'));
     assert.ok(uploads.every(u => u.body.includes('name="file"') && u.headers['content-type'].includes('multipart/form-data; boundary=')));
     assert.deepEqual(uploads.map(u => u.path), ['/api/v1/settings/brand-assets/logo', '/api/v1/settings/brand-assets/hero']);
@@ -114,7 +145,7 @@ try {
     assert.equal(saves[0].logoUrl, '/api/v1/branding/assets/1');
     assert.equal(saves[0].heroImageUrl, '/api/v1/branding/assets/2');
     assert.ok(!JSON.stringify(saves[0]).includes('blob:'), 'only persistent URLs are saved');
-    await page.getByRole('button', { name: 'Remover logo', exact: true }).click();
+    await page.getByRole('group', { name: 'Logo do sistema', exact: true }).getByRole('button', { name: 'Remover imagem', exact: true }).click();
     await logo.waitFor({ state: 'hidden' });
     assert.equal(await logo.count(), 0);
     assert.equal(await page.evaluate(() => window.revoked.length), 1, 'removed preview is released');
@@ -128,7 +159,25 @@ try {
     assert.equal(await page.getByAltText('Prévia: logo do sistema').count(), 0, 'removal persists after reload');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, 'no horizontal overflow');
     assert.deepEqual(errors, []);
-    await page.screenshot({ path: join(tmpdir(), `septem-settings-branding-${width}.png`), fullPage: true });
+    await page.screenshot({ path: join(tmpdir(), `septem-settings-branding-${width}.png`) });
+    for (const [tab,formName,label,endpoint] of [['E-mail','email','Testar e ativar','email'],['Arquivos','arquivos','Salvar','storage'],['OpenRouter','openrouter','Salvar','openrouter']]) {
+      await page.getByRole('tab',{name:tab,exact:true}).click();
+      const action = page.locator('header').getByRole('button',{name:label,exact:true});
+      await action.waitFor();
+      assert.equal(await page.locator('button[type=submit]').count(),1,'only active tab owns the header action');
+      assert.equal(await action.evaluate((button, name) => button.form === document.querySelector(`[data-testid=form-${name}]`),formName),true);
+      if(tab === 'E-mail') await page.getByRole('textbox',{name:'Destino do teste de e-mail',exact:true}).fill('teste@cliente.test');
+      const previousCount = otherSaves.length;
+      await action.click();
+      await waitUntil(()=>otherSaves.length===previousCount+1);
+      assert.equal(otherSaves.at(-1).path,`/api/v1/settings/${endpoint}`);
+      await page.waitForFunction(()=>!document.querySelector('header button[type=submit]').disabled);
+    }
+    await page.getByRole('tab',{name:'Integrações',exact:true}).click();
+    assert.equal(await page.locator('header button[type=submit]').count(),0,'read-only integrations have no save action');
+    policies = Object.fromEntries(['email','storage','openrouter'].map(section => [section,{visible:true,editable:false}]));
+    await open();
+    for (const tab of ['E-mail','Arquivos','OpenRouter']) assert.equal(await page.getByRole('tab',{name:tab,exact:true}).count(),0,'uneditable integration tabs remain unavailable');
     console.log(`PASS ${width}: attachments, grouping, multipart upload, loading, validation, failure recovery, persistence, removal and responsive layout.`);
     await context.close();
   }

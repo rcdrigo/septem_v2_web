@@ -16,10 +16,16 @@ try {
     import {createRoot} from 'react-dom/client';
     import {MemoryRouter} from 'react-router-dom';
     import {LoginPage} from './src/pages/LoginPage';
+    import {Sidebar} from './src/layout/Sidebar';
+    import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
     import {useSessionStore} from './src/stores/session';
     window.session = useSessionStore;
     const app = createRoot(document.getElementById('root'));
     window.unmount = () => app.unmount();
+    window.showSidebar = () => {
+      useSessionStore.setState({status:'authenticated', user:{id:'user',name:'Usuário Teste',email:'interno@cliente.test',isInternal:true,perms:[],hasDashboard:false,accessProfiles:[]},accessToken:'tenant-token'});
+      app.render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter><Sidebar mobileOpen/></MemoryRouter></QueryClientProvider>);
+    };
     const revoked = []; const revoke = URL.revokeObjectURL.bind(URL);
     URL.revokeObjectURL = url => { revoked.push(url); revoke(url); }; window.revoked = revoked;
     app.render(<MemoryRouter initialEntries={['/login']}><LoginPage/></MemoryRouter>);
@@ -40,6 +46,7 @@ try {
       const req = route.request(), path = new URL(req.url()).pathname;
       const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' };
       if (req.method() === 'OPTIONS') return route.fulfill({ headers, body: '' });
+      if (path === '/api/v1/auth/access-options') return route.fulfill({ headers, json: { isInternal: true } });
       if (path === '/api/tenant/config') return route.fulfill({ headers, json: tenant });
       if (path.startsWith('/api/v1/branding/assets/')) {
         images.push({ path, headers: req.headers() });
@@ -73,10 +80,24 @@ try {
       assert.equal(await page.locator('.login-tenant-brand').count(), 0);
       assert.equal(await page.locator('.login-hero-panel img').count(), 0);
       assert.equal(await page.locator('.login-form-panel img').count(), 1);
-      assert.equal(await page.locator('.login-hero-eyebrow').innerText(), tenant.ambienteNome);
-      assert.equal(await page.locator('.login-hero-copy h2').innerText(), tenant.systemDescription);
+      assert.equal(await page.locator('.login-hero-title').innerText(), tenant.ambienteNome);
+      assert.equal(await page.getByTestId('login-descricao').innerText(), tenant.systemDescription);
       assert.equal(await page.getByText('Bem-vindo de volta', { exact: true }).count(), 0);
-      assert.equal(await page.locator('.login-hero-copy p').count(), 0);
+      assert.equal(await page.locator('.login-hero-copy p').count(), 1);
+      assert.equal(await page.locator('.login-corner-bands').count(), 0, 'configured hero has no corner circles');
+      const hierarchy = await page.evaluate(() => {
+        const title = getComputedStyle(document.querySelector('.login-hero-title'));
+        const subtitle = getComputedStyle(document.querySelector('.login-hero-subtitle'));
+        return { bigger: parseFloat(title.fontSize) > parseFloat(subtitle.fontSize), heavier: Number(title.fontWeight) > Number(subtitle.fontWeight) };
+      });
+      assert.deepEqual(hierarchy, { bigger: true, heavier: true });
+      await page.locator('input[name=identifier]').fill('interno@cliente.test');
+      await page.getByRole('group', { name: 'Acessar como', exact: true }).waitFor();
+      assert.ok(await page.evaluate(() => {
+        const password = document.querySelector('input[name=password]');
+        const access = document.querySelector('input[name=accessMode]');
+        return !!(password.compareDocumentPosition(access) & Node.DOCUMENT_POSITION_FOLLOWING) && password.getBoundingClientRect().bottom <= access.getBoundingClientRect().top;
+      }), 'access selector follows password in visual and keyboard order');
       assert.equal(await page.getByRole('heading', { name: 'Entrar', exact: true }).count(), 1);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
       await page.screenshot({ path: join(tmpdir(), `septem-login-branding-${width}.png`), fullPage: true });
@@ -89,13 +110,19 @@ try {
       await page.evaluate(() => window.session.setState({ tenant: { ...window.session.getState().tenant, logoUrl: null, heroImageUrl: null, systemDescription: null } }));
       await page.waitForFunction(() => !document.querySelector('.login-client-logo img'));
       assert.equal(await page.locator('.login-client-logo').innerText(), tenant.ambienteNome);
-      assert.equal(await page.locator('.login-hero-copy h2').innerText(), 'Processos claros, conformidade em cada decisão.');
+      assert.equal(await page.getByTestId('login-descricao').innerText(), 'Processos claros, conformidade em cada decisão.');
       assert.equal(await page.locator('.login-hero-overlay').count(), 0);
+      assert.equal(await page.locator('.login-corner-bands').count(), 2, 'default hero retains its corner decoration');
       await page.evaluate(value => window.session.setState({ tenant: { ...value, ambienteNome: 'Sistema de Gestão Integrada de Serviços e Processos do Cliente', systemDescription: 'Organize o atendimento e acompanhe todas as etapas dos serviços e processos da organização, com informações para orientar cada decisão e facilitar o trabalho diário das equipes.' } }), tenant);
       await page.waitForFunction(() => document.querySelector('.login-client-logo img')?.naturalWidth > 0 && document.querySelector('[data-testid="login-hero"]').style.backgroundImage.includes('blob:'));
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, 'Nome e descrição longos não causam rolagem horizontal');
+      await page.evaluate(() => window.showSidebar());
+      await page.waitForFunction(() => document.querySelector('aside img')?.naturalWidth > 0);
+      assert.equal(images.length, 5, 'sidebar uses API origin and tenant to load the logo after login');
+      assert.ok(images.every(image => image.headers['x-tenant'] === 'hml-cliente' && !image.headers.authorization));
+      await page.screenshot({ path: join(tmpdir(), `septem-sidebar-branding-${width}.png`) });
       await page.evaluate(() => window.unmount());
-      assert.equal(await page.evaluate(() => window.revoked.length), 4, 'Imagens são liberadas na troca de configuração e ao desmontar a página');
+      assert.equal(await page.evaluate(() => window.revoked.length), 5, 'Imagens são liberadas na troca de configuração e ao desmontar a página');
       assert.deepEqual(errors, []);
     }
     console.log(`PASS ${width}: logo e hero carregados; identidade e layout do login verificados.`);

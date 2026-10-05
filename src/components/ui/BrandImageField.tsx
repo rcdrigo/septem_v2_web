@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { Image, Loader2, X } from 'lucide-react';
+import { Image, Loader2, Trash2 } from 'lucide-react';
 import { useBrandImage } from '@/lib/use-brand-image';
 
 export function BrandImageField({ kind, value, preview, fileName, tenantId, disabled, uploading, error, onSelect, onRemove }: {
@@ -42,8 +42,8 @@ export function BrandImageField({ kind, value, preview, fileName, tenantId, disa
         {uploading ? <span className="flex items-center gap-2"><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Enviando imagem…</span> : fileName && <p className="break-all">{fileName} · Anexada</p>}
       </div>
       {error && <p id={`${id}-error`} role="alert" className="text-sm text-rose-700">{error}</p>}
-      {value && <button type="button" onClick={onRemove} className="flex items-center gap-1.5 rounded-md px-2 py-2 text-sm text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 disabled:opacity-60">
-        <X size={16} aria-hidden="true" /> {kind === 'logo' ? 'Remover logo' : 'Remover imagem de destaque'}
+      {value && <button type="button" onClick={onRemove} className="flex items-center gap-1.5 rounded-md px-2 py-2 text-sm text-red-700 hover:bg-red-50 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-60">
+        <Trash2 size={16} aria-hidden="true" /> Remover imagem
       </button>}
     </fieldset>
   );

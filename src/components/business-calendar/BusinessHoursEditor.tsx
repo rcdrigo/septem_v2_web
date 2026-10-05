@@ -10,6 +10,7 @@ type Props = {
   onChange: (value: BusinessHoursWeek) => void;
   disabled?: boolean;
   id?: string;
+  showHeading?: boolean;
 };
 
 type PeriodListProps = {
@@ -108,7 +109,7 @@ function PeriodList({ periods, onChange, disabled, label, id }: PeriodListProps)
   );
 }
 
-export function BusinessHoursEditor({ value, onChange, disabled = false, id }: Props) {
+export function BusinessHoursEditor({ value, onChange, disabled = false, id, showHeading = true }: Props) {
   const generatedId = useId();
   const baseId = id ?? generatedId;
   const [selected, setSelected] = useState<Weekday[]>([1, 2, 3, 4, 5]);
@@ -135,12 +136,12 @@ export function BusinessHoursEditor({ value, onChange, disabled = false, id }: P
 
   return (
     <section aria-label="Horários úteis por dia da semana" data-testid="business-hours-editor" className="space-y-5">
-      <div>
+      {showHeading && <div>
         <h3 className="text-sm font-semibold text-slate-900">Horários úteis</h3>
-        <p className="mt-0.5 text-xs leading-5 text-slate-600">Configure períodos separados por intervalo. Os horários seguem o fuso do cliente.</p>
-      </div>
+        <p className="mt-0.5 text-xs leading-5 text-slate-600">Configure períodos separados por intervalo. Os horários seguem o fuso do ambiente.</p>
+      </div>}
 
-      <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
+      <div className={showHeading ? "rounded-lg border border-slate-200 bg-slate-50/70 p-3 sm:p-4" : "space-y-3"}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h4 className="text-sm font-semibold text-slate-900">Aplicar a vários dias</h4>
@@ -177,7 +178,7 @@ export function BusinessHoursEditor({ value, onChange, disabled = false, id }: P
           })}
         </div>
 
-        <div className="mt-4 border-t border-slate-200 pt-3">
+        <div className={showHeading ? "mt-4 border-t border-slate-200 pt-3" : "pt-1"}>
           <p className="mb-2 text-xs font-medium text-slate-700">Períodos para aplicar</p>
           <PeriodList periods={draft} onChange={setDraft} disabled={disabled} label="Modelo" id={`${baseId}-bulk`} />
           <button
@@ -196,12 +197,12 @@ export function BusinessHoursEditor({ value, onChange, disabled = false, id }: P
         </div>
       </div>
 
-      <div>
+      <div className={showHeading ? undefined : "border-t border-slate-200 pt-5"}>
         <h4 className="mb-2 text-sm font-semibold text-slate-900">Editar por dia</h4>
         {validateBusinessHours(value).includes('Defina ao menos um período útil na semana.') && (
           <p className="mb-2 text-xs text-rose-700" role="alert">Defina ao menos um período útil na semana.</p>
         )}
-        <div className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+        <div className={showHeading ? "divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white" : "divide-y divide-slate-200"}>
           {WEEKDAYS.map((day) => {
             const periods = value[day.value] ?? [];
             const expanded = expandedDay === day.value;

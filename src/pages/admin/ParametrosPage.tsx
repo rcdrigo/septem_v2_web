@@ -2,7 +2,8 @@ import { BusinessHoursEditor } from '@/components/business-calendar/BusinessHour
 import { CalendarLocationFields } from '@/components/business-calendar/CalendarLocationFields';
 import { validateBusinessHours } from '@/components/business-calendar/business-hours';
 import { businessHoursFromSettings, validateCalendarLocation } from '@/lib/business-calendar';
-import { Children, createContext, isValidElement, useContext, useEffect, useRef, useState } from 'react';
+import { Children, createContext, isValidElement, useContext, useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { BrandImageField } from '@/components/ui/BrandImageField';
 import { Save, Building2, Mail, HardDrive, Loader2, Send, PlugZap } from 'lucide-react';
 import { toast } from '@/stores/toast';
@@ -43,6 +44,8 @@ const POLICY_SECTION: Record<TabKey, string> = {
   openrouter: 'openrouter',
 };
 
+const HeaderActionsContext = createContext<HTMLDivElement | null>(null);
+
 const PolicyScopeContext = createContext<{ section: string; policies?: Record<string, SettingsPolicy> } | null>(null);
 
 const TABS: Array<{ key: TabKey; label: string; icon: typeof Building2 }> = [
@@ -61,6 +64,7 @@ const TABS: Array<{ key: TabKey; label: string; icon: typeof Building2 }> = [
 export function ParametrosPage() {
   useDocumentTitle('Parâmetros do sistema');
   const [tab, setTab] = useState<TabKey>('geral');
+  const [headerActions, setHeaderActions] = useState<HTMLDivElement | null>(null);
   const { data, isLoading } = useSettings();
   const visibleTabs = TABS.filter((item) =>
     settingsSectionVisible(data?.policies, POLICY_SECTION[item.key]),
@@ -68,65 +72,87 @@ export function ParametrosPage() {
   const activeTab = visibleTabs.find((item) => item.key === tab) ?? visibleTabs[0];
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
-        <div className="flex items-center gap-1">
-          <h1 className="text-lg font-semibold text-slate-900">Parâmetros do sistema</h1>
-          <ContextHelp manual="parametros-seguranca" section="configurar-parametros" label="Abrir manual de parâmetros e segurança" />
-        </div>
-        <p className="mt-0.5 text-sm text-slate-500">Identidade, calendário e integrações disponíveis neste ambiente.</p>
-        <nav className="-mb-4 mt-3 flex flex-wrap gap-1 sm:flex-nowrap sm:overflow-x-auto" role="tablist" aria-label="Seções de parâmetros">
-          {visibleTabs.map((item) => {
-            const Icon = item.icon;
-            const active = activeTab?.key === item.key;
-            return (
-              <button
-                key={item.key}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setTab(item.key)}
-                className={`flex shrink-0 items-center gap-1.5 border-b-2 px-2 py-2 text-xs font-medium transition-colors sm:px-3 sm:text-sm ${
-                  active
-                    ? 'border-slate-900 text-slate-900'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Icon size={15} className="hidden sm:block" /> {item.label}
-              </button>
-            );
-          })}
-        </nav>
-      </header>
+    <HeaderActionsContext.Provider value={headerActions}>
+      <div className="flex h-full min-h-0 flex-col">
+        <header className="sticky top-0 z-10 shrink-0 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1">
+                <h1 className="text-lg font-semibold text-slate-900">Parâmetros do sistema</h1>
+                <ContextHelp manual="parametros-seguranca" section="configurar-parametros" label="Abrir manual de parâmetros e segurança" />
+              </div>
+              <p className="mt-0.5 text-sm text-slate-500">Identidade, calendário e integrações disponíveis neste ambiente.</p>
+            </div>
+            <div ref={setHeaderActions} className="shrink-0" />
+          </div>
+          <nav className="-mb-4 mt-3 flex flex-wrap gap-1 sm:flex-nowrap sm:overflow-x-auto" role="tablist" aria-label="Seções de parâmetros">
+            {visibleTabs.map((item) => {
+              const Icon = item.icon;
+              const active = activeTab?.key === item.key;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setTab(item.key)}
+                  className={`flex shrink-0 items-center gap-1.5 border-b-2 px-2 py-2 text-xs font-medium transition-colors sm:px-3 sm:text-sm ${
+                    active
+                      ? 'border-slate-900 text-slate-900'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Icon size={15} className="hidden sm:block" /> {item.label}
+                </button>
+              );
+            })}
+          </nav>
+        </header>
 
-      <div className="flex-1 overflow-auto p-4 sm:p-6">
-        <p className="mb-4 text-sm text-slate-600">Autenticação em dois fatores obrigatória para todos os usuários. Um dispositivo confiável dispensa novos desafios por um mês.</p>
-        {isLoading && (
-          <p className="flex items-center gap-2 text-sm text-slate-400">
-            <Loader2 size={15} className="animate-spin" /> Carregando parâmetros...
-          </p>
-        )}
-        {!isLoading && visibleTabs.length === 0 && (
-          <p className="text-sm text-slate-500">Nenhuma seção de parâmetros está disponível para este ambiente.</p>
-        )}
-        {data && activeTab?.key === 'geral' && data.general && (
-          <PolicyScope section={POLICY_SECTION.geral} policies={data.policies}><GeralTab data={data.general} /></PolicyScope>
-        )}
-        {data && activeTab?.key === 'email' && data.email && (
-          <PolicyScope section={POLICY_SECTION.email} policies={data.policies}><EmailTab data={data.email} /></PolicyScope>
-        )}
-        {data && activeTab?.key === 'arquivos' && data.storage && (
-          <PolicyScope section={POLICY_SECTION.arquivos} policies={data.policies}><ArquivosTab data={data.storage} /></PolicyScope>
-        )}
-        {data && activeTab?.key === 'openrouter' && data.openRouter && (
-          <PolicyScope section={POLICY_SECTION.openrouter} policies={data.policies}><OpenRouterTab data={data.openRouter} /></PolicyScope>
-        )}
-        {data && activeTab?.key === 'integracoes' && (
-          <PolicyScope section={POLICY_SECTION.integracoes} policies={data.policies}><IntegracoesTab /></PolicyScope>
-        )}
+        <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-6" data-testid="settings-content">
+          <p className="mb-4 text-sm text-slate-600">Autenticação em dois fatores obrigatória para todos os usuários. Um dispositivo confiável dispensa novos desafios por um mês.</p>
+          {isLoading && (
+            <p className="flex items-center gap-2 text-sm text-slate-400">
+              <Loader2 size={15} className="animate-spin" /> Carregando parâmetros...
+            </p>
+          )}
+          {!isLoading && visibleTabs.length === 0 && (
+            <p className="text-sm text-slate-500">Nenhuma seção de parâmetros está disponível para este ambiente.</p>
+          )}
+          {data && activeTab?.key === 'geral' && data.general && (
+            <PolicyScope section={POLICY_SECTION.geral} policies={data.policies}><GeralTab data={data.general} /></PolicyScope>
+          )}
+          {data && activeTab?.key === 'email' && data.email && (
+            <PolicyScope section={POLICY_SECTION.email} policies={data.policies}><EmailTab data={data.email} /></PolicyScope>
+          )}
+          {data && activeTab?.key === 'arquivos' && data.storage && (
+            <PolicyScope section={POLICY_SECTION.arquivos} policies={data.policies}><ArquivosTab data={data.storage} /></PolicyScope>
+          )}
+          {data && activeTab?.key === 'openrouter' && data.openRouter && (
+            <PolicyScope section={POLICY_SECTION.openrouter} policies={data.policies}><OpenRouterTab data={data.openRouter} /></PolicyScope>
+          )}
+          {data && activeTab?.key === 'integracoes' && (
+            <PolicyScope section={POLICY_SECTION.integracoes} policies={data.policies}><IntegracoesTab /></PolicyScope>
+          )}
+        </div>
       </div>
-    </div>
+    </HeaderActionsContext.Provider>
   );
+}
+
+function HeaderSaveButton({ form, pending, disabled, label = 'Salvar' }: {
+  form: string;
+  pending: boolean;
+  disabled: boolean;
+  label?: string;
+}) {
+  const target = useContext(HeaderActionsContext);
+  return target && createPortal(
+    <button type="submit" form={form} disabled={disabled} aria-busy={pending}
+      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 disabled:cursor-not-allowed disabled:opacity-60 sm:px-4">
+      {pending ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
+      {pending ? 'Salvando…' : label}
+    </button>, target);
 }
 
 function PolicyScope({ section, policies, children }: {
@@ -180,6 +206,7 @@ function IntegracoesTab() {
 }
 
 function EmailTab({ data }: { data: SettingsEmail }) {
+  const formId = useId();
   const save = useSaveEmail();
   const policies = useCurrentPolicies();
   const canEdit = settingsSectionEditable(policies, 'email');
@@ -226,7 +253,7 @@ function EmailTab({ data }: { data: SettingsEmail }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="max-w-3xl space-y-5" data-testid="form-email">
+    <form id={formId} onSubmit={onSubmit} className="max-w-3xl space-y-5" data-testid="form-email">
       <Card title="Servidor SMTP" hint="Usado por notificações e códigos de autenticação. Ao salvar, a configuração é testada antes de ser ativada; uma falha mantém a anterior.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Servidor (host)">
@@ -342,18 +369,13 @@ function EmailTab({ data }: { data: SettingsEmail }) {
         </div>
       </Card>
 
-      <button
-        type="submit"
-        disabled={save.isPending || !canEdit}
-        className="flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-60"
-      >
-        {save.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Testar e ativar
-      </button>
+      <HeaderSaveButton form={formId} pending={save.isPending} disabled={save.isPending || !canEdit} label="Testar e ativar" />
     </form>
   );
 }
 
 function ArquivosTab({ data }: { data: SettingsStorage }) {
+  const formId = useId();
   const save = useSaveStorage();
   const policies = useCurrentPolicies();
   const canEdit = settingsSectionEditable(policies, 'storage');
@@ -390,7 +412,7 @@ function ArquivosTab({ data }: { data: SettingsStorage }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="max-w-3xl space-y-5" data-testid="form-arquivos">
+    <form id={formId} onSubmit={onSubmit} className="max-w-3xl space-y-5" data-testid="form-arquivos">
       <Card title="Bucket" hint="Onde os anexos dos formulários e os documentos gerados são guardados (S3 ou compatível, como MinIO).">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Bucket">
@@ -466,9 +488,7 @@ function ArquivosTab({ data }: { data: SettingsStorage }) {
       </Card>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={save.isPending || !canEdit} className="flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-60">
-          {save.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Salvar
-        </button>
+        <HeaderSaveButton form={formId} pending={save.isPending} disabled={save.isPending || !canEdit} />
         <button type="button" onClick={onTest} disabled={test.isPending || !canEdit} className="flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60">
           {test.isPending ? <Loader2 size={16} className="animate-spin" /> : <PlugZap size={16} />} Testar conexão
         </button>
@@ -483,6 +503,7 @@ function detalhe(err: unknown): string | undefined {
 }
 
 function GeralTab({ data }: { data: GeneralPayload & { tenantId: string; host: string | null } }) {
+  const formId = useId();
   const save = useSaveGeneral();
   const policies = useCurrentPolicies();
   const canEdit = settingsSectionEditable(policies, 'general');
@@ -582,7 +603,7 @@ function GeralTab({ data }: { data: GeneralPayload & { tenantId: string; host: s
   }
 
   return (
-    <form onSubmit={onSubmit} className="max-w-3xl space-y-5" data-testid="form-geral">
+    <form id={formId} onSubmit={onSubmit} className="max-w-3xl space-y-5" data-testid="form-geral">
       <Card title="Identidade do sistema" hint="Configure como o sistema é apresentado aos usuários deste ambiente.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Nome do sistema" required>
@@ -636,22 +657,16 @@ function GeralTab({ data }: { data: GeneralPayload & { tenantId: string; host: s
         <p className="mt-5 text-xs text-slate-600">Salve os parâmetros para aplicar as imagens e as demais alterações neste ambiente.</p>
       </Card>
 
-        {calendarPolicy.visible && <Card title="Horas úteis" hint="As alterações valem somente para novos cálculos neste ambiente. Os vencimentos já calculados são preservados.">
-          <BusinessHoursEditor value={businessHoursFromSettings(form)} onChange={businessHours => set('businessHours', businessHours)} disabled={!calendarPolicy.editable} />
+        {calendarPolicy.visible && <Card title="Horas úteis" hint="Defina os períodos de cada dia no fuso do ambiente. As alterações valem para novos cálculos; os vencimentos já calculados são preservados.">
+          <BusinessHoursEditor showHeading={false} value={businessHoursFromSettings(form)} onChange={businessHours => set('businessHours', businessHours)} disabled={!calendarPolicy.editable} />
         </Card>}
-        {locationVisible && <Card title="Calendário de feriados">
-          <CalendarLocationFields value={form} onChange={location => { hasEdits.current = true; setForm(current => ({ ...current, ...location })); }} disabled={!locationEditable} required={!!form.stateCode || !!form.cityCode} />
+        {locationVisible && <Card title="Calendário de feriados" hint="O estado e o município definem os feriados usados nos próximos cálculos de horas úteis deste ambiente.">
+          <CalendarLocationFields showHeading={false} value={form} onChange={location => { hasEdits.current = true; setForm(current => ({ ...current, ...location })); }} disabled={!locationEditable} required={!!form.stateCode || !!form.cityCode} />
           {!form.cityCode && <p className="mt-3 text-sm text-amber-800">Processos somente podem ser iniciados após configurar estado, município, fuso e horário de funcionamento.</p>}
         </Card>}
 
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="submit"
-          disabled={save.isPending || uploading !== null || !canEdit}
-          className="flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-60"
-        >
-          {save.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Salvar
-        </button>
+        <HeaderSaveButton form={formId} pending={save.isPending} disabled={save.isPending || uploading !== null || !canEdit} />
         <span className="text-xs text-slate-400">
           Tenant <code className="rounded bg-slate-100 px-1 py-0.5">{data.tenantId}</code>
           {data.host && <> · host {data.host}</>}
@@ -667,8 +682,10 @@ const inputCls =
 function Card({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4 sm:p-5">
-      <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
-      {hint && <p className="mb-4 mt-0.5 text-xs text-slate-500">{hint}</p>}
+      <div className="mb-5">
+        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+        {hint && <p className="mt-1 text-sm leading-5 text-slate-600">{hint}</p>}
+      </div>
       {children}
     </section>
   );
@@ -736,6 +753,7 @@ function pick(d: GeneralPayload): GeneralPayload {
 }
 
 function OpenRouterTab({ data }: { data: SettingsOpenRouter }) {
+  const formId = useId();
   const save = useSaveOpenRouter();
   const policies = useCurrentPolicies();
   const canEdit = settingsSectionEditable(policies, 'openrouter');
@@ -757,7 +775,7 @@ function OpenRouterTab({ data }: { data: SettingsOpenRouter }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="max-w-3xl space-y-5" data-testid="form-openrouter">
+    <form id={formId} onSubmit={onSubmit} className="max-w-3xl space-y-5" data-testid="form-openrouter">
       <Card title="OpenRouter" hint="Chave e modelo padrão para os agentes deste ambiente. Cada agente pode definir seu próprio modelo. As alterações valem na próxima solicitação.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field field="apiKey" label={data.apiKeySet ? 'Chave da API (configurada)' : 'Chave da API'}>
@@ -777,9 +795,7 @@ function OpenRouterTab({ data }: { data: SettingsOpenRouter }) {
         </div>
         <p className="mt-4 text-xs text-slate-500">A chave é armazenada cifrada e não é devolvida ao navegador. Use o identificador do modelo no OpenRouter, com suporte a respostas estruturadas (JSON Schema).</p>
       </Card>
-      <button type="submit" disabled={save.isPending || !canEdit} className="flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60">
-        {save.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Salvar
-      </button>
+      <HeaderSaveButton form={formId} pending={save.isPending} disabled={save.isPending || !canEdit} />
     </form>
   );
 }

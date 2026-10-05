@@ -4,20 +4,20 @@ import { api } from '@/lib/api';
 import type { CalendarLocation } from '@/lib/business-calendar';
 
 type LocationOption = { code: string; name: string; timeZoneId?: string };
-type Props = { value: CalendarLocation; onChange: (value: CalendarLocation) => void; disabled?: boolean; required?: boolean };
+type Props = { value: CalendarLocation; onChange: (value: CalendarLocation) => void; disabled?: boolean; required?: boolean; showHeading?: boolean };
 const input = 'min-h-11 w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-600 disabled:bg-slate-50 disabled:text-slate-500';
 const zones = ['America/Sao_Paulo', 'America/Fortaleza', 'America/Recife', 'America/Bahia', 'America/Belem', 'America/Maceio', 'America/Araguaina', 'America/Cuiaba', 'America/Campo_Grande', 'America/Manaus', 'America/Porto_Velho', 'America/Boa_Vista', 'America/Rio_Branco', 'America/Eirunepe', 'America/Santarem', 'America/Noronha'];
 const zoneByState: Record<string, string> = { AC: 'America/Rio_Branco', AL: 'America/Maceio', AM: 'America/Manaus', AP: 'America/Belem', BA: 'America/Bahia', CE: 'America/Fortaleza', MA: 'America/Fortaleza', MT: 'America/Cuiaba', MS: 'America/Campo_Grande', PA: 'America/Belem', PB: 'America/Fortaleza', PE: 'America/Recife', PI: 'America/Fortaleza', RN: 'America/Fortaleza', RO: 'America/Porto_Velho', RR: 'America/Boa_Vista', SE: 'America/Maceio', TO: 'America/Araguaina' };
 
 /** Public geographic catalogs also work while signed in only to the platform. */
-export function CalendarLocationFields({ value, onChange, disabled, required = true }: Props) {
+export function CalendarLocationFields({ value, onChange, disabled, required = true, showHeading = true }: Props) {
   const id = useId();
   const states = useQuery({ queryKey: ['locations', 'states'], queryFn: () => api.get<{ items: LocationOption[] }>('/api/v1/locations/states', { anonymous: true }), staleTime: 86_400_000 });
   const cities = useQuery({ queryKey: ['locations', 'cities', value.stateCode], queryFn: () => api.get<{ items: LocationOption[] }>(`/api/v1/locations/states/${encodeURIComponent(value.stateCode ?? '')}/cities`, { anonymous: true }), enabled: !!value.stateCode, staleTime: 86_400_000 });
   const selectedCityMissing = !!value.cityCode && !cities.data?.items.some(city => city.code === value.cityCode);
   return <fieldset disabled={disabled} className="min-w-0 space-y-3">
-    <legend className="text-sm font-semibold text-slate-900">Localização do ambiente</legend>
-    <p className="text-sm leading-6 text-slate-600">A cidade e o estado identificam os feriados usados nos próximos cálculos de horas úteis. A localização e o calendário valem somente para este ambiente.</p>
+    <legend className={showHeading ? "text-sm font-semibold text-slate-900" : "sr-only"}>Localização do ambiente</legend>
+    {showHeading && <p className="text-sm leading-6 text-slate-600">A cidade e o estado identificam os feriados usados nos próximos cálculos de horas úteis. A localização e o calendário valem somente para este ambiente.</p>}
     <div className="grid gap-4 sm:grid-cols-2">
       <label htmlFor={`${id}-state`} className="space-y-1 text-sm font-medium text-slate-700"><span>Estado</span><select id={`${id}-state`} required={required} className={input} value={value.stateCode ?? ''} disabled={disabled || states.isLoading || states.isError} onChange={event => {
         const stateCode = event.target.value;
