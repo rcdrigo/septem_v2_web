@@ -24,6 +24,7 @@
     "test:native-task-fields": "node tools/uitest/native-form-task-fields.mjs",
     "test:native-runtime": "node tools/uitest/native-form-runtime.mjs",
     "test:native-migration": "node tools/uitest/native-migration-contract.mjs",
+    "test:provisioning-modal": "npm run build && node tools/uitest/provisioning-modal.mjs",
     "test:client-onboarding": "npm run build && node tools/uitest/client-onboarding.mjs && node tools/uitest/client-access-policy.mjs",
     "test:client-onboarding-integration": "node tools/uitest/client-onboarding-integration.mjs"
   },

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, CheckCircle2, Loader2, RotateCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, RotateCw } from 'lucide-react';
 import { useOperation, useRetryOperation, type OperationStep } from '@/lib/api/platform-clients';
 
 /**
@@ -19,14 +19,16 @@ const ROTULO: Record<string, string> = {
   funcionalidades: 'Funcionalidades contratadas',
   'processos-do-catalogo': 'Processos do catálogo',
   'dados-ficticios': 'Dados fictícios',
+  superadmins: 'Superadministradores',
   'vinculo-do-admin': 'Vínculo do administrador',
   prontidao: 'Verificando prontidão',
   dns: 'Configurando endereço',
+  'binding-iis': 'Configurando HTTPS',
   https: 'Verificando HTTPS',
   'convite-do-admin': 'Convite do administrador',
 };
 
-export function CartaoProvisionamento({ operationId, titulo }: { operationId: string; titulo: string }) {
+export function CartaoProvisionamento({ operationId, titulo, environmentUrl }: { operationId: string; titulo: string; environmentUrl?: string }) {
   const { data } = useOperation(operationId, true);
   const retry = useRetryOperation();
   const [retryError, setRetryError] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export function CartaoProvisionamento({ operationId, titulo }: { operationId: st
           {titulo}
         </span>
         <span className="text-xs text-slate-500" data-testid="operacao-status">
-          {pronto ? 'Ambiente pronto' : falhou ? 'Falhou' : emAndamento ? 'Provisionando…' : data?.status}
+          {pronto ? 'Concluído' : falhou ? 'Falhou' : emAndamento ? 'Provisionando…' : data?.status}
         </span>
       </header>
 
@@ -65,6 +67,18 @@ export function CartaoProvisionamento({ operationId, titulo }: { operationId: st
         ))}
         {(data?.steps ?? []).length === 0 && <li className="text-xs text-slate-400">Aguardando o início…</li>}
       </ol>
+
+      {pronto && environmentUrl && (
+        <a
+          href={environmentUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Abrir ${titulo.toLocaleLowerCase('pt-BR')} em nova aba`}
+          className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-md border border-slate-300 px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+        >
+          <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" /> Abrir ambiente
+        </a>
+      )}
 
       {falhou && (
         <button

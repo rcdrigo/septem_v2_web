@@ -107,7 +107,9 @@ export function PlatformNovoClientePage() {
         production: { tenantId: slug, displayName: displayName.trim() || undefined },
         staging: { tenantId: `hml-${slug}`, displayName: displayName.trim() || undefined },
       });
-      navigate(routes.platformClient(result.clientId));
+      navigate(routes.platformClient(result.clientId), {
+        state: { provisioningOperationIds: result.operations.map((operation) => operation.operationId) },
+      });
     } catch (e) {
       setError(message(e, 'Não foi possível cadastrar. Seus dados foram preservados; confira os campos e tente novamente.'));
       if (e instanceof ApiError) {

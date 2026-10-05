@@ -49,7 +49,7 @@ try {
    const publicConfig=(await jsonFetch('/api/tenant/config',{tenant:env.tenantId})).data;assert.equal(publicConfig.calendarReady,false);assert.equal(publicConfig.ambienteNome,defaults.displayName);assert.equal('clienteNome' in publicConfig,false);
    const services=(await jsonFetch('/api/v1/public/services',{tenant:env.tenantId})).data;assert.deepEqual(services,[],'Creation installs no catalog processes.');
   }
-  const invites=(await jsonFetch(`/api/v1/platform/clients/${created.clientId}/admin-invites`,{token:centralToken})).data;assert.deepEqual(invites.items,[]);const metrics=(await jsonFetch(`/api/v1/platform/clients/${created.clientId}/metrics`,{token:centralToken})).data;assert.equal(metrics.internalUsers,0);assert.equal(metrics.externalUsers,0);
+  const invites=(await jsonFetch(`/api/v1/platform/clients/${created.clientId}/admin-invites`,{token:centralToken})).data;assert.deepEqual(invites.items,[]);const metrics=(await jsonFetch(`/api/v1/platform/clients/${created.clientId}/metrics`,{token:centralToken})).data;assert.equal(metrics.internalUsers,1,'Production starts with the authorized superadmin user.');assert.equal(metrics.externalUsers,0);
   const before=(await jsonFetch('/api/v1/platform/clients/',{token:centralToken})).data.total;
   for(const [candidate,candidateSlug] of [[name,slug+'-duplicate'],[name+' Hml',slug+'-collision']]) {
    const query=new URLSearchParams({name:candidate,slug:candidateSlug});const availability=(await jsonFetch('/api/v1/platform/provisioning-availability?'+query,{token:centralToken})).data;assert.equal(availability.available,false,'Names and derived database collisions must be rejected before provisioning.');

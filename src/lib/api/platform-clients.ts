@@ -37,7 +37,7 @@ export type PlatformClientDetail = CalendarLocation & {
   canManageClient: boolean;
   environments: PlatformEnvironment[];
   /** Operações que ainda não viraram ambiente — os primeiros segundos do provisionamento. */
-  pendingOperations?: { operationId: string; target: string; status: string; currentStep: string | null }[];
+  pendingOperations?: { operationId: string; target: string; status: string; currentStep: string | null; purpose?: string; host?: string }[];
 };
 
 export const platformClientKeys = {

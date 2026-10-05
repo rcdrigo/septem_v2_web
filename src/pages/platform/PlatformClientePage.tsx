@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQueries } from '@tanstack/react-query';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
@@ -24,6 +24,8 @@ import type { OperationDetail } from '@/lib/api/platform-clients';
  */
 export function PlatformClientePage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
   // Enquanto houver operação em andamento, o detalhe se atualiza sozinho: o ambiente
   // aparece na tela no momento em que o job o reserva.
   const { data, isLoading, isError, error } = usePlatformClient(id);
@@ -33,37 +35,59 @@ export function PlatformClientePage() {
   const changeStatus = useSetPlatformClientStatus(id ?? '');
   const [statusError, setStatusError] = useState<string | null>(null);
   const [dismissedOperations, setDismissedOperations] = useState<string[]>([]);
+  const [trackedOperations, setTrackedOperations] = useState<string[]>(() =>
+    Array.isArray(location.state?.provisioningOperationIds)
+      ? location.state.provisioningOperationIds.filter((value: unknown) => typeof value === 'string') : []);
   const reenviar = useResendInvite(id ?? '');
   useDocumentTitle(data ? `${data.name} · área central` : 'Cliente · área central');
 
   const naoEncontrado = isError && (error as { status?: number } | undefined)?.status === 404;
   const environments = data?.environments ?? [];
+  const provisioningTitle = (purpose: string) => purpose === 'staging'
+    ? 'Ambiente de homologação' : purpose === 'demo' ? 'Ambiente de demonstração' : 'Ambiente de produção';
   const operations = data ? [
     ...(data.pendingOperations ?? []).map((operation) => ({
       operationId: operation.operationId,
-      target: operation.target,
+      title: provisioningTitle(operation.purpose ?? (operation.target.startsWith('hml-') || operation.target.endsWith('-hml') ? 'staging' : 'production')),
+      url: operation.host ? 'https://' + operation.host : undefined,
       status: operation.status,
     })),
-    ...environments.filter((environment) => environment.operationId && environment.provisioningState !== 'ready')
+    ...environments.filter((environment) => environment.operationId)
       .map((environment) => ({
         operationId: environment.operationId!,
-        target: environment.displayName || environment.tenantId,
+        title: provisioningTitle(environment.purpose),
+        url: environment.url || 'https://' + environment.host,
         status: environment.provisioningState,
       })),
   ].filter((operation, index, all) => all.findIndex((candidate) => candidate.operationId === operation.operationId) === index) : [];
   const operationQueries = useQueries({ queries: operations.map((operation) => ({
     queryKey: ['platform', 'operations', operation.operationId],
     queryFn: () => platformApi.get<OperationDetail>(`/operations/${operation.operationId}`),
+    refetchInterval: (query: { state: { data?: OperationDetail } }) => {
+      const status = query.state.data?.status;
+      return !status || status === 'queued' || status === 'running' ? 3000 : false;
+    },
   })) });
   const provisioningRunning = operationQueries.some((query, index) => {
-    if (query.isError) return operations[index]?.status === 'queued' || operations[index]?.status === 'running';
-    if (!query.data) return true;
-    return query.data.status === 'queued' || query.data.status === 'running';
+    const status = query.data?.status ?? operations[index]?.status;
+    return status === 'queued' || status === 'running';
   });
-  const activeOperations = operations.filter((_, index) => operationQueries[index]?.data?.status !== 'completed');
-  const modalOperations = provisioningRunning
-    ? activeOperations
-    : activeOperations.filter((operation) => !dismissedOperations.includes(operation.operationId));
+  const provisioningFailed = operationQueries.some((query, index) =>
+    (query.data?.status ?? operations[index]?.status) === 'failed');
+  const hasUnfinishedOperations = operations.some((operation, index) => {
+    const status = operationQueries[index]?.data?.status ?? operation.status;
+    return status !== 'ready' && status !== 'completed';
+  });
+  const operationIds = operations.map((operation) => operation.operationId).join('|');
+  useEffect(() => {
+    if (!hasUnfinishedOperations) return;
+    const ids = operationIds.split('|').filter(Boolean);
+    // A conclusão de um ambiente preserva o cartão até o acompanhamento ser fechado.
+    setTrackedOperations((current) => ids.every((id) => current.includes(id))
+      ? current : [...new Set([...current, ...ids])]);
+  }, [hasUnfinishedOperations, operationIds]);
+  const modalOperations = operations.filter((operation) => trackedOperations.includes(operation.operationId)
+    && (provisioningRunning || !dismissedOperations.includes(operation.operationId)));
 
   return (
     <section>
@@ -93,17 +117,20 @@ export function PlatformClientePage() {
         <>
           <Dialog
             open={modalOperations.length > 0}
-            onClose={() => setDismissedOperations(operations.map((operation) => operation.operationId))}
+            onClose={() => {
+              setDismissedOperations(operations.map((operation) => operation.operationId));
+              navigate(location.pathname + location.search + location.hash, { replace: true, state: null });
+            }}
             title="Provisionamento de ambiente"
             width="lg"
             dismissible={!provisioningRunning}
             footer={provisioningRunning
               ? <span className="mr-auto text-xs text-slate-500">Mantenha esta janela aberta enquanto uma etapa estiver em execução.</span>
-              : <span className="mr-auto text-xs text-slate-500">A operação falhou e pode ser retomada pelo cartão de progresso.</span>}
+              : <span className="mr-auto text-xs text-slate-500">{provisioningFailed ? 'Há uma operação com falha. Retome pelo cartão de progresso.' : 'Provisionamento concluído. Abra os ambientes ou feche esta janela.'}</span>}
           >
             <p className="text-sm text-slate-600">O progresso é salvo no servidor e continuará acompanhado se você atualizar a página.</p>
             <div className="mt-4 grid gap-3" data-testid="provisioning-modal-content">
-              {modalOperations.map((operation) => <CartaoProvisionamento key={operation.operationId} operationId={operation.operationId} titulo={operation.target} />)}
+              {modalOperations.map((operation) => <CartaoProvisionamento key={operation.operationId} operationId={operation.operationId} titulo={operation.title} environmentUrl={operation.url} />)}
             </div>
             {provisioningRunning && <span className="sr-only" data-testid="provisioning-modal-not-dismissible">Fechamento indisponível durante a execução</span>}
             {!provisioningRunning && <span className="sr-only" data-testid="fechar-modal-provisionamento">Você pode fechar o acompanhamento</span>}
