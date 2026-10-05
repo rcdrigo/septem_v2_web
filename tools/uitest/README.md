@@ -113,6 +113,12 @@ A limpeza foi desativada. `python3 tools/uitest/native-migration.py` verifica co
 
 ## Cadastro simplificado e MFA mensal
 
+`npm run test:settings-branding` verifica os anexos de logo e imagem de destaque
+nos parâmetros do ambiente, em 1280 e 375 px. Usa a tela e o cliente HTTP reais
+com respostas de API simuladas, sem alterar dados do ambiente. Cobre agrupamento
+de identidade/login, multipart autenticado, bloqueio durante envio, validação,
+falha de substituição, persistência após recarga, remoção e ausência de overflow.
+
 As sondas `client-onboarding`, `client-branding`, `client-access-policy`,
 `session-renewal` e `platform-session-policy` usam os componentes e stores reais
 com respostas HTTP controladas para validar contratos, falhas e concorrência.

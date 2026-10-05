@@ -194,8 +194,8 @@ export const api = {
   },
 
   /** GET que devolve o corpo cru (Blob) — downloads (modelo XLSX, anexos). */
-  getBlob: async (path: string): Promise<Blob> => {
-    const resp = await request(path);
+  getBlob: async (path: string, opts?: ApiOptions): Promise<Blob> => {
+    const resp = await request(path, { method: 'GET', ...opts });
     return resp.blob();
   },
 

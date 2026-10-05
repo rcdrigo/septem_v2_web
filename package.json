@@ -14,6 +14,7 @@
     "test:script-task": "node tools/uitest/script-task-modeler.mjs",
     "test:session": "node tools/uitest/session-renewal.mjs && node tools/uitest/platform-session-policy.mjs",
     "test:client-branding": "npm run build && node tools/uitest/client-branding.mjs",
+    "test:settings-branding": "npm run build && node tools/uitest/parametros-branding.mjs",
     "test:platform-contracts": "npm run build && node tools/uitest/platform-merge-contracts.mjs",
     "test:business-calendar": "npm run build && node tools/uitest/business-calendar-contracts.mjs && node tools/uitest/business-calendar.mjs",
     "test:tags": "npm run build && node tools/uitest/tags.mjs && node tools/uitest/task-tags-session.mjs",
@@ -26,7 +27,8 @@
     "test:native-migration": "node tools/uitest/native-migration-contract.mjs",
     "test:provisioning-modal": "npm run build && node tools/uitest/provisioning-modal.mjs",
     "test:client-onboarding": "npm run build && node tools/uitest/client-onboarding.mjs && node tools/uitest/client-access-policy.mjs",
-    "test:client-onboarding-integration": "node tools/uitest/client-onboarding-integration.mjs"
+    "test:client-onboarding-integration": "node tools/uitest/client-onboarding-integration.mjs",
+    "test:platform-no-catalog": "npm run build && node tools/uitest/platform-no-process-catalog.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -47,7 +49,7 @@
     "react": "^19.2.6",
     "react-day-picker": "^9.14.0",
     "react-dom": "^19.2.6",
-    "react-router-dom": "^7.15.0",
+    "react-router-dom": "^7.18.4",
     "zustand": "^5.0.13"
   },
   "devDependencies": {
@@ -60,6 +62,6 @@
     "@vitejs/plugin-react": "^4.3.4",
     "tailwindcss": "^4.2.4",
     "typescript": "~5.6.3",
-    "vite": "^6.0.0"
+    "vite": "^6.4.3"
   }
 }

@@ -13,7 +13,6 @@ import {
 } from '@/lib/api/platform-clients';
 import { routes } from '@/lib/routes';
 import { useDocumentTitle } from '@/lib/use-document-title';
-import { PlatformCatalogInventory } from './PlatformCatalogInventory';
 import { platformApi } from '@/lib/platform-api';
 import type { OperationDetail } from '@/lib/api/platform-clients';
 
@@ -235,8 +234,6 @@ export function PlatformClientePage() {
               ))}
             </ul>
           )}
-
-          {environments.length > 0 && <PlatformCatalogInventory key={data.id} destinationClientId={data.id} />}
 
           <section className="mt-6 border-t border-slate-200 pt-4">
             <h2 className="text-sm font-semibold text-slate-900">Histórico do cliente</h2>

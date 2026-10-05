@@ -193,6 +193,12 @@ export function useSaveGeneral() {
   });
 }
 
+export function uploadSettingsBrandImage(kind: 'logo' | 'hero', file: File): Promise<{ url: string }> {
+  const body = new FormData();
+  body.append('file', file);
+  return api.postForm(`/api/v1/settings/brand-assets/${kind}`, body);
+}
+
 /** Situação das integrações do ambiente e se este cliente pode trocar credenciais (ADM-04). */
 export type IntegrationState = {
   kind: string;

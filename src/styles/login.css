@@ -50,18 +50,9 @@
   z-index: 0;
   border-radius: inherit;
 }
-.login-tenant-brand,
 .login-hero-actions {
   position: relative;
   z-index: 1;
-}
-.login-hero-copy { z-index: 1; }
-.login-hero-descricao {
-  margin-top: 0.85rem;
-  max-width: 34ch;
-  font-size: 0.95rem;
-  line-height: 1.5;
-  opacity: 0.95;
 }
 
 .login-corner-bands {
@@ -126,38 +117,6 @@
   background-color: var(--color-login-band-bottom-3);
 }
 
-.login-tenant-brand,
-.login-mobile-brand {
-  position: relative;
-  z-index: 2;
-  align-items: center;
-  min-width: 0;
-}
-
-.login-tenant-brand {
-  display: none;
-}
-
-.login-tenant-brand strong,
-.login-tenant-brand span,
-.login-mobile-brand strong {
-  display: block;
-}
-
-.login-tenant-brand strong {
-  max-width: 28ch;
-  overflow-wrap: anywhere;
-  font-size: var(--text-login-tenant);
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.login-tenant-brand span {
-  margin-block-start: 0.125rem;
-  color: var(--color-login-brand-muted);
-  font-size: var(--text-login-tenant-meta);
-}
-
 .login-hero-copy {
   position: relative;
   z-index: 2;
@@ -166,6 +125,8 @@
 }
 
 .login-hero-eyebrow {
+  display: block;
+  overflow-wrap: anywhere;
   color: var(--color-login-gold);
   font-size: var(--text-login-eyebrow);
   font-weight: 700;
@@ -185,10 +146,6 @@
   line-height: 1.12;
 }
 
-.login-hero-title-break {
-  display: none;
-}
-
 .login-form-panel {
   display: flex;
   flex-direction: column;
@@ -199,12 +156,21 @@
   background-color: var(--color-login-paper);
 }
 
-.login-mobile-brand {
+.login-client-logo {
   display: flex;
-  margin-block-end: 1.125rem;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
 }
 
-.login-mobile-brand strong {
+.login-client-logo img {
+  display: block;
+  max-width: min(100%, 16rem);
+  max-height: 6rem;
+  object-fit: contain;
+}
+
+.login-client-logo strong {
   max-width: 32ch;
   overflow-wrap: anywhere;
   color: var(--color-login-action-ink);
@@ -228,33 +194,15 @@
     padding: 2rem;
   }
 
-  .login-tenant-brand {
-    display: flex;
-  }
-
-  .login-hero-copy {
-    margin-block-start: 2.25rem;
-  }
-
   .login-hero-copy h2 {
     margin-block-start: 0.625rem;
     font-size: var(--text-login-title-tablet);
   }
 
-  .login-hero-title-break {
-    display: initial;
-  }
-
-
-
-
   .login-form-panel {
     padding: 2.5rem;
   }
 
-  .login-mobile-brand {
-    display: none;
-  }
 }
 
 @media (min-width: 60rem) {
@@ -272,10 +220,6 @@
   .login-hero-panel {
     min-height: 0;
     padding: 2.375rem;
-  }
-
-  .login-hero-copy {
-    margin-block-start: 3.25rem;
   }
 
   .login-hero-copy h2 {

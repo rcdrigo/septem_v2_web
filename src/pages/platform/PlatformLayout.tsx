@@ -83,7 +83,7 @@ export function PlatformLayout() {
           {/* flex-wrap: com os itens de suporte a navegação cresce, e no 375 ela precisa quebrar
               linha em vez de empurrar a página para o lado. */}
           <nav className="flex flex-wrap items-center gap-1 text-sm">
-            {/* Catálogo e Clientes são do super admin. Quem só faz triagem não vê links que só
+            {/* Clientes são do super admin. Quem só faz triagem não vê links que só
                 levariam a uma recusa. */}
             {ehSuperAdmin && (<>
             <NavLink

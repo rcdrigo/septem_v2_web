@@ -2,7 +2,8 @@ import { BusinessHoursEditor } from '@/components/business-calendar/BusinessHour
 import { CalendarLocationFields } from '@/components/business-calendar/CalendarLocationFields';
 import { validateBusinessHours } from '@/components/business-calendar/business-hours';
 import { businessHoursFromSettings, validateCalendarLocation } from '@/lib/business-calendar';
-import { Children, createContext, isValidElement, useContext, useEffect, useState } from 'react';
+import { Children, createContext, isValidElement, useContext, useEffect, useRef, useState } from 'react';
+import { BrandImageField } from '@/components/ui/BrandImageField';
 import { Save, Building2, Mail, HardDrive, Loader2, Send, PlugZap } from 'lucide-react';
 import { toast } from '@/stores/toast';
 import { useDocumentTitle } from '@/lib/use-document-title';
@@ -18,6 +19,7 @@ import {
   type SettingsOpenRouter,
   type SettingsPolicy,
   useSaveGeneral,
+  uploadSettingsBrandImage,
   useSaveEmail,
   useTestEmail,
   useSaveStorage,
@@ -491,16 +493,81 @@ function GeralTab({ data }: { data: GeneralPayload & { tenantId: string; host: s
   const refreshTenant = useSessionStore((s) => s.refreshTenant);
 
   const [form, setForm] = useState<GeneralPayload>(() => pick(data));
+  const hasEdits = useRef(false);
+  type ImageKind = 'logo' | 'hero';
+  const [uploading, setUploading] = useState<ImageKind | null>(null);
+  const [imageError, setImageError] = useState<{ kind: ImageKind; message: string } | null>(null);
+  const [previews, setPreviews] = useState<Partial<Record<ImageKind, { value: string; url: string; name: string }>>>({});
+  const objectUrls = useRef<Partial<Record<ImageKind, string>>>({});
+  const mounted = useRef(false);
+  const uploadInFlight = useRef(false);
 
-  // Se outra aba/salvamento atualizar o cache, refletir aqui.
   useEffect(() => {
-    setForm(pick(data));
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      Object.values(objectUrls.current).forEach(url => URL.revokeObjectURL(url));
+    };
+  }, []);
+
+  // Atualizações do cache não devem descartar anexos ou alterações em andamento.
+  useEffect(() => {
+    if (!hasEdits.current) setForm(pick(data));
   }, [data]);
 
-  const set = <K extends keyof GeneralPayload>(k: K, v: GeneralPayload[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const set = <K extends keyof GeneralPayload>(k: K, v: GeneralPayload[K]) => {
+    hasEdits.current = true;
+    setForm((f) => ({ ...f, [k]: v }));
+  };
+
+  async function uploadImage(kind: ImageKind, file: File) {
+    if (uploadInFlight.current || save.isPending || !canEdit) return;
+    setImageError(null);
+    if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type)) {
+      setImageError({ kind, message: 'Escolha uma imagem PNG, JPEG, GIF ou WebP.' });
+      return;
+    }
+    uploadInFlight.current = true;
+    setUploading(kind);
+    try {
+      const result = await uploadSettingsBrandImage(kind, file);
+      if (!mounted.current) return;
+      const url = URL.createObjectURL(file);
+      const previous = objectUrls.current[kind];
+      objectUrls.current[kind] = url;
+      setPreviews(current => ({ ...current, [kind]: { value: result.url, url, name: file.name } }));
+      set(kind === 'logo' ? 'logoUrl' : 'heroImageUrl', result.url);
+      if (previous) URL.revokeObjectURL(previous);
+    } catch (err) {
+      if (mounted.current) setImageError({ kind, message: detalhe(err) ?? 'Não foi possível enviar a imagem. Tente novamente.' });
+    } finally {
+      uploadInFlight.current = false;
+      if (mounted.current) setUploading(null);
+    }
+  }
+
+  function removeImage(kind: ImageKind) {
+    const previous = objectUrls.current[kind];
+    if (previous) URL.revokeObjectURL(previous);
+    delete objectUrls.current[kind];
+    setPreviews(current => ({ ...current, [kind]: undefined }));
+    setImageError(null);
+    set(kind === 'logo' ? 'logoUrl' : 'heroImageUrl', null);
+  }
+
+  function imageField(kind: ImageKind) {
+    const value = kind === 'logo' ? form.logoUrl : form.heroImageUrl;
+    const policy = settingsFieldPolicy(policies, 'general', kind === 'logo' ? 'logoUrl' : 'heroImageUrl');
+    const preview = previews[kind]?.value === value ? previews[kind] : undefined;
+    return policy.visible && <BrandImageField kind={kind} value={value} preview={preview?.url} fileName={preview?.name}
+      tenantId={data.tenantId} disabled={!policy.editable || uploading !== null || save.isPending}
+      uploading={uploading === kind} error={imageError?.kind === kind ? imageError.message : undefined}
+      onSelect={file => void uploadImage(kind, file)} onRemove={() => removeImage(kind)} />;
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (uploadInFlight.current || save.isPending || !canEdit) return;
     const calendarProblem = calendarPolicy.editable ? validateBusinessHours(businessHoursFromSettings(form))[0] : null;
     const locationChanged = locationFields.some(field => form[field as keyof GeneralPayload] !== data[field as keyof GeneralPayload]);
     const locationProblem = locationEditable && (locationChanged || !!data.cityCode) ? validateCalendarLocation(form) : null;
@@ -516,7 +583,7 @@ function GeralTab({ data }: { data: GeneralPayload & { tenantId: string; host: s
 
   return (
     <form onSubmit={onSubmit} className="max-w-3xl space-y-5" data-testid="form-geral">
-      <Card title="Identidade" hint="Aparece no cabeçalho, na tela de login e nos e-mails enviados pelo sistema.">
+      <Card title="Identidade do sistema" hint="Configure como o sistema é apresentado aos usuários deste ambiente.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Nome do sistema" required>
             <input
@@ -526,15 +593,6 @@ function GeralTab({ data }: { data: GeneralPayload & { tenantId: string; host: s
               maxLength={120}
               className={inputCls}
               name="ambienteNome"
-            />
-          </Field>
-          <Field label="URL do logo">
-            <input
-              value={form.logoUrl ?? ''}
-              onChange={(e) => set('logoUrl', e.target.value || null)}
-              placeholder="https://..."
-              className={inputCls}
-              name="logoUrl"
             />
           </Field>
           <Field label="Cor primária">
@@ -556,19 +614,7 @@ function GeralTab({ data }: { data: GeneralPayload & { tenantId: string; host: s
             </div>
           </Field>
         </div>
-      </Card>
-
-      <Card title="Tela de login" hint="Imagem de fundo e texto de apresentação exibidos ao entrar.">
-        <div className="space-y-4">
-          <Field label="URL da imagem de destaque">
-            <input
-              value={form.heroImageUrl ?? ''}
-              onChange={(e) => set('heroImageUrl', e.target.value || null)}
-              placeholder="https://..."
-              className={inputCls}
-              name="heroImageUrl"
-            />
-          </Field>
+        <div className="mt-4">
           <Field label="Descrição do sistema">
             <textarea
               value={form.systemDescription ?? ''}
@@ -581,20 +627,27 @@ function GeralTab({ data }: { data: GeneralPayload & { tenantId: string; host: s
             />
           </Field>
         </div>
+        <div className="mt-5">{imageField('logo')}</div>
+        <div className="mt-6 border-t border-slate-200 pt-5">
+          <h3 className="text-sm font-semibold text-slate-900">Tela de login</h3>
+          <p className="mb-4 mt-1 text-xs text-slate-600">A tela de login usa o nome, a descrição e o logo definidos acima.</p>
+          {imageField('hero')}
+        </div>
+        <p className="mt-5 text-xs text-slate-600">Salve os parâmetros para aplicar as imagens e as demais alterações neste ambiente.</p>
       </Card>
 
         {calendarPolicy.visible && <Card title="Horas úteis" hint="As alterações valem somente para novos cálculos neste ambiente. Os vencimentos já calculados são preservados.">
           <BusinessHoursEditor value={businessHoursFromSettings(form)} onChange={businessHours => set('businessHours', businessHours)} disabled={!calendarPolicy.editable} />
         </Card>}
         {locationVisible && <Card title="Calendário de feriados">
-          <CalendarLocationFields value={form} onChange={location => setForm(current => ({ ...current, ...location }))} disabled={!locationEditable} required={!!form.stateCode || !!form.cityCode} />
+          <CalendarLocationFields value={form} onChange={location => { hasEdits.current = true; setForm(current => ({ ...current, ...location })); }} disabled={!locationEditable} required={!!form.stateCode || !!form.cityCode} />
           {!form.cityCode && <p className="mt-3 text-sm text-amber-800">Processos somente podem ser iniciados após configurar estado, município, fuso e horário de funcionamento.</p>}
         </Card>}
 
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
-          disabled={save.isPending || !canEdit}
+          disabled={save.isPending || uploading !== null || !canEdit}
           className="flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-60"
         >
           {save.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Salvar
@@ -637,7 +690,7 @@ function Field({ label, required, children, field }: {
   return (
     <fieldset disabled={!policy.editable} className={`m-0 min-w-0 border-0 p-0 ${policy.editable ? '' : 'opacity-60'}`}>
       <label className="block">
-        <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+          <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
           {label}
           {required && <span className="ml-0.5 text-rose-500">*</span>}
         </span>

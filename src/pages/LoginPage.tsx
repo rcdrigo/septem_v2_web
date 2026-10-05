@@ -1,4 +1,5 @@
 import { tenantSystemName } from '@/lib/tenant-meta';
+import { useBrandImage } from '@/lib/use-brand-image';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, TriangleAlert } from 'lucide-react';
@@ -38,9 +39,8 @@ export function LoginPage() {
   const reauthenticationRequired = useSessionStore((s) => s.reauthenticationRequired);
   const bootstrap = useSessionStore((s) => s.bootstrap);
   const tenantName = tenantSystemName(tenant);
-  const tenantAccent = tenant?.primaryColor && /^#[0-9a-f]{6}$/i.test(tenant.primaryColor)
-    ? tenant.primaryColor
-    : undefined;
+  const logoUrl = useBrandImage(tenant?.logoUrl, tenant?.tenantId);
+  const heroImageUrl = useBrandImage(tenant?.heroImageUrl, tenant?.tenantId);
   useDocumentTitle(validatingDocument ? 'Validar documento' : 'Entrar');
 
   // Branding do tenant no /login acessado direto: o bootstrap só rodava no
@@ -267,10 +267,10 @@ export function LoginPage() {
       <div className="login-card">
         {/* ── Painel institucional (esquerda) ─────────────────────────────── */}
         <aside className="login-hero-panel" data-testid="login-hero"
-          style={tenant?.heroImageUrl ? { backgroundImage: `url("${tenant.heroImageUrl}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
+          style={heroImageUrl ? { backgroundImage: `url("${heroImageUrl}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
           {/* Fundo do hero vindo dos Parâmetros do sistema (Fase 1): sobreposição
               escura mantém o texto legível por cima da imagem. */}
-          {tenant?.heroImageUrl && <div className="login-hero-overlay bg-slate-900/75" aria-hidden="true" />}
+          {heroImageUrl && <div className="login-hero-overlay bg-slate-900/75" aria-hidden="true" />}
           <div className="login-corner-bands login-corner-bands--top-right" aria-hidden="true">
             <i /><i /><i />
           </div>
@@ -278,24 +278,11 @@ export function LoginPage() {
             <i /><i /><i />
           </div>
 
-          <div className="login-tenant-brand">
-            {tenant?.logoUrl && <img src={tenant.logoUrl} alt="" className="h-10 max-w-36 shrink-0 rounded bg-white/95 p-1 object-contain" />}
-            <div>
-              <strong>{tenantName}</strong>
-              <span>Gestão integrada</span>
-            </div>
-            {tenantAccent && <span aria-hidden="true" className="ml-auto h-1 w-6 shrink-0 self-center rounded-full" style={{ backgroundColor: tenantAccent }} />}
-          </div>
-
           <div className="login-hero-copy">
-            <span className="login-hero-eyebrow">PROCESSOS &amp; COMPLIANCE</span>
-            <h2>
-              Processos claros,<br />
-              conformidade em<br className="login-hero-title-break" /> cada decisão.
+            <span className="login-hero-eyebrow">{tenantName}</span>
+            <h2 data-testid="login-descricao">
+              {tenant?.systemDescription?.trim() || 'Processos claros, conformidade em cada decisão.'}
             </h2>
-            {tenant?.systemDescription && (
-              <p className="login-hero-descricao" data-testid="login-descricao">{tenant.systemDescription}</p>
-            )}
           </div>
 
           <div className="login-hero-actions">
@@ -315,12 +302,6 @@ export function LoginPage() {
 
         {/* ── Formulário (direita) ─────────────────────────────────────────── */}
         <main className="login-form-panel" data-step={step}>
-          <div className="login-mobile-brand">
-            {tenant?.logoUrl && <img src={tenant.logoUrl} alt="" className="h-9 max-w-32 shrink-0 rounded bg-white/95 p-1 object-contain" />}
-            <strong>{tenantName}</strong>
-            {tenantAccent && <span aria-hidden="true" className="ml-auto h-1 w-6 shrink-0 self-center rounded-full" style={{ backgroundColor: tenantAccent }} />}
-          </div>
-
           {step === 'validacao' && (
             <>
               <h1 className="text-3xl font-bold text-slate-900">Validar documento</h1>
@@ -334,8 +315,10 @@ export function LoginPage() {
 
           {step === 'credenciais' && (
             <>
-              <h1 className="text-3xl font-bold text-slate-900">Bem-vindo de volta</h1>
-              <p className="mt-2 text-sm text-slate-500">Entre com seus dados para acessar {tenantName}.</p>
+              <h1 className="sr-only">Entrar</h1>
+              <div className="login-client-logo">
+                {logoUrl ? <img src={logoUrl} alt={`Logo de ${tenantName}`} /> : <strong>{tenantName}</strong>}
+              </div>
 
               {reauthenticationRequired && <p role="status" className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">O período de confiança deste dispositivo terminou. Entre novamente e confirme o código enviado por e-mail.</p>}
               <form onSubmit={entrar} className="mt-8 space-y-5" data-testid="form-credenciais">
