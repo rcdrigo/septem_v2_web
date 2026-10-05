@@ -49,14 +49,18 @@ export function Sidebar({ mobileOpen = false }: { mobileOpen?: boolean }) {
     >
       {/* Logo do cliente */}
       <div className="flex items-center gap-2.5 border-b border-slate-200 px-4 py-3.5">
-        {logoUrl ? (
-          <img src={logoUrl} alt={`Logo de ${tenantName}`} className="h-8 max-w-24 shrink-0 object-contain" />
-        ) : (
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-900 text-sm font-bold text-white">
-            {tenantName[0]}
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            {logoUrl ? (
+              <img src={logoUrl} alt={`Logo de ${tenantName}`} className="h-8 max-w-full object-contain" />
+            ) : (
+              <>
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-900 text-sm font-bold text-white">
+                  {tenantName[0]}
+                </div>
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight text-slate-900">{tenantName}</span>
+              </>
+            )}
           </div>
-        )}
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight text-slate-900">{tenantName}</span>
         {/* No mobile o sino fica na barra superior (a sidebar é um drawer fechado). */}
         <span className="hidden lg:block"><SinoDeNotificacoes lado="cliente" align="left" /></span>
       </div>
