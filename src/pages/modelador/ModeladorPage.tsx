@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useSessionStore } from '@/stores/session';
 import { ModeladorNavbar, type RecursosHandlers } from '@/components/modelador/ModeladorNavbar';
@@ -74,12 +74,17 @@ export function ModeladorPage() {
   const [dirty, setDirty] = useState(false);
   const [pendingAction, setPendingAction] = useState<'save' | 'publish' | 'version' | null>(null);
   const suppressDirty = useRef(false);
+  const editRevision = useRef(0);
 
   // Marca "alterações pendentes" a cada edição do fluxo (ignorando o import programático).
   useEffect(() => {
     if (!modeler) return;
     const bus = modeler.get('eventBus');
-    const onChanged = () => { if (!suppressDirty.current) setDirty(true); };
+    const onChanged = () => {
+      if (suppressDirty.current) return;
+      editRevision.current += 1;
+      setDirty(true);
+    };
     bus.on('commandStack.changed', onChanged);
     return () => bus.off('commandStack.changed', onChanged);
   }, [modeler]);
@@ -113,8 +118,8 @@ export function ModeladorPage() {
     return xml as string;
   }
 
-  function afterPersist(r: SavedProcess) {
-    setDirty(false);
+  function afterPersist(r: SavedProcess, savedRevision: number) {
+    setDirty(editRevision.current !== savedRevision);
     setStatusAtual(r.status ?? null);
     setVersaoAtual(r.version ?? null);
     if (key !== r.key) {
@@ -153,6 +158,7 @@ export function ModeladorPage() {
     try {
       const xml = await currentXml();
       if (xml == null) return;
+      const savedRevision = editRevision.current;
       const r = key
         ? await updateMut.mutateAsync({ key, bpmnXml: xml })
         : await saveMut.mutateAsync({ bpmnXml: xml });
@@ -166,10 +172,21 @@ export function ModeladorPage() {
           ? `Rascunho salvo v${r.version} — produção segue na versão publicada`
           : `Rascunho salvo v${r.version}`;
       toast.success(label + warnSuffix(r));
-      afterPersist(r);
+      afterPersist(r, savedRevision);
     } catch (err) { handleError(err); }
     finally { setPendingAction(null); }
   }
+
+  const autoSave = useEffectEvent(() => {
+    if (!token || !modeler || !dirty || pendingAction || suppressDirty.current) return;
+    if (key && loadedKey !== key) return;
+    void onSave();
+  });
+
+  useEffect(() => {
+    const interval = window.setInterval(() => autoSave(), 5 * 60 * 1000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   // Versionar: cria uma NOVA versão explicitamente.
   async function onVersion() {
@@ -178,9 +195,10 @@ export function ModeladorPage() {
     try {
       const xml = await currentXml();
       if (xml == null) return;
+      const savedRevision = editRevision.current;
       const r = await saveMut.mutateAsync({ bpmnXml: xml, key: key ?? undefined });
       toast.success(`Versão v${r.version} criada.` + warnSuffix(r));
-      afterPersist(r);
+      afterPersist(r, savedRevision);
     } catch (err) { handleError(err); }
     finally { setPendingAction(null); }
   }
@@ -192,6 +210,7 @@ export function ModeladorPage() {
     try {
       const xml = await currentXml();
       if (xml == null) return;
+      const savedRevision = editRevision.current;
       const schema = getEmbeddedFormSchema(modeler, true);
       if (schema && typeof schema === 'object' && 'format' in schema && schema.format === 'septem-native') {
         const unnamed = nativeFields(parseNativeForm(schema)).filter(({ field }) => !field.key);
@@ -205,7 +224,7 @@ export function ModeladorPage() {
         : await saveMut.mutateAsync({ bpmnXml: xml });
       const published = await patchMut.mutateAsync({ key: r.key, status: 'published' });
       toast.success(`Publicado v${published.version}.`);
-      afterPersist({ ...r, status: published.status, version: published.version });
+      afterPersist({ ...r, status: published.status, version: published.version }, savedRevision);
     } catch (err) { handleError(err); }
     finally { setPendingAction(null); }
   }
