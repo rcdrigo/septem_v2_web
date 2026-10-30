@@ -91,25 +91,25 @@ export class SeptemPaletteProvider {
       'hand-tool': {
         group: 'tools',
         className: 'bpmn-icon-hand-tool',
-        title: 'Mover o canvas',
+        title: 'Mover o canvas: Arraste a área do diagrama para visualizar outras partes do fluxo.',
         action: { click: (e) => this.handTool.activateHand(e) },
       },
       'lasso-tool': {
         group: 'tools',
         className: 'bpmn-icon-lasso-tool',
-        title: 'Selecionar em área (laço)',
+        title: 'Selecionar em área (laço): Selecione vários elementos de uma vez desenhando uma área ao redor deles.',
         action: { click: (e) => this.lassoTool.activateSelection(e) },
       },
       'space-tool': {
         group: 'tools',
         className: 'bpmn-icon-space-tool',
-        title: 'Inserir/remover espaço',
+        title: 'Inserir/remover espaço: Afaste ou aproxime elementos para ajustar o espaço entre as etapas do fluxo.',
         action: { click: (e) => this.spaceTool.activateSelection(e) },
       },
       'global-connect-tool': {
         group: 'tools',
         className: 'bpmn-icon-connection-multi',
-        title: 'Conectar elementos',
+        title: 'Conectar elementos: Ligue uma etapa a outra para definir a sequência do fluxo.',
         action: { click: (e) => this.globalConnect.start(e) },
       },
       'tool-separator': {
@@ -124,13 +124,13 @@ export class SeptemPaletteProvider {
         'bpmn:StartEvent',
         'event',
         'bpmn-icon-start-event-none',
-        'Início',
+        'Início: Define o ponto de entrada da requisição no fluxo.',
       ),
       'create.end-event': createEntry(
         'bpmn:EndEvent',
         'event',
         'bpmn-icon-end-event-none',
-        'Fim',
+        'Fim: Marca o encerramento de um caminho do fluxo.',
       ),
 
       // Atividades
@@ -138,25 +138,27 @@ export class SeptemPaletteProvider {
         'bpmn:UserTask',
         'activity',
         'bpmn-icon-user-task',
-        'Tarefa humana',
+        'Tarefa humana: Aguarda uma pessoa realizar e concluir uma atividade para continuar o fluxo.',
       ),
       'create.script-task': createEntry(
-        'bpmn:ScriptTask', 'activity', 'bpmn-icon-script-task', 'Tarefa de script',
+        'bpmn:ScriptTask', 'activity', 'bpmn-icon-script-task',
+        'Tarefa de script: Executa automaticamente a fonte de dados configurada e segue o fluxo.',
       ),
-        'create.business-rule-task': createEntry(
-          'bpmn:BusinessRuleTask', 'activity', 'bpmn-icon-business-rule-task', 'Regra de negócio',
-        ),
+      'create.business-rule-task': createEntry(
+        'bpmn:BusinessRuleTask', 'activity', 'bpmn-icon-business-rule-task',
+        'Regra de negócio: Aplica uma operação automática, como cancelar ou congelar requisições ou definir o valor de um campo.',
+      ),
       'create.service-task': createEntry(
         'bpmn:ServiceTask',
         'activity',
         'bpmn-icon-service-task',
-        'Atividade de serviço (fonte de dados)',
+        'Atividade de serviço (fonte de dados): Representa uma integração automática associada a uma fonte de dados.',
       ),
       'create.subprocess': createEntry(
         'bpmn:CallActivity',
         'activity',
         'bpmn-icon-call-activity',
-        'Subprocesso',
+        'Subprocesso: Representa a chamada de outro processo como uma etapa deste fluxo.',
       ),
 
       // Eventos intermediários
@@ -164,21 +166,21 @@ export class SeptemPaletteProvider {
         'bpmn:IntermediateThrowEvent',
         'event',
         'bpmn-icon-intermediate-event-throw-message',
-        'Evento de e-mail',
+        'Evento de e-mail: Envia uma comunicação usando o modelo de e-mail configurado ao chegar a este ponto do fluxo.',
         { eventDefinitionType: 'bpmn:MessageEventDefinition' },
       ),
       'create.timer-event': createEntry(
         'bpmn:IntermediateCatchEvent',
         'event',
         'bpmn-icon-intermediate-event-catch-timer',
-        'Evento de timer',
+        'Evento de timer: Representa uma espera por uma data ou por um período definido.',
         { eventDefinitionType: 'bpmn:TimerEventDefinition' },
       ),
       'create.milestone-event': createEntry(
         'bpmn:IntermediateThrowEvent',
         'event',
         'bpmn-icon-intermediate-event-throw-signal',
-        'Evento de marco',
+        'Evento de marco: Identifica um ponto de acompanhamento do andamento da requisição, com abertura ou fechamento de um marco.',
         { eventDefinitionType: 'bpmn:SignalEventDefinition' },
       ),
 
@@ -187,25 +189,25 @@ export class SeptemPaletteProvider {
         'bpmn:InclusiveGateway',
         'gateway',
         'bpmn-icon-gateway-or',
-        'Desvio condicional (inclusivo)',
+        'Desvio condicional (inclusivo): Segue por um ou mais caminhos cujas condições sejam atendidas.',
       ),
       'create.exclusive-gateway': createEntry(
         'bpmn:ExclusiveGateway',
         'gateway',
         'bpmn-icon-gateway-xor',
-        'Desvio condicional exclusivo',
+        'Desvio condicional exclusivo: Escolhe um único caminho de saída conforme as condições configuradas.',
       ),
       'create.parallel-fork': createEntry(
         'bpmn:ParallelGateway',
         'gateway',
         'bpmn-icon-gateway-parallel',
-        'Desvio de paralelismo',
+        'Desvio de paralelismo: Abre todos os caminhos de saída em paralelo, sem avaliar condições.',
       ),
       'create.parallel-join': createEntry(
         'bpmn:ParallelGateway',
         'gateway',
         'bpmn-icon-gateway-parallel',
-        'Convergência de paralelismo',
+        'Convergência de paralelismo: Reúne caminhos paralelos e aguarda a conclusão das tarefas desses caminhos antes de continuar.',
       ),
 
       // Piscina/raias: cria um "pool" expandido. As RAIAS (setores) são adicionadas
@@ -215,7 +217,7 @@ export class SeptemPaletteProvider {
       'create.participant-expanded': {
         group: 'collaboration',
         className: 'bpmn-icon-participant',
-        title: 'Piscina (raias/setores)',
+        title: 'Piscina (raias/setores): Organiza o fluxo em raias para identificar os setores responsáveis pelas atividades.',
         action: {
           dragstart: (event: Event) => this.create.start(event, this.elementFactory.createParticipantShape()),
           click: (event: Event) => this.create.start(event, this.elementFactory.createParticipantShape()),
