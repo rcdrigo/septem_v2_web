@@ -145,6 +145,61 @@ try {
   await page.getByText('Revise os campos indicados antes de continuar.', { exact: true }).waitFor();
   await page.keyboard.press('Escape');
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  const footerOutput = await mkdtemp(join(tmpdir(), 'septem-creation-actions-'));
+  const longForm = structuredClone(schema);
+  const longTab = longForm.tabs[0];
+  const longGroup = longTab.groups[0];
+  longGroup.fields = Array.from({ length: 24 }, (_, i) => ({
+    ...structuredClone(original), id: `footer-field-${i}`, key: `footer_field_${i}`, label: `Campo ${i + 1}`,
+  }));
+  longTab.groups.push(
+    { ...structuredClone(longGroup), id: 'footer-empty', label: 'Grupo vazio', fields: [] },
+    { ...structuredClone(schema.tabs[1].groups[1]), id: 'footer-table', key: 'footer_table', label: 'Tabela final', fields: [] },
+  );
+  await page.evaluate(() => { window.referenceElements = []; });
+  for (const [device, width, height] of [['desktop', 1280, 900], ['mobile', 375, 812]]) {
+    await page.setViewportSize({ width, height });
+    await page.evaluate(s => window.loadXml(s), longForm);
+    await page.getByRole('button', { name: 'Configurar aba', exact: true }).click();
+    const groupFooter = page.getByRole('button', { name: 'Adicionar campo ao final de Grupo 1', exact: true });
+    await groupFooter.scrollIntoViewIfNeeded();
+    const lastField = page.locator('[data-field-id="footer-field-23"]');
+    assert.ok((await groupFooter.boundingBox()).y >= (await lastField.boundingBox()).y + (await lastField.boundingBox()).height,
+      `${device}: ação abaixo do último campo do agrupamento longo`);
+    await page.screenshot({ path: join(footerOutput, `${device}-group.png`) });
+    await groupFooter.focus();
+    await page.keyboard.press('Enter');
+    await page.getByRole('dialog').getByRole('button', { name: 'Texto', exact: true }).click();
+    await page.getByLabel('Nome', { exact: true }).fill('Campo no final');
+    let changed = await saved();
+    assert.equal(changed.tabs[0].groups[0].fields.at(-1).label, 'Campo no final', `${device}: campo criado no fim do grupo correto`);
+    assert.equal(changed.tabs[0].groups[1].fields.length, 0);
+    await page.getByRole('button', { name: 'Adicionar campo ao final de Grupo vazio', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Texto', exact: true }).click();
+    await page.getByLabel('Nome', { exact: true }).fill('Primeiro campo');
+    await page.getByRole('button', { name: 'Adicionar campo ao final de Tabela final', exact: true }).click();
+    assert.equal(await page.getByRole('dialog').getByRole('button', { name: 'HTML', exact: true }).count(), 0);
+    await page.keyboard.press('Escape');
+    const newGroupFooter = page.getByRole('button', { name: 'Novo agrupamento em Aba 1', exact: true });
+    await newGroupFooter.scrollIntoViewIfNeeded();
+    const lastGroup = page.locator('[data-group-id="footer-table"]');
+    assert.ok((await newGroupFooter.boundingBox()).y >= (await lastGroup.boundingBox()).y + (await lastGroup.boundingBox()).height,
+      `${device}: ações da aba abaixo do último agrupamento`);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${device}: sem overflow horizontal`);
+    await page.screenshot({ path: join(footerOutput, `${device}-tab.png`) });
+    await newGroupFooter.click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Padrão', exact: true }).click();
+    changed = await saved();
+    assert.equal(changed.tabs[0].groups.length, 4, `${device}: agrupamento criado ao final da aba`);
+    assert.equal(changed.tabs[0].groups[1].fields[0].label, 'Primeiro campo');
+    await page.getByRole('button', { name: 'Configurar aba Aba 1', exact: true }).click();
+    await page.getByLabel('Nome', { exact: true }).fill('Aba configurada pelo rodapé');
+    changed = await saved();
+    assert.equal(changed.tabs[0].label, 'Aba configurada pelo rodapé');
+    await page.evaluate(s => window.loadXml(s), changed);
+    assert.deepEqual(await saved(), changed, `${device}: ações do rodapé persistem após reabrir`);
+  }
+  console.log(`PASSOU: ações no fim de agrupamentos longos/vazios e tabelas, teclado, criação, configuração e persistência em desktop/mobile. Capturas: ${footerOutput}`);
   await page.evaluate(() => { window.oldFlush = window.flush; window.previousFlush = window.captureFlush(); window.unmount(); });
   await page.evaluate(() => window.render(true));
   if (await page.evaluate(() => !!window.previousFlush)) assert.equal(await page.evaluate(() => window.previousFlush().then(() => false, () => true)), true, 'flush antigo não salva após remontagem');

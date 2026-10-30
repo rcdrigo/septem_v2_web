@@ -235,7 +235,14 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
                 disabled={checkingRemoval} onClick={() => void remove({ tabId: tab.id, groupId: g.id, fieldId: f.id })}
                 className="shrink-0 self-center rounded-md p-2 text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:cursor-not-allowed disabled:opacity-50"><Trash2 size={16} aria-hidden="true" /></button>
               </div>)}</div>}
+            <div className="flex justify-end border-t border-slate-200 p-3">
+              <button type="button" className={button} aria-label={`Adicionar campo ao final de ${g.label}`} onClick={() => { selectGroup(g); setCatalog(true); }}><Plus size={16} /> Adicionar campo</button>
+            </div>
           </section>)}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-4">
+            <button type="button" className={button} aria-label={`Configurar aba ${tab.label}`} onClick={() => { setSelection({ tabId: tab.id }); window.requestAnimationFrame(() => nameRef.current?.focus()); }}><Settings2 size={16} /> Configurar aba</button>
+            <button type="button" className={button} aria-label={`Novo agrupamento em ${tab.label}`} onClick={() => setNewGroup(true)}><Plus size={16} /> Novo agrupamento</button>
+          </div>
         </div>
       </div>
       <aside aria-label="Propriedades da seleção" data-native-properties className="w-full shrink-0 border-t border-slate-200 bg-white lg:w-80 lg:overflow-y-auto lg:border-l lg:border-t-0">
