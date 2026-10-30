@@ -1,3 +1,5 @@
+import type { FormFieldDescriptor } from '@/stores/form';
+
 export const BUSINESS_RULE_OPERATIONS = [
   { value: 'cancel', label: 'Cancelar processo' },
   { value: 'freeze', label: 'Congelar processo' },
@@ -20,6 +22,23 @@ export const BUSINESS_RULE_DEFAULTS = {
 };
 
 export type BusinessRuleConfig = typeof BUSINESS_RULE_DEFAULTS;
+
+export function businessRuleFieldReference(field: FormFieldDescriptor): string {
+  return field.fieldId ? `field:${field.fieldId}` : field.id;
+}
+
+export function resolveBusinessRuleField(fields: FormFieldDescriptor[], reference: string): FormFieldDescriptor | undefined {
+  if (reference.startsWith('field:')) return fields.find((field) => field.fieldId === reference.slice('field:'.length));
+  return fields.find((field) => field.id === reference || field.path === reference)
+    ?? fields.find((field) => field.fieldId === reference);
+}
+
+export function businessRuleFieldOptions(fields: FormFieldDescriptor[]) {
+  return fields.filter((field) => !field.tableKey).map((field) => ({
+    value: businessRuleFieldReference(field),
+    label: `${field.tabLabel || 'Aba'} › ${field.group || 'Agrupamento'} › ${field.label || field.id} (${field.path || field.id})`,
+  }));
+}
 
 export function isBusinessRuleOperation(value: string): value is BusinessRuleOperation {
   return BUSINESS_RULE_OPERATIONS.some((operation) => operation.value === value);

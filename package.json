@@ -33,7 +33,7 @@
     "test:client-onboarding": "npm run build && node tools/uitest/client-onboarding.mjs && node tools/uitest/client-access-policy.mjs",
     "test:client-onboarding-integration": "node tools/uitest/client-onboarding-integration.mjs",
     "test:platform-no-catalog": "npm run build && node tools/uitest/platform-no-process-catalog.mjs",
-    "test:business-rules": "npm run build && node tools/uitest/business-rule-modeler.mjs && node tools/uitest/business-rule-execution.mjs"
+    "test:business-rules": "npm run build && node tools/uitest/business-rule-field-references.mjs && node tools/uitest/business-rule-modeler.mjs && node tools/uitest/business-rule-execution.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

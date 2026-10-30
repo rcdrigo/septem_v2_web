@@ -26,9 +26,9 @@ Modeler.prototype.importXML=function(...args){window.modeler=this;return origina
 useSessionStore.setState({accessToken:'test-token',status:'authenticated',user:{id:'test',name:'Teste',email:'teste@local',isInternal:true,perms:['*'],accessProfiles:[]}});
 window.fields=()=>useFormStore.getState().setFields([
 {id:'numero_alvo',label:'Número da requisição alvo',type:'number',group:'Geral'},
-{id:'valor',label:'Valor do pedido',type:'number',group:'Geral'},
-{id:'categorias',label:'Categorias do pedido',type:'taglist',group:'Geral'},
-{id:'arquivos',label:'Documentos do pedido',type:'filepicker',group:'Geral'},
+{id:'valor',fieldId:'field-valor',tabLabel:'Dados',label:'Valor do pedido',type:'number',group:'Geral'},
+{id:'categorias',fieldId:'field-categorias',tabLabel:'Dados',label:'Categorias do pedido',type:'taglist',group:'Geral'},
+{id:'arquivos',fieldId:'field-arquivos',tabLabel:'Dados',label:'Documentos do pedido',type:'filepicker',group:'Geral'},
 {id:'coluna',label:'Coluna de tabela',type:'number',group:'Itens',tableKey:'itens',path:'itens[].coluna'}]);
 window.config=()=>getExtensionConfig(window.modeler.get('elementRegistry').get(window.ruleId),'septem:BusinessRule',BUSINESS_RULE_DEFAULTS);
 window.setConfig=patch=>setExtensionConfig(window.modeler,window.modeler.get('elementRegistry').get(window.ruleId),'septem:BusinessRule',patch);
@@ -95,7 +95,7 @@ try {
       assert.equal(await page.getByRole('radio').count(),0);
       await page.locator('button').filter({hasText:/^Selecione o campo do formulário$/}).click();
       assert.equal(await page.getByTestId('combobox-popover').getByText('Coluna de tabela',{exact:false}).count(),0);
-      await page.getByTestId('combobox-popover').getByRole('button',{name:'Valor do pedido (valor)',exact:true}).click();
+      await page.getByTestId('combobox-popover').getByRole('button',{name:'Dados › Geral › Valor do pedido (valor)',exact:true}).click();
       await page.getByLabel('Valor fixo',{exact:true}).fill('42.5');
     }
     const before=await page.evaluate(async()=>({xml:(await window.modeler.saveXML({format:true})).xml,config:window.config(),issues:window.lint()}));
@@ -114,8 +114,8 @@ try {
   await page.waitForFunction(()=>document.body.innerText.includes('salvo')||document.body.innerText.includes('Salvo'));
   assert.ok(lastSave?.bpmnXml.includes('valueJson="42.5"'));
   await page.screenshot({path:join(dir,'modeler-field-desktop.png')});
-  await page.locator('button').filter({hasText:/^Valor do pedido \(valor\)$/}).click();
-  await page.getByTestId('combobox-popover').getByRole('button',{name:'Categorias do pedido (categorias)',exact:true}).click();
+  await page.locator('button').filter({hasText:/^Dados › Geral › Valor do pedido \(valor\)$/}).click();
+  await page.getByTestId('combobox-popover').getByRole('button',{name:'Dados › Geral › Categorias do pedido (categorias)',exact:true}).click();
   const list=page.getByLabel('Valor fixo',{exact:true});
   await list.fill('Primeiro');await list.press('Enter');
   assert.equal(await list.inputValue(),'Primeiro\n');
@@ -127,11 +127,14 @@ try {
   assert.equal(await page.getByLabel('Valor fixo',{exact:true}).inputValue(),'Primeiro\nSegundo');
   await page.screenshot({path:join(dir,'modeler-list-desktop.png')});
   console.log('PASS: lista digitada com Enter, segundo valor e persistência');
-  await page.locator('button').filter({hasText:/^Categorias do pedido \(categorias\)$/}).click();
-  await page.getByTestId('combobox-popover').getByRole('button',{name:'Documentos do pedido (arquivos)',exact:true}).click();
+  await page.locator('button').filter({hasText:/^Dados › Geral › Categorias do pedido \(categorias\)$/}).click();
+  await page.getByTestId('combobox-popover').getByRole('button',{name:'Dados › Geral › Documentos do pedido (arquivos)',exact:true}).click();
   await page.getByLabel('Valor fixo',{exact:true}).fill('https://files.example.test/licenca.pdf');
   assert.deepEqual(JSON.parse((await page.evaluate(()=>window.config())).valueJson),[{name:'licenca.pdf',url:'https://files.example.test/licenca.pdf',size:0}]);
   console.log('PASS: valor fixo de arquivo preserva o formato de anexo');
+  await page.setViewportSize({width:375,height:900});
+  await page.screenshot({path:join(dir,'modeler-field-mobile.png'),fullPage:true});
+  await page.setViewportSize({width:1440,height:1000});
   await page.getByRole('button',{name:'Configurações',exact:true}).click();
   await page.getByRole('button',{name:'Controle de acesso',exact:true}).click();
   await page.getByRole('button',{name:'Adicionar regra',exact:true}).click();

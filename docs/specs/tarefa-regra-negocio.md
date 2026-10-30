@@ -74,10 +74,14 @@ O tipo BPMN é `bpmn:BusinessRuleTask`. A extensão `septem:BusinessRule` é ser
 | `instanceFieldRef` | Campo da requisição atual que fornece os números dos alvos |
 | `dataSourceRef` | Fonte que fornece os números dos alvos na primeira coluna |
 | `statusText` | Texto do status final, com até 240 caracteres |
-| `fieldRef` | Campo da própria requisição que recebe o valor fixo |
+| `fieldRef` | Referência estável `field:<id>` do campo da própria requisição que recebe o valor fixo |
 | `valueJson` | Valor fixo tipado, serializado em JSON no XML |
 
 O painel apresenta controles de edição conforme o tipo do campo. Listas recebem um valor por linha; anexos recebem um endereço por linha e preservam o formato de anexo da execução. `setField` exige `target=current`; `setStatus` exige alvos externos já encerrados.
+
+O seletor apresenta o caminho **Aba › Agrupamento › Campo** e a chave de resposta. Novas seleções gravam o identificador estrutural com o prefixo `field:`, preservando o vínculo após renomear a chave. Referências antigas continuam aceitas por chave ou caminho, com identificador sem prefixo como alternativa quando não existe chave correspondente. A chave de um campo não conflita com o identificador de outro.
+
+Referências ausentes não são oferecidas como opções válidas. A validação informa a referência não encontrada e orienta selecionar novamente o campo. Um conflito real informa os campos envolvidos.
 
 As ações manuais são `POST /api/v1/workflow/instances/{id}/freeze` e `POST /api/v1/workflow/instances/{id}/unfreeze`, com `{ "justification": "motivo" }`. As capacidades correspondentes são `freeze` e `unfreeze`.
 
@@ -98,3 +102,5 @@ A decisão sobre continuação persistida está em `docs/adr/0010-continuacao-pe
 - As alterações foram aplicadas ao backend original preservando o trabalho existente. Os 31 arquivos dessa entrega foram comparados com a cópia validada; o backend de destino compilou sem erros.
 - A rodada de regressão excluiu o teste legado `Usuario_externo_lista_apenas_as_proprias_instancias_mesmo_sem_filtro_mine`, cujo problema de preparação de acesso já está documentado em `docs/specs/filtros-tarefas-requisicoes.md`.
 - A revisão visual confirmou a preservação da interface existente. O problema de edição de listas identificado nessa revisão foi corrigido e validado.
+- A regressão de referência de campo reproduziu a rejeição de `nome` quando esse texto também era o identificador de outro campo. `tools/uitest/business-rule-field-references.mjs` verifica campos extraídos do formulário real, caminho completo, referências estáveis, XML e renomeação; `BusinessRuleFieldReferenceTests` cobre a validação do BPMN e a compatibilidade das referências antigas.
+- Após corrigir a referência de campo, a suíte de regra de negócio passou em 51 testes no PostgreSQL temporário, incluindo publicação e execução por chave antiga e por identificador estável. O teste de navegador do modelador e o build do frontend também passaram.

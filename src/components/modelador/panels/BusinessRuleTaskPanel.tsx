@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Field, RadioGroup, Section, Select, TextArea, TextInput } from '@/components/ui/Field';
 import { Combobox } from '@/components/ui/Combobox';
 import { useExtensionState } from '@/lib/useExtensionState';
-import { BUSINESS_RULE_DEFAULTS, BUSINESS_RULE_OPERATIONS, businessRuleErrors } from '@/lib/bpmn-business-rule';
+import { BUSINESS_RULE_DEFAULTS, BUSINESS_RULE_OPERATIONS, businessRuleErrors, businessRuleFieldOptions, businessRuleFieldReference, resolveBusinessRuleField } from '@/lib/bpmn-business-rule';
 import { useFormStore } from '@/stores/form';
 import { DataSourceSelect } from '../fields/DataSourceSelect';
 import { FormFieldSelect } from '../fields/FormFieldSelect';
@@ -53,13 +53,14 @@ function FixedValueInput({ kind, valueJson, onChange }: { kind: 'number' | 'list
 export function BusinessRuleTaskPanel({ modeler, element }: PanelProps) {
   const { state, flush } = useExtensionState(modeler, element, 'septem:BusinessRule', BUSINESS_RULE_DEFAULTS);
   const fields = useFormStore((store) => store.fields);
-  const field = fields.find((candidate) => candidate.id === state.fieldRef || candidate.path === state.fieldRef);
+  const field = resolveBusinessRuleField(fields, state.fieldRef);
   const fileValue = field?.type === 'filepicker';
   const listValue = field?.type === 'checklist' || field?.type === 'taglist';
   const numericValue = field?.type === 'number';
-  const fieldOptions = fields.filter((candidate) => !candidate.tableKey).map((candidate) => ({ value: candidate.id, label: `${candidate.label || candidate.id} (${candidate.path || candidate.id})` }));
-  if (state.fieldRef && !fieldOptions.some((option) => option.value === state.fieldRef)) fieldOptions.unshift({ value: state.fieldRef, label: state.fieldRef });
+  const fieldOptions = businessRuleFieldOptions(fields);
+  const selectedField = field && !field.tableKey ? businessRuleFieldReference(field) : '';
   const errors = businessRuleErrors(state);
+  if (state.operation === 'setField' && state.fieldRef && !selectedField) errors.push('O campo configurado não está disponível neste formulário. Selecione novamente o campo a alterar.');
 
   function changeOperation(operation: string) {
     flush({ ...BUSINESS_RULE_DEFAULTS, operation, target: operation === 'setStatus' ? 'field' : 'current' });
@@ -96,7 +97,7 @@ export function BusinessRuleTaskPanel({ modeler, element }: PanelProps) {
       {state.operation === 'setField' && <>
         <p className="text-xs leading-relaxed text-slate-600">Altera somente o formulário da própria requisição, com um valor fixo.</p>
         <Field label="Campo a alterar" hint="Campos de agrupamentos padrão. Colunas de tabela não fazem parte desta operação.">
-          <Combobox value={state.fieldRef} options={fieldOptions} onChange={(fieldRef) => flush({ fieldRef, valueJson: '' })} placeholder="Selecione o campo do formulário" clearLabel="Nenhum campo" />
+          <Combobox value={selectedField} options={fieldOptions} onChange={(fieldRef) => flush({ fieldRef, valueJson: '' })} placeholder="Selecione o campo do formulário" clearLabel="Nenhum campo" />
         </Field>
         {state.fieldRef && <Field label="Valor fixo" hint={fileValue ? 'Informe o endereço de cada arquivo, um por linha.' : listValue ? 'Informe um valor por linha.' : numericValue ? 'Informe um número.' : undefined}>
           {field?.type === 'checkbox' ? <Select aria-label="Valor fixo" value={state.valueJson} placeholder="Selecione o valor" options={[{ value: 'true', label: 'Sim' }, { value: 'false', label: 'Não' }]} onChange={(event) => flush({ valueJson: event.target.value })} />
