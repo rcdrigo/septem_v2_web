@@ -97,8 +97,8 @@ function useRuntime() {
  */
 export type ExtraTab = { id: string; label: string; icon?: React.ReactNode; render: () => React.ReactNode };
 
-export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: Record<string, unknown>; readOnly?: boolean; optionsByField?: OptionsMap; automationScripts?: AutomationSource[]; uploadContext?: UploadContext; extraTabs?: { leading?: ExtraTab[]; trailing?: ExtraTab[] } }>(
-  ({ schema, data, readOnly, optionsByField, automationScripts, uploadContext, extraTabs }, ref) => {
+export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: Record<string, unknown>; readOnly?: boolean; suspended?: boolean; optionsByField?: OptionsMap; automationScripts?: AutomationSource[]; uploadContext?: UploadContext; extraTabs?: { leading?: ExtraTab[]; trailing?: ExtraTab[] } }>(
+  ({ schema, data, readOnly, suspended, optionsByField, automationScripts, uploadContext, extraTabs }, ref) => {
     const [native] = useState(() => isNativeForm(schema) ? nativeRuntime(schema) : null);
     const [runtimeSchema, setRuntimeSchema] = useState(() => native ? { components: native.components } as AutomationSchema : structuredClone((schema ?? {}) as AutomationSchema));
     const [validationAttempt, setValidationAttempt] = useState(0);
@@ -133,7 +133,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
 
     // Carrega as opções dos selects/radios alimentados por fonte de dados.
     useEffect(() => {
-      const dsFields = inputs.filter(needsFetch);
+      const dsFields = suspended ? [] : inputs.filter(needsFetch);
       if (dsFields.length === 0) { setDsLoading(false); return; }
       let cancelled = false;
       setDsLoading(true);
@@ -141,7 +141,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
         for (const c of dsFields) {
           try {
             const res = await api.post<{ options: { value: string | null; label: string | null }[] }>(
-              '/api/v1/workflow/field-options', { dataSourceId: c.properties!.septemDataSourceId });
+              '/api/v1/workflow/field-options', { dataSourceId: c.properties!.septemDataSourceId, taskId: uploadContext?.taskId });
             if (cancelled) return;
             const opts = res.options.map((o) => ({ value: String(o.value ?? ''), label: String(o.label ?? o.value ?? '') }));
             setDsOptions((prev) => ({ ...prev, [c.key!]: opts }));
@@ -150,7 +150,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
         if (!cancelled) setDsLoading(false);
       })();
       return () => { cancelled = true; };
-    }, [inputs]);
+    }, [inputs, suspended, uploadContext?.taskId]);
 
     function set(key: string, value: unknown) {
       valuesRef.current = { ...valuesRef.current, [key]: value };
@@ -208,6 +208,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
     }
 
     function runEvent(comp: Component, type: string, event: unknown, scope = '') {
+      if (suspended) return;
       automation.current?.emit(type, { key: fieldPath(scope, comp.key ?? ''), value: scopeData(scope)[comp.key ?? ''], event });
       const evs = parseEvents(comp.properties?.septemEvents).filter((e) => e.type === type && e.action?.trim());
       const get = (k: string) => scopeData(scope)[k];
@@ -226,6 +227,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
     }
 
     useEffect(() => {
+      if (suspended) { automation.current?.dispose(); automation.current = null; return; }
       if (dsLoading || !automationRoot.current || automation.current) return;
       automationError.current = null;
       setAutomationMessage(null);
@@ -237,11 +239,11 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
         setFieldState: (path, patch) => setFieldState(previous => ({ ...previous, [path]: { ...previous[path], ...patch } })),
         setSchema: (next) => { schemaRef.current = next; setRuntimeSchema(next); },
         setOptions: (key, options) => setDsOptions(prev => ({ ...prev, [key]: options })),
-        dataSource: (id, parameters) => api.post('/api/v1/workflow/field-options', { dataSourceId: id, parameters }),
+        dataSource: (id, parameters) => api.post('/api/v1/workflow/field-options', { dataSourceId: id, parameters, taskId: uploadContext?.taskId }),
         onError: (message) => { automationError.current = message; setAutomationMessage(message); },
       }, readOnly ? [] : automationScripts ?? []);
       automation.current = runtime;
-    }, [automationScripts, readOnly, dsLoading]);
+    }, [automationScripts, readOnly, dsLoading, suspended, uploadContext?.taskId]);
     useEffect(() => () => { automation.current?.dispose(); automation.current = null; }, []);
 
     useImperativeHandle(ref, () => ({

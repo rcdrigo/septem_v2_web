@@ -222,6 +222,7 @@ Ao selecionar um elemento, o menu contextual oferece atalhos para anexar **Taref
 | Eventos | **Fim** | Marca o encerramento de um caminho. | Informações gerais. |
 | Atividades | **Tarefa humana** | Interrompe o avanço até que uma pessoa conclua a etapa. | Informações gerais, formulário, botões, responsáveis e prazos, assinaturas e rotinas. |
 | Atividades | **Tarefa de script** | Executa uma fonte de dados de forma automática e segue o fluxo. | Informações gerais e fonte de dados. |
+| Atividades | **Regra de negócio** | Cancela, congela, descongela, altera um status final ou define um valor de campo. | Uma operação e seus alvos, status ou valor fixo. |
 | Atividades | **Atividade de serviço (fonte de dados)** | Representa uma integração automática associada a uma fonte. | Informações gerais, fonte de dados e rotinas. |
 | Atividades | **Subprocesso** | Representa a chamada de outro processo. | Informações gerais, processo chamado, sincronia, cópia de valores, mensagens, multi-processos e rotinas. |
 | Eventos intermediários | **Evento de e-mail** | Dispara um modelo de e-mail durante o percurso. | Informações gerais, template e rotinas. |
@@ -242,6 +243,7 @@ A toolbar permite configurar todos os elementos acima, mas a execução atual n�
 | Início | Entra no fluxo e avança pelas conexões. |
 | Tarefa humana | Cria uma tarefa pendente, resolve responsável e prazo e aguarda conclusão. |
 | Tarefa de script | Executa a fonte configurada; registra a etapa como concluída; uma fonte ausente ou uma falha interrompe a execução. |
+| Regra de negócio | Executa a operação publicada e registra sua origem automática. Falhas interrompem o avanço e desfazem as alterações no banco. |
 | Evento de e-mail | Resolve o template e os destinatários e tenta enviar a mensagem; uma falha de envio é registrada sem interromper o fluxo. |
 | Gateways exclusivo, inclusivo e paralelo | Avaliam caminhos condicionais ou controlam abertura e reunião dos ramos. |
 | Fim | Encerra o caminho; a instância é concluída quando não existem tarefas pendentes. |
@@ -299,6 +301,20 @@ Use **Tarefa de script** para executar automaticamente uma fonte de dados no mei
 Selecione uma fonte cadastrada, atualize a lista se ela tiver sido criada em outra aba e salve. O servidor exige uma fonte para esse tipo e impede a publicação quando ela não está configurada. Durante a execução, o motor monta o contexto do processo, executa a fonte e só então avança. Se a fonte não existir ou falhar, a execução é interrompida com erro.
 
 Exemplo: depois da análise, executar uma fonte que registra o resultado em um sistema integrado. Teste sucesso, indisponibilidade, resposta inválida e repetição para avaliar idempotência.
+
+### Regra de negócio
+
+Adicione **Regra de negócio** pela toolbar ou pelo menu contextual. Selecione uma operação por tarefa:
+
+- **Cancelar processo**, **Congelar processo** ou **Descongelar processo** afetam a própria requisição ou outras requisições.
+- **Modificar o status de um processo finalizado** recebe um texto livre para requisições já encerradas. A alteração preserva o encerramento.
+- **Modificar valor de campo do formulário** define um valor fixo em um campo de agrupamento padrão da própria requisição. Colunas de tabela não participam desta entrega.
+
+Para selecionar outras requisições, escolha um campo do formulário atual ou uma fonte de dados. O campo fornece um número ou uma lista de números. A primeira coluna da fonte fornece um número exibido de requisição por linha, no mesmo ambiente. Uma seleção inválida impede a operação inteira; o motor não altera apenas parte de um lote.
+
+O congelamento suspende tarefas, prazos, alertas e automações. As tarefas ficam ocultas e não podem ser abertas por link direto. O descongelamento retoma o fluxo e preserva o tempo restante dos prazos. Uma chamada externa já disparada pode terminar; os passos seguintes aguardam o descongelamento.
+
+Em **Configurações › Controle de acesso**, as capacidades **Congelar** e **Descongelar** controlam as ações manuais no relatório da instância. Administradores sempre podem utilizá-las. A tarefa automática segue a configuração publicada, independentemente da permissão pessoal de quem concluiu a etapa anterior.
 
 ### Atividade de serviço
 

@@ -584,6 +584,49 @@
           "isBody": true
         }
       ]
+    },
+    {
+      "name": "BusinessRule",
+      "superClass": [
+        "Element"
+      ],
+      "properties": [
+        {
+          "name": "operation",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "target",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "instanceFieldRef",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "dataSourceRef",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "statusText",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "fieldRef",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "valueJson",
+          "isAttr": true,
+          "type": "String"
+        }
+      ]
     }
   ]
 }

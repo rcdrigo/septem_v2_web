@@ -1,5 +1,22 @@
 # Domínio Septem
 
+## Linguagem — Modelagem de processos
+
+**Tarefa de regra de negócio**:
+Etapa automática de um processo destinada a cancelar, congelar ou descongelar requisições, alterar o status de uma requisição encerrada ou modificar um campo da própria requisição.
+
+**Congelamento de requisição**:
+Suspensão das tarefas, dos prazos, dos alertas e das automações de uma requisição. Enquanto congelada, suas tarefas ficam ocultas da caixa de entrada e não podem ser acessadas, inclusive por link direto.
+
+**Status customizado de requisição**:
+Texto livre que descreve o resultado de uma requisição encerrada, preservando seu encerramento.
+
+**Ação automática de processo**:
+Operação determinada pelo fluxo publicado, cuja execução não depende da permissão pessoal de quem concluiu a etapa anterior para realizar a mesma ação manualmente.
+
+**Ação manual de requisição**:
+Operação acionada pelo usuário no relatório de uma requisição e sujeita às suas permissões sobre o processo.
+
 ## Linguagem — Formulários
 
 **Formulário**:

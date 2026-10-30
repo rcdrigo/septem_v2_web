@@ -3,7 +3,7 @@ import { TestBadge } from '@/components/execution/TestBadge';
 import { ExecutionSummary } from '@/components/execution/ExecutionSummary';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { AlertCircle, ArrowRight, CalendarCheck2, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, CircleHelp, CircleX, Clock, FileText, History, ListTree, MessageSquare, Pencil, Printer, RotateCw, Save, Trash2, Workflow, X } from 'lucide-react';
+import { AlertCircle, ArrowRight, CalendarCheck2, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, CircleHelp, CircleX, Clock, PauseCircle, FileText, History, ListTree, MessageSquare, Pencil, Printer, RotateCw, Save, Trash2, Workflow, X } from 'lucide-react';
 import { useInstances, useInstance, useMyTasks, useDeleteInstance, useUpdateInstance, type InstanceListItem, type InstanceTask, type FieldChange, type InstanceDetail } from '@/lib/api/execution';
 import { ApiError } from '@/lib/api';
 import { appHref, openTab } from '@/lib/nav';
@@ -85,7 +85,7 @@ function RequestCards({ items, onOpen }: { items: InstanceListItem[]; onOpen: (i
   return <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">{items.map((item) => <article key={item.id} data-testid="req-card" role="link" aria-label={`${item.process || 'Requisição'} ${item.number ?? ''}`} tabIndex={0} onClick={() => onOpen(item.id)} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onOpen(item.id); } }} className="task-card group relative flex min-w-0 cursor-pointer flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700">
     <div className="flex min-w-0 items-start justify-between gap-3"><div className="min-w-0"><ExecutionProcessPill item={item} /></div><ExecutionNumber executionId={item.id} number={item.number} /></div>
     <div className="task-card-main relative mt-3 flex-1">
-      <h2 className="text-sm font-bold text-slate-900">{STATUS[item.status]?.label || item.status}</h2>
+      <h2 className="text-sm font-bold text-slate-900">{statusPresentation(item).label}</h2>
       <ExecutionSummary html={item.inboxHtml} text={item.inboxText} className="mt-1 line-clamp-3 min-h-12 text-xs leading-4 text-slate-500" />
       <CardAccess />
     </div>
@@ -103,7 +103,7 @@ function RequestTable({ items, onOpen }: { items: InstanceListItem[]; onOpen: (i
       <td className="px-4 py-3 align-top"><ExecutionNumber executionId={item.id} number={item.number} /></td>
       <td className="px-4 py-3 align-top"><ExecutionProcessPill item={item} /></td>
       <td className="min-w-0 px-4 py-3 align-top"><ExecutionSummary html={item.inboxHtml} text={item.inboxText} className="line-clamp-3 text-xs leading-4 text-slate-500" fallback="—" /><ExecutionIndicators isTest={item.isTest} tags={item.tags} className="mt-2" /></td>
-      <td className="px-4 py-3 align-top"><StatusBadge status={item.status} /></td>
+      <td className="px-4 py-3 align-top"><StatusBadge {...item} /></td>
       <td className="px-4 py-3 align-top text-xs text-slate-500"><p>Início {fmt(item.startedAt)}</p><p className="mt-1">Fim {item.endedAt ? fmt(item.endedAt) : '—'}</p><span className="task-access mt-2 inline-flex items-center gap-1 whitespace-nowrap font-semibold text-slate-700 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">Acessar <ArrowRight size={14} /></span></td>
     </tr>)}</tbody>
   </table></div>;
@@ -148,8 +148,8 @@ export function InstanceReport({ id, messageAccess }: { id: string; messageAcces
   }
   const d = inst.data;
   const data = (d.data ?? {}) as Record<string, unknown>;
-  const canEditForm = !!d.canEdit && !!d.formSchema; // edição inline só quando há schema
-  const hasActions = canEditForm || !!d.canCancel || !!d.canDelete || !!d.canReturn || !!d.canForward || !!d.canReassign || !!d.canReopen;
+  const canEditForm = !!d.canEdit && !!d.formSchema && !d.isFrozen && !d.frozenAt; // edição inline só quando há schema
+  const hasActions = canEditForm || !!d.canFreeze || !!d.canUnfreeze || !!d.canCancel || !!d.canDelete || !!d.canReturn || !!d.canForward || !!d.canReassign || !!d.canReopen;
   const showMessages = (d.messages?.count ?? 0) > 0 || d.messages?.canPost === true;
 
 
@@ -171,7 +171,7 @@ export function InstanceReport({ id, messageAccess }: { id: string; messageAcces
       <header className="border-b border-slate-200 bg-white p-4 sm:p-6">
         <div className="flex min-w-0 flex-col justify-between gap-4 lg:flex-row lg:items-start">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-3"><h1 className="text-xl font-semibold text-slate-900">Requisição{d.number != null ? ` nº ${d.number}` : ''}</h1><StatusPill status={d.status} />{d.isTest && <TestBadge />}</div>
+            <div className="flex flex-wrap items-center gap-3"><h1 className="text-xl font-semibold text-slate-900">Requisição{d.number != null ? ` nº ${d.number}` : ''}</h1><StatusPill status={d.status} customStatus={d.customStatus} frozenAt={d.frozenAt} isFrozen={d.isFrozen} />{d.isTest && <TestBadge />}</div>
             <p className="mt-2 break-words text-base font-medium text-slate-700">{d.process ?? 'Processo não informado'}</p>
             <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-3 text-sm">
               <div><dt className="text-xs text-slate-500">Data de início</dt><dd className="mt-1 text-slate-700">{fmt(d.startedAt)}</dd></div>
@@ -224,7 +224,7 @@ export function InstanceReport({ id, messageAccess }: { id: string; messageAcces
         <section aria-labelledby="request-form-heading" className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
           <CardHeader id="request-form-heading" title="Informações do formulário" icon={<FileText size={17} />} />
           <div className="p-4">
-          {d.formSchema ? <ReactForm key={`${id}:${editing}`} ref={formRef} automationScripts={d.automationScripts} schema={d.formSchema} data={data} readOnly={!editing} /> : <KeyValueData data={data} />}</div>
+          {d.formSchema ? <ReactForm key={`${id}:${editing}`} ref={formRef} automationScripts={d.automationScripts} suspended={!!d.isFrozen || !!d.frozenAt} schema={d.formSchema} data={data} readOnly={!editing || !!d.isFrozen || !!d.frozenAt} /> : <KeyValueData data={data} />}</div>
         </section>
         {showMessages ? <ProcessMessages executionId={id} originType="report" messageAccess={messageAccess} /> : <section aria-labelledby="request-messages-heading" className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"><CardHeader id="request-messages-heading" title="Mensagens" icon={<MessageSquare size={17} />} /><p className="p-4 text-sm text-slate-500">Nenhuma mensagem disponível.</p></section>}
       </div>
@@ -237,17 +237,18 @@ export function InstanceReport({ id, messageAccess }: { id: string; messageAcces
 
 function NextStep({ d, onHistory }: { d: InstanceDetail; onHistory: () => void }) {
   const tasks = useMyTasks();
-  const ongoing = d.status === 'em_andamento';
+  const frozen = !!d.isFrozen || !!d.frozenAt;
+  const ongoing = d.status === 'em_andamento' && !frozen;
   const ownTasks = ongoing && tasks.isSuccess && !tasks.isPlaceholderData && !tasks.isFetching
     ? tasks.data.items.filter((task) => task.executionId === d.id) : [];
   const lastTask = [...d.tasks].filter(task => task.completedAt).sort((a, b) => Date.parse(b.completedAt!) - Date.parse(a.completedAt!))[0];
   const completedBy = lastTask?.completedByImpersonator ? `${lastTask.completedByImpersonator} em nome de ${lastTask.completedBy ?? 'usuário não informado'}` : lastTask?.completedBy;
   return (
     <section aria-labelledby="request-next-step-heading" className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <CardHeader id="request-next-step-heading" title={d.status === 'concluido' ? 'Processo concluído' : d.status === 'cancelado' ? 'Processo cancelado' : 'Tarefa ativa'} icon={<Workflow size={17} />}
+      <CardHeader id="request-next-step-heading" title={frozen ? 'Processo congelado' : d.status === 'concluido' ? 'Processo concluído' : d.status === 'cancelado' ? 'Processo cancelado' : 'Tarefa ativa'} icon={<Workflow size={17} />}
         action={<button type="button" onClick={onHistory} className="inline-flex min-h-7 items-center gap-1.5 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"><ListTree size={13} /> Visualizar tramitação completa</button>} />
       <div className="p-4">
-        {ongoing && d.activeTask ? <>
+        {frozen ? <p role="status" className="text-sm leading-relaxed text-slate-700">A requisição está congelada{d.frozenAt ? ` desde ${fmt(d.frozenAt)}` : ''}. Tarefas, prazos, alertas e automações estão suspensos. Um administrador ou usuário autorizado pode descongelá-la pelo menu Ações.</p> : ongoing && d.activeTask ? <>
           <p className="break-words font-medium text-slate-900">{d.activeTask.name ?? 'Tarefa sem nome'}</p>
           <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-3">
             <div><dt className="text-xs text-slate-500">Data de início</dt><dd className="mt-1 text-slate-700">{d.activeTask.startedAt ? fmt(d.activeTask.startedAt) : 'Não informada'}</dd></div>
@@ -267,10 +268,18 @@ function NextStep({ d, onHistory }: { d: InstanceDetail; onHistory: () => void }
 }
 
 /** Pílula de status do processo (com ícone). Reaproveitada no header do relatório. */
-export function StatusPill({ status }: { status: string }) {
-  const v = STATUS[status] ?? { label: status, cls: 'bg-slate-100 text-slate-600' };
-  const Icon = status === 'concluido' ? CircleCheck : status === 'cancelado' ? CircleX : status === 'em_andamento' ? Clock : CircleHelp;
-  return <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-medium ${v.cls}`}><Icon size={14} aria-hidden="true" /> {v.label}</span>;
+type RequestStatus = Pick<InstanceListItem, 'status' | 'customStatus' | 'frozenAt' | 'isFrozen'>;
+
+function statusPresentation({ status, customStatus, frozenAt, isFrozen }: RequestStatus) {
+  if (isFrozen || frozenAt) return { label: 'Congelada', cls: 'bg-slate-200 text-slate-800' };
+  const standard = STATUS[status] ?? { label: status, cls: 'bg-slate-100 text-slate-600' };
+  return { ...standard, label: customStatus || standard.label };
+}
+
+export function StatusPill(props: RequestStatus) {
+  const v = statusPresentation(props);
+  const Icon = props.isFrozen || props.frozenAt ? PauseCircle : props.status === 'concluido' ? CircleCheck : props.status === 'cancelado' ? CircleX : props.status === 'em_andamento' ? Clock : CircleHelp;
+  return <span title={STATUS[props.status]?.label} className={`inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-medium ${v.cls}`}><Icon size={14} className="shrink-0" aria-hidden="true" /><span className="min-w-0 break-words">{v.label}</span></span>;
 }
 
 /** Pílula de prazo: verde (>24h), laranja (<24h), vermelho (vencido). */
@@ -298,6 +307,10 @@ const ROTULO_ACAO: Record<string, string> = {
   return: 'Devolvido para tarefa já executada',
   forward: 'Encaminhado para nova tarefa',
   reassign: 'Requisição realocada',
+  freeze: 'Requisição congelada',
+  unfreeze: 'Requisição descongelada',
+  setStatus: 'Status da requisição alterado',
+  setField: 'Campo do formulário alterado',
 };
 
 function TramitacaoTab({ d }: { d: InstanceDetail }) {
@@ -313,7 +326,7 @@ function TramitacaoTab({ d }: { d: InstanceDetail }) {
   }));
   for (const [index, action] of (d.actions ?? []).entries()) entries.push({
     id: `action:${index}`, at: action.at, title: ROTULO_ACAO[action.action] ?? action.action,
-    state: 'Ação administrativa', actor: action.onBehalfOf ? `${action.actor ?? 'Usuário não informado'} em nome de ${action.onBehalfOf}` : action.actor ?? 'Responsável não informado', action,
+    state: action.origin === 'automatic' ? 'Ação automática' : 'Ação administrativa', actor: action.onBehalfOf ? `${action.actor ?? 'Usuário não informado'} em nome de ${action.onBehalfOf}` : action.actor ?? (action.origin === 'automatic' ? 'Fluxo do processo' : 'Responsável não informado'), action,
   });
   if (!d.tasks.some(task => task.isStart)) entries.push({ id: 'start', at: d.startedAt, title: 'Requisição iniciada', state: 'Abertura', actor: d.requester ?? 'Requisitante não informado' });
   if (d.endedAt && d.status === 'concluido') entries.push({ id: 'end', at: d.endedAt, title: 'Processo concluído', state: 'Encerramento', actor: '' });
@@ -400,9 +413,9 @@ function groupChanges(items: FieldChange[]): ChangeGroup[] {
   return [...map.values()].sort((a, b) => (a.changedAt < b.changedAt ? 1 : -1));
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const v = STATUS[status] ?? { label: status, cls: 'bg-slate-100 text-slate-600' };
-  return <span className={`inline-block rounded-full px-2 py-0.5 text-center text-xs font-medium ${v.cls}`}>{v.label}</span>;
+function StatusBadge(props: RequestStatus) {
+  const v = statusPresentation(props);
+  return <span className={`inline-block max-w-full break-words rounded-full px-2 py-0.5 text-center text-xs font-medium ${v.cls}`}>{v.label}</span>;
 }
 
 function fmt(iso: string): string {

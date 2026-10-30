@@ -1,14 +1,14 @@
 import { useState } from 'react';
-import { AlertTriangle, CornerUpLeft, RotateCcw, Send, UserCog, XCircle } from 'lucide-react';
+import { AlertTriangle, CornerUpLeft, PauseCircle, PlayCircle, RotateCcw, Send, UserCog, XCircle } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { toast } from '@/stores/toast';
 import {
-  useActionOptions, useCancelInstance, useMoveInstance, useReassignInstance,
+  useActionOptions, useCancelInstance, useMoveInstance, useReassignInstance, useStandbyInstance,
   type InstanceDetail,
 } from '@/lib/api/execution';
 
 /** As cinco ações administrativas da Fase 4 (requisitos 2026-08-03). */
-type Acao = 'cancel' | 'return' | 'forward' | 'reassign' | 'reopen';
+type Acao = 'cancel' | 'return' | 'forward' | 'reassign' | 'reopen' | 'freeze' | 'unfreeze';
 
 const TITULO: Record<Acao, string> = {
   cancel: 'Cancelar processo',
@@ -16,6 +16,8 @@ const TITULO: Record<Acao, string> = {
   forward: 'Encaminhar para nova tarefa',
   reassign: 'Realocar processo',
   reopen: 'Reabrir processo',
+  freeze: 'Congelar processo',
+  unfreeze: 'Descongelar processo',
 };
 
 const CONFIRMA: Record<Acao, string> = {
@@ -24,6 +26,8 @@ const CONFIRMA: Record<Acao, string> = {
   forward: 'Encaminhar',
   reassign: 'Realocar',
   reopen: 'Reabrir',
+  freeze: 'Congelar',
+  unfreeze: 'Descongelar',
 };
 
 /**
@@ -40,8 +44,10 @@ export function AcoesDoProcesso({ id, d, onFeito }: { id: string; d: InstanceDet
   const [alvo, setAlvo] = useState('');
   const [erro, setErro] = useState<string | null>(null);
 
-  const opcoes = useActionOptions(id, aberta !== null && aberta !== 'cancel');
+  const opcoes = useActionOptions(id, aberta === 'return' || aberta === 'forward' || aberta === 'reassign' || aberta === 'reopen');
   const cancelar = useCancelInstance();
+  const congelar = useStandbyInstance('freeze');
+  const descongelar = useStandbyInstance('unfreeze');
   const devolver = useMoveInstance('return');
   const encaminhar = useMoveInstance('forward');
   const reabrir = useMoveInstance('reopen');
@@ -53,6 +59,8 @@ export function AcoesDoProcesso({ id, d, onFeito }: { id: string; d: InstanceDet
     { acao: 'reassign', ativo: !!d.canReassign, icone: <UserCog size={14} />, classe: 'text-slate-700 hover:bg-slate-50' },
     { acao: 'reopen', ativo: !!d.canReopen, icone: <RotateCcw size={14} />, classe: 'text-emerald-700 hover:bg-emerald-50' },
     { acao: 'cancel', ativo: !!d.canCancel, icone: <XCircle size={14} />, classe: 'text-amber-700 hover:bg-amber-50' },
+    { acao: 'freeze', ativo: !!d.canFreeze, icone: <PauseCircle size={14} />, classe: 'text-slate-700 hover:bg-slate-50' },
+    { acao: 'unfreeze', ativo: !!d.canUnfreeze, icone: <PlayCircle size={14} />, classe: 'text-slate-700 hover:bg-slate-50' },
   ];
 
   function abrir(acao: Acao) {
@@ -65,7 +73,7 @@ export function AcoesDoProcesso({ id, d, onFeito }: { id: string; d: InstanceDet
     : undefined;
   const precisaEtapa = aberta === 'return' || aberta === 'forward' || aberta === 'reopen';
   const precisaUsuario = aberta === 'reassign';
-  const enviando = cancelar.isPending || devolver.isPending || encaminhar.isPending || reabrir.isPending || realocar.isPending;
+  const enviando = cancelar.isPending || congelar.isPending || descongelar.isPending || devolver.isPending || encaminhar.isPending || reabrir.isPending || realocar.isPending;
 
   async function confirmar() {
     if (!aberta) return;
@@ -77,6 +85,8 @@ export function AcoesDoProcesso({ id, d, onFeito }: { id: string; d: InstanceDet
     setErro(null);
     try {
       if (aberta === 'cancel') await cancelar.mutateAsync({ id, justification: justificativa });
+        else if (aberta === 'freeze') await congelar.mutateAsync({ id, justification: justificativa });
+        else if (aberta === 'unfreeze') await descongelar.mutateAsync({ id, justification: justificativa });
       else if (aberta === 'reassign') await realocar.mutateAsync({ id, userId: alvo, justification: justificativa });
       else {
         const m = aberta === 'return' ? devolver : aberta === 'forward' ? encaminhar : reabrir;
@@ -85,7 +95,8 @@ export function AcoesDoProcesso({ id, d, onFeito }: { id: string; d: InstanceDet
       toast.success(`${TITULO[aberta]}: concluído.`);
       setAberta(null);
       onFeito?.();
-    } catch {
+      } catch (error) {
+        setErro(error instanceof Error ? error.message : 'Não foi possível realizar a ação. Tente novamente.');
       toast.error(`Não foi possível concluir: ${TITULO[aberta].toLowerCase()}.`);
     }
   }
@@ -120,6 +131,7 @@ export function AcoesDoProcesso({ id, d, onFeito }: { id: string; d: InstanceDet
         }
       >
         <div className="space-y-4">
+            {(aberta === 'freeze' || aberta === 'unfreeze') && <p className="text-sm leading-relaxed text-slate-700">{aberta === 'freeze' ? 'As tarefas ficam ocultas e inacessíveis. Prazos, alertas e automações ficam suspensos até o descongelamento.' : 'As tarefas voltam à caixa dos responsáveis. Prazos, alertas e automações retomam de onde pararam.'}</p>}
           {/* A spec pede este alerta em destaque: encaminhar pula o desenho, e a etapa
               de destino pode não ter saída a partir dali. */}
           {aberta === 'forward' && (

@@ -1,6 +1,7 @@
 import { getActionButtons } from './bpmn-action-buttons';
 import { getGatewayCondition } from './bpmn-gateway-conditions';
 import { getExtensionConfig } from './bpmn-helpers';
+import { BUSINESS_RULE_DEFAULTS, businessRuleErrors } from './bpmn-business-rule';
 
 export type IssueSeverity = 'error' | 'warning';
 
@@ -201,6 +202,11 @@ const ruleUserTaskHasButtons: Rule = (els) =>
       return [];
     });
 
+const ruleBusinessRule: Rule = (els) => els
+  .filter((element) => element.type === 'bpmn:BusinessRuleTask')
+  .flatMap((element) => businessRuleErrors(getExtensionConfig(element.el, 'septem:BusinessRule', BUSINESS_RULE_DEFAULTS))
+    .map((message, index) => issue(`business-rule-${index}`, 'error', `${labelOf(element)}: ${message}`, element.id)));
+
 const RULES: Rule[] = [
   ruleHasStart,
   ruleHasEnd,
@@ -212,6 +218,7 @@ const RULES: Rule[] = [
   ruleExclusiveHasElse,
   ruleUserTaskNeedsActor,
   ruleUserTaskHasButtons,
+  ruleBusinessRule,
 ];
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -225,6 +232,7 @@ function isExecutable(type: string): boolean {
     type === 'bpmn:UserTask' ||
     type === 'bpmn:ServiceTask' ||
     type === 'bpmn:ScriptTask' ||
+    type === 'bpmn:BusinessRuleTask' ||
     type === 'bpmn:CallActivity' ||
     type === 'bpmn:IntermediateThrowEvent' ||
     type === 'bpmn:IntermediateCatchEvent'
@@ -242,6 +250,8 @@ function labelOf(e: Element): string {
       return 'Tarefa humana';
     case 'bpmn:ScriptTask':
       return 'Tarefa de script';
+    case 'bpmn:BusinessRuleTask':
+      return 'Regra de negócio';
     case 'bpmn:ServiceTask':
       return 'Atividade de serviço';
     case 'bpmn:CallActivity':

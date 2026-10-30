@@ -143,6 +143,9 @@ export class SeptemPaletteProvider {
       'create.script-task': createEntry(
         'bpmn:ScriptTask', 'activity', 'bpmn-icon-script-task', 'Tarefa de script',
       ),
+        'create.business-rule-task': createEntry(
+          'bpmn:BusinessRuleTask', 'activity', 'bpmn-icon-business-rule-task', 'Regra de negócio',
+        ),
       'create.service-task': createEntry(
         'bpmn:ServiceTask',
         'activity',

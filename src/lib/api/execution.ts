@@ -196,7 +196,7 @@ export function useTaskSummary() {
 }
 
 export function useTask(id: string | null) {
-  return useQuery({ queryKey: execKeys.task(id ?? ''), queryFn: () => api.get<TaskDetail>(`/api/v1/workflow/tasks/${id}`), enabled: !!id });
+  return useQuery({ queryKey: execKeys.task(id ?? ''), queryFn: () => api.get<TaskDetail>(`/api/v1/workflow/tasks/${id}`), enabled: !!id, refetchInterval: TASKS_REFETCH_INTERVAL_MS, refetchOnWindowFocus: 'always' });
 }
 
 export function useCompleteTask() {
@@ -220,14 +220,14 @@ export function useSaveTask() {
 }
 
 // ── instâncias (acompanhamento) ───────────────────────────────────────
-export type InstanceListItem = ProcessMetadata & { id: string; number?: number; status: string; isTest?: boolean; startedAt: string; endedAt: string | null; pendingTasks: number; tags?: ExecutionTag[] };
+export type InstanceListItem = ProcessMetadata & { id: string; number?: number; status: string; customStatus?: string | null; frozenAt?: string | null; isFrozen?: boolean; isTest?: boolean; startedAt: string; endedAt: string | null; pendingTasks: number; tags?: ExecutionTag[] };
 export type InstancesPage = { items: InstanceListItem[]; total: number; page: number; pageSize: number; processes?: ProcessFacet[]; tagNames?: TagNameFacet[] };
 export type FieldChange = { changedAt: string; changedBy: string | null; impersonator: string | null; action: string; group: string | null; field: string; changeType: string; oldValue: string | null; newValue: string | null };
 /** isStart: a tarefa nasceu do evento de início — na tramitação ela É o nó de abertura. */
 export type InstanceTask = { id: string; name: string | null; status: string; isStart?: boolean; assignee: string | null; completedBy: string | null; completedByImpersonator?: string | null; createdAt: string; completedAt: string | null; dueAt: string | null; action: string | null; actionPrimaryColor?: string | null; actionTextColor?: string | null; justification?: string | null; fieldHistory?: FieldChange[] };
 export type ActiveTask = { name: string | null; assignee: string | null; startedAt?: string | null; dueAt: string | null };
 /** Ação administrativa registrada na tramitação (Fase 4). */
-export type InstanceAction = { action: string; justification: string; at: string; actor: string | null; onBehalfOf?: string | null; targetTaskName?: string | null; targetUser?: string | null };
+export type InstanceAction = { action: string; justification: string; at: string; actor: string | null; onBehalfOf?: string | null; targetTaskName?: string | null; targetUser?: string | null; origin?: string | null; sourceExecutionPublicId?: string | null; sourceTaskBpmnId?: string | null; details?: unknown };
 /** Opções dos modais — vêm PRONTAS do servidor; a tela não recalcula a regra. */
 export type ActionOptions = {
   returnTargets: { taskBpmnId: string; name: string | null }[];
@@ -236,7 +236,7 @@ export type ActionOptions = {
   reassignCandidates: { id: string; name: string }[];
   reassignSource: string | null;
 };
-export type InstanceDetail = { id: string; number?: number; process: string | null; category?: string | null; flowKey?: string | null; requester?: string | null; status: string; isTest?: boolean; startedAt: string; endedAt: string | null; data: unknown; automationScripts?: AutomationSource[]; formSchema?: unknown; inboxHtml?: string | null; activeTask?: ActiveTask | null; tasks: InstanceTask[]; actions?: InstanceAction[]; tags?: ExecutionTag[]; canEdit?: boolean; canCancel?: boolean; canDelete?: boolean; canReopen?: boolean; canReturn?: boolean; canForward?: boolean; canReassign?: boolean; messages?: { count: number; canPost: boolean } };
+export type InstanceDetail = { id: string; number?: number; process: string | null; category?: string | null; flowKey?: string | null; requester?: string | null; status: string; customStatus?: string | null; frozenAt?: string | null; isFrozen?: boolean; isTest?: boolean; startedAt: string; endedAt: string | null; data: unknown; automationScripts?: AutomationSource[]; formSchema?: unknown; inboxHtml?: string | null; activeTask?: ActiveTask | null; tasks: InstanceTask[]; actions?: InstanceAction[]; tags?: ExecutionTag[]; canEdit?: boolean; canFreeze?: boolean; canUnfreeze?: boolean; canCancel?: boolean; canDelete?: boolean; canReopen?: boolean; canReturn?: boolean; canForward?: boolean; canReassign?: boolean; messages?: { count: number; canPost: boolean } };
 export type InstancesParams = TaskFilters & { status?: string; mine?: boolean; scope?: 'personal'; relationship?: 'requester' | 'participant'; endedFrom?: string; endedTo?: string; page?: number; pageSize?: number };
 
 export function useInstances(params: InstancesParams) {
@@ -288,7 +288,16 @@ export function useCancelInstance() {
   return useMutation({
     mutationFn: ({ id, justification }: { id: string; justification: string }) =>
       api.post<void>(`/api/v1/workflow/instances/${id}/cancel`, { justification }),
-    onSuccess: (_d, { id }) => { qc.invalidateQueries({ queryKey: ['workflow', 'instance', id] }); qc.invalidateQueries({ queryKey: ['workflow', 'instances'] }); },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['workflow'] }),
+  });
+}
+
+export function useStandbyInstance(action: 'freeze' | 'unfreeze') {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, justification }: { id: string; justification: string }) =>
+      api.post<void>(`/api/v1/workflow/instances/${id}/${action}`, { justification }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['workflow'] }),
   });
 }
 

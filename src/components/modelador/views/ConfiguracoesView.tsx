@@ -207,7 +207,7 @@ type AccessRule = {
   type: 'all' | 'user' | 'profile' | 'orgUnit' | 'position' | 'orgUnitPosition';
   action: 'allow' | 'deny';
   /** view = ver/iniciar (padrão); edit/cancel/delete = ações sobre a instância no relatório. */
-  capability?: 'view' | 'edit' | 'cancel' | 'delete';
+  capability?: 'view' | 'edit' | 'cancel' | 'delete' | 'freeze' | 'unfreeze';
   userId?: string;
   profileId?: string;
   orgUnitId?: string;
@@ -227,6 +227,8 @@ const CAPABILITIES = [
   { value: 'view', label: 'Ver / iniciar' },
   { value: 'edit', label: 'Editar' },
   { value: 'cancel', label: 'Cancelar' },
+  { value: 'freeze', label: 'Congelar' },
+  { value: 'unfreeze', label: 'Descongelar' },
   { value: 'delete', label: 'Excluir' },
 ] as const;
 
@@ -282,7 +284,7 @@ function AccessRuleRow({ rule, onChange, onRemove }: { rule: AccessRule; onChang
         )}
       </Field>
       <Field label="Capacidade">
-        <Select value={rule.capability ?? 'view'} options={CAPABILITIES.map((c) => ({ value: c.value, label: c.label }))} onChange={(e) => onChange({ capability: e.target.value as AccessRule['capability'] })} />
+        <Select value={rule.capability ?? 'view'} options={CAPABILITIES.map((c) => ({ value: c.value, label: c.label }))} onChange={(e) => { const next = CAPABILITIES.find((item) => item.value === e.target.value); if (next) onChange({ capability: next.value }); }} />
       </Field>
       <Field label="Ação">
         <Select value={rule.action} options={[{ value: 'allow', label: 'Permitir' }, { value: 'deny', label: 'Bloquear' }]} onChange={(e) => onChange({ action: e.target.value as AccessRule['action'] })} />

@@ -323,6 +323,18 @@ export function TaskView({ taskId, onClose }: { taskId: string; onClose: () => v
 
   if (done) return <CompletionScreen kind="task" next={done.nextTaskForMe} executionId={done.executionId} onClose={onClose} />;
 
+  if (task.isError) {
+    const frozen = task.error instanceof ApiError && task.error.body?.error === 'execution_frozen';
+    return <section role="alert" className="mx-auto max-w-lg space-y-4 p-6 text-slate-800">
+      <h1 className="text-lg font-semibold">{frozen ? 'Requisição congelada' : 'Tarefa indisponível'}</h1>
+      <p className="text-sm leading-relaxed">{frozen ? 'Esta tarefa não pode ser acessada enquanto a requisição estiver congelada. Um administrador ou usuário autorizado pode descongelá-la pelo relatório da instância.' : 'Não foi possível abrir esta tarefa. Verifique seu acesso ou tente novamente.'}</p>
+      <div className="flex flex-wrap gap-3">
+        <button type="button" onClick={onClose} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium hover:bg-slate-50">Voltar à caixa de tarefas</button>
+        <button type="button" onClick={() => task.refetch()} className="min-h-11 rounded-md bg-slate-900 px-3 text-sm font-medium text-white hover:bg-slate-700">Tentar novamente</button>
+      </div>
+    </section>;
+  }
+
   const buttons = task.data?.buttons ?? [];
 
   const pendentes = (assinaturas.data?.documentos ?? [])

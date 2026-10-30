@@ -69,6 +69,7 @@ export class SeptemContextPadProvider {
       if (canAppend) {
         allowed['append.user-task'] = this.appendAction('bpmn:UserTask', 'bpmn-icon-user-task', 'Nova tarefa humana');
         allowed['append.script-task'] = this.appendAction('bpmn:ScriptTask', 'bpmn-icon-script-task', 'Nova tarefa de script');
+        allowed['append.business-rule-task'] = this.appendAction('bpmn:BusinessRuleTask', 'bpmn-icon-business-rule-task', 'Nova tarefa de regra de negócio');
         allowed['append.service-task'] = this.appendAction('bpmn:ServiceTask', 'bpmn-icon-service-task', 'Nova tarefa de serviço');
         allowed['append.subprocess'] = this.appendAction('bpmn:CallActivity', 'bpmn-icon-call-activity', 'Nova tarefa de subprocesso');
         allowed['append.email-event'] = this.appendAction('bpmn:IntermediateThrowEvent', 'bpmn-icon-intermediate-event-throw-message', 'Novo evento de e-mail', { eventDefinitionType: 'bpmn:MessageEventDefinition' });

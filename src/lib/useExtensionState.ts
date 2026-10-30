@@ -21,11 +21,15 @@ export function useExtensionState<T extends ConfigShape>(
   const [state, setState] = useState<T>(defaults);
 
   useEffect(() => {
-    setState(getExtensionConfig(element, type, defaults));
+    const refresh = () => setState(getExtensionConfig(element, type, defaults));
+    refresh();
+    const eventBus = modeler.get('eventBus');
+    eventBus.on('commandStack.changed', refresh);
+    return () => eventBus.off('commandStack.changed', refresh);
     // defaults é estável por convenção (const no módulo) — não vamos depender dele
     // para evitar reset em cada render do parent
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [element, type]);
+  }, [modeler, element, type]);
 
   const update = useCallback((patch: Partial<T>) => {
     setState((s) => ({ ...s, ...patch }));

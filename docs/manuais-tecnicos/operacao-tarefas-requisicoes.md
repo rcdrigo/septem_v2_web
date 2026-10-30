@@ -214,12 +214,16 @@ Mensagens registram a comunicação permitida pelo processo. Documentos podem in
 Usuários com permissões e capacidade no processo podem encontrar ações como:
 
 - **Cancelar:** encerra a execução antes do fim normal;
+- **Congelar:** oculta e bloqueia as tarefas e suspende prazos, alertas e automações;
+- **Descongelar:** restaura as tarefas e retoma o fluxo, preservando o tempo restante dos prazos;
 - **Reabrir:** retoma uma requisição encerrada quando permitido;
 - **Devolver:** retorna a uma tarefa já executada;
 - **Encaminhar:** cria uma nova etapa conforme a opção disponível;
 - **Realocar:** troca o responsável pela tarefa ativa.
 
 Essas ações exigem cuidado porque alteram a tramitação. Registre uma justificativa concreta e confirme o número da requisição antes de prosseguir.
+
+Administradores podem congelar e descongelar pelo menu **Ações** do relatório da instância. Outros usuários precisam da capacidade correspondente no controle de acesso do processo. O relatório continua disponível durante o congelamento; a execução das tarefas permanece bloqueada.
 
 ## Exemplo completo
 

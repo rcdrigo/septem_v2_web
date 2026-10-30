@@ -46,20 +46,6 @@ export function setDocumentation(modeler: AnyModeler, element: AnyElement, text:
 
 // ─── infra de extensionElements ──────────────────────────────────────────────
 
-function ensureExtensionElements(modeler: AnyModeler, element: AnyElement) {
-  const moddle = modeler.get('moddle');
-  const modeling = modeler.get('modeling');
-  const bo = element.businessObject;
-  let ext = bo.extensionElements;
-  if (!ext) {
-    ext = moddle.create('bpmn:ExtensionElements', { values: [] });
-    ext.$parent = bo;
-    modeling.updateProperties(element, { extensionElements: ext });
-  }
-  if (!Array.isArray(ext.values)) ext.values = [];
-  return ext;
-}
-
 function findExtensionNode<T = any>(element: AnyElement, type: string): T | undefined {
   const ext = element?.businessObject?.extensionElements;
   if (!ext?.values) return undefined;
@@ -99,14 +85,10 @@ export function setExtensionConfig<T extends ConfigShape>(
 ) {
   const moddle = modeler.get('moddle');
   const modeling = modeler.get('modeling');
-  const ext = ensureExtensionElements(modeler, element);
-
-  let node = ext.values.find((v: any) => v.$type === type);
-  if (!node) {
-    node = moddle.create(type, {});
-    node.$parent = ext;
-    ext.values.push(node);
-  }
+  const previous = findExtensionNode<Record<string, unknown>>(element, type);
+  const properties = Object.fromEntries(Object.entries(previous ?? {}).filter(([key]) => !key.startsWith('$')));
+  const node = moddle.create(type, properties);
+  if (previous?.$attrs && typeof previous.$attrs === 'object') Object.assign(node.$attrs, previous.$attrs);
   for (const [k, v] of Object.entries(patch)) {
     if (v === undefined || v === '' || v === null) {
       delete node[k];
@@ -118,8 +100,11 @@ export function setExtensionConfig<T extends ConfigShape>(
   const isEmpty = Object.keys(node).every(
     (k) => k.startsWith('$') || node[k] === undefined || node[k] === '' || node[k] === null,
   );
-  if (isEmpty) ext.values = ext.values.filter((v: any) => v !== node);
-
+  const otherValues = (element.businessObject.extensionElements?.values ?? [])
+    .filter((value: { $type: string }) => value.$type !== type);
+  const ext = moddle.create('bpmn:ExtensionElements', { values: isEmpty ? otherValues : [...otherValues, node] });
+  ext.$parent = element.businessObject;
+  node.$parent = ext;
   modeling.updateProperties(element, { extensionElements: ext });
 }
 
