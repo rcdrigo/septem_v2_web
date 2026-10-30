@@ -12,7 +12,7 @@ export function GenericPanel({ modeler, element }: PanelProps) {
       <GeneralInfoSection modeler={modeler} element={element} />
       <Section title="Configurações específicas">
         <PlaceholderBox>
-          Este tipo de elemento não tem configurações adicionais previstas na spec.
+          Este elemento não possui configurações adicionais.
         </PlaceholderBox>
       </Section>
     </>

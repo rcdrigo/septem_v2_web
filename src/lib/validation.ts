@@ -2,6 +2,7 @@ import { getActionButtons } from './bpmn-action-buttons';
 import { getGatewayCondition } from './bpmn-gateway-conditions';
 import { getExtensionConfig } from './bpmn-helpers';
 import { BUSINESS_RULE_DEFAULTS, businessRuleErrors } from './bpmn-business-rule';
+import { attachedTimers, BOUNDARY_TIMER_DEFAULTS, DEADLINE_DEFAULTS, deadlineErrors, isBoundaryTimer } from './bpmn-deadline';
 
 export type IssueSeverity = 'error' | 'warning';
 
@@ -207,6 +208,30 @@ const ruleBusinessRule: Rule = (els) => els
   .flatMap((element) => businessRuleErrors(getExtensionConfig(element.el, 'septem:BusinessRule', BUSINESS_RULE_DEFAULTS))
     .map((message, index) => issue(`business-rule-${index}`, 'error', `${labelOf(element)}: ${message}`, element.id)));
 
+const ruleDeadline: Rule = (els) => els.flatMap((element) => {
+  if (element.type === 'bpmn:UserTask') {
+    return deadlineErrors(element.el, attachedTimers(els.map((candidate) => candidate.el), element.id))
+      .map((message, index) => issue(`deadline-${index}`, 'error', `${labelOf(element)}: ${message}`, element.id));
+  }
+  if (!isBoundaryTimer(element.el)) return [];
+  const errors: ValidationIssue[] = [];
+  const add = (rule: string, message: string) => errors.push(issue(`boundary-timer-${rule}`, 'error', `${labelOf(element)}: ${message}`, element.id));
+  if (!element.bo.attachedToRef) add('task', 'Anexe o timer a uma tarefa.');
+  if (element.outgoing.length === 0) add('path', 'Conecte a saída do timer ao caminho de vencimento.');
+  const config = getExtensionConfig(element.el, 'septem:BoundaryTimerConfig', BOUNDARY_TIMER_DEFAULTS);
+  if (config.deadlineSource === 'task') {
+    const task = els.find((candidate) => candidate.id === element.bo.attachedToRef?.id);
+    const deadline = getExtensionConfig(task?.el, 'septem:DeadlineConfig', DEADLINE_DEFAULTS);
+    if (deadline.overdueAction !== 'timer' || deadline.overdueTimerRef !== element.id) add('link', 'Selecione este timer na ação de vencimento da tarefa.');
+  } else {
+    const timer = getExtensionConfig(element.el, 'septem:TimerConfig', { kind: 'untilDate', mode: 'fixed', value: '', fieldRef: '' });
+    if (timer.mode === 'dynamic' ? !timer.fieldRef : !timer.value.trim()) add('value', 'Defina o prazo próprio do timer.');
+    else if (timer.mode === 'fixed' && (timer.kind === 'forHours' || timer.kind === 'forDays') && !(Number(timer.value) > 0)) add('value', 'A duração do timer deve ser maior que zero.');
+    else if (timer.mode === 'fixed' && timer.kind === 'untilDay' && (!Number.isInteger(Number(timer.value)) || Number(timer.value) < 1 || Number(timer.value) > 31)) add('value', 'Informe um dia do mês entre 1 e 31.');
+  }
+  return errors;
+});
+
 const RULES: Rule[] = [
   ruleHasStart,
   ruleHasEnd,
@@ -219,6 +244,7 @@ const RULES: Rule[] = [
   ruleUserTaskNeedsActor,
   ruleUserTaskHasButtons,
   ruleBusinessRule,
+  ruleDeadline,
 ];
 
 // ─── helpers ─────────────────────────────────────────────────────────────────

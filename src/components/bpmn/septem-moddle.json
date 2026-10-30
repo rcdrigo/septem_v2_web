@@ -332,6 +332,33 @@
           "name": "expiresInFieldRef",
           "isAttr": true,
           "type": "String"
+        },
+        {
+          "name": "overdueAction",
+          "isAttr": true,
+          "type": "String",
+          "default": "record"
+        },
+        {
+          "name": "overdueTimerRef",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "overdueNotifyTarget",
+          "isAttr": true,
+          "type": "String",
+          "default": "assignee"
+        },
+        {
+          "name": "overdueAreaId",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "overduePositionId",
+          "isAttr": true,
+          "type": "String"
         }
       ]
     },
@@ -625,6 +652,20 @@
           "name": "valueJson",
           "isAttr": true,
           "type": "String"
+        }
+      ]
+    },
+    {
+      "name": "BoundaryTimerConfig",
+      "superClass": [
+        "Element"
+      ],
+      "properties": [
+        {
+          "name": "deadlineSource",
+          "isAttr": true,
+          "type": "String",
+          "default": "task"
         }
       ]
     }

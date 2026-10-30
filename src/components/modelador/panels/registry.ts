@@ -8,6 +8,7 @@ import { ServiceTaskPanel } from './ServiceTaskPanel';
 import { CallActivityPanel } from './CallActivityPanel';
 import { EmailEventPanel } from './EmailEventPanel';
 import { TimerEventPanel } from './TimerEventPanel';
+import { BoundaryTimerPanel } from './BoundaryTimerPanel';
 import { MilestoneEventPanel } from './MilestoneEventPanel';
 import { InclusiveGatewayPanel } from './InclusiveGatewayPanel';
 import { ExclusiveGatewayPanel } from './ExclusiveGatewayPanel';
@@ -57,6 +58,10 @@ export function resolvePanel(element: any): { Panel: PanelComponent; label: stri
       if (evDef === 'bpmn:TimerEventDefinition')
         return { Panel: TimerEventPanel, label: 'Evento de timer' };
       return { Panel: GenericPanel, label: 'Evento intermediário' };
+    case 'bpmn:BoundaryEvent':
+      if (element.businessObject.eventDefinitions?.some((definition: { $type: string }) => definition.$type === 'bpmn:TimerEventDefinition'))
+        return { Panel: BoundaryTimerPanel, label: 'Timer anexado à tarefa' };
+      return { Panel: GenericPanel, label: 'Evento anexado' };
     case 'bpmn:SequenceFlow':
       return { Panel: GenericPanel, label: 'Conexão' };
     case 'bpmn:Process':

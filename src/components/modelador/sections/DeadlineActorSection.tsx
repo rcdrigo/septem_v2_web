@@ -5,6 +5,8 @@ import { DataSourceSelect } from '../fields/DataSourceSelect';
 import { FormFieldSelect } from '../fields/FormFieldSelect';
 import { DeadlineAlertsEditor } from '../editors/DeadlineAlertsEditor';
 import { ContextHelp } from '@/components/guide/ContextHelp';
+import { DEADLINE_DEFAULTS } from '@/lib/bpmn-deadline';
+import { DeadlineActionSection } from './DeadlineActionSection';
 
 type Props = {
   modeler: any;
@@ -19,28 +21,12 @@ type ActorConfig = {
   dataSourceRef: string;
 };
 
-type DeadlineConfig = {
-  respectWorkHours: boolean;
-  sendReceiptMail: boolean;
-  sendDeadlineMail: boolean;
-  expiresIn: string;
-  expiresInFieldRef: string;
-};
-
 const ACTOR_DEFAULTS: ActorConfig = {
   actorType: 'requester',
   areaId: '',
   positionId: '',
   fieldRef: '',
   dataSourceRef: '',
-};
-
-const DEADLINE_DEFAULTS: DeadlineConfig = {
-  respectWorkHours: false,
-  sendReceiptMail: false,
-  sendDeadlineMail: false,
-  expiresIn: '',
-  expiresInFieldRef: '',
 };
 
 const ACTOR_OPTIONS = [
@@ -53,9 +39,6 @@ const ACTOR_OPTIONS = [
 /**
  * Seção "Responsáveis e prazos" — exclusiva de tarefa humana.
  * Define horário de expediente, e-mails de notificação, requisitante e demais responsáveis.
- *
- * O cronograma detalhado de alertas (único / repetido / após X dias / faltando X horas)
- * fica como placeholder até a Fase 4.2.
  */
 export function DeadlineActorSection({ modeler, element }: Props) {
   const actor = useExtensionState(modeler, element, 'septem:ActorConfig', ACTOR_DEFAULTS);
@@ -168,8 +151,8 @@ export function DeadlineActorSection({ modeler, element }: Props) {
             min={0}
             step="0.5"
             value={deadline.state.expiresIn}
-            onChange={(e) => deadline.update({ expiresIn: e.target.value })}
-            onBlur={() => deadline.commit('expiresIn')}
+            onChange={(e) => deadline.update({ expiresIn: e.target.value, ...(e.target.value ? { expiresInFieldRef: '' } : {}) })}
+            onBlur={() => deadline.flush({ expiresIn: deadline.state.expiresIn, expiresInFieldRef: deadline.state.expiresInFieldRef })}
           />
         </Field>
         <Field label="…OU CAMPO">
@@ -182,6 +165,7 @@ export function DeadlineActorSection({ modeler, element }: Props) {
           />
         </Field>
       </div>
+      <DeadlineActionSection modeler={modeler} element={element} />
     </Section>
   );
 }

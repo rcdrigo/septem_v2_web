@@ -1,5 +1,6 @@
 import { Field, RadioGroup, Section, TextInput } from '@/components/ui/Field';
 import { useExtensionState } from '@/lib/useExtensionState';
+import { FormFieldSelect } from '../fields/FormFieldSelect';
 
 type Props = {
   modeler: any;
@@ -51,38 +52,38 @@ export function TimerSection({ modeler, element }: Props) {
     <Section title="Configuração do temporizador">
       <Field label="Tipo de temporizador">
         <RadioGroup<TimerKind>
-          name="timer-kind"
+          name={`timer-kind-${element.id}`}
           value={state.kind}
           onChange={(v) => flush({ kind: v })}
-          options={KIND_OPTIONS as any}
+          options={KIND_OPTIONS}
         />
       </Field>
 
       <Field label="Origem do valor">
         <RadioGroup<TimerMode>
-          name="timer-mode"
+          name={`timer-mode-${element.id}`}
           value={state.mode}
           onChange={(v) =>
             flush(v === 'fixed' ? { mode: 'fixed', fieldRef: '' } : { mode: 'dynamic', value: '' })
           }
-          options={MODE_OPTIONS as any}
+          options={MODE_OPTIONS}
         />
       </Field>
 
       {state.mode === 'fixed' ? (
         <Field label={valueLabel} help={valueHelp}>
           <TextInput
+            aria-label={valueLabel}
             value={state.value}
             onChange={(e) => update({ value: e.target.value })}
             onBlur={() => commit('value')}
           />
         </Field>
       ) : (
-        <Field label="Campo do formulário" help="Identificador do campo que fornece o valor. Exemplo: data_prevista.">
-          <TextInput
+        <Field label="Campo do formulário" help="Selecione o campo que fornece o valor do temporizador.">
+          <FormFieldSelect
             value={state.fieldRef}
-            onChange={(e) => update({ fieldRef: e.target.value })}
-            onBlur={() => commit('fieldRef')}
+            onChange={(fieldRef) => flush({ fieldRef })}
           />
         </Field>
       )}
