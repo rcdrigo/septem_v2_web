@@ -50,9 +50,10 @@ try {
     await page.goto('http://localhost/flows/edit'+query);
     await page.clock.install();
     await page.addScriptTag({path:join(dir,'app.js')});
-  await page.waitForFunction(()=>document.body.innerText.includes('Unexpected Application Error')||!!document.querySelector('[data-native-editor]'),null,{timeout:15000});
+  await page.waitForFunction(()=>document.body.innerText.includes('Unexpected Application Error')||[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='Importar JSON'&&!b.disabled),null,{timeout:15000});
   const body=await page.locator('body').innerText();
   assert.ok(!body.includes('Unexpected Application Error'),body);
+  assert.equal(await page.locator('[data-native-editor]').count(),0,'Abrir/salvar o fluxo não exige montar o editor de formulário');
   await page.getByRole('button',{name:'Importar JSON',exact:true,includeHidden:true}).waitFor({state:'attached'});
   assert.deepEqual(errors,[]);
   if(query.includes('key=')) assert.equal(await page.evaluate(()=>window.modeler.get('canvas').getRootElement().businessObject.name),'Processo existente');

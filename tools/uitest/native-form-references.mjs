@@ -23,6 +23,14 @@ try {
   assert.equal(invalidNativeReferences(definition,nativeReferences(repeated,definition)).length,1);
   bo.extensionElements.values[0].entries.push({$type:'septem:FormRule',fieldRef:'missing'});
   assert.equal(invalidNativeReferences(definition,nativeReferences(repeated,definition)).length,2,'different uses stay distinct');
+  bo.extensionElements.values[0].entries = [
+    {$type:'septem:FormFieldEntry',fieldRef:'missing',fieldId:'first-id'},
+    {$type:'septem:FormFieldEntry',fieldRef:'missing',fieldId:'second-id'},
+    {$type:'septem:FormFieldEntry',fieldRef:'missing',fieldId:'first-id'},
+  ];
+  assert.deepEqual(nativeReferences(repeated,definition).map(ref=>ref.fieldId),['first-id','second-id'],'same key with distinct field IDs retains both checks and original order');
+  bo.extensionElements.values = [{$type:'septem:ActorConfig',actorType:'formField',fieldRef:'same_key',multiInstanceGroupRef:'same_key'}];
+  assert.deepEqual(nativeReferences(repeated,definition).map(ref=>ref.table),[false,true],'scalar and table references are not merged');
   assert.deepEqual(automationReferences("if(form.has('optional')) form.set('optional',1);form.cell('itens',0,'produto');form.get(variable); // form.get('comment')"),['optional','itens','produto']);
   console.log('PASSOU: usos, referências inválidas/corrigidas e análise de chamadas literais sem interpretar comentários.');
 } finally {await rm(dir,{recursive:true,force:true});}

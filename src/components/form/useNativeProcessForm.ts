@@ -13,6 +13,8 @@ export function useNativeProcessForm(modeler: any, processReady: boolean) {
   const [revision, setRevision] = useState(0);
   const draft = useRef<NativeFormDefinition | null>(null);
   const lastStored = useRef('');
+  const changeRevision = useRef(0);
+  const flushedRevision = useRef(0);
   const active = useRef(false);
   // Formulário em formato anterior: o editor não o assume, mas o PROCESSO continua
   // salvável. Sem esta distinção o `flush` rejeitava e o Salvar do modelador morria
@@ -33,6 +35,8 @@ export function useNativeProcessForm(modeler: any, processReady: boolean) {
         }
         const next = stored ? parseNativeForm(stored) : createNativeForm();
         lastStored.current = stored ? JSON.stringify(next) : '';
+        changeRevision.current = stored ? 0 : 1;
+        flushedRevision.current = 0;
         draft.current = next; active.current = true; setDefinition(next); setRevision(r => r + 1);
         useFormStore.getState().setFields(extractFields(next));
       } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o formulário. Reabra o processo.'); }
@@ -46,14 +50,19 @@ export function useNativeProcessForm(modeler: any, processReady: boolean) {
       // Salvar do processo segue. Só "ainda carregando" é impedimento de verdade.
       if (legado.current) return;
       if (!active.current || !draft.current) throw new Error('O formulário não está pronto para salvar.');
+      if (changeRevision.current === flushedRevision.current) return;
+      const revisionToFlush = changeRevision.current;
       const serialized = JSON.stringify(draft.current);
       if (serialized !== lastStored.current) {
         setEmbeddedNativeForm(modeler, draft.current);
         lastStored.current = serialized;
       }
+      flushedRevision.current = revisionToFlush;
     };
     useModeladorStore.getState().setFlushForm(flush);
-    const interval = window.setInterval(() => { if (active.current) void flush().catch(cause => setError(String(cause))); }, 600);
+    const interval = window.setInterval(() => {
+      if (active.current && changeRevision.current !== flushedRevision.current) void flush().catch(cause => setError(String(cause)));
+    }, 600);
     return () => {
       active.current = false; window.clearInterval(interval);
       bus?.off('import.parse.start', pause); bus?.off('import.done', load);
@@ -66,6 +75,7 @@ export function useNativeProcessForm(modeler: any, processReady: boolean) {
     const next = structuredClone(draft.current); change(next);
     const valid = parseNativeForm(next);
     syncTaskFieldEntries(modeler, extractFields(draft.current), extractFields(valid));
+    changeRevision.current += 1;
     draft.current = valid; setDefinition(valid);
     useFormStore.getState().setFields(extractFields(valid));
   }, [modeler]);
@@ -73,6 +83,7 @@ export function useNativeProcessForm(modeler: any, processReady: boolean) {
     const next = parseNativeForm(value);
     if (!active.current) throw new Error('Aguarde o carregamento do formulário.');
     syncTaskFieldEntries(modeler, extractFields(draft.current), extractFields(next));
+    changeRevision.current += 1;
     draft.current = next; setDefinition(next); setError(null); setRevision(r => r + 1);
     useFormStore.getState().setFields(extractFields(next));
   }, [modeler]);

@@ -1,6 +1,6 @@
 import { useSessionStore } from '@/stores/session';
 import { routes } from '@/lib/routes';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Regex, FileUp, FileSpreadsheet, Download, Eye, Code2 } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { ReactForm, type ReactFormHandle } from '@/components/form/ReactForm';
@@ -14,11 +14,13 @@ import { useNativeProcessForm } from '@/components/form/useNativeProcessForm';
 import { useFormMasks } from '@/lib/api/forms';
 import { toast } from '@/stores/toast';
 
-type Props = { modeler: any | null; processReady?: boolean; processKey?: string | null };
+type Props = { modeler: any | null; processReady?: boolean; processKey?: string | null; editorActive?: boolean };
 
 /** Native draft editor with the E4 filling preview; automation authoring follows in E6. */
-export function FormularioView({ modeler, processReady = true, processKey }: Props) {
+export function FormularioView({ modeler, processReady = true, processKey, editorActive = true }: Props) {
   const { definition, revision, error, update, importDefinition } = useNativeProcessForm(modeler, processReady);
+  const [editorVisited, setEditorVisited] = useState(editorActive);
+  useEffect(() => { if (editorActive) setEditorVisited(true); }, [editorActive]);
   const masks = useFormMasks();
   const canAutomate = useSessionStore(s => s.can('forms:javascript'));
   const [masksOpen, setMasksOpen] = useState(false);
@@ -75,7 +77,7 @@ export function FormularioView({ modeler, processReady = true, processKey }: Pro
     {error && <p role="alert" className="px-5 py-3 text-sm text-red-700">{error}</p>}
     {importError && <p role="alert" className="px-5 py-3 text-sm text-red-700">{importError}</p>}
     {!definition && !error && <p role="status" className="px-5 py-3 text-sm">Carregando formulário…</p>}
-    {definition && <NativeFormEditor key={`${processKey}:${definition.id}:${revision}`} definition={definition} modeler={modeler} processKey={processKey} update={update} masks={maskOptions} />}
+    {definition && (editorActive || editorVisited) && <NativeFormEditor key={`${processKey}:${definition.id}:${revision}`} definition={definition} modeler={modeler} processKey={processKey} update={update} masks={maskOptions} />}
     {masksOpen && <MasksDialog onClose={() => setMasksOpen(false)} />}
     {/* `importDefinition` é o mesmo caminho do "Importar JSON" e valida com
         `parseNativeForm` antes de trocar o rascunho: planilha que gere formulário inválido

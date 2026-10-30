@@ -38,10 +38,13 @@ export function nativeReferences(modeler: any, definition: NativeFormDefinition)
   }
   // Registry entries (for example labels) may share a business object. Keep one
   // occurrence per owner/use/field without merging distinct compatibility checks.
-  return result.filter((ref, index) => result.findIndex(other =>
-    other.owner === ref.owner && other.use === ref.use && other.key === ref.key
-    && other.fieldId === ref.fieldId && other.column === ref.column
-    && other.table === ref.table && other.type === ref.type) === index);
+  const seen = new Set<string>();
+  return result.filter(ref => {
+    const key = JSON.stringify([ref.owner, ref.use, ref.key, ref.fieldId, ref.column, ref.table, ref.type]);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 export function invalidNativeReferences(definition: NativeFormDefinition, references: NativeReference[]) {
   const fields = nativeFields(definition);

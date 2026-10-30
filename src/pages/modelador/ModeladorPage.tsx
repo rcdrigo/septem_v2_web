@@ -294,13 +294,12 @@ export function ModeladorPage() {
           <FluxoView ref={modelerHandleRef} onReady={onReady} modelerInstance={modeler} />
         </div>
         {/*
-          O editor de Formulário nativo também fica SEMPRE montado (oculto via
-          `hidden`): remontá-lo ao trocar de view fazia a paleta de componentes
-          sumir e recriava o editor desnecessariamente.
+          O controlador do formulário permanece ativo para sincronizar e salvar.
+          O editor visual monta na primeira visita e permanece montado depois.
         */}
         <div className={currentView === 'formulario' ? 'flex flex-1 overflow-hidden' : 'hidden flex-1'}>
           <ErrorBoundary context="o editor de formulário">
-            <FormularioView processKey={key} modeler={modeler} processReady={!key || loadedKey === key} />
+            <FormularioView processKey={key} modeler={modeler} processReady={!key || loadedKey === key} editorActive={currentView === 'formulario'} />
           </ErrorBoundary>
         </div>
         {currentView === 'tarefasXcampos' && (

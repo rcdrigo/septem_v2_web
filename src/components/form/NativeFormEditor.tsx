@@ -4,7 +4,7 @@ import { fetchNativeFieldUsage, type NativeFieldUsage } from '@/lib/api/forms';
 import { getFormFieldEntries, setFormFieldEntries } from '@/lib/bpmn-form-fields';
 import { renderIcon } from '@/lib/icon-catalog';
 import { nativeReferences, invalidNativeReferences } from '@/lib/native-form-references';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Settings2, Trash2, Table2, Rows3, GripVertical } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { NativeStructureDialog, type StructureAction } from './NativeStructureDialog';
@@ -38,12 +38,16 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
   currentDefinition.current = definition;
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  const [, refreshReferences] = useState(0);
+  const [referencesRevision, refreshReferences] = useState(0);
   useEffect(() => {
     const bus = modeler?.get?.('eventBus');
     const refresh = () => refreshReferences(n => n + 1);
     bus?.on('commandStack.changed', refresh);
-    return () => bus?.off('commandStack.changed', refresh);
+    bus?.on('import.done', refresh);
+    return () => {
+      bus?.off('commandStack.changed', refresh);
+      bus?.off('import.done', refresh);
+    };
   }, [modeler]);
   const nameRef = useRef<HTMLInputElement>(null);
   const tab = definition.tabs.find(t => t.id === selection.tabId) ?? definition.tabs[0];
@@ -152,12 +156,12 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
   const kindLabel = field ? 'campo' : group ? 'agrupamento' : 'aba';
   const panel = field ? nativePanelField(field) : null;
   const options = field?.config?.values;
-  const references = nativeReferences(modeler, definition);
+  const references = useMemo(() => nativeReferences(modeler, definition), [modeler, definition, referencesRevision]);
   const selectedKeys = new Set((field ? [field] : group ? group.fields : tab.groups.flatMap(g => g.fields)).flatMap(f => f.kind === 'field' ? [f.key] : []));
   for (const g of group ? [group] : tab.groups) if (!field && g.type === 'table') selectedKeys.add(g.key);
   const selectedIds = new Set((field ? [field] : group ? group.fields : tab.groups.flatMap(g => g.fields)).map(f => f.id));
   const usages = references.filter(r => r.fieldId ? selectedIds.has(r.fieldId) : selectedKeys.has(r.key) || [...selectedKeys].some(key => r.key.endsWith(`[].${key}`)));
-  const invalid = invalidNativeReferences(definition, references);
+  const invalid = useMemo(() => invalidNativeReferences(definition, references), [definition, references]);
   // Campo sem CHAVE é descartado ao salvar (sem chave não há resposta para guardar), e
   // isso acontecia em silêncio: o usuário acrescentava o campo, salvava e ele sumia.
   // A chave nasce do NOME, então dizer "dê um nome" é a instrução útil.
