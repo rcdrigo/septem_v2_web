@@ -12,6 +12,7 @@
     "test:execution-filters": "npm run build && node tools/uitest/execution-filters.mjs && node tools/uitest/execution-list-layout.mjs",
     "test:report-filters": "npm run build && node tools/uitest/report-filters.mjs",
     "test:script-task": "node tools/uitest/script-task-modeler.mjs",
+    "test:process-name": "node tools/uitest/process-name-save.mjs",
     "test:session": "node tools/uitest/session-renewal.mjs && node tools/uitest/platform-session-policy.mjs",
     "test:client-branding": "npm run build && node tools/uitest/client-branding.mjs",
     "test:settings-branding": "npm run build && node tools/uitest/parametros-branding.mjs",

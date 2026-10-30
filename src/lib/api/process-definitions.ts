@@ -104,6 +104,9 @@ export function useProcessList(params: ProcessListParams) {
   return useQuery({
     queryKey: processKeys.list(params),
     queryFn: () => api.get<ProcessPage>(`${BASE}/${toQuery(params)}`),
+    // O modelador salva em outra aba, com um QueryClient independente.
+    refetchOnWindowFocus: 'always',
+    refetchOnMount: 'always',
     placeholderData: (prev) => prev,
   });
 }
