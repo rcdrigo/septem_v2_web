@@ -1,3 +1,4 @@
+import { FormSection } from '@/components/ui/FormSection';
 import { BusinessHoursEditor } from '@/components/business-calendar/BusinessHoursEditor';
 import { CalendarLocationFields } from '@/components/business-calendar/CalendarLocationFields';
 import { validateBusinessHours } from '@/components/business-calendar/business-hours';
@@ -253,8 +254,8 @@ function EmailTab({ data }: { data: SettingsEmail }) {
   }
 
   return (
-    <form id={formId} onSubmit={onSubmit} className="max-w-3xl space-y-5" data-testid="form-email">
-      <Card title="Servidor SMTP" hint="Usado por notificações e códigos de autenticação. Ao salvar, a configuração é testada antes de ser ativada; uma falha mantém a anterior.">
+    <form id={formId} onSubmit={onSubmit} className="max-w-3xl" data-testid="form-email">
+      <FormSection title="Servidor SMTP" description="Servidor usado para notificações e códigos de autenticação. Ao salvar, a configuração é testada antes de ser ativada; uma falha mantém a anterior.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Servidor (host)">
             <input
@@ -276,6 +277,10 @@ function EmailTab({ data }: { data: SettingsEmail }) {
               name="port"
             />
           </Field>
+        </div>
+      </FormSection>
+      <FormSection title="Autenticação e segurança" description="Credenciais e proteção da conexão com o servidor.">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Autenticação">
             <select
               value={form.authMode}
@@ -324,6 +329,10 @@ function EmailTab({ data }: { data: SettingsEmail }) {
               </Field>
             </>
           )}
+        </div>
+      </FormSection>
+      <FormSection title="Remetente" description="Endereço e nome exibidos nas mensagens enviadas.">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Remetente (e-mail)">
             <input
               value={form.fromAddress ?? ''}
@@ -343,9 +352,9 @@ function EmailTab({ data }: { data: SettingsEmail }) {
             />
           </Field>
         </div>
-      </Card>
+      </FormSection>
 
-      <Card title="Enviar e-mail de teste" hint="O teste usa os valores deste formulário, sem alterar o servidor ativo.">
+      <FormSection title="Enviar e-mail de teste" description="O teste usa os valores deste formulário, sem alterar o servidor ativo.">
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
             type="email"
@@ -367,7 +376,7 @@ function EmailTab({ data }: { data: SettingsEmail }) {
             {test.isPending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} Enviar teste
           </button>
         </div>
-      </Card>
+      </FormSection>
 
       <HeaderSaveButton form={formId} pending={save.isPending} disabled={save.isPending || !canEdit} label="Testar e ativar" />
     </form>

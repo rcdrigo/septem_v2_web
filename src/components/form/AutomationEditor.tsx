@@ -1,6 +1,7 @@
+import { FormSection } from '@/components/ui/FormSection';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { diffLines } from 'diff';
-import { Code2, History, MessageSquare, Play, Save, Upload } from 'lucide-react';
+import { Code2, History, Play, Save, Upload } from 'lucide-react';
 import { automationApi, type AgentConfiguration, type AutomationState, type Conversation, type Revision } from '@/lib/form-automation/api';
 import { nativeFields, parseNativeForm } from '@/lib/native-form';
 import { automationReferences, validateAutomation } from '@/lib/form-automation/validation';
@@ -157,9 +158,6 @@ export function AutomationEditor({ processKey, onClose }: { processKey: string; 
         <p className="text-xs text-slate-500">{processKey} · Rascunho v{state.head} · {state.publishedVersion ? `Publicado v${state.publishedVersion}` : 'Ainda não publicado'}</p>
       </div>
       <div className="flex flex-wrap gap-2">
-        <button className={button} disabled={busy || invalid} onClick={() => { setPreview(scripts.filter(s => !s.taskId || s.taskId === selected)); setPreviewResult(''); }}><Play size={14} className="inline" /> Testar prévia</button>
-        <button className={button} disabled={busy || invalid || !!remote} onClick={save}><Save size={14} className="inline" /> Salvar rascunho</button>
-        <button className={primary} disabled={busy || invalid || dirty || !!remote || !state.head || state.head === state.publishedVersion} onClick={publish}><Upload size={14} className="inline" /> Publicar conjunto</button>
         {onClose && <button className={button} onClick={close}>Fechar</button>}
       </div>
     </div>
@@ -172,50 +170,67 @@ export function AutomationEditor({ processKey, onClose }: { processKey: string; 
       <button className={button} onClick={() => { setState(remote); setRemote(null); setError(''); setTab('diff'); }}>Manter minha edição sobre a nova base</button>
     </div>}
     <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(280px,2fr)]">
-      <section className="min-w-0 space-y-3">
-        <label className="block text-sm font-medium">Escopo<select aria-label="Escopo do código" className="mt-1 w-full rounded border p-2" value={selected} disabled={busy} onChange={e => { setSelected(e.target.value); setScripts(prev => prev.some(s => s.taskId === e.target.value) ? prev : [...prev, { taskId: e.target.value, code: '' }]); }}>
-          <option value="">Código comum (todas as tarefas)</option>
-          {tasks.map(t => <option key={t.id} value={t.id}>{t.name} · {t.id}</option>)}
-        </select></label>
-        {selected && <button className={button} disabled={busy} onClick={() => { setScripts(prev => prev.filter(s => s.taskId !== selected)); setSelected(''); }}>Remover código desta tarefa do rascunho</button>}
-        <div className="flex gap-2"><button className={button} onClick={() => setTab('code')}><Code2 size={14} className="inline" /> Código</button><button className={button} onClick={() => setTab('diff')}>Diferenças</button><button className={button} onClick={() => setTab('history')}><History size={14} className="inline" /> Histórico</button></div>
-        {tab === 'code' && <textarea aria-label="Código JavaScript" spellCheck={false} value={current} disabled={busy} onChange={e => edit(e.target.value)} rows={18} className="w-full rounded border bg-slate-950 p-3 font-mono text-xs text-slate-100" placeholder={'form.on("change", "tipo", () => {\n  if (form.get("tipo") === "empresa") form.show("empresa");\n  else form.hide("empresa");\n});'} />}
-        {tab === 'diff' && <CodeDiff before={codeOf(state.scripts, selected)} after={current} />}
-        {tab === 'history' && <div className="max-h-96 space-y-2 overflow-auto">{history.length === 0 && <p>Sem versões salvas.</p>}{history.map(r => <div key={r.version} className="rounded border p-3 text-sm"><p className="font-medium">v{r.version} · {r.status === 'published' ? 'Publicado' : 'Rascunho'}</p><p>{r.changelog}</p><p className="text-xs text-slate-500">{new Date(r.createdAt).toLocaleString()} · Autor: {r.authorName}{r.publisherName && ` · Publicado por: ${r.publisherName}`}</p><div className="mt-2 flex gap-2"><button className={button} onClick={() => setRevision(r)}>Comparar e ver conversa</button><button disabled={busy} className={button} onClick={() => { if (dirty && !window.confirm('Substituir sua edição pela versão escolhida?')) return; setScripts(structuredClone(r.scripts)); setRestoredFrom(r.version); setChangelog(`Restauração da versão ${r.version}`); setTab('diff'); setMessage('Versão carregada para revisão. Salve e publique para ativá-la.'); }}>Restaurar para revisão</button></div></div>)}</div>}
-        {diagnostics.map((d, i) => <p key={i} role={d.error ? 'alert' : undefined} className={`text-xs ${d.error ? 'text-rose-700' : 'text-amber-700'}`}>{d.scope}: {d.text}</p>)}
-        <label className="block text-sm">Descrição da alteração<input className="mt-1 w-full rounded border p-2" value={changelog} onChange={e => setChangelog(e.target.value)} /></label>
-        <details className="text-xs text-slate-600"><summary>API de automação e limites da validação</summary><p className="mt-2">Use form.get/set, show/hide, update/add/remove, setRequired, setDisabled, setOptions, getSchema/setSchema, on e beforeSubmit. IDs e chaves identificam campos e grupos. form.root e form.query dão acesso ao DOM. jQuery está disponível em $ e jQuery; prefira $(form.root).find(...). Use form.set para atualizar valores controlados pelo React.</p><p className="mt-2">form.dataSource(id, parâmetros) consulta fontes pela API. fetch e $.ajax permitem outras integrações. Registre limpeza em form.onCleanup. Sintaxe e análise estática não detectam todos os erros: teste dados e respostas reais na prévia. O código comum será entregue também aos usuários externos.</p></details>
-      </section>
-      <section className="min-w-0 space-y-3 rounded border bg-slate-50 p-3">
-        <h3 className="font-medium"><MessageSquare size={15} className="inline" /> Agente · OpenRouter</h3>
-        <details className="space-y-3 text-sm">
-          <summary className="cursor-pointer font-medium">Configuração do agente</summary>
-          <p className="text-slate-600">Vale para o agente de formulários em todos os processos deste ambiente.</p>
-          <label className="block">Modelo específico (opcional)
-            <input className="mt-1 w-full rounded border p-2" value={agentModel} disabled={busy} maxLength={200} onChange={e => { setAgentModel(e.target.value); setAgentMessage(''); }} placeholder="Ex.: fornecedor/modelo" />
-          </label>
-          <p className="break-words text-xs text-slate-600">Deixe vazio para usar o padrão do sistema: {agent?.defaultModel || 'não configurado'}.</p>
-          <label className="block">Limite de tokens por resposta (opcional)
-            <input type="number" min={1} max={1000000} step={1} className="mt-1 w-full rounded border p-2" value={agentTokens} disabled={busy} onChange={e => { setAgentTokens(e.target.value); setAgentMessage(''); }} placeholder="Usar o limite do modelo" />
-          </label>
-          <p className="text-xs text-slate-600">Deixe vazio para não definir um limite adicional. Em modelos com raciocínio, o limite também pode incluir os tokens de pensamento.</p>
-          {agentInvalid && <p role="alert" className="text-xs text-rose-700">Use um identificador de modelo sem espaços e, se definir tokens, um número inteiro entre 1 e 1.000.000.</p>}
+      <div className="min-w-0">
+        <FormSection compact title="Escopo" description="Escolha o código comum ou uma tarefa específica para editar.">
+          <label className="block text-sm font-medium">Escopo<select aria-label="Escopo do código" className="mt-1 w-full rounded border p-2" value={selected} disabled={busy} onChange={e => { setSelected(e.target.value); setScripts(prev => prev.some(s => s.taskId === e.target.value) ? prev : [...prev, { taskId: e.target.value, code: '' }]); }}>
+            <option value="">Código comum (todas as tarefas)</option>
+            {tasks.map(t => <option key={t.id} value={t.id}>{t.name} · {t.id}</option>)}
+          </select></label>
+          {selected && <button className={button} disabled={busy} onClick={() => { setScripts(prev => prev.filter(s => s.taskId !== selected)); setSelected(''); }}>Remover código desta tarefa do rascunho</button>}
+        </FormSection>
+        <FormSection compact title="Código e validação" description="Edite o escopo selecionado, compare as alterações e teste na prévia.">
+          <div className="flex flex-wrap gap-2"><button className={button} onClick={() => setTab('code')}><Code2 size={14} className="inline" /> Código</button><button className={button} onClick={() => setTab('diff')}>Diferenças</button></div>
+          {tab === 'code' && <textarea aria-label="Código JavaScript" spellCheck={false} value={current} disabled={busy} onChange={e => edit(e.target.value)} rows={18} className="w-full rounded border bg-slate-950 p-3 font-mono text-xs text-slate-100" placeholder={'form.on("change", "tipo", () => {\n  if (form.get("tipo") === "empresa") form.show("empresa");\n  else form.hide("empresa");\n});'} />}
+          {tab === 'diff' && <CodeDiff before={codeOf(state.scripts, selected)} after={current} />}
+          {diagnostics.map((d, i) => <p key={i} role={d.error ? 'alert' : undefined} className={`text-xs ${d.error ? 'text-rose-700' : 'text-amber-700'}`}>{d.scope}: {d.text}</p>)}
+          <details className="text-xs text-slate-600"><summary>API de automação e limites da validação</summary><p className="mt-2">Use form.get/set, show/hide, update/add/remove, setRequired, setDisabled, setOptions, getSchema/setSchema, on e beforeSubmit. IDs e chaves identificam campos e grupos. form.root e form.query dão acesso ao DOM. jQuery está disponível em $ e jQuery; prefira $(form.root).find(...). Use form.set para atualizar valores controlados pelo React.</p><p className="mt-2">form.dataSource(id, parâmetros) consulta fontes pela API. fetch e $.ajax permitem outras integrações. Registre limpeza em form.onCleanup. Sintaxe e análise estática não detectam todos os erros: teste dados e respostas reais na prévia. O código comum será entregue também aos usuários externos.</p></details>
+          <button className={button} disabled={busy || invalid} onClick={() => { setPreview(scripts.filter(s => !s.taskId || s.taskId === selected)); setPreviewResult(''); }}><Play size={14} className="inline" /> Testar prévia</button>
+        </FormSection>
+        <FormSection compact title="Versão e publicação" description="Salvar rascunho registra o conjunto de códigos deste processo. Publicar conjunto ativa a versão salva em todas as tarefas.">
+          <label className="block text-sm">Descrição da alteração<input className="mt-1 w-full rounded border p-2" value={changelog} onChange={e => setChangelog(e.target.value)} /></label>
           <div className="flex flex-wrap gap-2">
-            <button className={button} disabled={busy || !agent || !agentDirty || agentInvalid} onClick={saveAgent}>Salvar configuração do agente</button>
-            <button className={button} disabled={busy} onClick={reloadAgent}>Recarregar configuração</button>
+            <button className={button} disabled={busy || invalid || !!remote} onClick={save}><Save size={14} className="inline" /> Salvar rascunho</button>
+            <button className={primary} disabled={busy || invalid || dirty || !!remote || !state.head || state.head === state.publishedVersion} onClick={publish}><Upload size={14} className="inline" /> Publicar conjunto</button>
+            <button className={button} onClick={() => setTab('history')}><History size={14} className="inline" /> Histórico de versões</button>
           </div>
-          {agentError && <p role="alert" className="text-sm text-rose-700">{agentError}</p>}
-          {agentMessage && <p role="status" className="text-sm text-emerald-700">{agentMessage}</p>}
-        </details>
-        {agentDirty && <p role="status" className="text-xs text-amber-800">Salve a configuração do agente antes de gerar uma proposta.</p>}
-        <select aria-label="Conversa" className="w-full rounded border p-2 text-sm" value={conversation?.id ?? ''} disabled={busy} onChange={e => setConversation(conversations.find(c => c.id === e.target.value) ?? null)}><option value="">Nova conversa</option>{conversations.map(c => <option key={c.id} value={c.id}>{c.messages[0]?.content.slice(0, 65) || c.id}</option>)}</select>
-        <div className="max-h-72 space-y-3 overflow-auto" aria-live="polite">{conversation?.messages.map((m, i) => <div key={i} className="rounded border bg-white p-2 text-sm"><p className="text-xs font-medium text-slate-500">{m.role === 'user' ? 'Solicitação' : 'Agente'} · {label(m.taskId)}{m.model && ` · ${m.model}`}</p><p className="whitespace-pre-wrap">{m.content}</p></div>)}</div>
-        <textarea aria-label="Pedido ao agente" className="w-full rounded border p-2 text-sm" rows={4} value={prompt} disabled={busy} onChange={e => setPrompt(e.target.value)} placeholder="Descreva o comportamento desejado para o escopo selecionado…" />
-        <button className={primary} disabled={busy || agentDirty || !prompt.trim()} onClick={ask}>{busy ? 'Aguarde…' : 'Gerar proposta'}</button>
-        {proposal && <div className="space-y-2"><p className="text-sm font-medium">Proposta para {label(proposal.taskId)}</p><CodeDiff before={codeOf(scripts, proposal.taskId)} after={proposal.code} /><textarea aria-label="Editar proposta" className="w-full rounded border p-2 font-mono text-xs" rows={8} value={proposal.code} onChange={e => setProposal({ ...proposal, code: e.target.value })} />
-          <button disabled={busy} className={button} onClick={() => { if (codeOf(scripts, proposal.taskId) !== proposal.base && !window.confirm('O código mudou após o pedido. Aplicar a proposta sobre sua edição atual?')) return; setScripts(prev => prev.some(s => s.taskId === proposal.taskId) ? prev.map(s => s.taskId === proposal.taskId ? { ...s, code: proposal.code } : s) : [...prev, { taskId: proposal.taskId, code: proposal.code }]); setSelected(proposal.taskId); setProposal(null); setTab('diff'); }}>Aplicar ao editor</button><button disabled={busy} className={button} onClick={() => setProposal(null)}>Descartar proposta</button>
-        </div>}
-      </section>
+          {tab === 'history' && <div className="max-h-96 space-y-2 overflow-auto">{history.length === 0 && <p>Sem versões salvas.</p>}{history.map(r => <div key={r.version} className="rounded border p-3 text-sm"><p className="font-medium">v{r.version} · {r.status === 'published' ? 'Publicado' : 'Rascunho'}</p><p>{r.changelog}</p><p className="text-xs text-slate-500">{new Date(r.createdAt).toLocaleString()} · Autor: {r.authorName}{r.publisherName && ` · Publicado por: ${r.publisherName}`}</p><div className="mt-2 flex gap-2"><button className={button} onClick={() => setRevision(r)}>Comparar e ver conversa</button><button disabled={busy} className={button} onClick={() => { if (dirty && !window.confirm('Substituir sua edição pela versão escolhida?')) return; setScripts(structuredClone(r.scripts)); setRestoredFrom(r.version); setChangelog(`Restauração da versão ${r.version}`); setTab('diff'); setMessage('Versão carregada para revisão. Salve e publique para ativá-la.'); }}>Restaurar para revisão</button></div></div>)}</div>}
+        </FormSection>
+      </div>
+      <div className="min-w-0 border-t border-slate-200 pt-5 lg:border-t-0 lg:border-l lg:pl-5 lg:pt-0">
+        <FormSection compact title="Agente · OpenRouter" description="Gere propostas para o escopo selecionado. Revise e aplique o código antes de salvar o rascunho.">
+          <details className="space-y-3 text-sm">
+            <summary className="cursor-pointer font-medium">Configuração do agente</summary>
+            <p className="text-slate-600">Vale para o agente de formulários em todos os processos deste ambiente.</p>
+            <label className="block">Modelo específico (opcional)
+              <input className="mt-1 w-full rounded border p-2" value={agentModel} disabled={busy} maxLength={200} onChange={e => { setAgentModel(e.target.value); setAgentMessage(''); }} placeholder="Ex.: fornecedor/modelo" />
+            </label>
+            <p className="break-words text-xs text-slate-600">Deixe vazio para usar o padrão do sistema: {agent?.defaultModel || 'não configurado'}.</p>
+            <label className="block">Limite de tokens por resposta (opcional)
+              <input type="number" min={1} max={1000000} step={1} className="mt-1 w-full rounded border p-2" value={agentTokens} disabled={busy} onChange={e => { setAgentTokens(e.target.value); setAgentMessage(''); }} placeholder="Usar o limite do modelo" />
+            </label>
+            <p className="text-xs text-slate-600">Deixe vazio para não definir um limite adicional. Em modelos com raciocínio, o limite também pode incluir os tokens de pensamento.</p>
+            {agentInvalid && <p role="alert" className="text-xs text-rose-700">Use um identificador de modelo sem espaços e, se definir tokens, um número inteiro entre 1 e 1.000.000.</p>}
+            <div className="flex flex-wrap gap-2">
+              <button className={button} disabled={busy || !agent || !agentDirty || agentInvalid} onClick={saveAgent}>Salvar configuração do agente</button>
+              <button className={button} disabled={busy} onClick={reloadAgent}>Recarregar configuração</button>
+            </div>
+            {agentError && <p role="alert" className="text-sm text-rose-700">{agentError}</p>}
+            {agentMessage && <p role="status" className="text-sm text-emerald-700">{agentMessage}</p>}
+          </details>
+          {agentDirty && <p role="status" className="text-xs text-amber-800">Salve a configuração do agente antes de gerar uma proposta.</p>}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-slate-900">Conversas e propostas</h3>
+            <p className="mb-3 text-xs leading-relaxed text-slate-600">Retome uma conversa anterior ou inicie um novo pedido. A proposta só altera o código quando aplicada ao editor.</p>
+            <select aria-label="Conversa" className="w-full rounded border p-2 text-sm" value={conversation?.id ?? ''} disabled={busy} onChange={e => setConversation(conversations.find(c => c.id === e.target.value) ?? null)}><option value="">Nova conversa</option>{conversations.map(c => <option key={c.id} value={c.id}>{c.messages[0]?.content.slice(0, 65) || c.id}</option>)}</select>
+            <div className="max-h-72 space-y-3 overflow-auto" aria-live="polite">{conversation?.messages.map((m, i) => <div key={i} className="rounded border bg-white p-2 text-sm"><p className="text-xs font-medium text-slate-500">{m.role === 'user' ? 'Solicitação' : 'Agente'} · {label(m.taskId)}{m.model && ` · ${m.model}`}</p><p className="whitespace-pre-wrap">{m.content}</p></div>)}</div>
+            <textarea aria-label="Pedido ao agente" className="w-full rounded border p-2 text-sm" rows={4} value={prompt} disabled={busy} onChange={e => setPrompt(e.target.value)} placeholder="Descreva o comportamento desejado para o escopo selecionado…" />
+            <button className={primary} disabled={busy || agentDirty || !prompt.trim()} onClick={ask}>{busy ? 'Aguarde…' : 'Gerar proposta'}</button>
+            {proposal && <div className="space-y-2"><p className="text-sm font-medium">Proposta para {label(proposal.taskId)}</p><CodeDiff before={codeOf(scripts, proposal.taskId)} after={proposal.code} /><textarea aria-label="Editar proposta" className="w-full rounded border p-2 font-mono text-xs" rows={8} value={proposal.code} onChange={e => setProposal({ ...proposal, code: e.target.value })} />
+              <button disabled={busy} className={button} onClick={() => { if (codeOf(scripts, proposal.taskId) !== proposal.base && !window.confirm('O código mudou após o pedido. Aplicar a proposta sobre sua edição atual?')) return; setScripts(prev => prev.some(s => s.taskId === proposal.taskId) ? prev.map(s => s.taskId === proposal.taskId ? { ...s, code: proposal.code } : s) : [...prev, { taskId: proposal.taskId, code: proposal.code }]); setSelected(proposal.taskId); setProposal(null); setTab('diff'); }}>Aplicar ao editor</button><button disabled={busy} className={button} onClick={() => setProposal(null)}>Descartar proposta</button>
+            </div>}
+          </div>
+        </FormSection>
+      </div>
     </div>
     {preview && <Dialog open title={`Prévia · ${label(selected)}`} width="2xl" onClose={() => setPreview(null)}><label className="mb-4 block text-sm font-medium">Versão do formulário<select aria-label="Versão do formulário" className="mt-1 w-full rounded border p-2" value={formVersion} onChange={e => { setFormVersion(e.target.value); setPreviewResult(''); }}><option value="current">Rascunho atual</option>{state.formVersions?.map(v => <option key={v.version} value={v.version}>Versão {v.version} · {v.status}</option>)}</select></label><ReactForm key={formVersion} ref={previewRef} schema={previewSchema} automationScripts={preview} /><button className={`${button} mt-4`} onClick={async () => { const result = await previewRef.current?.submit(); setPreviewResult(result && !Object.keys(result.errors).length ? 'Validação concluída. Nenhum dado foi enviado.' : JSON.stringify(result?.errors)); }}>Simular envio</button><p role="status" className="mt-2 text-sm">{previewResult}</p></Dialog>}
     {revision && <Dialog open title={`Versão ${revision.version} · diferenças e conversas`} width="2xl" onClose={() => setRevision(null)}><div className="space-y-4">{[...new Set([...scripts, ...revision.scripts].map(s => s.taskId))].map(id => <div key={id}><h3>{label(id)}</h3><CodeDiff before={codeOf(scripts, id)} after={codeOf(revision.scripts, id)} /></div>)}{revision.conversations.map((c, i) => <div key={i}><h3 className="font-medium">Solicitado por {c.requesterName}</h3>{c.messages.map((m, j) => <div key={j} className="my-2 rounded border p-2 text-sm"><p>{m.role} · {new Date(m.createdAt).toLocaleString()} · {m.model}</p><p className="whitespace-pre-wrap">{m.content}</p>{m.code != null && <pre className="overflow-auto text-xs">{m.code}</pre>}</div>)}</div>)}</div></Dialog>}

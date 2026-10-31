@@ -34,6 +34,8 @@ import { TarefaPage } from './pages/TarefaPage';
 import { SolicitacaoPage } from './pages/SolicitacaoPage';
 import { GuidePage } from './pages/GuidePage';
 import { FonteDadosPage } from './pages/FonteDadosPage';
+import { ModeloEmailPage } from './pages/ModeloEmailPage';
+import { ModeloDocumentoPage } from './pages/ModeloDocumentoPage';
 import { ManualEditorPage } from './pages/ManualEditorPage';
 import { StubPage } from './pages/StubPage';
 import { AmbienteInativoPage } from './pages/AmbienteInativoPage';
@@ -78,6 +80,8 @@ export const router = createBrowserRouter(
     { path: '/requests/:instanceId', element: <SolicitacaoPage /> },
     // Criar/editar fonte de dados em aba própria (sem menus).
     { path: '/data-sources/:id', element: <FonteDadosPage /> },
+      { path: '/email-templates/:id', element: <ModeloEmailPage /> },
+      { path: '/document-templates/:id', element: <ModeloDocumentoPage /> },
     // Criar/editar manual em aba própria (sem menus) — como a fonte de dados.
     { path: '/manuals/:id', element: <ManualEditorPage /> },
     // Abrem em aba própria a partir do editor de modelos de documento (Fase 6e).

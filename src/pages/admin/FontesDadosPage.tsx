@@ -26,6 +26,7 @@ import { normalizeSqlQuery } from '@/lib/sql-query';
 import { formatFormFieldMapping, parseFormFieldMapping, type ApiMapping } from '@/lib/data-source-mapping';
 import { routes } from '@/lib/routes';
 import { ContextHelp } from '@/components/guide/ContextHelp';
+import { FormSection } from '@/components/ui/FormSection';
 import { EditableTableEditor, TableQueryEditor } from './TableDataSourceEditors';
 import { readEditableTable, readTableQuery, validateEditableTable, comparisons, type EditableTable, type TableQuery } from '@/lib/table-data-source';
 
@@ -190,14 +191,20 @@ export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string
 
   if (fullPage) {
     return (
-      <div className="flex h-screen flex-col bg-slate-100">
+        <div className="flex h-dvh flex-col bg-slate-100">
         <header className="border-b border-slate-200 bg-white px-6 py-4">
           <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
         </header>
-        <main className="flex-1 overflow-auto p-6">
-          <div className="w-full space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <main className="min-h-0 flex-1 overflow-auto p-4 sm:p-6">
+            <div className="grid w-full items-start gap-6 xl:grid-cols-[minmax(0,1fr)_15rem]">
+              <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-5 sm:p-7">
             {renderForm()}
-            {id && <UsagesSection id={id} />}
+              </div>
+              <aside className="min-w-0 space-y-6 py-2" aria-label="Informações da fonte">
+                <div><h2 className="mb-3 text-sm font-semibold text-slate-900">Nesta página</h2><nav aria-label="Seções da fonte" className="flex flex-col gap-3 text-sm text-slate-600"><a className="hover:text-slate-900 hover:underline" href="#fonte-identificacao">Identificação</a><a className="hover:text-slate-900 hover:underline" href="#fonte-configuracao">Configuração da fonte</a><a className="hover:text-slate-900 hover:underline" href="#fonte-teste">Teste da fonte</a></nav></div>
+                {id && <UsagesSection id={id} />}
+                <p className="text-sm leading-relaxed text-slate-600">Os dados retornados podem alimentar opções de seleção e preencher campos do formulário.</p>
+              </aside>
           </div>
         </main>
         <footer className="flex justify-end gap-2 border-t border-slate-200 bg-white px-6 py-3">{footer}</footer>
@@ -214,40 +221,49 @@ export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string
 
   function renderForm() {
     return (
-      <form id="ds-form" className="flex flex-col gap-3" onSubmit={save}>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <form id="ds-form" onSubmit={save}>
+          <FormSection id="fonte-identificacao" title="Identificação" description="Dê um nome que ajude a reconhecer a fonte e escolha como obter os dados.">
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
           <Field label="Nome"><TextInput required autoFocus value={name} onChange={(e) => setName(e.target.value)} /></Field>
           <Field label="Tipo">
             <Select value={type} options={Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))} onChange={(e) => { setType(e.target.value as DataSourceType); setResult(null); }} />
           </Field>
         </div>
-        <Field label="Descrição"><TextArea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
+          <details open={!!description} className="text-sm text-slate-600"><summary className="cursor-pointer py-1 font-medium">Descrição (opcional)</summary><div className="pt-3"><Field label="Descrição"><TextArea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></Field></div></details>
+          </FormSection>
 
-        {type === 'fixed' && <FixedEditor items={items} setItems={setItems} />}
-        {type === 'fixed-table' && <EditableTableEditor value={table} onChange={setTable} />}
+          <div id="fonte-configuracao">
+          {type === 'fixed' && <FormSection title="Opções da fonte" description="Defina o valor e o texto de cada opção de seleção."><FixedEditor items={items} setItems={setItems} /></FormSection>}
+          {type === 'fixed-table' && <FormSection title="Tabela de dados" description="Organize as colunas e os registros disponíveis para consulta."><EditableTableEditor value={table} onChange={setTable} /></FormSection>}
         {type === 'table' && <>
+            <FormSection title="Consulta à tabela" description="Escolha a origem e os critérios usados para encontrar os registros.">
           <TableQueryEditor value={tableQuery} onChange={setTableQuery} scope={scope} samples={samples} onSamples={setSamples} />
-          <FormFieldMappingEditor value={fieldMapping} onChange={setFieldMapping} table />
+            </FormSection>
+            <FormSection title="Preenchimento de campos" description="Associe as colunas retornadas aos campos do formulário."><FormFieldMappingEditor value={fieldMapping} onChange={setFieldMapping} table /></FormSection>
         </>}
         {type === 'sql' && (
-          <>
+            <FormSection title="Consulta SQL" description="Configure a consulta que será executada para obter os dados.">
             <Field label="Consulta (SELECT ou procedure — somente leitura)" hint="Roda no banco do tenant. 1 coluna → valor=texto; 2 → valor,texto. Use @parametros. Suporta {{placeholders}} (resolvidos como parâmetro na execução).">
               <TextArea rows={5} value={query} onChange={(e) => setQuery(e.target.value)} className="font-mono text-xs" placeholder="SELECT id, nome FROM setores WHERE responsavel = {{requisitante.nome}}" />
             </Field>
             <PlaceholderHelp />
-          </>
+            </FormSection>
         )}
         {type === 'api' && (
           <>
             <ApiEditor url={url} setUrl={setUrl} method={method} setMethod={setMethod} headers={headers} setHeaders={setHeaders} body={body} setBody={setBody} mapping={mapping} setMapping={setMapping} fieldMapping={fieldMapping} setFieldMapping={setFieldMapping} />
-            <PlaceholderHelp />
           </>
         )}
-
-        {result && (type === 'api' ? <ApiTestResult result={result} /> : <>
+          </div>
+          {type === 'api' && <FormSection title="Dados dinâmicos" description="Use marcadores quando a consulta depender de dados do processo ou do formulário."><PlaceholderHelp /></FormSection>}
+          <FormSection id="fonte-teste" title="Teste da fonte" description="Confira o retorno e o preenchimento antes de salvar a configuração.">
+          <button type="button" onClick={runTest} disabled={test.isPending} className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"><Play size={15} />{test.isPending ? 'Testando…' : 'Testar fonte'}</button>
+          {!result && <p className="text-sm text-slate-500">Execute o teste para visualizar os dados retornados.</p>}
+          {result && (type === 'api' ? <ApiTestResult result={result} /> : <>
           <ResultTable result={result} />
           {type === 'table' && result.mappedResult && result.mappedResult.rows.length > 0 && <ResultTable result={result.mappedResult} title="Resultado mapeado" />}
         </>)}
+          </FormSection>
       </form>
     );
   }
@@ -259,9 +275,9 @@ function UsagesSection({ id }: { id: string }) {
   const items = usages.data?.usages ?? [];
   return (
     <div className="mt-4 border-t border-slate-200 pt-3">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Onde é utilizada</p>
-      {usages.isLoading ? <p className="text-sm text-slate-400">Carregando…</p>
-        : items.length === 0 ? <p className="text-sm text-slate-400">Não está sendo utilizada em nenhum local.</p>
+      <h2 className="mb-3 text-sm font-semibold text-slate-900">Onde é utilizada</h2>
+      {usages.isLoading ? <p className="text-sm text-slate-600">Carregando…</p>
+        : items.length === 0 ? <p className="text-sm text-slate-600">Não está sendo utilizada em nenhum local.</p>
         : (
           <div className="overflow-hidden rounded-md border border-slate-200">
             <table className="w-full text-sm">
@@ -334,44 +350,66 @@ function ApiEditor(p: {
 }) {
   return (
     <>
-      <div className="grid grid-cols-[1fr_120px] gap-2">
-        <Field label="URL"><TextInput value={p.url} onChange={(e) => p.setUrl(e.target.value)} placeholder="https://api.exemplo.gov.br/dados" /></Field>
-        <Field label="Método"><Select value={p.method} options={['GET', 'POST', 'PUT'].map((m) => ({ value: m, label: m }))} onChange={(e) => p.setMethod(e.target.value)} /></Field>
-      </div>
-      <Field label="Headers">
-        <div className="flex flex-col gap-1.5">
-          {p.headers.map((h, i) => (
-            <div key={i} className="flex gap-2">
-              <TextInput value={h.k} placeholder="parâmetro" onChange={(e) => p.setHeaders(p.headers.map((x, j) => j === i ? { ...x, k: e.target.value } : x))} />
-              <TextInput value={h.v} placeholder="valor" onChange={(e) => p.setHeaders(p.headers.map((x, j) => j === i ? { ...x, v: e.target.value } : x))} />
-              <button type="button" onClick={() => p.setHeaders(p.headers.filter((_, j) => j !== i))} className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-700"><X size={15} /></button>
+      <FormSection title="Conexão com a API" description="Informe o endereço da consulta e os parâmetros exigidos pelo serviço.">
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
+          <Field label="URL"><TextInput value={p.url} onChange={event => p.setUrl(event.target.value)} placeholder="https://api.exemplo.gov.br/dados" /></Field>
+          <Field label="Método"><Select value={p.method} options={['GET', 'POST', 'PUT'].map(value => ({ value, label: value }))} onChange={event => p.setMethod(event.target.value)} /></Field>
+        </div>
+        <fieldset className="min-w-0 space-y-3">
+          <legend className="mb-2 text-sm font-medium text-slate-800">Headers</legend>
+          <p className="text-sm text-slate-600">Adicione os headers de autenticação e outros parâmetros exigidos pela API.</p>
+          {p.headers.map((header, index) => (
+            <div key={index} className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+              <Field label="Nome do header"><TextInput value={header.k} placeholder="Authorization" onChange={event => p.setHeaders(p.headers.map((item, at) => at === index ? { ...item, k: event.target.value } : item))} /></Field>
+              <div className="col-start-1 sm:col-start-auto"><Field label="Valor do header"><TextInput value={header.v} placeholder="valor" onChange={event => p.setHeaders(p.headers.map((item, at) => at === index ? { ...item, v: event.target.value } : item))} /></Field></div>
+              <button type="button" aria-label="Remover header" onClick={() => p.setHeaders(p.headers.filter((_, at) => at !== index))} className="col-start-2 row-start-1 rounded p-2 text-slate-600 hover:bg-rose-50 hover:text-rose-700 sm:col-start-auto sm:row-start-auto"><X size={16} /></button>
             </div>
           ))}
-          <button type="button" onClick={() => p.setHeaders([...p.headers, { k: '', v: '' }])} className="self-start text-xs font-medium text-slate-600 hover:text-slate-900">+ header</button>
-        </div>
-      </Field>
-      {p.method !== 'GET' && <Field label="Body (JSON)"><TextArea rows={3} value={p.body} onChange={(e) => p.setBody(e.target.value)} className="font-mono text-xs" /></Field>}
-      <fieldset className="space-y-2">
-        <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">Mapeamento das opções</legend>
-        <p className="text-xs text-slate-600">Use caminhos JSON pontilhados. Valor e texto são usados em campos de seleção. Para uma resposta com um único objeto, deixe o nó de repetição vazio.</p>
-        <div className="grid gap-2 sm:grid-cols-3">
-          <Field label="Nó de repetição"><TextInput value={p.mapping.repeat} placeholder="data.itens" onChange={(e) => p.setMapping({ ...p.mapping, repeat: e.target.value })} /></Field>
-          <Field label="Nó de valor"><TextInput value={p.mapping.value} placeholder="id" onChange={(e) => p.setMapping({ ...p.mapping, value: e.target.value })} /></Field>
-          <Field label="Nó de texto"><TextInput value={p.mapping.text} placeholder="nome" onChange={(e) => p.setMapping({ ...p.mapping, text: e.target.value })} /></Field>
-        </div>
-      </fieldset>
-      <FormFieldMappingEditor value={p.fieldMapping} onChange={p.setFieldMapping} />
+          <button type="button" onClick={() => p.setHeaders([...p.headers, { k: '', v: '' }])} className="inline-flex items-center gap-1.5 py-2 text-sm font-medium text-slate-700 hover:text-slate-900"><Plus size={15} /> Adicionar header</button>
+        </fieldset>
+        {p.method !== 'GET' && <Field label="Body (JSON)"><TextArea rows={4} value={p.body} onChange={event => p.setBody(event.target.value)} className="font-mono text-sm" /></Field>}
+      </FormSection>
+      <FormSection title="Preenchimento de campos" description="Escolha qual dado da resposta vai preencher cada campo do formulário.">
+        <FormFieldMappingEditor value={p.fieldMapping} onChange={p.setFieldMapping} />
+        <details open={!!(p.mapping.repeat || p.mapping.value || p.mapping.text)} className="text-sm text-slate-700">
+          <summary className="cursor-pointer py-2 font-medium">Usar a resposta em uma lista de opções</summary>
+          <div className="space-y-4 pt-3">
+            <p className="max-w-prose text-sm text-slate-600">Use caminhos JSON pontilhados. Valor e texto são usados em campos de seleção. Para uma resposta com um único objeto, deixe o nó de repetição vazio.</p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Nó de repetição"><TextInput value={p.mapping.repeat} placeholder="data.itens" onChange={event => p.setMapping({ ...p.mapping, repeat: event.target.value })} /></Field>
+              <Field label="Nó de valor"><TextInput value={p.mapping.value} placeholder="id" onChange={event => p.setMapping({ ...p.mapping, value: event.target.value })} /></Field>
+              <Field label="Nó de texto"><TextInput value={p.mapping.text} placeholder="nome" onChange={event => p.setMapping({ ...p.mapping, text: event.target.value })} /></Field>
+            </div>
+          </div>
+        </details>
+      </FormSection>
     </>
   );
 }
 
 function FormFieldMappingEditor({ value, onChange, table = false }: { value: string; onChange: (value: string) => void; table?: boolean }) {
-  return <Field label="Mapeamento dos campos do formulário">
-    <p className="text-xs text-slate-600">Informe <code>{table ? 'identificador => coluna' : 'identificador => caminho JSON'}</code>, um por linha. {table ? 'Use o nome exato da coluna da tabela de origem.' : 'O caminho parte de cada item do nó de repetição ou da resposta inteira, se esse nó estiver vazio.'}</p>
-    <TextArea rows={4} value={value} onChange={e => onChange(e.target.value)} className="font-mono text-xs" placeholder={table ? 'codigo_atividade => Código da atividade' : 'status_pagamento => Situacao\nvalor_pago => ValorPago'} />
-    <p className="text-xs text-slate-600">No modelador, abra <strong>Formulário</strong>, selecione o campo e copie a opção <strong>Chave (identificador)</strong> no painel de propriedades.</p>
-    <p className="text-xs text-slate-600">Ao executar a fonte, os valores retornados preenchem os campos indicados. Em uma lista de opções, o preenchimento acompanha a opção selecionada.</p>
-  </Field>;
+  const lines = value ? value.split('\n') : [];
+  function changeRow(index: number, key: string, path: string) {
+    onChange(lines.map((line, at) => at === index ? `${key} => ${path}` : line).join('\n'));
+  }
+  return <div className="space-y-4">
+    <div role="group" aria-label="Associações de campos" className="space-y-4">
+      {lines.map((line, index) => {
+        const separator = line.indexOf('=>');
+        const key = separator >= 0 ? line.slice(0, separator).trimStart().trimEnd() : line;
+        const path = separator >= 0 ? line.slice(separator + 2).trimStart() : '';
+        return <div key={index} className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+          <Field label="Campo do formulário"><TextInput value={key} placeholder="cnpj_empreendimento" onChange={event => changeRow(index, event.target.value, path)} /></Field>
+          <div className="col-start-1 sm:col-start-auto"><Field label={table ? 'Coluna da tabela' : 'Caminho no JSON'}><TextInput value={path} placeholder={table ? 'Código' : 'CpfCnpj'} onChange={event => changeRow(index, key, event.target.value)} className="font-mono text-sm" /></Field></div>
+          <button type="button" aria-label="Remover associação" onClick={() => onChange(lines.filter((_, at) => at !== index).join('\n'))} className="col-start-2 row-start-1 rounded p-2 text-slate-600 hover:bg-rose-50 hover:text-rose-700 sm:col-start-auto sm:row-start-auto"><X size={16} /></button>
+        </div>;
+      })}
+      {!lines.length && <p className="text-sm text-slate-600">Nenhum campo associado. Adicione uma associação para preencher dados do formulário.</p>}
+      <button type="button" onClick={() => onChange([...lines, ' => '].join('\n'))} className="inline-flex items-center gap-1.5 py-2 text-sm font-medium text-slate-700 hover:text-slate-900"><Plus size={15} /> Associar outro campo</button>
+    </div>
+    <details className="text-sm text-slate-700"><summary className="cursor-pointer py-1 font-medium">Como encontrar o campo e o caminho?</summary><div className="space-y-2 pt-3 text-sm text-slate-600"><p>No modelador, abra <strong>Formulário</strong>, selecione o campo e copie a opção <strong>Chave (identificador)</strong> no painel de propriedades.</p><p>{table ? 'Use o nome exato da coluna da tabela de origem.' : 'O caminho parte de cada item do nó de repetição ou da resposta inteira, se esse nó estiver vazio. Separe níveis de objetos por ponto.'}</p><p>Ao executar a fonte, os valores retornados preenchem os campos indicados. Em uma lista de opções, o preenchimento acompanha a opção selecionada.</p></div></details>
+    <details className="text-sm text-slate-700"><summary className="cursor-pointer py-1 font-medium">Editar mapeamento em texto</summary><div className="pt-3"><Field label="Mapeamento dos campos do formulário"><p className="text-xs text-slate-600">Informe <code>{table ? 'identificador => coluna' : 'identificador => caminho JSON'}</code>, um por linha.</p><TextArea rows={4} value={value} onChange={event => onChange(event.target.value)} className="font-mono text-sm" /></Field></div></details>
+  </div>;
 }
 
 function ApiTestResult({ result }: { result: TestResult }) {

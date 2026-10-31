@@ -68,7 +68,8 @@ try {
     await page.getByLabel('Nome', { exact: true }).fill('Pagamento');
     await page.locator('#ds-form select').first().selectOption('api');
     await page.getByLabel('URL', { exact: true }).fill(saved.config.url);
-    const mapping = page.getByRole('textbox', { name: /Mapeamento dos campos do formulário/ });
+    await page.getByText('Editar mapeamento em texto', {exact:true}).click();
+    const mapping = page.getByRole('textbox', { name: /Mapeamento dos campos do formulário/, includeHidden: true });
     await page.getByRole('button', { name: 'Testar', exact: true }).click();
     await page.getByRole('region', { name: 'Resultado original' }).waitFor();
     assert.match(await page.locator('pre').innerText(), /Situacao/);
@@ -96,6 +97,16 @@ try {
     await page.waitForFunction(() => window.closedEditor);
     assert.deepEqual(requests.at(-1).body.config.mapping.fields, fields);
     await page.evaluate(() => window.editor('source'));
+    await page.getByRole('textbox', { name: 'Campo do formulário', exact: true }).first().waitFor();
+    assert.deepEqual(await page.getByRole('textbox', { name: 'Campo do formulário', exact: true }).evaluateAll(inputs => inputs.map(input => input.value)), Object.keys(fields), 'edição por linhas recupera as associações salvas');
+    await page.getByLabel('Nome', { exact: true }).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(root, `.impeccable/review/data-source-api-editor-${width}.png`) });
+    const jsonPath = page.getByRole('textbox', { name: 'Caminho no JSON', exact: true }).last();
+    await jsonPath.fill('ValorPagoAlternativo');
+    await page.getByRole('button', { name: 'Testar', exact: true }).click();
+    assert.equal(requests.at(-1).body.config.mapping.fields.valor_pago, 'ValorPagoAlternativo', 'edição por linhas altera o mapeamento enviado');
+    await jsonPath.fill('ValorPago');
+    await page.getByText('Editar mapeamento em texto', {exact:true}).click();
     assert.equal(await mapping.inputValue(), mappingText, 'edição recupera o mapeamento salvo');
     response = { ...rawResult, originalResponse: '[]', mappedResult: { columns: Object.keys(fields), rows: [] } };
     await page.getByRole('button', { name: 'Testar', exact: true }).click();

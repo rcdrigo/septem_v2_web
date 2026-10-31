@@ -5,6 +5,8 @@ import { HelpPopover } from '@/components/ui/HelpPopover';
 import { useSessionStore } from '@/stores/session';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { Field, Checkbox, Select, TextInput } from '@/components/ui/Field';
+import { FormSection } from '@/components/ui/FormSection';
+import { CombinedSearch, useCombinedSearch, type SearchColumn } from '@/components/ui/CombinedSearch';
 import { Combobox } from '@/components/ui/Combobox';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
@@ -79,6 +81,14 @@ export function RelatorioBuilderPage() {
       }),
     [columns, def.hiddenColumns, def.columnLabels],
   );
+
+  const fieldColumns: SearchColumn<(typeof columns)[number]>[] = [
+    { key: 'field', label: 'Campo', value: c => `${c.label} ${c.key}` },
+    { key: 'label', label: 'Rótulo no relatório', value: c => def.columnLabels?.[c.key] || c.label },
+    { key: 'group', label: 'Grupo', value: c => c.group ?? '—' },
+    { key: 'type', label: 'Tipo', value: c => fieldTypeLabel(def.columnTypes?.[c.key] ?? c.type) },
+  ];
+  const fieldSearch = useCombinedSearch(columns, fieldColumns);
 
   if (!token) return <Navigate to={routes.login} replace />;
   if (!key) return <Navigate to={routes.adminReports} replace />;
@@ -245,7 +255,9 @@ export function RelatorioBuilderPage() {
               </div>
               {meta.isError && <p className="mt-2 text-xs text-amber-600">Origem ainda sem schema — salve o rascunho para carregar os campos.</p>}
               {columns.length > 0 && (
-                <div className="mt-3 overflow-x-auto">
+                <FormSection compact title="Campos do relatório" description="Encontre campos por nome, rótulo, grupo ou tipo para ajustar sua apresentação.">
+                <CombinedSearch columns={fieldColumns} search={fieldSearch} loading={meta.isLoading} />
+                <div className="overflow-x-auto">
                   <p className="mb-1.5 text-xs text-slate-500">
                     Renomeie como cada campo aparece no relatório{sourceType === 'process' ? '; remova os que não vai usar' : ''}.
                   </p>
@@ -260,7 +272,8 @@ export function RelatorioBuilderPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {columns.map((c) => {
+                      {fieldSearch.rows.length === 0 && <tr><td colSpan={sourceType === 'process' ? 5 : 4} className="py-6 text-center text-slate-600">Nenhum campo encontrado. Ajuste os filtros ou limpe a busca.</td></tr>}
+                      {fieldSearch.rows.map((c) => {
                         const hidden = (def.hiddenColumns ?? []).includes(c.key);
                         return (
                           <tr key={c.key} className={`border-t border-slate-100 ${hidden ? 'opacity-45' : ''}`}>
@@ -280,7 +293,7 @@ export function RelatorioBuilderPage() {
                                   <option value="text">texto</option><option value="number">número</option>
                                   <option value="date">data</option><option value="bool">sim/não</option>
                                 </select>
-                              ) : <span className="text-slate-500">{c.type}</span>}
+                              ) : <span className="text-slate-500">{fieldTypeLabel(c.type)}</span>}
                             </td>
                             {sourceType === 'process' && (
                               <td className="py-1 text-right">
@@ -299,6 +312,7 @@ export function RelatorioBuilderPage() {
                     </tbody>
                   </table>
                 </div>
+                </FormSection>
               )}
             </section>
 
@@ -348,6 +362,13 @@ function BlocksEditor({ def, setDef, columnOptions, reportKey, hasSource }: {
   const blocks = def.blocks ?? [];
   const [editing, setEditing] = useState<{ block: BlockDef; index: number | null } | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const entries = blocks.map((block, index) => ({ block, index }));
+  const searchColumns: SearchColumn<(typeof entries)[number]>[] = [
+    { key: 'title', label: 'Título', value: ({ block }) => block.title || blockTypeLabel(block.type) },
+    { key: 'type', label: 'Tipo', value: ({ block }) => blockTypeLabel(block.type) },
+    { key: 'size', label: 'Tamanho', value: ({ block }) => `${block.w ?? 6}×${block.h ?? 1}` },
+  ];
+  const search = useCombinedSearch(entries, searchColumns);
 
   function openNew() {
     setEditing({ block: { id: `b${Date.now().toString(36)}`, type: 'table', w: 12, h: 1 }, index: null });
@@ -378,6 +399,7 @@ function BlocksEditor({ def, setDef, columnOptions, reportKey, hasSource }: {
         </button>
       </div>
 
+      {blocks.length > 0 && <div className="mb-4"><CombinedSearch columns={searchColumns} search={search} /></div>}
       {blocks.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-6 py-16 text-center">
           <BarChart3 size={48} strokeWidth={1.5} className="text-slate-300" aria-hidden />
@@ -391,11 +413,12 @@ function BlocksEditor({ def, setDef, columnOptions, reportKey, hasSource }: {
         </div>
       ) : (
         <div className="grid grid-cols-12 gap-3" style={{ gridAutoRows: '82px' }}>
-          {blocks.map((b, i) => (
-            <BlockCard key={b.id} block={b} dragging={dragIndex === i}
-              onEdit={() => setEditing({ block: b, index: i })}
-              onRemove={() => setDef({ ...def, blocks: blocks.filter((_, j) => j !== i) })}
-              onDragStart={() => setDragIndex(i)} onDragEnd={() => setDragIndex(null)} onDrop={() => dropOn(i)} />
+          {search.rows.length === 0 && <p className="col-span-12 py-6 text-center text-sm text-slate-600">Nenhum componente encontrado. Ajuste os filtros ou limpe a busca.</p>}
+          {search.rows.map(({ block, index }) => (
+            <BlockCard key={block.id} block={block} dragging={dragIndex === index}
+              onEdit={() => setEditing({ block, index })}
+              onRemove={() => setDef({ ...def, blocks: blocks.filter((_, j) => j !== index) })}
+              onDragStart={() => setDragIndex(index)} onDragEnd={() => setDragIndex(null)} onDrop={() => dropOn(index)} />
           ))}
         </div>
       )}
@@ -435,7 +458,7 @@ function BlockCard({ block, dragging, onEdit, onRemove, onDragStart, onDragEnd, 
         <span className="text-slate-300">⋮⋮</span>
         <Icon size={14} className="shrink-0 text-slate-500" />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-700">{block.title || blockTypeLabel(block.type)}</span>
-        <span className="flex shrink-0 gap-0.5 opacity-0 group-hover:opacity-100">
+        <span className="flex shrink-0 gap-0.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100">
           <button type="button" onClick={onEdit} aria-label="Editar componente"
             className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Pencil size={13} /></button>
           <button type="button" onClick={onRemove} aria-label="Remover bloco"
@@ -530,6 +553,11 @@ function FiltersAndDetailEditor({ def, setDef, columnOptions }: {
       </section>
     </>
   );
+}
+
+function fieldTypeLabel(type: string): string {
+  const labels: Record<string, string> = { text: 'texto', number: 'número', date: 'data', bool: 'sim/não' };
+  return labels[type] ?? type;
 }
 
 const RULE_TYPE_OPTIONS = [

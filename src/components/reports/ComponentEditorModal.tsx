@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Grid3x3, Hash, Layers, PieChart, Plus, Table, Trash2, type LucideIcon } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
+import { FormSection } from '@/components/ui/FormSection';
 import { Field, Select, TextInput } from '@/components/ui/Field';
 import { PreviewBlockView } from '@/components/reports/ReportViewer';
 import { previewBlock, type BlockDef, type BlockFilterDef, type GlobalFilterDef, type RunBlock, type SortDef, type TableColumnDef } from '@/lib/api/reports';
@@ -105,116 +106,66 @@ export function ComponentEditorModal({
     >
       <div className="grid h-[70vh] grid-cols-1 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
         {/* ── ESQUERDA: configuração ─────────────────────────────────── */}
-        <div className="flex flex-col gap-4 overflow-y-auto border-b border-slate-200 p-4 lg:border-b-0 lg:border-r">
-          {/* Tipos de componente (tiles) */}
-          <div className="grid grid-cols-3 gap-2">
-            {BLOCK_TYPES.map((t) => {
-              const Icon = t.icon;
-              const active = block.type === t.value;
-              return (
-                <button key={t.value} type="button" onClick={() => patch({ type: t.value })}
-                  aria-pressed={active}
-                  className={`flex flex-col items-center gap-1.5 rounded-lg border px-2 py-3 text-xs font-medium ${
-                    active ? 'border-sky-500 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                  }`}>
-                  <Icon size={20} strokeWidth={1.75} />
-                  <span className="text-center leading-tight">{t.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <Field label="Título do componente">
-            <TextInput value={block.title ?? ''} onChange={(e) => patch({ title: e.target.value })} placeholder={blockTypeLabel(block.type)} />
-          </Field>
-
-          {/* Config específica por tipo */}
-          {block.type === 'table' ? (
-            <div className="flex flex-col gap-3">
-              <TableColumnsEditor block={block} onChange={(columns) => patch({ columns })} columnOptions={columnOptions} />
-              <MultiSortEditor block={block} onChange={(sorts) => patch({ sorts, sort: undefined })} columnOptions={columnOptions} allowValue={false} />
+        <div className="min-h-0 overflow-y-auto border-b border-slate-200 p-4 lg:border-b-0 lg:border-r">
+          <FormSection compact title="Tipo e título">
+            <div className="grid grid-cols-3 gap-2">
+              {BLOCK_TYPES.map(t => {
+                const Icon = t.icon;
+                return <button key={t.value} type="button" onClick={() => patch({ type: t.value })} aria-pressed={block.type === t.value}
+                  className={`flex flex-col items-center gap-1.5 rounded-md border px-2 py-3 text-xs font-medium ${block.type === t.value ? 'border-slate-900 bg-slate-100 text-slate-900' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                  <Icon size={20} strokeWidth={1.75} aria-hidden="true" /><span className="text-center leading-tight">{t.label}</span>
+                </button>;
+              })}
             </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {block.type !== 'kpi' && (
-                <Field label="Agrupar por">
-                  <Select value={block.groupBy ?? ''} onChange={(e) => patch({ groupBy: e.target.value })}
-                    options={[{ value: '', label: '—' }, ...columnOptions]} />
-                </Field>
-              )}
-              {block.type === 'stackedBars' && (
-                <Field label="Empilhar por (série)">
-                  <Select value={block.stackBy ?? ''} onChange={(e) => patch({ stackBy: e.target.value })}
-                    options={[{ value: '', label: '—' }, ...columnOptions]} />
-                </Field>
-              )}
+            <Field label="Título do componente"><TextInput value={block.title ?? ''} onChange={e => patch({ title: e.target.value })} placeholder={blockTypeLabel(block.type)} /></Field>
+          </FormSection>
+
+          <FormSection compact title="Dados e cálculos" description="Escolha os campos que alimentam este componente.">
+            {block.type === 'table' ? <TableColumnsEditor block={block} onChange={columns => patch({ columns })} columnOptions={columnOptions} /> : <>
+              {block.type !== 'kpi' && <Field label="Agrupar por"><Select value={block.groupBy ?? ''} onChange={e => patch({ groupBy: e.target.value })} options={[{ value: '', label: '—' }, ...columnOptions]} /></Field>}
+              {block.type === 'stackedBars' && <Field label="Empilhar por (série)"><Select value={block.stackBy ?? ''} onChange={e => patch({ stackBy: e.target.value })} options={[{ value: '', label: '—' }, ...columnOptions]} /></Field>}
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Agregação">
-                  <Select value={block.agg ?? 'count'} onChange={(e) => patch({ agg: e.target.value })} options={AGG_OPTIONS} />
-                </Field>
-                <Field label="Campo de valor">
-                  <Select value={block.valueField ?? ''} onChange={(e) => patch({ valueField: e.target.value })}
-                    options={[{ value: '', label: '—' }, ...columnOptions]} />
-                </Field>
-                <Field label="Formatação">
-                  <Select value={block.format ?? ''} onChange={(e) => patch({ format: e.target.value || undefined })} options={FORMAT_OPTIONS} />
-                </Field>
-                <Field label={block.type === 'heatmap' ? 'Nº de cards (top-N)' : 'Limite'}
-                  hint={block.type === 'heatmap' ? 'Padrão 5.' : undefined}>
-                  <TextInput type="number" value={block.limit ?? ''} placeholder={block.type === 'heatmap' ? '5' : 'Todos'}
-                    onChange={(e) => patch({ limit: e.target.value ? Number(e.target.value) : undefined })} />
-                </Field>
+                <Field label="Agregação"><Select value={block.agg ?? 'count'} onChange={e => patch({ agg: e.target.value })} options={AGG_OPTIONS} /></Field>
+                <Field label="Campo de valor"><Select value={block.valueField ?? ''} onChange={e => patch({ valueField: e.target.value })} options={[{ value: '', label: '—' }, ...columnOptions]} /></Field>
               </div>
+              {block.type === 'kpi' && <Field label="Evolução por (data)" hint="Sparkline por mês."><Select value={block.trendField ?? ''} onChange={e => patch({ trendField: e.target.value || undefined })} options={[{ value: '', label: '—' }, ...columnOptions]} /></Field>}
+              <details className="rounded-md border border-slate-200 px-3 py-2">
+                <summary className="cursor-pointer text-sm font-medium text-slate-700">Fórmula avançada {block.formula ? '(configurada)' : '(opcional)'}</summary>
+                <div className="mt-3"><Field label="Expressão por linha" hint="Use campos entre colchetes, como [valor] * 1.1 ou [campo_a] + [campo_b]. A expressão é validada, sem SQL."><TextInput value={block.formula ?? ''} onChange={e => patch({ formula: e.target.value || undefined })} placeholder="[campo_a] + [campo_b]" /></Field></div>
+              </details>
+            </>}
+          </FormSection>
 
-              {block.type === 'kpi' && (
-                <div className="grid grid-cols-3 gap-3">
-                  <Field label="Ícone">
-                    <Select value={block.icon ?? ''} onChange={(e) => patch({ icon: e.target.value || undefined })} options={KPI_ICON_OPTIONS} />
-                  </Field>
-                  <Field label="Cor">
-                    <input type="color" aria-label="Cor do KPI" value={block.color ?? '#0ea5e9'}
-                      onChange={(e) => patch({ color: e.target.value })}
-                      className="h-9 w-full cursor-pointer rounded-md border border-slate-300" />
-                  </Field>
-                  <Field label="Evolução por (data)" hint="Sparkline por mês.">
-                    <Select value={block.trendField ?? ''} onChange={(e) => patch({ trendField: e.target.value || undefined })}
-                      options={[{ value: '', label: '—' }, ...columnOptions]} />
-                  </Field>
-                </div>
-              )}
+          <FormSection compact title="Filtros e ordenação" description="Refine os resultados além dos filtros globais do relatório.">
+            <BlockFiltersEditor block={block} onChange={filters => patch({ filters })} columnOptions={columnOptions} />
+            <MultiSortEditor block={block} onChange={sorts => patch({ sorts, sort: undefined })} columnOptions={columnOptions} allowValue={block.type !== 'table'} />
+            {block.type !== 'table' && <Field label={block.type === 'heatmap' ? 'Nº de cards (top-N)' : 'Limite'} hint={block.type === 'heatmap' ? 'Padrão 5.' : undefined}>
+              <TextInput type="number" value={block.limit ?? ''} placeholder={block.type === 'heatmap' ? '5' : 'Todos'} onChange={e => patch({ limit: e.target.value ? Number(e.target.value) : undefined })} />
+            </Field>}
+          </FormSection>
 
-              <MultiSortEditor block={block} onChange={(sorts) => patch({ sorts, sort: undefined })} columnOptions={columnOptions} allowValue />
-              <Field label="Fórmula avançada (opcional)" hint="Expressão por linha, ex.: [valor] * 1.1 — validada, sem SQL.">
-                <TextInput value={block.formula ?? ''} onChange={(e) => patch({ formula: e.target.value || undefined })} placeholder="[campo_a] + [campo_b]" />
-              </Field>
-            </div>
-          )}
-
-          <BlockFiltersEditor block={block} onChange={(filters) => patch({ filters })} columnOptions={columnOptions} />
-
-          {/* Tamanho no grid (12 colunas) */}
-          <div className="border-t border-slate-100 pt-3">
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Tamanho no grid</span>
-            <div className="mt-2 grid grid-cols-2 gap-3">
-              <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-                Largura: {w} de 12 colunas
-                <input type="range" min={1} max={12} value={w} aria-label="Largura em colunas"
-                  onChange={(e) => patch({ w: Number(e.target.value) })} />
+          <FormSection compact title="Aparência" description="Ajuste a apresentação e o espaço ocupado no relatório.">
+            {block.type !== 'table' && <Field label="Formatação"><Select value={block.format ?? ''} onChange={e => patch({ format: e.target.value || undefined })} options={FORMAT_OPTIONS} /></Field>}
+            {block.type === 'kpi' && <div className="grid grid-cols-2 gap-3">
+              <Field label="Ícone"><Select value={block.icon ?? ''} onChange={e => patch({ icon: e.target.value || undefined })} options={KPI_ICON_OPTIONS} /></Field>
+              <Field label="Cor"><input type="color" aria-label="Cor do KPI" value={block.color ?? '#0ea5e9'} onChange={e => patch({ color: e.target.value })} className="h-9 w-full cursor-pointer rounded-md border border-slate-300" /></Field>
+            </div>}
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">Largura: {w} de 12 colunas
+                <input type="range" min={1} max={12} value={w} aria-label="Largura em colunas" onChange={e => patch({ w: Number(e.target.value) })} />
               </label>
-              <Field label="Altura (linhas)">
-                <TextInput type="number" min={1} max={6} value={h} aria-label="Altura em linhas"
-                  onChange={(e) => patch({ h: Math.max(1, Number(e.target.value) || 1) })} />
-              </Field>
+              <Field label="Altura (linhas)"><TextInput type="number" min={1} max={6} value={h} aria-label="Altura em linhas" onChange={e => patch({ h: Math.max(1, Number(e.target.value) || 1) })} /></Field>
             </div>
-          </div>
+          </FormSection>
         </div>
 
         {/* ── DIREITA: preview ao vivo ────────────────────────────────── */}
-        <div className="min-w-0 overflow-y-auto bg-slate-50 p-6">
+        <div className="min-h-0 min-w-0 overflow-y-auto bg-slate-50 p-4 lg:p-6">
+          <h2 className="mb-4 text-sm font-semibold text-slate-900">Preview do componente</h2>
           {!hasSource ? (
             <PreviewEmpty text="Selecione a fonte de dados e salve o rascunho para ver o preview do componente." />
           ) : loading && !preview ? (
-            <p className="text-center text-sm text-slate-400">Montando preview…</p>
+            <p className="text-center text-sm text-slate-600">Montando preview…</p>
           ) : preview?.block ? (
             <div className="rounded-lg border border-slate-200 bg-white p-4">
               <PreviewBlockView block={preview.block} />
@@ -249,7 +200,7 @@ function MultiSortEditor({ block, onChange, columnOptions, allowValue }: {
   ];
   const set = (next: SortDef[]) => onChange(next);
   return (
-    <div className="border-t border-slate-100 pt-3">
+    <div className="space-y-2">
       <div className="mb-1 flex items-center gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Ordenação</span>
         <button type="button" aria-label="Adicionar ordenação"
@@ -258,11 +209,11 @@ function MultiSortEditor({ block, onChange, columnOptions, allowValue }: {
           <Plus size={10} /> coluna
         </button>
       </div>
-      {sorts.length === 0 && <p className="text-xs text-slate-400">Sem ordenação.</p>}
+      {sorts.length === 0 && <p className="text-xs text-slate-600">Sem ordenação.</p>}
       <div className="flex flex-col gap-1.5">
         {sorts.map((s, i) => (
           <div key={i} className="flex items-center gap-1.5">
-            {i > 0 && <span className="text-[10px] uppercase text-slate-400">depois</span>}
+            {i > 0 && <span className="text-[10px] uppercase text-slate-600">depois</span>}
             <Select value={s.field} aria-label={`Ordenar por ${i + 1}`} options={opts} className="min-w-0 flex-1"
               onChange={(e) => set(sorts.map((x, j) => (j === i ? { ...x, field: e.target.value } : x)))} />
             <button type="button" onClick={() => set(sorts.map((x, j) => (j === i ? { ...x, desc: !x.desc } : x)))}
@@ -284,7 +235,7 @@ function BlockFiltersEditor({ block, onChange, columnOptions }: {
 }) {
   const filters = block.filters ?? [];
   return (
-    <div className="border-t border-slate-100 pt-3">
+    <div className="space-y-2">
       <div className="mb-1 flex items-center gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Filtros do componente</span>
         <button type="button"
@@ -293,7 +244,7 @@ function BlockFiltersEditor({ block, onChange, columnOptions }: {
           <Plus size={10} /> filtro
         </button>
       </div>
-      {filters.length === 0 && <p className="text-xs text-slate-400">Sem filtros próprios — usa só os filtros globais.</p>}
+      {filters.length === 0 && <p className="text-xs text-slate-600">Sem filtros próprios — usa só os filtros globais.</p>}
       <div className="flex flex-col gap-1.5">
         {filters.map((f, i) => (
           <div key={i} className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_2rem] items-center gap-1.5">

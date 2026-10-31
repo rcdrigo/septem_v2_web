@@ -41,6 +41,7 @@ const keys = {
 export function useDocumentTemplates(q?: string) {
   return useQuery({
     queryKey: [...keys.all, q ?? ''],
+      refetchOnWindowFocus: 'always',
     queryFn: () => api.get<DocumentTemplateListItem[]>(`/api/v1/document-templates/${q ? `?q=${encodeURIComponent(q)}` : ''}`),
   });
 }

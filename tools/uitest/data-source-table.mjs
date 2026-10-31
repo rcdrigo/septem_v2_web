@@ -83,7 +83,8 @@ try {
    await page.getByLabel(`Comparação do filtro ${i}`,{exact:true}).selectOption('eq');
    await page.getByLabel(`Identificador do filtro ${i}`,{exact:true}).fill(key);
   }
-  await page.getByRole('textbox',{name:/Mapeamento dos campos do formulário/}).fill('codigo => Código');
+  await page.getByText('Editar mapeamento em texto',{exact:true}).click();
+  await page.getByRole('textbox',{name:/Mapeamento dos campos do formulário/,includeHidden:true}).fill('codigo => Código');
   await page.getByLabel('Teste: grupo',{exact:true}).fill('1');await page.getByLabel('Teste: subgrupo',{exact:true}).fill('1.2');
   await page.getByRole('button',{name:'Testar',exact:true}).click();await page.getByRole('region',{name:'Resultado',exact:true}).waitFor();
   assert.deepEqual(requests.at(-1).body.params,{grupo:'1',subgrupo:'1.2'});
@@ -94,7 +95,7 @@ try {
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   await page.evaluate(()=>window.editor('derived'));
   assert.equal(await page.getByLabel('Identificador do filtro 2',{exact:true}).inputValue(),'subgrupo');
-  assert.equal(await page.getByRole('textbox',{name:/Mapeamento dos campos do formulário/}).inputValue(),'codigo => Código');
+  assert.equal(await page.getByRole('textbox',{name:/Mapeamento dos campos do formulário/,includeHidden:true}).inputValue(),'codigo => Código');
   await page.evaluate(s=>window.form(s),schema(false));
   const group=page.getByRole('combobox',{name:'grupo',exact:true}),sub=page.getByRole('combobox',{name:'subgrupo',exact:true}),activity=page.getByRole('combobox',{name:'atividade',exact:true});
   await page.waitForFunction(()=>!!document.querySelector('select[aria-label="subgrupo"]')?.disabled);

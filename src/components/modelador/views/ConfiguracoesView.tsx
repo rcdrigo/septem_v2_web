@@ -1,3 +1,4 @@
+import { FormSection } from '@/components/ui/FormSection';
 import { useEffect, useState } from 'react';
 import { Field, RadioGroup, Select, Section, Switch, TextArea, TextInput } from '@/components/ui/Field';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
@@ -117,82 +118,70 @@ export function ConfiguracoesView({ modeler, processKey }: Props) {
         )}
 
         {tab === 'geral' && (
-          <>
-            <Section title="Identificação">
-              <div className="grid grid-cols-1 gap-x-6 gap-y-3 lg:grid-cols-2">
-                {/* Coluna 1 */}
-                <div className="flex flex-col gap-3">
-                  <Field label="Nome" help="Mesmo nome exibido na barra superior.">
-                    <TextInput value={draftName} onChange={(e) => setDraftName(e.target.value)} onBlur={commitName} />
-                  </Field>
-                  <Field label="Categoria">
-                    <Select value={cfg.categoryId} onChange={(e) => patch({ categoryId: e.target.value })} options={categoryOptions} />
-                  </Field>
-                  <Field label="Unidade organizacional responsável" help="Secretaria ou órgão responsável pelo processo.">
-                    <Combobox
-                      value={cfg.areaId}
-                      options={(orgUnits.data ?? []).map((u) => ({ value: u.key, label: u.name }))}
-                      onChange={(v) => { setCfg((c) => ({ ...c, areaId: v })); patch({ areaId: v }); }}
-                      clearLabel="— nenhuma —"
-                      placeholder="Selecione a unidade"
-                    />
-                  </Field>
-                  <Field label="URL da documentação" help="Endereço completo da documentação do processo. Exemplo: https://exemplo.gov.br/documentacao.">
-                    <TextInput type="url" value={cfg.documentationUrl}
-                      onChange={(e) => setCfg((c) => ({ ...c, documentationUrl: e.target.value }))}
-                      onBlur={() => patch({ documentationUrl: cfg.documentationUrl })} />
-                  </Field>
-                  <Field label="Ícone" help="Ícone FontAwesome usado para representar o processo.">
-                    <IconSearchPicker value={cfg.icon} onChange={(cls) => { setCfg((c) => ({ ...c, icon: cls ?? '' })); patch({ icon: cls ?? '' }); }} />
-                  </Field>
-                </div>
-                {/* Coluna 2 */}
-                <div className="flex flex-col gap-3">
-                  <Field label="Descrição" help="Aceita formatação, listas, links e quebras de linha. É exibida nas listagens de serviço.">
-                    <RichTextEditor
-                      value={cfg.description ?? ''}
-                      onChange={(html) => setCfg((c) => ({ ...c, description: html }))}
-                      onBlur={() => patch({ description: cfg.description })}
-                    />
-                  </Field>
-                  <Field
-                    label="Inbox / resumo da requisição"
-                    help="Resumo com formatação HTML básica mostrado nas listagens. Ao salvar, a alteração se aplica às requisições de todas as versões deste processo, inclusive às já abertas ou concluídas. Use variáveis qualificadas, como {{formulario.titulo}}, {{requisitante.nome}}, {{requisitante.email}}, {{processo.nome}} e {{processo.numero}}. Exemplo: &lt;strong&gt;{{formulario.titulo}}&lt;/strong&gt; — solicitado por {{requisitante.nome}}."
-                  >
-                    <TextArea
-                      value={cfg.inbox}
-                      onChange={(e) => setCfg((c) => ({ ...c, inbox: e.target.value }))}
-                      onBlur={() => patch({ inbox: cfg.inbox })}
-                      rows={5}
-                    />
-                  </Field>
-                </div>
+          <div className="px-4 py-6 sm:px-6">
+            <FormSection title="Identificação" description="Nome, categoria e unidade responsável pelo processo.">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Field label="Nome" help="Mesmo nome exibido na barra superior.">
+                  <TextInput value={draftName} onChange={(e) => setDraftName(e.target.value)} onBlur={commitName} />
+                </Field>
+                <Field label="Categoria">
+                  <Select value={cfg.categoryId} onChange={(e) => patch({ categoryId: e.target.value })} options={categoryOptions} />
+                </Field>
+                <Field label="Unidade organizacional responsável" help="Secretaria ou órgão responsável pelo processo.">
+                  <Combobox
+                    value={cfg.areaId}
+                    options={(orgUnits.data ?? []).map((u) => ({ value: u.key, label: u.name }))}
+                    onChange={(v) => { setCfg((c) => ({ ...c, areaId: v })); patch({ areaId: v }); }}
+                    clearLabel="— nenhuma —"
+                    placeholder="Selecione a unidade"
+                  />
+                </Field>
               </div>
-            </Section>
-
-            <Section title="Publicação e permissões">
-              <div className="grid grid-cols-1 gap-x-6 gap-y-3 lg:grid-cols-2">
-                {/* Coluna 1 */}
-                <div className="flex flex-col gap-3">
-                  <Field label="Status">
-                    <RadioGroup<ProcessStatus> name="proc-status" value={cfg.status} onChange={(v) => patch({ status: v })} options={STATUS_OPTIONS as any} />
-                  </Field>
-                </div>
-                {/* Coluna 2 */}
-                <div className="flex flex-col gap-2">
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Permissões durante a execução</span>
-                    <div className="flex flex-col gap-2">
-                      <Switch checked={cfg.allowMessages} onChange={(v) => patch({ allowMessages: v })} label="Permitir inserção de mensagens nas execuções" />
-                      <Switch checked={cfg.allowCancel} onChange={(v) => patch({ allowCancel: v })} label="Permitir cancelamento do processo" />
-                      <Switch checked={cfg.allowExternal} onChange={(v) => patch({ allowExternal: v })} label="Publicar na Central de serviços (exige login)" help="O serviço aparece na vitrine pública, mas só é possível enviar depois de entrar na conta." />
-                      <Switch checked={cfg.allowAnonymous} onChange={(v) => patch({ allowAnonymous: v })} label="Permitir requisições anônimas (portal)" help="Dispensa login: qualquer visitante envia, com verificação anti-robô. Também publica na Central de serviços." />
-                    </div>
-                  </div>
-                </div>
+            </FormSection>
+            <FormSection title="Apresentação do serviço" description="Conteúdo usado para apresentar o processo nas listagens de serviços.">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Field label="Ícone" help="Ícone FontAwesome usado para representar o processo.">
+                  <IconSearchPicker value={cfg.icon} onChange={(cls) => { setCfg((c) => ({ ...c, icon: cls ?? '' })); patch({ icon: cls ?? '' }); }} />
+                </Field>
+                <Field label="URL da documentação" help="Endereço completo da documentação do processo. Exemplo: https://exemplo.gov.br/documentacao.">
+                  <TextInput type="url" value={cfg.documentationUrl}
+                    onChange={(e) => setCfg((c) => ({ ...c, documentationUrl: e.target.value }))}
+                    onBlur={() => patch({ documentationUrl: cfg.documentationUrl })} />
+                </Field>
               </div>
-            </Section>
-          </>
+              <Field label="Descrição" help="Aceita formatação, listas, links e quebras de linha. É exibida nas listagens de serviço.">
+                <RichTextEditor
+                  value={cfg.description ?? ''}
+                  onChange={(html) => setCfg((c) => ({ ...c, description: html }))}
+                  onBlur={() => patch({ description: cfg.description })}
+                />
+              </Field>
+            </FormSection>
+            <FormSection title="Resumo nas listagens" description="Defina como cada requisição é identificada nas listas de trabalho.">
+              <Field
+                label="Inbox / resumo da requisição"
+                help="Resumo com formatação HTML básica mostrado nas listagens. Ao salvar, a alteração se aplica às requisições de todas as versões deste processo, inclusive às já abertas ou concluídas. Use variáveis qualificadas, como {{formulario.titulo}}, {{requisitante.nome}}, {{requisitante.email}}, {{processo.nome}} e {{processo.numero}}. Exemplo: &lt;strong&gt;{{formulario.titulo}}&lt;/strong&gt; — solicitado por {{requisitante.nome}}."
+              >
+                <TextArea
+                  value={cfg.inbox}
+                  onChange={(e) => setCfg((c) => ({ ...c, inbox: e.target.value }))}
+                  onBlur={() => patch({ inbox: cfg.inbox })}
+                  rows={5}
+                />
+              </Field>
+            </FormSection>
+            <FormSection title="Publicação" description="Disponibilidade do processo e formas de acesso pela Central de serviços.">
+              <Field label="Status">
+                <RadioGroup<ProcessStatus> name="proc-status" value={cfg.status} onChange={(v) => patch({ status: v })} options={STATUS_OPTIONS as any} />
+              </Field>
+              <Switch checked={cfg.allowExternal} onChange={(v) => patch({ allowExternal: v })} label="Publicar na Central de serviços (exige login)" help="O serviço aparece na vitrine pública, mas só é possível enviar depois de entrar na conta." />
+              <Switch checked={cfg.allowAnonymous} onChange={(v) => patch({ allowAnonymous: v })} label="Permitir requisições anônimas (portal)" help="Dispensa login: qualquer visitante envia, com verificação anti-robô. Também publica na Central de serviços." />
+            </FormSection>
+            <FormSection title="Permissões durante a execução" description="Ações disponíveis depois que a requisição é iniciada.">
+              <Switch checked={cfg.allowMessages} onChange={(v) => patch({ allowMessages: v })} label="Permitir inserção de mensagens nas execuções" />
+              <Switch checked={cfg.allowCancel} onChange={(v) => patch({ allowCancel: v })} label="Permitir cancelamento do processo" />
+            </FormSection>
+          </div>
         )}
 
         {tab === 'acesso' && (

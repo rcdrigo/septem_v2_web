@@ -16,6 +16,8 @@ import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
 import { openTab } from '@/lib/nav';
 import { routes } from '@/lib/routes';
+import { FormSection } from '@/components/ui/FormSection';
+import { CombinedSearch, useCombinedSearch, type SearchColumn } from '@/components/ui/CombinedSearch';
 import { ContextHelp } from '@/components/guide/ContextHelp';
 
 const AUDIENCE_OPTIONS = [
@@ -36,7 +38,16 @@ export function ManuaisPage() {
   const list = useManuals();
   const del = useDeleteManual();
 
-  const visible = (list.data ?? []).filter((m) => (tab === 'tecnico' ? m.isTechnical : !m.isTechnical));
+  const columns: SearchColumn<ManualListItem>[] = [
+    { key: 'title', label: 'Título', value: m => m.title },
+    { key: 'category', label: 'Categoria', value: m => m.categoryName },
+    { key: 'audience', label: 'Público', value: m => AUDIENCE_OPTIONS.find(a => a.value === m.audience)?.label ?? m.audience,
+      options: AUDIENCE_OPTIONS.map(a => ({ value: a.label, label: a.label })) },
+    { key: 'published', label: 'Publicação', value: m => m.published ? 'Publicado' : 'Rascunho',
+      options: [{ value: 'Publicado', label: 'Publicado' }, { value: 'Rascunho', label: 'Rascunho' }] },
+  ];
+  const search = useCombinedSearch(list.data ?? [], columns);
+  const visible = search.rows.filter((m) => (tab === 'tecnico' ? m.isTechnical : !m.isTechnical));
 
   async function askDelete(m: ManualListItem) {
     const ok = await confirm({ title: 'Excluir manual?', message: `"${m.title}" será removido.`, confirmLabel: 'Excluir', cancelLabel: 'Cancelar', destructive: true });
@@ -67,38 +78,30 @@ export function ManuaisPage() {
         </div>
       )}
 
+      <CombinedSearch columns={columns} search={{ ...search, rows: visible }} loading={list.isLoading} />
       <div className="flex-1 overflow-auto p-4 sm:p-6">
-        {list.isLoading ? (
-          <p className="text-sm text-slate-400">Carregando…</p>
-        ) : visible.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400"><BookOpen size={26} /></div>
-            <p className="text-sm font-medium text-slate-700">Nenhum manual {tab === 'tecnico' ? 'técnico' : ''} ainda</p>
-            <p className="mt-1 text-sm text-slate-500">Crie o primeiro em "Novo manual".</p>
-          </div>
-        ) : (
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="lista-manuais">
-            {visible.map((m) => (
-              <li key={m.id} className="flex min-w-0 flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex min-w-0 items-start justify-between gap-2">
-                  <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                    {m.icon && <i className={m.icon} aria-hidden="true" />}<span className="truncate">{m.categoryName}</span>
-                  </span>
-                  <div className="flex shrink-0 gap-1">
-                    <button type="button" aria-label="Editar" onClick={() => openTab(routes.manual(m.id))} className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"><Pencil size={15} /></button>
-                    <button type="button" aria-label="Excluir" onClick={() => askDelete(m)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"><Trash2 size={15} /></button>
-                  </div>
-                </div>
-                <h2 className="mt-3 truncate text-sm font-bold text-slate-900">{m.title}</h2>
-                <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3 text-xs">
-                  <Badge tone={m.published ? 'green' : 'slate'}>{m.published ? 'Publicado' : 'Rascunho'}</Badge>
-                  <Badge tone="slate">{AUDIENCE_OPTIONS.find((a) => a.value === m.audience)?.label ?? m.audience}</Badge>
-                  {m.isTechnical && <Badge tone="amber">Técnico</Badge>}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+        {list.isError ? <div role="alert" className="py-12 text-center text-sm text-slate-700">Não foi possível carregar os manuais. <button type="button" onClick={() => void list.refetch()} className="font-medium underline underline-offset-2">Tentar novamente</button></div>
+          : list.isLoading ? <p role="status" className="text-sm text-slate-600">Carregando…</p>
+          : visible.length === 0 ? <div className="py-16 text-center">
+            <BookOpen size={28} aria-hidden="true" className="mx-auto mb-4 text-slate-500" />
+            <p className="text-sm font-medium text-slate-700">{search.query || search.activeCount ? 'Nenhum manual encontrado' : `Nenhum manual ${tab === 'tecnico' ? 'técnico ' : ''}ainda`}</p>
+            <p className="mt-1 text-sm text-slate-600">{search.query || search.activeCount ? 'Ajuste os filtros ou limpe a busca.' : 'Crie o primeiro em “Novo manual”.'}</p>
+          </div> : <table className="w-full min-w-[640px] border border-slate-200 bg-white text-sm" data-testid="lista-manuais">
+            <thead className="bg-slate-50 text-left text-xs font-semibold text-slate-600"><tr>
+              <th scope="col" className="px-4 py-3">Título</th><th scope="col" className="px-4 py-3">Categoria</th>
+              <th scope="col" className="px-4 py-3">Público</th><th scope="col" className="px-4 py-3">Publicação</th><th scope="col" className="px-4 py-3 text-right">Ações</th>
+            </tr></thead>
+            <tbody>{visible.map(m => <tr key={m.id} className="border-t border-slate-200 hover:bg-slate-50">
+              <td className="px-4 py-3 font-medium text-slate-900"><button type="button" onClick={() => openTab(routes.manual(m.id))} className="text-left hover:underline underline-offset-2">{m.title}</button></td>
+              <td className="px-4 py-3 text-slate-700">{m.icon && <i className={`${m.icon} mr-2`} aria-hidden="true" />}{m.categoryName}</td>
+              <td className="px-4 py-3 text-slate-700">{AUDIENCE_OPTIONS.find(a => a.value === m.audience)?.label ?? m.audience}</td>
+              <td className="px-4 py-3"><Badge tone={m.published ? 'green' : 'slate'}>{m.published ? 'Publicado' : 'Rascunho'}</Badge></td>
+              <td className="px-4 py-3"><div className="flex justify-end gap-1">
+                <button type="button" aria-label={`Editar ${m.title}`} onClick={() => openTab(routes.manual(m.id))} className="rounded p-2 text-slate-600 hover:bg-slate-100"><Pencil size={16} /></button>
+                <button type="button" aria-label={`Excluir ${m.title}`} onClick={() => askDelete(m)} className="rounded p-2 text-slate-600 hover:bg-rose-50 hover:text-rose-700"><Trash2 size={16} /></button>
+              </div></td>
+            </tr>)}</tbody>
+          </table>}
       </div>
 
     </div>
@@ -213,8 +216,9 @@ export function ManualEditor({ id, defaultTechnical, canTechnical, onClose, full
   );
   const content = (
     <>
-      {!ready ? <p className="p-4 text-sm text-slate-400">Carregando…</p> : (
-        <div className="grid gap-4">
+      {detail.isError ? <p role="alert" className="py-4 text-sm text-slate-700">Não foi possível carregar o manual. <button type="button" onClick={() => void detail.refetch()} className="underline">Tentar novamente</button></p> : !ready ? <p className="p-4 text-sm text-slate-600">Carregando…</p> : (
+        <div>
+          <FormSection title="Identificação e categoria" description="Defina o título e a posição do artigo no guia.">
           <Field label="Título"><TextInput data-testid="manual-titulo" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ex.: Como abrir uma requisição" /></Field>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -236,12 +240,14 @@ export function ManualEditor({ id, defaultTechnical, canTechnical, onClose, full
             </Field>
           </div>
 
+          <Field label="Ícone"><IconSearchPicker value={form.icon || undefined} onChange={(next) => setForm({ ...form, icon: next ?? '' })} /></Field>
+          </FormSection>
+          <FormSection title="Público e visibilidade" description="Escolha quem pode consultar este manual.">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Público">
               <Select data-testid="manual-publico" value={form.audience}
-                onChange={(e) => setForm({ ...form, audience: e.target.value as ManualAudience })} options={AUDIENCE_OPTIONS} />
+                onChange={(e) => setForm({ ...form, audience: e.target.value === 'interno' || e.target.value === 'ambos' ? e.target.value : 'externo' })} options={AUDIENCE_OPTIONS} />
             </Field>
-            <Field label="Ícone"><IconSearchPicker value={form.icon || undefined} onChange={(next) => setForm({ ...form, icon: next ?? '' })} /></Field>
           </div>
 
           {showUnits && (
@@ -262,14 +268,19 @@ export function ManualEditor({ id, defaultTechnical, canTechnical, onClose, full
             </Field>
           )}
 
+          </FormSection>
+          <FormSection title="Conteúdo">
           <Field label="Conteúdo" hint="Formate o texto, insira imagens/vídeos por URL ou edite o HTML.">
             <RichTextEditor value={form.contentHtml} enableMedia enableHtmlSource onChange={(html) => setForm((f) => ({ ...f, contentHtml: html }))} />
           </Field>
 
+          </FormSection>
+          <FormSection title="Publicação" description="Publique quando o conteúdo estiver pronto para os leitores.">
           <div className="flex flex-wrap items-center gap-4">
             <Checkbox checked={form.published} onChange={(v) => setForm({ ...form, published: v })} label="Publicar" />
             {canTechnical && <Checkbox checked={form.isTechnical} onChange={(v) => setForm({ ...form, isTechnical: v })} label="Manual técnico" />}
           </div>
+          </FormSection>
         </div>
       )}
     </>
@@ -293,9 +304,9 @@ export function ManualEditor({ id, defaultTechnical, canTechnical, onClose, full
 
   if (fullPage) {
     return (
-      <div className="flex h-screen flex-col bg-slate-100">
+      <div className="flex h-screen min-w-0 flex-col bg-slate-100">
         <header className="border-b border-slate-200 bg-white px-6 py-4"><h1 className="text-lg font-semibold text-slate-900">{title}</h1></header>
-        <main className="flex-1 overflow-auto p-6"><div className="mx-auto w-full max-w-4xl rounded-lg border border-slate-200 bg-white p-6 shadow-sm">{content}</div></main>
+        <main className="flex-1 overflow-auto p-4 sm:p-6"><div className="w-full min-w-0 rounded-lg border border-slate-200 bg-white p-4 sm:p-6">{content}</div></main>
         <footer className="flex justify-end gap-2 border-t border-slate-200 bg-white px-6 py-3">{footer}</footer>
         {catModal}
       </div>

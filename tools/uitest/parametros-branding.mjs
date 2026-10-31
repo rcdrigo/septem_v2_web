@@ -31,7 +31,7 @@ try {
   for (const width of [1280, 375]) {
     const context = await browser.newContext({ viewport: { width, height: 1000 } });
     let general = { tenantId: 'cliente', host: 'cliente.test', ambienteNome: 'Portal de serviços', logoUrl: null, heroImageUrl: null, primaryColor: '#0ea5e9', systemDescription: 'Serviços do município.', businessHourStart: 8, businessHourEnd: 18, businessDays: '1,2,3,4,5', stateCode: null, cityCode: null, cityName: null, timeZoneId: null };
-    const uploads = [], saves = [], otherSaves = [];
+    const uploads = [], saves = [], otherSaves = [], emailTests = [];
     let policies = Object.fromEntries(['email', 'storage', 'openrouter'].map(section => [section,{visible:true,editable:true}]));
     const sections = {
       email: {host:'smtp.test',port:587,useSsl:true,authMode:'none',user:null,passwordSet:false,fromAddress:'teste@cliente.test',fromName:'Cliente'},
@@ -57,6 +57,10 @@ try {
       }
       if (path.includes('/branding/assets/')) return route.fulfill({ headers, contentType: 'image/png', body: png });
       if (path === '/api/tenant/config') { refreshes++; return route.fulfill({ headers, json: { tenantId: 'cliente', ...general } }); }
+      if (request.method() === 'POST' && path === '/api/v1/settings/email/test') {
+        emailTests.push(request.postDataJSON());
+        return route.fulfill({ headers, json: { ok: true } });
+      }
       if (request.method() === 'PUT' && path.startsWith('/api/v1/settings/')) {
         otherSaves.push({path,payload:request.postDataJSON()});
         return route.fulfill({headers,json:{ok:true}});
@@ -166,7 +170,23 @@ try {
       await action.waitFor();
       assert.equal(await page.locator('button[type=submit]').count(),1,'only active tab owns the header action');
       assert.equal(await action.evaluate((button, name) => button.form === document.querySelector(`[data-testid=form-${name}]`),formName),true);
-      if(tab === 'E-mail') await page.getByRole('textbox',{name:'Destino do teste de e-mail',exact:true}).fill('teste@cliente.test');
+      if (tab === 'E-mail') {
+        for (const title of ['Servidor SMTP', 'Autenticação e segurança', 'Remetente', 'Enviar e-mail de teste']) await page.getByRole('heading', { name: title, exact: true }).waitFor();
+        assert.equal(await page.locator('input[name=password]').count(), 0, 'sem autenticação não pede credenciais');
+        await page.locator('select[name=authMode]').selectOption('login');
+        await page.locator('input[name=user]').fill('remetente@cliente.test');
+        await page.locator('input[name=password]').fill('senha-apenas-de-fixture');
+        await page.getByRole('textbox', { name: 'Destino do teste de e-mail', exact: true }).fill('teste@cliente.test');
+        const beforeTest = otherSaves.length;
+        await page.getByRole('button', { name: 'Enviar teste', exact: true }).click();
+        await waitUntil(() => emailTests.length === 1);
+        assert.equal(emailTests[0].to, 'teste@cliente.test');
+        assert.equal(emailTests[0].candidate.user, 'remetente@cliente.test');
+        assert.equal(emailTests[0].candidate.password, 'senha-apenas-de-fixture');
+        assert.equal(otherSaves.length, beforeTest, 'testar não ativa a configuração');
+        await page.getByTestId('settings-content').evaluate(element => { element.scrollTop = 0; });
+        await page.screenshot({ path: join(tmpdir(), `septem-settings-smtp-${width}.png`) });
+      }
       const previousCount = otherSaves.length;
       await action.click();
       await waitUntil(()=>otherSaves.length===previousCount+1);

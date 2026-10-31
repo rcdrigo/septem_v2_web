@@ -1,3 +1,4 @@
+import { FormSection } from '@/components/ui/FormSection';
 import { useEffect, useRef, useState } from 'react';
 import { MousePointerClick, Pencil, ExternalLink } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
@@ -206,125 +207,136 @@ export function FieldConfigPanel({ field, editField, masks, native = false, nati
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-4">
-          {tab === 'geral' && (
-            <div className="flex flex-col gap-3">
-              {native && nativeTypeOptions && onNativeTypeChange && <Select label="Tipo do campo" value={field.type} options={nativeTypeOptions} onChange={onNativeTypeChange} />}
-            {/* Conteúdo dos elementos de apresentação (não têm "rótulo"). */}
-            {field.type === 'text' && <TextArea label="Conteúdo (Markdown)" value={field.text ?? ''} onChange={(v) => set(['text'], v)} />}
-            {field.type === 'html' && <TextArea label="Conteúdo (HTML)" value={field.content ?? ''} onChange={(v) => set(['content'], v)} />}
-            {field.type === 'image' && <Text label="Origem (URL ou expressão)" value={field.source ?? ''} onChange={(v) => set(['source'], v)} />}
-            {field.type === 'image' && <Text label="Texto alternativo" value={field.alt ?? ''} onChange={(v) => set(['alt'], v)} />}
-
-              {(native || !NO_LABEL.has(field.type)) && <Text label="Nome" value={draftLabel}
-                onChange={v => {
-                  setDraftLabel(v);
-                  if (native) {
-                    if (field.key === '' || generatingInitialKey.current) generatingInitialKey.current = true;
-                    editField(field, ['label'], v);
-                    if (generatingInitialKey.current && slugify(v)) {
-                      const nextKey = nativeKeyForLabel ? nativeKeyForLabel(v) : slugify(v).slice(0, 120);
-                      try { editField(field, ['key'], nextKey); setDraftKey(nextKey); }
-                      catch { toast.error('Já existe um campo com essa chave. Personalize a chave para continuar.'); }
+        {tab === 'geral' && (
+          <div>
+            {(native || !NO_LABEL.has(field.type)) && (
+              <FormSection compact title="Identificação" description="Nome e chave usados para reconhecer este campo.">
+                {native && nativeTypeOptions && onNativeTypeChange && <Select label="Tipo do campo" value={field.type} options={nativeTypeOptions} onChange={onNativeTypeChange} />}
+                <Text label="Nome" value={draftLabel}
+                  onChange={v => {
+                    setDraftLabel(v);
+                    if (native) {
+                      if (field.key === '' || generatingInitialKey.current) generatingInitialKey.current = true;
+                      editField(field, ['label'], v);
+                      if (generatingInitialKey.current && slugify(v)) {
+                        const nextKey = nativeKeyForLabel ? nativeKeyForLabel(v) : slugify(v).slice(0, 120);
+                        try { editField(field, ['key'], nextKey); setDraftKey(nextKey); }
+                        catch { toast.error('Já existe um campo com essa chave. Personalize a chave para continuar.'); }
+                      }
                     }
-                  }
-                }}
-                onBlur={() => { if (native) generatingInitialKey.current = false; else changeLabel(draftLabel); }} />}
-            {isInput && <Text label="Chave (identificador)" value={draftKey} onChange={setDraftKey} onBlur={() => changeKey(draftKey)} hint={native ? "Alterar a chave exige corrigir seus usos antes de publicar. A identidade do campo é preservada." : "Acompanha o nome até ser personalizada manualmente."} />}
-
-            {isContainer && (
-              <>
-                <div>
-                  <Lbl>Ícone do {field.type === 'dynamiclist' ? 'lista' : 'grupo'}</Lbl>
-                  <IconSearchPicker value={props.septemGroupIcon} onChange={(cls) => merge('properties', { septemGroupIcon: cls || undefined })} />
-                </div>
-                {field.type === 'group' && (
-                  <Switch label="Exibir contador de pendências" checked={props.septemShowPending !== 'no'}
-                    onChange={(b) => merge('properties', { septemShowPending: b ? undefined : 'no' })} />
-                )}
-              </>
+                  }}
+                  onBlur={() => { if (native) generatingInitialKey.current = false; else changeLabel(draftLabel); }} />
+                {isInput && <Text label="Chave (identificador)" value={draftKey} onChange={setDraftKey} onBlur={() => changeKey(draftKey)} hint={native ? "Alterar a chave exige corrigir seus usos antes de publicar. A identidade do campo é preservada." : "Acompanha o nome até ser personalizada manualmente."} />}
+              </FormSection>
             )}
-
             {(isInput || isContainer) && (
-              <div>
-                <Lbl>Tipo de ajuda</Lbl>
-                <select className={fieldCls} value={helpType} onChange={(e) => merge('properties', { septemHelpType: e.target.value })}>
-                  <option value="inline">Inline</option>
-                  <option value="popover">Popover</option>
-                </select>
-                {helpType === 'popover' ? (
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <button type="button" onClick={() => setHelpOpen(true)}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
-                      <Pencil size={13} /> Editar orientações
-                    </button>
-                    <span className="text-[11px] text-slate-400">{helpDraft ? 'definidas' : 'vazias'}</span>
-                  </div>
-                ) : (
-                  <textarea rows={2} className={`${fieldCls} mt-1.5`} aria-label="Orientações" value={helpDraft}
-                    onChange={(e) => { setHelpDraft(e.target.value); if (native) merge('properties', { septemHelpText: e.target.value }); }}
-                    onBlur={() => merge('properties', { septemHelpText: helpDraft.trim() || undefined })}
-                    placeholder="Orientações exibidas abaixo do campo." />
-                )}
-              </div>
+              <FormSection compact title="Orientações" description="Ajude quem preenche a entender o que informar.">
+                <div>
+                  <Lbl>Tipo de ajuda</Lbl>
+                  <select className={fieldCls} value={helpType} onChange={(e) => merge('properties', { septemHelpType: e.target.value })}>
+                    <option value="inline">Inline</option>
+                    <option value="popover">Popover</option>
+                  </select>
+                  {helpType === 'popover' ? (
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <button type="button" onClick={() => setHelpOpen(true)}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
+                        <Pencil size={13} /> Editar orientações
+                      </button>
+                      <span className="text-[11px] text-slate-400">{helpDraft ? 'definidas' : 'vazias'}</span>
+                    </div>
+                  ) : (
+                    <textarea rows={2} className={`${fieldCls} mt-1.5`} aria-label="Orientações" value={helpDraft}
+                      onChange={(e) => { setHelpDraft(e.target.value); if (native) merge('properties', { septemHelpText: e.target.value }); }}
+                      onBlur={() => merge('properties', { septemHelpText: helpDraft.trim() || undefined })}
+                      placeholder="Orientações exibidas abaixo do campo." />
+                  )}
+                </div>
+              </FormSection>
             )}
-
             {FONTE_DADOS_TYPES.has(field.type) && (
-              <div>
-                <Lbl>Fonte de dados</Lbl>
-                <DataSourceSelect value={props.septemDataSourceId ?? ''}
-                  onChange={(v) => {
-                    merge('properties', { septemDataSourceId: v || undefined });
-                    // Campos de opção: carrega as opções da fonte direto no campo.
-                    if (v && supportsOptions && !native) {
-                      fetchDataSourceOptions(v)
-                        .then((opts) => { set(['values'], opts); toast.success(`${opts.length} opç${opts.length === 1 ? 'ão' : 'ões'} carregada${opts.length === 1 ? '' : 's'}.`); })
-                        .catch(() => toast.error('Não foi possível carregar as opções da fonte.'));
-                    }
-                  }} />
-                {props.septemDataSourceId && (
-                  <button type="button"
-                    onClick={() => openTab(routes.dataSource(encodeURIComponent(props.septemDataSourceId)))}
-                    className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900">
-                    <ExternalLink size={12} /> Editar fonte de dados
-                  </button>
-                )}
-              </div>
+              <FormSection compact title="Fonte de dados" description="Defina de onde vêm os valores deste campo.">
+                <div>
+                  <Lbl>Fonte de dados</Lbl>
+                  <DataSourceSelect value={props.septemDataSourceId ?? ''}
+                    onChange={(v) => {
+                      merge('properties', { septemDataSourceId: v || undefined });
+                      // Campos de opção: carrega as opções da fonte direto no campo.
+                      if (v && supportsOptions && !native) {
+                        fetchDataSourceOptions(v)
+                          .then((opts) => { set(['values'], opts); toast.success(`${opts.length} opç${opts.length === 1 ? 'ão' : 'ões'} carregada${opts.length === 1 ? '' : 's'}.`); })
+                          .catch(() => toast.error('Não foi possível carregar as opções da fonte.'));
+                      }
+                    }} />
+                  {props.septemDataSourceId && (
+                    <button type="button"
+                      onClick={() => openTab(routes.dataSource(encodeURIComponent(props.septemDataSourceId)))}
+                      className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900">
+                      <ExternalLink size={12} /> Editar fonte de dados
+                    </button>
+                  )}
+                </div>
+              </FormSection>
             )}
+            {(isInput || isContainer) && (
+              <FormSection compact title="Comportamento e visibilidade">
+                {isInput && <Switch label="Obrigatório" checked={!!validate.required} onChange={(b) => merge('validate', { required: b })} help="Exige o preenchimento antes de concluir a tarefa." />}
+                <Switch label="Visível no relatório" checked={props.septemVisReport !== 'no'} onChange={(b) => merge('properties', { septemVisReport: b ? undefined : 'no' })} help="Controla a exibição deste conteúdo no relatório do processo." />
+                <Switch label="Visível ao requisitante" checked={props.septemVisRequester !== 'no'} onChange={(b) => merge('properties', { septemVisRequester: b ? undefined : 'no' })} help="Controla a exibição deste conteúdo para quem iniciou a requisição." />
+              </FormSection>
+            )}
+            {(isContainer || ['text', 'html', 'image', 'filepicker'].includes(field.type)) && (
+              <FormSection compact title={field.type === 'filepicker' ? 'Anexos e geração de documentos' : isContainer ? 'Configuração do agrupamento' : 'Conteúdo'}>
+                {/* Conteúdo dos elementos de apresentação (não têm "rótulo"). */}
+                {field.type === 'text' && <TextArea label="Conteúdo (Markdown)" value={field.text ?? ''} onChange={(v) => set(['text'], v)} />}
+                {field.type === 'html' && <TextArea label="Conteúdo (HTML)" value={field.content ?? ''} onChange={(v) => set(['content'], v)} />}
+                {field.type === 'image' && <Text label="Origem (URL ou expressão)" value={field.source ?? ''} onChange={(v) => set(['source'], v)} />}
+                {field.type === 'image' && <Text label="Texto alternativo" value={field.alt ?? ''} onChange={(v) => set(['alt'], v)} />}
 
-            {field.type === 'filepicker' && (
-              <>
-                <ExtensionPicker value={props.septemAllowedExts} onChange={(csv) => merge('properties', { septemAllowedExts: csv || undefined })} />
-
-                {/* Fase 6f (:50-:53): o campo de anexo pode ser alimentado por um
-                    documento GERADO a partir de um modelo. Desmarcado por padrão. */}
-                <Switch
-                  label="Gera documento?"
-                  checked={props.septemDocGen === 'yes'}
-                  onChange={(b) => merge('properties', { septemDocGen: b ? 'yes' : undefined })}
-                />
-                {props.septemDocGen === 'yes' && (
+                {isContainer && (
                   <>
-                    <Switch
-                      label="Permitir anexar documento manualmente?"
-                      checked={props.septemDocManual === 'yes'}
-                      onChange={(b) => merge('properties', { septemDocManual: b ? 'yes' : undefined })}
-                    />
-                    <DocumentGenConfig
-                      value={parseDocGen(props.septemDocGenConfig)}
-                      onChange={(next) => merge('properties', { septemDocGenConfig: JSON.stringify(next) })}
-                      camposDoForm={(availableFields ?? formFields).map((f) => ({ key: f.id, label: f.label }))}
-                    />
+                    <div>
+                      <Lbl>Ícone do {field.type === 'dynamiclist' ? 'lista' : 'grupo'}</Lbl>
+                      <IconSearchPicker value={props.septemGroupIcon} onChange={(cls) => merge('properties', { septemGroupIcon: cls || undefined })} />
+                    </div>
+                    {field.type === 'group' && (
+                      <Switch label="Exibir contador de pendências" checked={props.septemShowPending !== 'no'}
+                        onChange={(b) => merge('properties', { septemShowPending: b ? undefined : 'no' })} />
+                    )}
                   </>
                 )}
-              </>
+
+                {field.type === 'filepicker' && (
+                  <>
+                    <ExtensionPicker value={props.septemAllowedExts} onChange={(csv) => merge('properties', { septemAllowedExts: csv || undefined })} />
+
+                    {/* Fase 6f (:50-:53): o campo de anexo pode ser alimentado por um
+                    documento GERADO a partir de um modelo. Desmarcado por padrão. */}
+                    <Switch
+                      label="Gera documento?"
+                      checked={props.septemDocGen === 'yes'}
+                      onChange={(b) => merge('properties', { septemDocGen: b ? 'yes' : undefined })}
+                    />
+                    {props.septemDocGen === 'yes' && (
+                      <>
+                        <Switch
+                          label="Permitir anexar documento manualmente?"
+                          checked={props.septemDocManual === 'yes'}
+                          onChange={(b) => merge('properties', { septemDocManual: b ? 'yes' : undefined })}
+                        />
+                        <DocumentGenConfig
+                          value={parseDocGen(props.septemDocGenConfig)}
+                          onChange={(next) => merge('properties', { septemDocGenConfig: JSON.stringify(next) })}
+                          camposDoForm={(availableFields ?? formFields).map((f) => ({ key: f.id, label: f.label }))}
+                        />
+                      </>
+                    )}
+                  </>
+                )}
+              </FormSection>
             )}
-
-            {isInput && <Switch label="Obrigatório" checked={!!validate.required} onChange={(b) => merge('validate', { required: b })} help="Exige o preenchimento antes de concluir a tarefa." />}
-            {(isInput || isContainer) && <Switch label="Visível no relatório" checked={props.septemVisReport !== 'no'} onChange={(b) => merge('properties', { septemVisReport: b ? undefined : 'no' })} help="Controla a exibição deste conteúdo no relatório do processo." />}
-            {(isInput || isContainer) && <Switch label="Visível ao requisitante" checked={props.septemVisRequester !== 'no'} onChange={(b) => merge('properties', { septemVisRequester: b ? undefined : 'no' })} help="Controla a exibição deste conteúdo para quem iniciou a requisição." />}
-
-            {(field.type === 'spacer' || field.type === 'separator') && (
-              <p className="text-sm text-slate-400">Este elemento não tem configurações em Geral.</p>
+            {!native && (field.type === 'spacer' || field.type === 'separator') && (
+              <p className="text-sm text-slate-600">Este elemento não tem configurações em Geral.</p>
             )}
           </div>
         )}

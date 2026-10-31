@@ -31,6 +31,8 @@ export const routes = {
   request: (instanceId: string) => `/requests/${instanceId}`,
   /** Criar/editar fonte de dados (`id = 'nova'` para criar). */
   dataSource: (id: string) => `/data-sources/${id}`,
+  emailTemplate: (id: string) => `/email-templates/${encodeURIComponent(id)}`,
+  documentTemplate: (id: string) => `/document-templates/${encodeURIComponent(id)}`,
   /** Criar/editar manual (`id = 'nova'` para criar). */
   manual: (id: string) => `/manuals/${id}`,
   serviceFields: '/service-fields',

@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Archive, ChevronLeft, ChevronRight, FileSearch, LayoutDashboard, Pencil, Plus, Search, Send, Tags } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { fetchSearchRows } from '@/lib/paginated-search';
+import { useQuery } from '@tanstack/react-query';
+import { Archive, ChevronLeft, ChevronRight, FileSearch, LayoutDashboard, Pencil, Plus, Send, Tags } from 'lucide-react';
 import {
-  useReportsList,
   useReport,
   useCreateReport,
   useUpdateReport,
@@ -12,6 +13,7 @@ import {
   useUpdateReportCategory,
   useDeleteReportCategory,
   type ReportListItem,
+  type ReportPage,
   type ReportStatus,
 } from '@/lib/api/reports';
 import { CategoryManagerDialog } from '@/components/categories/CategoryManagerDialog';
@@ -21,7 +23,9 @@ import { Field, TextInput } from '@/components/ui/Field';
 import { Combobox } from '@/components/ui/Combobox';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
-import { ApiError } from '@/lib/api';
+import { FormSection } from '@/components/ui/FormSection';
+import { CombinedSearch, useCombinedSearch, type SearchColumn } from '@/components/ui/CombinedSearch';
+import { api, ApiError } from '@/lib/api';
 import { routes } from '@/lib/routes';
 import { openTab } from '@/lib/nav';
 import { ContextHelp } from '@/components/guide/ContextHelp';
@@ -32,16 +36,32 @@ import { ContextHelp } from '@/components/guide/ContextHelp';
  * fonte de dados (scope=report) e, publicado, aparece na tela de Consultas.
  */
 export function RelatoriosPage() {
-  const [q, setQ] = useState('');
-  const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [editKey, setEditKey] = useState<string | null | undefined>(undefined); // undefined=fechado, null=novo
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const pageSize = 20;
 
-  const list = useReportsList({ q: q || undefined, status: status || undefined, page, pageSize });
-  const total = list.data?.total ?? 0;
+  // Fetch every server page before filtering so a search reaches the entire catalogue.
+  const list = useQuery({
+    queryKey: ['reports', 'list', 'combined-search'],
+    refetchOnWindowFocus: 'always',
+    queryFn: ({ signal }) => fetchSearchRows(async page => {
+      signal.throwIfAborted();
+      return api.get<ReportPage>(`/api/v1/reports/?page=${page}&pageSize=100`);
+    }),
+  });
+  const columns: SearchColumn<ReportListItem>[] = [
+    { key: 'name', label: 'Relatório', value: r => r.name },
+    { key: 'description', label: 'Descrição', value: r => r.description },
+    { key: 'status', label: 'Status', value: r => STATUS_LABELS[r.status], options: Object.values(STATUS_LABELS).map(label => ({ value: label, label })) },
+    { key: 'updated', label: 'Atualizado', value: r => formatDate(r.updatedAt) },
+  ];
+  const search = useCombinedSearch(list.data ?? [], columns);
+  const total = search.rows.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const visible = search.rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  useEffect(() => { setPage(1); }, [search.query, search.filters]);
   const patch = usePatchReportStatus();
   const del = useDeleteReport();
 
@@ -113,31 +133,20 @@ export function RelatoriosPage() {
         />
       )}
 
-      <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-6 py-3">
-        <div className="relative flex-1">
-          <Search size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="search" placeholder="Buscar por nome..." value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-3 text-sm focus:border-slate-500 focus:outline-none" />
-        </div>
-        <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm">
-          <option value="">Todos</option>
-          <option value="draft">Rascunhos</option>
-          <option value="published">Publicados</option>
-          <option value="inactive">Inativos</option>
-        </select>
-      </div>
+      <CombinedSearch columns={columns} search={search} loading={list.isLoading} />
 
       <div className="flex-1 overflow-auto p-6">
-        {!list.isLoading && total === 0 ? (
+        {list.isError ? <div role="alert" className="py-12 text-center text-sm text-slate-700">Não foi possível carregar os relatórios. <button type="button" onClick={() => void list.refetch()} className="font-medium underline underline-offset-2">Tentar novamente</button></div> : !list.isLoading && total === 0 ? (
           <div className="flex flex-1 items-center justify-center py-16">
             <div className="max-w-md text-center">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400"><FileSearch size={26} /></div>
-              <p className="text-sm font-medium text-slate-700">{q || status ? 'Nenhum relatório encontrado' : 'Nenhum relatório ainda'}</p>
-              <p className="mt-1 text-sm text-slate-500">{q || status ? 'Ajuste a busca ou o filtro.' : 'Crie um relatório a partir de uma fonte de dados.'}</p>
+              <p className="text-sm font-medium text-slate-700">{search.query || search.activeCount ? 'Nenhum relatório encontrado' : 'Nenhum relatório ainda'}</p>
+              <p className="mt-1 text-sm text-slate-500">{search.query || search.activeCount ? 'Ajuste os filtros ou limpe a busca.' : 'Crie um relatório a partir de uma fonte de dados.'}</p>
             </div>
           </div>
         ) : (
           <>
-            <table className="w-full overflow-hidden rounded-md border border-slate-200 bg-white text-sm">
+            <table className="w-full min-w-[600px] overflow-hidden rounded-md border border-slate-200 bg-white text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-2 text-left">Relatório</th>
@@ -148,11 +157,11 @@ export function RelatoriosPage() {
               </thead>
               <tbody>
                 {list.isLoading && <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">Carregando...</td></tr>}
-                {list.data?.items.map((r) => (
+                {visible.map((r) => (
                   <tr key={r.key} className="border-t border-slate-100 hover:bg-slate-50">
                     <td className="px-4 py-2 font-medium text-slate-800">
                       <button type="button" onClick={() => setEditKey(r.key)} className="hover:underline">{r.name}</button>
-                      {r.description && <p className="text-xs font-normal text-slate-400">{r.description}</p>}
+                      {r.description && <p className="text-xs font-normal text-slate-600">{r.description}</p>}
                     </td>
                     <td className="px-4 py-2"><StatusBadge status={r.status} /></td>
                     <td className="px-4 py-2 text-slate-500">{formatDate(r.updatedAt)}</td>
@@ -172,9 +181,9 @@ export function RelatoriosPage() {
             <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
               <span>{total} relatório{total === 1 ? '' : 's'}</span>
               <div className="flex items-center gap-2">
-                <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="rounded border border-slate-300 p-1 disabled:opacity-40"><ChevronLeft size={14} /></button>
-                <span>{page} / {totalPages}</span>
-                <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="rounded border border-slate-300 p-1 disabled:opacity-40"><ChevronRight size={14} /></button>
+                <button type="button" aria-label="Página anterior" disabled={currentPage <= 1} onClick={() => setPage((p) => p - 1)} className="rounded border border-slate-300 p-1 disabled:opacity-40"><ChevronLeft size={14} /></button>
+                <span>{currentPage} / {totalPages}</span>
+                <button type="button" aria-label="Próxima página" disabled={currentPage >= totalPages} onClick={() => setPage((p) => p + 1)} className="rounded border border-slate-300 p-1 disabled:opacity-40"><ChevronRight size={14} /></button>
               </div>
             </div>
           </>
@@ -241,6 +250,7 @@ function RelatorioDialog({ editKey, onClose }: { editKey: string | null; onClose
     }>
       {!isNew && !detail.data ? <p className="text-sm text-slate-500">Carregando...</p> : (
         <form id="report-form" className="flex flex-col gap-3" onSubmit={submit}>
+          <FormSection compact title="Identificação" description="Nome, descrição e categoria exibidos no catálogo.">
           <Field label="Nome"><TextInput required minLength={2} value={name} onChange={(e) => setName(e.target.value)} autoFocus /></Field>
           <Field label="Descrição"><TextInput value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
           <Field label="Categoria" hint="Agrupa e colore o relatório em Consultas.">
@@ -252,6 +262,8 @@ function RelatorioDialog({ editKey, onClose }: { editKey: string | null; onClose
               placeholder="Selecione…"
             />
           </Field>
+          </FormSection>
+          <FormSection compact title="Origem dos dados">
           <Field label="Fonte de dados (relatório)">
             <Combobox
               value={dataSourceId}
@@ -262,11 +274,14 @@ function RelatorioDialog({ editKey, onClose }: { editKey: string | null; onClose
             />
             {sources.data && sources.data.length === 0 && <span className="mt-0.5 block text-xs text-slate-400">Nenhuma fonte com escopo "relatório". Crie em Configurações › Fontes de dados.</span>}
           </Field>
+          </FormSection>
         </form>
       )}
     </Dialog>
   );
 }
+
+const STATUS_LABELS: Record<ReportStatus, string> = { draft: 'Rascunho', published: 'Publicado', inactive: 'Inativo' };
 
 function StatusBadge({ status }: { status: ReportStatus }) {
   const map: Record<ReportStatus, { label: string; cls: string }> = {

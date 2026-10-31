@@ -32,7 +32,7 @@ const keys = {
 
 // ── Manuais ─────────────────────────────────────────────────────────────
 export function useManuals() {
-  return useQuery({ queryKey: keys.list, queryFn: () => api.get<ManualListItem[]>('/api/v1/manuals/') });
+  return useQuery({ queryKey: keys.list, queryFn: () => api.get<ManualListItem[]>('/api/v1/manuals/'), refetchOnWindowFocus: 'always' });
 }
 
 export function useManual(id: string | null) {

@@ -31,7 +31,7 @@ export type EmailTemplateWrite = {
 const keys = { all: ['email-templates'] as const, detail: (id: string) => ['email-templates', id] as const };
 
 export function useEmailTemplatesList() {
-  return useQuery({ queryKey: keys.all, queryFn: () => api.get<EmailTemplateListItem[]>('/api/v1/email-templates/') });
+  return useQuery({ queryKey: keys.all, queryFn: () => api.get<EmailTemplateListItem[]>('/api/v1/email-templates/'), refetchOnWindowFocus: 'always' });
 }
 
 export function useEmailTemplate(id: string | null) {

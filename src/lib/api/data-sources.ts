@@ -21,6 +21,7 @@ const dsKeys = { all: ['data-sources'] as const, scoped: (s: string) => ['data-s
 export function useDataSourcesList(scope?: DataSourceScope) {
   return useQuery({
     queryKey: scope ? dsKeys.scoped(scope) : dsKeys.all,
+      refetchOnWindowFocus: 'always',
     queryFn: () => api.get<DataSourceListItem[]>(`/api/v1/data-sources/${scope ? `?scope=${scope}` : ''}`),
   });
 }

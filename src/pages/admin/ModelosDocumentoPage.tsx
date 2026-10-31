@@ -18,6 +18,8 @@ import { formatWithRelative, formatDuration } from '@/lib/relative-time';
 import { openTab } from '@/lib/nav';
 import { routes } from '@/lib/routes';
 import { ContextHelp } from '@/components/guide/ContextHelp';
+import { FormSection } from '@/components/ui/FormSection';
+import { CombinedSearch, useCombinedSearch, type SearchColumn } from '@/components/ui/CombinedSearch';
 
 /**
  * Preview do modelo em nova aba, somente leitura (:11). Vai pelo PDF, que o navegador
@@ -29,7 +31,7 @@ async function preview(id: string) {
     await openDocumentTemplatePreview(id);
   } catch (error) {
     const detail = error instanceof ApiError
-      ? (error.body as { detail?: string } | undefined)?.detail
+      ? error.detail
       : error instanceof Error ? error.message : undefined;
     toast.error(detail ?? 'Não foi possível abrir o arquivo do modelo.');
   }
@@ -42,11 +44,18 @@ async function preview(id: string) {
  */
 export function ModelosDocumentoPage() {
   const list = useDocumentTemplates();
-  const [editId, setEditId] = useState<string | null>(null);
+  const columns: SearchColumn<DocumentTemplateListItem>[] = [
+    { key: 'name', label: 'Nome', value: row => row.name },
+    { key: 'description', label: 'Descrição', value: row => row.description ?? '' },
+    { key: 'file', label: 'Arquivo', value: row => row.hasFile ? (row.fileName ?? '') : 'Sem arquivo' },
+    { key: 'validation', label: 'Validação', value: row => !row.hasFile ? 'Sem arquivo' : row.templateValid ? 'Válido' : 'Com problemas', options: [{ value: 'Sem arquivo', label: 'Sem arquivo' }, { value: 'Válido', label: 'Válido' }, { value: 'Com problemas', label: 'Com problemas' }] },
+    { key: 'output', label: 'Saída', value: row => row.outputType.toUpperCase(), options: [{ value: 'DOCX', label: 'DOCX' }, { value: 'PDF', label: 'PDF' }] },
+    { key: 'status', label: 'Status', value: row => row.active ? 'Ativo' : 'Inativo', options: [{ value: 'Ativo', label: 'Ativo' }, { value: 'Inativo', label: 'Inativo' }] },
+  ];
+  const search = useCombinedSearch(list.data ?? [], columns);
   const [testId, setTestId] = useState<string | null>(null);
   const [histId, setHistId] = useState<{ id: string; nome: string } | null>(null);
   const [camposOpen, setCamposOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
   const del = useDeleteDocumentTemplate();
 
   async function askDelete(t: DocumentTemplateListItem) {
@@ -61,7 +70,7 @@ export function ModelosDocumentoPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
         <div className="flex items-center gap-1">
           <h1 className="text-lg font-semibold text-slate-900">Modelos de documentos</h1>
           <ContextHelp manual="documentos-assinaturas" section="criar-modelo-documento" label="Abrir manual de modelos de documentos" />
@@ -89,7 +98,7 @@ export function ModelosDocumentoPage() {
           </button>
           <button
             type="button"
-            onClick={() => setCreating(true)}
+            onClick={() => openTab(routes.documentTemplate('novo'))}
             className="flex items-center gap-2 rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-700"
           >
             <Plus size={16} /> <span className="hidden sm:inline">Novo modelo</span><span className="sm:hidden">Novo</span>
@@ -97,8 +106,11 @@ export function ModelosDocumentoPage() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto p-6">
-        {!list.isLoading && (list.data?.length ?? 0) === 0 ? (
+      <CombinedSearch columns={columns} search={search} loading={list.isLoading} />
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
+        {list.isError ? (
+          <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">Não foi possível carregar os modelos. <button type="button" onClick={() => void list.refetch()} className="font-medium underline">Tentar novamente</button></p>
+        ) : !list.isLoading && (list.data?.length ?? 0) === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400">
               <FileStack size={26} />
@@ -108,6 +120,8 @@ export function ModelosDocumentoPage() {
               Cadastre modelos .docx com chaves para gerar documentos nas tarefas.
             </p>
           </div>
+        ) : !list.isLoading && search.rows.length === 0 ? (
+          <div className="py-16 text-center text-sm text-slate-600"><p>Nenhum modelo corresponde à busca.</p><button type="button" onClick={search.clear} className="mt-3 font-medium text-slate-900 underline">Limpar busca</button></div>
         ) : (
           <>
           {/* Mobile: cards empilhados. A tabela larga jogaria os botões de ação para
@@ -115,7 +129,7 @@ export function ModelosDocumentoPage() {
               colunas viram linhas e as ações ficam sempre visíveis. */}
           <ul className="flex flex-col gap-2 sm:hidden">
             {list.isLoading && <li className="py-8 text-center text-slate-400">Carregando...</li>}
-            {list.data?.map((t) => (
+            {search.rows.map((t) => (
               <li key={t.id} className="rounded-md border border-slate-200 bg-white p-3" data-testid="doc-card">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -142,7 +156,7 @@ export function ModelosDocumentoPage() {
                   )}
                   <button type="button" onClick={() => setHistId({ id: t.id, nome: t.name })} title="Histórico"
                     className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800"><History size={15} /></button>
-                  <button type="button" onClick={() => setEditId(t.id)} title="Editar"
+                  <button type="button" onClick={() => openTab(routes.documentTemplate(t.id))} aria-label={`Editar ${t.name} em nova aba`} title="Editar em nova aba"
                     className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800"><Pencil size={15} /></button>
                   <button type="button" onClick={() => askDelete(t)} title="Excluir"
                     className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"><Trash2 size={15} /></button>
@@ -166,7 +180,7 @@ export function ModelosDocumentoPage() {
                 {list.isLoading && (
                   <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Carregando...</td></tr>
                 )}
-                {list.data?.map((t) => (
+                {search.rows.map((t) => (
                   <tr key={t.id} className="border-t border-slate-100 hover:bg-slate-50" data-testid="doc-linha">
                     <td className="px-4 py-2">
                       <span className="font-medium text-slate-800">{t.name}</span>
@@ -221,7 +235,7 @@ export function ModelosDocumentoPage() {
                         >
                           <History size={15} />
                         </button>
-                        <button type="button" onClick={() => setEditId(t.id)} title="Editar"
+                        <button type="button" onClick={() => openTab(routes.documentTemplate(t.id))} aria-label={`Editar ${t.name} em nova aba`} title="Editar em nova aba"
                           className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-800">
                           <Pencil size={15} />
                         </button>
@@ -243,8 +257,6 @@ export function ModelosDocumentoPage() {
       {camposOpen && <CamposDialog onClose={() => setCamposOpen(false)} />}
       {testId && <TestDialog id={testId} onClose={() => setTestId(null)} />}
       {histId && <HistoricoDialog id={histId.id} nome={histId.nome} onClose={() => setHistId(null)} />}
-      {creating && <TemplateDialog onClose={() => setCreating(false)} />}
-      {editId && <TemplateDialog id={editId} onClose={() => setEditId(null)} />}
     </div>
   );
 }
@@ -416,7 +428,7 @@ function TestDialog({ id, onClose }: { id: string; onClose: () => void }) {
       toast.success('Documento de teste gerado e aberto.');
     } catch (err) {
       const d = err instanceof ApiError
-        ? (err.body as { detail?: string } | undefined)?.detail
+        ? err.detail
         : err instanceof Error ? err.message : undefined;
       setErro(d ?? 'Não foi possível gerar o documento.');
     } finally { setGerando(false); }
@@ -473,7 +485,7 @@ function TestDialog({ id, onClose }: { id: string; onClose: () => void }) {
   );
 }
 
-function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
+export function DocumentTemplateEditor({ id, onClose }: { id?: string; onClose: () => void }) {
   const detail = useDocumentTemplate(id ?? null);
   const create = useCreateDocumentTemplate();
   const update = useUpdateDocumentTemplate();
@@ -520,7 +532,7 @@ function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
       toast.success(id ? 'Modelo atualizado.' : `Modelo "${name}" criado.`);
       onClose();
     } catch (err) {
-      const d = err instanceof ApiError ? (err.body as { detail?: string } | undefined)?.detail : undefined;
+      const d = err instanceof ApiError ? err.detail : undefined;
       toast.error(d ?? 'Não foi possível salvar o modelo.');
     }
   }
@@ -531,64 +543,45 @@ function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
       const r = await upload.mutateAsync({ id, file });
       toast.success(`Arquivo "${r.fileName}" enviado.`);
     } catch (err) {
-      const d = err instanceof ApiError ? (err.body as { detail?: string } | undefined)?.detail : undefined;
+      const d = err instanceof ApiError ? err.detail : undefined;
       toast.error(d ?? 'Não foi possível enviar o arquivo.');
     }
   }
 
+  const saving = create.isPending || update.isPending;
+  const title = id ? 'Editar modelo de documento' : 'Novo modelo de documento';
+
   return (
-    <Dialog
-      open
-      onClose={onClose}
-      width="lg"
-      title={id ? 'Editar modelo de documento' : 'Novo modelo de documento'}
-      footer={
-        <>
-          <button onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-1.5 text-sm">Cancelar</button>
-          <button form="dt-form" type="submit" disabled={!name || carregando}
-            className="rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">
-            Salvar
-          </button>
-        </>
-      }
-    >
-      {carregando ? (
-        <p className="py-10 text-center text-sm text-slate-400" data-testid="doc-carregando">Carregando o modelo…</p>
-      ) : (
-      <form id="dt-form" className="flex flex-col gap-3" onSubmit={save}>
-        <Field label="Nome"><TextInput required autoFocus value={name} onChange={(e) => setName(e.target.value)} /></Field>
-        <Field label="Descrição"><TextArea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
-        <Field label="Unidade organizacional" hint="Define quem pode editar o modelo pela permissão de unidade.">
-          <Combobox
-            value={orgUnitId}
-            options={unitOptions}
-            onChange={setOrgUnitId}
-            clearLabel="— sem unidade (global) —"
-            placeholder={units.isLoading ? 'Carregando…' : 'Selecione a unidade'}
-          />
-        </Field>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Status">
-            <RadioGroup<'ativo' | 'inativo'> name="dt-status" value={status} onChange={setStatus} options={STATUS_OPTIONS as any} />
-          </Field>
-          <Field label="Tipo de saída">
-            <RadioGroup<'docx' | 'pdf'> name="dt-output" value={outputType} onChange={setOutputType} options={OUTPUT_OPTIONS as any} />
-          </Field>
-        </div>
-
-        {/* A busca fica dentro do editor, no momento em que o usuário precisa das chaves. */}
-        <div className="flex flex-wrap gap-2 rounded-md bg-slate-50 p-2">
-          <button
-            type="button"
-            onClick={() => setCamposOpen(true)}
-            data-testid="dlg-buscar-campos"
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <Search size={13} /> Buscar campos disponíveis
-          </button>
-        </div>
-
-        {/* Arquivo: só existe depois de salvar (precisa do id para a chave no storage). */}
+    <div className="flex h-dvh flex-col bg-slate-100">
+      <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+        <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
+      </header>
+      <main className="min-h-0 flex-1 overflow-auto p-4 sm:p-6">
+        <div className="w-full rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
+          {carregando ? (
+            <div role={detail.isError ? 'alert' : 'status'} className="py-10 text-center text-sm text-slate-600" data-testid="doc-carregando">
+              {detail.isError ? <><p>Não foi possível carregar o modelo.</p><button type="button" onClick={() => void detail.refetch()} className="mt-3 font-medium text-slate-900 underline">Tentar novamente</button></> : 'Carregando o modelo…'}
+            </div>
+          ) : (
+            <form id="dt-form" onSubmit={save}>
+              <FormSection title="Identificação e responsabilidade" description="Identifique o modelo e a unidade responsável pela sua edição.">
+                <Field label="Nome"><TextInput required autoFocus value={name} onChange={(e) => setName(e.target.value)} /></Field>
+                <Field label="Descrição"><TextArea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
+                <Field label="Unidade organizacional" hint="Define quem pode editar o modelo pela permissão de unidade.">
+                  <Combobox value={orgUnitId} options={unitOptions} onChange={setOrgUnitId} clearLabel="— sem unidade (global) —" placeholder={units.isLoading ? 'Carregando…' : 'Selecione a unidade'} />
+                </Field>
+              </FormSection>
+              <FormSection title="Formato e disponibilidade" description="Escolha o formato gerado e se o modelo está disponível para uso.">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field label="Tipo de saída"><RadioGroup<'docx' | 'pdf'> name="dt-output" value={outputType} onChange={setOutputType} options={OUTPUT_OPTIONS} /></Field>
+                  <Field label="Status"><RadioGroup<'ativo' | 'inativo'> name="dt-status" value={status} onChange={setStatus} options={STATUS_OPTIONS} /></Field>
+                </div>
+              </FormSection>
+              <FormSection title="Arquivo" description="Envie o documento Word com as chaves que serão preenchidas nas tarefas.">
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => setCamposOpen(true)} data-testid="dlg-buscar-campos" className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"><Search size={14} /> Buscar campos disponíveis</button>
+                  <button type="button" onClick={() => openTab(routes.manualTemplates)} className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"><BookOpen size={14} /> Manual técnico</button>
+                </div>
         <Field label="Arquivo do modelo (.docx)" hint={id ? 'Word ou LibreOffice. O arquivo substitui o anterior.' : 'Salve o modelo primeiro para enviar o arquivo.'}>
           <div className="flex flex-wrap items-center gap-2">
             <input
@@ -597,7 +590,7 @@ function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
               accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               className="hidden"
               data-testid="doc-file-input"
-              onChange={(e) => void pickFile(e.target.files?.[0])}
+              onChange={(e) => { void pickFile(e.target.files?.[0]); e.target.value = ''; }}
             />
             <button
               type="button"
@@ -609,7 +602,7 @@ function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
             </button>
             {detail.data?.fileName && (
               <>
-                <span className="truncate text-sm text-slate-600">{detail.data.fileName}</span>
+                <span className="min-w-0 break-all text-sm text-slate-600">{detail.data.fileName}</span>
                 <button
                   type="button"
                   onClick={() => id && void preview(id)}
@@ -622,20 +615,24 @@ function TemplateDialog({ id, onClose }: { id?: string; onClose: () => void }) {
           </div>
         </Field>
 
-        {/* Erros de sintaxe do template detectados no upload (Fase 6b). */}
-        {issues.length > 0 && (
-          <div className="rounded-md border border-amber-300 bg-amber-50 p-3" data-testid="doc-issues">
-            <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-800">
-              <AlertTriangle size={13} /> Problemas encontrados no template
-            </p>
-            <ul className="list-disc space-y-0.5 pl-5 text-sm text-amber-900">
-              {issues.map((it, i) => <li key={i}>{it.message}</li>)}
-            </ul>
-          </div>
-        )}
-      </form>
-      )}
+              </FormSection>
+              <FormSection title="Validação" description="Confira o resultado da validação de sintaxe após o envio do arquivo.">
+                {issues.length > 0 ? (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-3" data-testid="doc-issues">
+                    <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-amber-900"><AlertTriangle size={15} /> Problemas encontrados no template</p>
+                    <ul className="list-disc space-y-1 pl-5 text-sm text-amber-900">{issues.map((it, i) => <li key={i}>{it.message}</li>)}</ul>
+                  </div>
+                ) : <p className="text-sm text-slate-600">{detail.data?.hasFile ? (detail.data.templateValid ? 'Nenhum problema de sintaxe encontrado no arquivo.' : 'O arquivo tem problemas de sintaxe. Envie uma versão corrigida.') : 'Envie um arquivo para validar o modelo.'}</p>}
+              </FormSection>
+            </form>
+          )}
+        </div>
+      </main>
+      <footer className="flex shrink-0 justify-end gap-2 border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
+        <button type="button" onClick={onClose} className="rounded-md border border-slate-300 px-3.5 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancelar</button>
+        <button form="dt-form" type="submit" disabled={!name.trim() || carregando || saving || upload.isPending} className="rounded-md bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60">{saving ? 'Salvando…' : 'Salvar'}</button>
+      </footer>
       {camposOpen && <CamposDialog onClose={() => setCamposOpen(false)} />}
-    </Dialog>
+    </div>
   );
 }

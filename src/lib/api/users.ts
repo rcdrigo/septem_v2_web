@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { fetchSearchRows } from '@/lib/paginated-search';
 
 export type UserListItem = {
   id: string;
@@ -56,6 +57,13 @@ export function useUsersList(params: UsersListParams) {
     queryKey: userKeys.list(params),
     queryFn: () => api.get<UsersPage>(`/api/v1/users/${toQuery(params)}`),
     placeholderData: (prev) => prev,   // pagination não pisca
+  });
+}
+
+export function useUsersForSearch() {
+  return useQuery({
+    queryKey: [...userKeys.all, 'combined-search'],
+    queryFn: () => fetchSearchRows(page => api.get<UsersPage>(`/api/v1/users/${toQuery({ page, pageSize: 100 })}`)),
   });
 }
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Copy, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Pencil, Plus, Trash2 } from 'lucide-react';
 import {
-  useUsersList,
+  useUsersForSearch,
   useUser,
   useCreateUser,
   useUpdateUser,
@@ -21,6 +21,8 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
 import { ContextHelp } from '@/components/guide/ContextHelp';
+import { FormSection } from '@/components/ui/FormSection';
+import { CombinedSearch, useCombinedSearch, type SearchColumn } from '@/components/ui/CombinedSearch';
 
 /**
  * Admin › Configurações › Usuários — IF1.b. Lista com busca + status + paginação,
@@ -28,14 +30,25 @@ import { ContextHelp } from '@/components/guide/ContextHelp';
  * soft-delete via ConfirmDialog.
  */
 export function UsuariosPage() {
-  const [q, setQ] = useState('');
-  const [status, setStatus] = useState<string>('');
   const [page, setPage] = useState(1);
   const pageSize = 20;
 
-  const list = useUsersList({ q: q || undefined, status: status || undefined, page, pageSize });
-  const total = list.data?.total ?? 0;
+  const list = useUsersForSearch();
+  const statusLabels = { active: 'Ativo', disabled: 'Desativado', invited: 'Convidado' };
+  const columns: SearchColumn<UserListItem>[] = [
+    { key: 'name', label: 'Nome', value: user => user.name },
+    { key: 'email', label: 'E-mail', value: user => user.email },
+    { key: 'status', label: 'Status', value: user => statusLabels[user.status], options: Object.values(statusLabels).map(label => ({ value: label, label })) },
+    { key: 'access', label: 'Acesso', value: user => user.isInternal ? 'Interno' : 'Externo', options: ['Interno', 'Externo'].map(label => ({ value: label, label })) },
+  ];
+  const search = useCombinedSearch(list.data ?? [], columns);
+  const total = search.rows.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const filterKey = JSON.stringify([search.query, search.filters]);
+  const [previousFilters, setPreviousFilters] = useState(filterKey);
+  if (previousFilters !== filterKey) { setPreviousFilters(filterKey); setPage(1); }
+  const activePage = Math.min(page, totalPages);
+  const rows = search.rows.slice((activePage - 1) * pageSize, activePage * pageSize);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -75,30 +88,9 @@ export function UsuariosPage() {
         </button>
       </header>
 
-      <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-6 py-3">
-        <div className="relative flex-1">
-          <Search size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            placeholder="Buscar por nome ou e-mail..."
-            value={q}
-            onChange={(e) => { setQ(e.target.value); setPage(1); }}
-            className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-3 text-sm focus:border-slate-500 focus:outline-none"
-          />
-        </div>
-        <select
-          value={status}
-          onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm"
-        >
-          <option value="">Todos</option>
-          <option value="active">Ativos</option>
-          <option value="disabled">Desativados</option>
-          <option value="invited">Convidados</option>
-        </select>
-      </div>
+      <CombinedSearch columns={columns} search={search} loading={list.isLoading} />
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-6">
         <table className="w-full overflow-hidden rounded-md border border-slate-200 bg-white text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>
@@ -110,13 +102,14 @@ export function UsuariosPage() {
             </tr>
           </thead>
           <tbody>
+            {list.isError && <tr><td colSpan={5} role="alert" className="px-4 py-6 text-sm text-rose-700">Não foi possível carregar os usuários. <button type="button" className="underline" onClick={() => void list.refetch()}>Tentar novamente</button></td></tr>}
             {list.isLoading && (
               <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Carregando...</td></tr>
             )}
-            {!list.isLoading && (list.data?.items.length ?? 0) === 0 && (
+            {!list.isLoading && search.rows.length === 0 && !list.isError && (
               <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Nenhum usuário encontrado.</td></tr>
             )}
-            {list.data?.items.map((u) => (
+            {rows.map((u) => (
               <tr key={u.id} className="border-t border-slate-100 hover:bg-slate-50">
                 <td className="px-4 py-2 font-medium text-slate-800">{u.name}</td>
                 <td className="px-4 py-2 text-slate-600">{u.email}</td>
@@ -152,16 +145,16 @@ export function UsuariosPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              disabled={page <= 1}
+              disabled={activePage <= 1}
               onClick={() => setPage((p) => p - 1)}
               className="rounded border border-slate-300 p-1 disabled:opacity-40"
             >
               <ChevronLeft size={14} />
             </button>
-            <span>{page} / {totalPages}</span>
+            <span>{activePage} / {totalPages}</span>
             <button
               type="button"
-              disabled={page >= totalPages}
+              disabled={activePage >= totalPages}
               onClick={() => setPage((p) => p + 1)}
               className="rounded border border-slate-300 p-1 disabled:opacity-40"
             >
@@ -265,14 +258,19 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
         >Criar</button>
       </>
     }>
-      <form id="create-user-form" className="flex flex-col gap-3" onSubmit={submit}>
+      <form id="create-user-form" onSubmit={submit}>
+        <FormSection title="Dados pessoais" compact description="Identificação e contato da pessoa.">
         <Field label="Nome">
           <TextInput required minLength={2} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         </Field>
         <Field label="E-mail">
           <TextInput required type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
-        <CadastralGrid value={cadastral} onChange={setCadastral} />
+        </FormSection>
+        <FormSection title="Dados funcionais" compact>
+          <CadastralGrid value={cadastral} onChange={setCadastral} />
+        </FormSection>
+        <FormSection title="Acesso ao sistema" compact description="Defina a situação da conta e as permissões de acesso.">
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={isInternal} onChange={(e) => setIsInternal(e.target.checked)} />
           Usuário interno (funcionário)
@@ -290,9 +288,12 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
             {profiles.data && profiles.data.length === 0 && <span className="text-xs text-slate-400">Nenhum perfil cadastrado.</span>}
           </div>
         </Field>
+        </FormSection>
+        <FormSection title="Unidades e posições" compact description="Vincule a pessoa às unidades e posições em que atua.">
         <Field label="Unidades e posições">
           <PositionsEditor positions={positions} onChange={setPositions} />
         </Field>
+        </FormSection>
       </form>
     </Dialog>
   );
@@ -357,14 +358,19 @@ function EditUserDialog({ id, onClose }: { id: string; onClose: () => void }) {
     }>
       {!user.data && <p className="text-sm text-slate-500">Carregando...</p>}
       {user.data && (
-        <form id="edit-user-form" className="flex flex-col gap-3" onSubmit={submit}>
+        <form id="edit-user-form" onSubmit={submit}>
+            <FormSection title="Dados pessoais" compact description="Identificação e contato da pessoa.">
           <Field label="Nome">
             <TextInput required value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
           <Field label="E-mail">
             <TextInput value={user.data.email} readOnly className="bg-slate-50 text-slate-500" />
           </Field>
+          </FormSection>
+        <FormSection title="Dados funcionais" compact>
           <CadastralGrid value={cadastral} onChange={setCadastral} />
+        </FormSection>
+        <FormSection title="Acesso ao sistema" compact description="Defina a situação da conta e as permissões de acesso.">
           <Field label="Status">
             <select
               value={status}
@@ -389,9 +395,12 @@ function EditUserDialog({ id, onClose }: { id: string; onClose: () => void }) {
               {profiles.data && profiles.data.length === 0 && <span className="text-xs text-slate-400">Nenhum perfil cadastrado.</span>}
             </div>
           </Field>
-          <Field label="Unidades e posições">
+          </FormSection>
+        <FormSection title="Unidades e posições" compact description="Vincule a pessoa às unidades e posições em que atua.">
+        <Field label="Unidades e posições">
             <PositionsEditor positions={positions} onChange={setPositions} />
           </Field>
+        </FormSection>
         </form>
       )}
     </Dialog>
@@ -404,7 +413,7 @@ function CadastralGrid({ value, onChange }: { value: UserCadastral; onChange: (v
   const set = (k: keyof UserCadastral) => (e: React.ChangeEvent<HTMLInputElement>) => onChange({ ...value, [k]: e.target.value });
   const cpfInvalid = !!value.cpf && !isValidCpf(value.cpf);
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid gap-4 sm:grid-cols-2">
       <Field label="CPF">
         <TextInput
           value={value.cpf ?? ''}
