@@ -1,6 +1,7 @@
 // Import RELATIVO, não `@/lib/uuid`: estes módulos são empacotados por sondas de contrato
 // que chamam o esbuild SEM o tsconfig, e lá o alias `@/` não resolve.
 import { novoId } from './uuid';
+import { slugify } from './slugify';
 import { NATIVE_FIELD_TYPES, type NativeFormDefinition, type NativeConfig, type NativeField, type NativeGroup, type NativePresentation, type NativeTab } from './native-form';
 
 export type NativeElement = NativeField | NativePresentation;
@@ -105,6 +106,36 @@ export function findNativeGroup(definition: NativeFormDefinition, groupId: strin
     if (group) return { tab, group };
   }
   throw new Error('Agrupamento não encontrado.');
+}
+
+export function generateNativeFieldKey({ definition, groupId, fieldId, label }: { definition: NativeFormDefinition; groupId: string; fieldId: string; label: string }): string {
+  const base = slugify(label).slice(0, 120);
+  if (!base) return '';
+  const used = new Set(definition.tabs.flatMap(t => t.groups.flatMap(g => [
+    ...(g.type === 'table' ? [g.key] : []),
+    ...g.fields.flatMap(f => f.kind === 'field' && f.id !== fieldId ? [f.key] : []),
+  ])));
+  if (!used.has(base)) return base;
+  const groupName = slugify(findNativeGroup(definition, groupId).group.label).slice(0, 59) || 'grupo';
+  const qualified = `${base.slice(0, 119 - groupName.length)}_${groupName}`;
+  let candidate = qualified;
+  for (let suffix = 2; used.has(candidate); suffix++) {
+    const ending = `_${suffix}`;
+    candidate = `${qualified.slice(0, 120 - ending.length)}${ending}`;
+  }
+  return candidate;
+}
+
+export function moveNativeGroup(definition: NativeFormDefinition, tabId: string, groupId: string, beforeId?: string) {
+  const tab = definition.tabs.find(t => t.id === tabId);
+  if (!tab) throw new Error('Aba não encontrada.');
+  const index = tab.groups.findIndex(g => g.id === groupId);
+  if (index < 0) throw new Error('Agrupamento não encontrado.');
+  if (beforeId !== undefined && !tab.groups.some(g => g.id === beforeId)) throw new Error('Posição de destino não encontrada.');
+  if (beforeId === groupId) return;
+  const [group] = tab.groups.splice(index, 1);
+  const position = beforeId === undefined ? tab.groups.length : tab.groups.findIndex(g => g.id === beforeId);
+  tab.groups.splice(position, 0, group);
 }
 
 export function createNativeTable(label: string, types: NativeElementType[]): NativeGroup {

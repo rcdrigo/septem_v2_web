@@ -72,10 +72,11 @@ function availableTabIds(field: any, native = false): Tab[] {
  * Painel de configuração do CAMPO selecionado, em 3 abas (Geral, Validação,
  * Aparência). Lê/edita o campo via a engine do form-js (`editField`).
  */
-export function FieldConfigPanel({ field, editField, masks, native = false, nativeTypeOptions, onNativeTypeChange, availableFields }: {
+export function FieldConfigPanel({ field, editField, masks, native = false, nativeTypeOptions, onNativeTypeChange, nativeKeyForLabel, availableFields }: {
   native?: boolean;
   nativeTypeOptions?: Opt[];
   onNativeTypeChange?: (type: string) => void;
+  nativeKeyForLabel?: (label: string) => string;
   availableFields?: { id: string; label: string }[];
   field: any | null;
   editField: (field: any, path: string[], value: unknown) => void;
@@ -221,7 +222,7 @@ export function FieldConfigPanel({ field, editField, masks, native = false, nati
                     if (field.key === '' || generatingInitialKey.current) generatingInitialKey.current = true;
                     editField(field, ['label'], v);
                     if (generatingInitialKey.current && slugify(v)) {
-                      const nextKey = slugify(v).slice(0, 120);
+                      const nextKey = nativeKeyForLabel ? nativeKeyForLabel(v) : slugify(v).slice(0, 120);
                       try { editField(field, ['key'], nextKey); setDraftKey(nextKey); }
                       catch { toast.error('Já existe um campo com essa chave. Personalize a chave para continuar.'); }
                     }

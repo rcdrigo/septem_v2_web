@@ -161,8 +161,23 @@ try {
     await page.setViewportSize({ width, height });
     await page.evaluate(s => window.loadXml(s), longForm);
     await page.getByRole('button', { name: 'Configurar aba', exact: true }).click();
-    const groupFooter = page.getByRole('button', { name: 'Adicionar campo ao final de Grupo 1', exact: true });
+    assert.equal(await page.getByRole('button', { name: 'Configurar aba', exact: true }).count(), 1);
+    assert.equal(await page.getByRole('button', { name: 'Novo agrupamento', exact: true }).count(), 1);
+    const actions = page.getByRole('group', { name: 'Ações da aba', exact: true });
+    const initialActions = await actions.boundingBox();
+    const checkActions = async () => {
+      const box = await actions.boundingBox();
+      assert.ok(box.y >= 0 && box.y + box.height <= height && Math.abs(box.y - initialActions.y) <= 1, `${device}: barra sempre visível na mesma posição`);
+      for (const control of await actions.getByRole('button').all()) {
+        const rect = await control.boundingBox();
+        assert.ok(rect.x >= 0 && rect.x + rect.width <= width && rect.y >= box.y && rect.y + rect.height <= box.y + box.height, `${device}: botões sem cortes`);
+      }
+    };
+    await checkActions();
+    const groupFooter = page.getByRole('button', { name: 'Adicionar campo em Grupo 1', exact: true });
+    assert.equal(await groupFooter.count(), 1, 'apenas uma ação de campo por agrupamento');
     await groupFooter.scrollIntoViewIfNeeded();
+    await checkActions();
     const lastField = page.locator('[data-field-id="footer-field-23"]');
     assert.ok((await groupFooter.boundingBox()).y >= (await lastField.boundingBox()).y + (await lastField.boundingBox()).height,
       `${device}: ação abaixo do último campo do agrupamento longo`);
@@ -174,17 +189,14 @@ try {
     let changed = await saved();
     assert.equal(changed.tabs[0].groups[0].fields.at(-1).label, 'Campo no final', `${device}: campo criado no fim do grupo correto`);
     assert.equal(changed.tabs[0].groups[1].fields.length, 0);
-    await page.getByRole('button', { name: 'Adicionar campo ao final de Grupo vazio', exact: true }).click();
+    await page.getByRole('button', { name: 'Adicionar campo em Grupo vazio', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Texto', exact: true }).click();
     await page.getByLabel('Nome', { exact: true }).fill('Primeiro campo');
-    await page.getByRole('button', { name: 'Adicionar campo ao final de Tabela final', exact: true }).click();
+    await page.getByRole('button', { name: 'Adicionar campo em Tabela final', exact: true }).click();
     assert.equal(await page.getByRole('dialog').getByRole('button', { name: 'HTML', exact: true }).count(), 0);
     await page.keyboard.press('Escape');
-    const newGroupFooter = page.getByRole('button', { name: 'Novo agrupamento em Aba 1', exact: true });
-    await newGroupFooter.scrollIntoViewIfNeeded();
-    const lastGroup = page.locator('[data-group-id="footer-table"]');
-    assert.ok((await newGroupFooter.boundingBox()).y >= (await lastGroup.boundingBox()).y + (await lastGroup.boundingBox()).height,
-      `${device}: ações da aba abaixo do último agrupamento`);
+    const newGroupFooter = actions.getByRole('button', { name: 'Novo agrupamento', exact: true });
+    await checkActions();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${device}: sem overflow horizontal`);
     await page.screenshot({ path: join(footerOutput, `${device}-tab.png`) });
     await newGroupFooter.click();
@@ -192,14 +204,57 @@ try {
     changed = await saved();
     assert.equal(changed.tabs[0].groups.length, 4, `${device}: agrupamento criado ao final da aba`);
     assert.equal(changed.tabs[0].groups[1].fields[0].label, 'Primeiro campo');
-    await page.getByRole('button', { name: 'Configurar aba Aba 1', exact: true }).click();
+    await page.getByLabel('Nome', { exact: true }).fill('Responsável');
+    for (const expected of ['campo_no_final_responsavel', 'campo_no_final_responsavel_2']) {
+      await page.getByRole('button', { name: 'Adicionar campo em Responsável', exact: true }).click();
+      await page.getByRole('dialog').getByRole('button', { name: 'Texto', exact: true }).click();
+      await page.getByLabel('Nome', { exact: true }).fill('Campo no final');
+      assert.equal(await page.getByLabel('Chave (identificador)', { exact: true }).inputValue(), expected, `${device}: colisão resolvida automaticamente`);
+      await page.getByLabel('Nome', { exact: true }).blur();
+    }
+    await page.getByLabel('Chave (identificador)', { exact: true }).fill('chave_personalizada');
+    await page.getByLabel('Chave (identificador)', { exact: true }).blur();
+    await page.getByLabel('Nome', { exact: true }).fill('Outro nome');
+    await page.getByLabel('Nome', { exact: true }).blur();
+    assert.equal((await saved()).tabs[0].groups[3].fields[1].key, 'chave_personalizada', 'renomear preserva chave já definida');
+    await checkActions();
+    await actions.getByRole('button', { name: 'Configurar aba', exact: true }).click();
     await page.getByLabel('Nome', { exact: true }).fill('Aba configurada pelo rodapé');
     changed = await saved();
     assert.equal(changed.tabs[0].label, 'Aba configurada pelo rodapé');
     await page.evaluate(s => window.loadXml(s), changed);
     assert.deepEqual(await saved(), changed, `${device}: ações do rodapé persistem após reabrir`);
+
+    const reorderForm = structuredClone(changed);
+    reorderForm.tabs[0].groups[0].fields = reorderForm.tabs[0].groups[0].fields.slice(0, 1);
+    await page.evaluate(s => window.loadXml(s), reorderForm);
+    const order = reorderForm.tabs[0].groups.map(g => g.id);
+    const handle = page.getByRole('button', { name: 'Mover agrupamento Tabela final', exact: true });
+    await handle.focus();
+    await page.keyboard.press('ArrowUp');
+    assert.deepEqual((await saved()).tabs[0].groups.map(g => g.id), [order[0], order[2], order[1], order[3]], `${device}: reordenação por teclado`);
+    await page.keyboard.press('ArrowDown');
+    assert.deepEqual((await saved()).tabs[0].groups.map(g => g.id), order);
+    if (device === 'desktop') {
+      await handle.dragTo(page.locator(`[data-group-id="${order[0]}"] > div`).first());
+      changed = await saved();
+      assert.deepEqual(changed.tabs[0].groups.map(g => g.id), [order[2], order[0], order[1], order[3]], 'arraste real reordena agrupamento');
+      const box = await handle.boundingBox();
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + 10, box.y + box.height / 2 + 10, { steps: 5 });
+      await page.locator('[data-group-drop-end]').scrollIntoViewIfNeeded();
+      const end = await page.locator('[data-group-drop-end]').boundingBox();
+      await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2, { steps: 10 });
+      await page.mouse.up();
+      assert.deepEqual((await saved()).tabs[0].groups.map(g => g.id), [order[0], order[1], order[3], order[2]], 'arraste ao final');
+    }
+    changed = await saved();
+    for (const g of changed.tabs[0].groups) assert.deepEqual(g, reorderForm.tabs[0].groups.find(original => original.id === g.id), 'reordenar preserva todo o conteúdo');
+    await page.evaluate(s => window.loadXml(s), changed);
+    assert.deepEqual(await saved(), changed, 'ordem persiste após reabrir');
   }
-  console.log(`PASSOU: ações no fim de agrupamentos longos/vazios e tabelas, teclado, criação, configuração e persistência em desktop/mobile. Capturas: ${footerOutput}`);
+  console.log(`PASSOU: ações únicas, barra fixa, reordenação por arraste/teclado, chaves únicas e persistência em desktop/mobile. Capturas: ${footerOutput}`);
   await page.evaluate(() => { window.oldFlush = window.flush; window.previousFlush = window.captureFlush(); window.unmount(); });
   await page.evaluate(() => window.render(true));
   if (await page.evaluate(() => !!window.previousFlush)) assert.equal(await page.evaluate(() => window.previousFlush().then(() => false, () => true)), true, 'flush antigo não salva após remontagem');

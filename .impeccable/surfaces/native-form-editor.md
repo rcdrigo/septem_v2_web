@@ -10,7 +10,7 @@ OWN-WORLD: preservar a interface clara do modelador: superfícies white/slate-50
 
 STORY: começar com aba e grupo prontos, criar estruturas, escolher tipos, editar propriedades e salvar o processo.
 
-FIRST VIEWPORT: barra de abas acima do canvas; grupos empilhados com ação Adicionar campo no cabeçalho; propriedades à direita. O grupo selecionado recebe borda escura. Em telas estreitas, propriedades seguem o canvas no mesmo scroll.
+FIRST VIEWPORT: barra de abas acima do canvas; grupos empilhados com alça de reordenação no cabeçalho e ação Adicionar campo apenas no rodapé. Configurar aba e Novo agrupamento aparecem uma única vez, em uma barra sempre visível na base do editor, fora da área de rolagem. Propriedades à direita; o grupo selecionado recebe borda escura. Em telas estreitas, propriedades seguem o canvas no mesmo scroll, acima da barra de ações.
 
 FORM: extensão prescrita pelo desenho confirmado, sem sorteio de conceitos. Controles HTML e diálogo do projeto, com foco visível, teclado e estados vazios explícitos.
 

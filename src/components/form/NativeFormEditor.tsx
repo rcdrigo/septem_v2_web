@@ -11,7 +11,7 @@ import { NativeStructureDialog, type StructureAction } from './NativeStructureDi
 import { FieldConfigPanel } from './FieldConfigPanel';
 import { Field, TextInput, TextArea, Switch } from '@/components/ui/Field';
 import { nativeFields, type NativeFormDefinition, type NativeGroup, type NativeTab } from '@/lib/native-form';
-import { canDragNativeElement, findNativeGroup, moveNativeElement, NATIVE_CATALOG, createNativeElement, createNativeGroup, createNativeTab, changeNativeElementType, editNativeElement, nativePanelField, hasOptions, type NativeElement, type NativeElementType } from '@/lib/native-form-editor';
+import { canDragNativeElement, findNativeGroup, moveNativeElement, moveNativeGroup, generateNativeFieldKey, NATIVE_CATALOG, createNativeElement, createNativeGroup, createNativeTab, changeNativeElementType, editNativeElement, nativePanelField, hasOptions, type NativeElement, type NativeElementType } from '@/lib/native-form-editor';
 
 const button = 'inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 disabled:cursor-not-allowed disabled:opacity-50';
 type Selection = { tabId: string; groupId?: string; fieldId?: string };
@@ -28,7 +28,7 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
   const [catalog, setCatalog] = useState(false);
   const [newGroup, setNewGroup] = useState(false);
   const [structureAction, setStructureAction] = useState<StructureAction | null>(null);
-  const [drag, setDrag] = useState<{ groupId: string; fieldId: string } | null>(null);
+  const [drag, setDrag] = useState<{ kind: 'field'; groupId: string; fieldId: string } | { kind: 'group'; groupId: string } | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const [checkingRemoval, setCheckingRemoval] = useState(false);
@@ -95,7 +95,7 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
     window.requestAnimationFrame(() => nameRef.current?.focus());
   }
   function acceptsDrop(destination: NativeGroup) {
-    return !!drag && canDragNativeElement(findNativeGroup(definition, drag.groupId).group, destination);
+    return drag?.kind === 'field' && canDragNativeElement(findNativeGroup(definition, drag.groupId).group, destination);
   }
   function move(sourceId: string, fieldId: string, destinationId: string, beforeId?: string) {
     update(next => moveNativeElement(next, sourceId, fieldId, destinationId, beforeId));
@@ -105,8 +105,18 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
   }
   function drop(e: React.DragEvent, destination: NativeGroup, beforeId?: string) {
     e.preventDefault(); e.stopPropagation();
-    if (drag && acceptsDrop(destination)) move(drag.groupId, drag.fieldId, destination.id, beforeId);
+    if (drag?.kind === 'field' && acceptsDrop(destination)) move(drag.groupId, drag.fieldId, destination.id, beforeId);
     else setNotice('Use Transferir campo para mover entre tabelas ou entre Padrão e Tabela.');
+    setDrag(null); setDropTarget(null);
+  }
+  function reorderGroup(groupId: string, beforeId?: string) {
+    update(next => moveNativeGroup(next, tab.id, groupId, beforeId));
+    setSelection({ tabId: tab.id, groupId });
+    setNotice(`Agrupamento ${tab.groups.find(g => g.id === groupId)?.label} reposicionado.`);
+  }
+  function dropGroup(e: React.DragEvent, beforeId?: string) {
+    e.preventDefault(); e.stopPropagation();
+    if (drag?.kind === 'group') reorderGroup(drag.groupId, beforeId);
     setDrag(null); setDropTarget(null);
   }
   async function remove(target?: { tabId: string; groupId: string; fieldId: string }) {
@@ -169,7 +179,8 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
     .filter(f => f.kind === 'field' && !f.key)
     .map(f => ({ aba: t.label, grupo: g.label, campo: f.label }))));
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-auto lg:flex-row lg:overflow-hidden" data-native-editor>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden" data-native-editor>
+      <div className="flex min-h-0 flex-1 flex-col overflow-auto lg:flex-row lg:overflow-hidden">
       <div className="min-w-0 flex-1 lg:overflow-y-auto">
         {/* `role=status`, não `alert`: é orientação, não erro urgente — e um `alert` aqui
             entrava no caminho de quem espera "nenhum alerta na tela" como sinal de que não
@@ -181,8 +192,8 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
         </div>}
         {invalid.length > 0 && <div role="alert" className="border-b border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"><p className="font-semibold">Corrija as referências antes de publicar</p><p>O rascunho pode ser salvo.</p><ul className="mt-2 list-disc pl-5">{invalid.map((r, i) => <li key={i} className="break-words">{r.owner} · {r.use}: {r.key}</li>)}</ul></div>}
         <nav aria-label="Abas do formulário" className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3">
-          {definition.tabs.map(t => <button type="button" key={t.id} onDragEnter={() => { if (drag) setSelection({ tabId: t.id, groupId: t.groups[0].id }); }}
-            onDragOver={e => { if (drag) e.preventDefault(); }} aria-current={t.id === tab.id ? 'page' : undefined}
+          {definition.tabs.map(t => <button type="button" key={t.id} onDragEnter={() => { if (drag?.kind === 'field') setSelection({ tabId: t.id, groupId: t.groups[0].id }); }}
+            onDragOver={e => { if (drag?.kind === 'field') e.preventDefault(); }} aria-current={t.id === tab.id ? 'page' : undefined}
             className={`${button} aria-[current=page]:border-slate-900 aria-[current=page]:bg-slate-900 aria-[current=page]:text-white aria-[current=page]:hover:bg-slate-800`}
             onClick={() => { setSelection({ tabId: t.id, groupId: t.groups[0].id }); setCatalog(false); }}>{renderIcon(typeof t.config?.icon === 'string' ? t.config.icon : undefined, 16)}{t.label || 'Aba sem nome'}</button>)}
           <button type="button" className={button} onClick={() => {
@@ -194,27 +205,32 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
         <p role="status" className="px-4 pt-2 text-sm text-slate-600">{notice || 'Arraste pela alça para ordenar. Para mover entre abas, mantenha o campo sobre a aba de destino.'}</p>
         {removalError && <p role="alert" className="px-4 pt-2 text-sm text-red-700">{removalError}</p>}
         <div className="space-y-5 bg-slate-50 p-3 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <button type="button" className={button} onClick={() => { setSelection({ tabId: tab.id }); window.requestAnimationFrame(() => nameRef.current?.focus()); }}><Settings2 size={16} /> Configurar aba</button>
-            <button type="button" className={button} onClick={() => setNewGroup(true)}><Plus size={16} /> Novo agrupamento</button>
-          </div>
           {tab.groups.map(g => <section key={g.id} aria-label={g.label || 'Agrupamento sem nome'} data-group-id={g.id}
-            onDragOver={e => { if (acceptsDrop(g)) { e.preventDefault(); setDropTarget(g.id); } }}
-            onDrop={e => drop(e, g)}
+            onDragOver={e => { if (drag?.kind === 'group' || acceptsDrop(g)) { e.preventDefault(); e.stopPropagation(); setDropTarget(g.id); } }}
+            onDrop={e => drag?.kind === 'group' ? dropGroup(e, g.id) : drop(e, g)}
             className={`rounded-lg border bg-white ${dropTarget === g.id ? 'border-blue-700 ring-2 ring-blue-700' : g.id === group?.id ? 'border-slate-700 ring-1 ring-slate-700' : 'border-slate-200'}`}>
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 p-3">
+            <div className="flex items-stretch gap-2 border-b border-slate-200 p-3">
+              <button type="button" draggable aria-label={`Mover agrupamento ${g.label}`} title="Arraste para mover; use as setas para ordenar pelo teclado."
+                className="shrink-0 cursor-grab rounded px-1 text-slate-600 hover:bg-slate-100 focus-visible:outline-2 active:cursor-grabbing"
+                onClick={() => selectGroup(g)}
+                onKeyDown={e => {
+                  const index = tab.groups.findIndex(item => item.id === g.id);
+                  if (e.key === 'ArrowUp' && index > 0) { e.preventDefault(); reorderGroup(g.id, tab.groups[index - 1].id); }
+                  if (e.key === 'ArrowDown' && index < tab.groups.length - 1) { e.preventDefault(); reorderGroup(g.id, tab.groups[index + 2]?.id); }
+                }}
+                onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', g.id); setDrag({ kind: 'group', groupId: g.id }); setNotice('Solte sobre um agrupamento para inserir antes dele ou na área ao final para inserir por último.'); }}
+                onDragEnd={() => { setDrag(null); setDropTarget(null); }}><GripVertical size={16} /></button>
               <button type="button" aria-pressed={g.id === group?.id && !field} className="flex min-w-0 items-center gap-2 rounded p-1 text-left focus-visible:outline-2"
                 onClick={() => { selectGroup(g); window.requestAnimationFrame(() => nameRef.current?.focus()); }}>
                 {g.type === 'table' ? <Table2 size={18} /> : <Rows3 size={18} />}
                 <span className="break-words font-semibold text-slate-900">{g.label || 'Agrupamento sem nome'}</span>
                 <span className="text-xs text-slate-600">{g.type === 'table' ? 'Tabela' : 'Padrão'}</span>
               </button>
-              <button type="button" className={button} aria-label={`Adicionar campo em ${g.label}`} onClick={() => { selectGroup(g); setCatalog(true); }}><Plus size={16} /> Adicionar campo</button>
             </div>
             {typeof g.config?.description === 'string' && <p className="px-4 pt-3 text-sm text-slate-600">{g.config.description}</p>}
             {g.fields.length === 0 ? <p className="p-5 text-sm text-slate-600">{g.type === 'table' ? 'Adicione campos para definir as colunas desta tabela.' : 'Adicione o primeiro campo deste agrupamento.'}</p>
               : <div className="divide-y divide-slate-100">{g.fields.map(f => <div key={f.id} data-field-id={f.id} className="flex items-stretch"
-                onDragOver={e => { e.stopPropagation(); if (acceptsDrop(g)) { e.preventDefault(); setDropTarget(f.id); } }} onDrop={e => drop(e, g, f.id)}>
+                onDragOver={e => { if (drag?.kind === 'field') { e.stopPropagation(); if (acceptsDrop(g)) { e.preventDefault(); setDropTarget(f.id); } } }} onDrop={e => { if (drag?.kind === 'field') drop(e, g, f.id); }}>
                 <button type="button" draggable aria-label={`Mover ${f.label}`} title="Arraste para mover; use as setas para ordenar pelo teclado."
                   className="cursor-grab px-2 text-slate-600 hover:bg-slate-100 focus-visible:outline-2 active:cursor-grabbing"
                   onClick={() => { setSelection({ tabId: tab.id, groupId: g.id, fieldId: f.id }); }}
@@ -223,7 +239,7 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
                     if (e.key === 'ArrowUp' && index > 0) { e.preventDefault(); move(g.id, f.id, g.id, g.fields[index - 1].id); }
                     if (e.key === 'ArrowDown' && index < g.fields.length - 1) { e.preventDefault(); move(g.id, f.id, g.id, g.fields[index + 2]?.id); }
                   }}
-                  onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', f.id); setDrag({ groupId: g.id, fieldId: f.id }); setNotice('Solte antes de um campo ou no agrupamento para inserir ao final.'); }}
+                  onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', f.id); setDrag({ kind: 'field', groupId: g.id, fieldId: f.id }); setNotice('Solte antes de um campo ou no agrupamento para inserir ao final.'); }}
                   onDragEnd={() => { setDrag(null); setDropTarget(null); }}><GripVertical size={16} /></button>
                 <button type="button" aria-pressed={f.id === field?.id}
                 className={`flex min-w-0 w-full flex-wrap ${dropTarget === f.id ? 'border-t-2 border-blue-700' : ''} items-center justify-between gap-2 px-4 py-4 text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] ${f.id === field?.id ? 'bg-slate-100' : 'hover:bg-slate-50'}`}
@@ -236,13 +252,11 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
                 className="shrink-0 self-center rounded-md p-2 text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:cursor-not-allowed disabled:opacity-50"><Trash2 size={16} aria-hidden="true" /></button>
               </div>)}</div>}
             <div className="flex justify-end border-t border-slate-200 p-3">
-              <button type="button" className={button} aria-label={`Adicionar campo ao final de ${g.label}`} onClick={() => { selectGroup(g); setCatalog(true); }}><Plus size={16} /> Adicionar campo</button>
+              <button type="button" className={button} aria-label={`Adicionar campo em ${g.label}`} onClick={() => { selectGroup(g); setCatalog(true); }}><Plus size={16} /> Adicionar campo</button>
             </div>
           </section>)}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-4">
-            <button type="button" className={button} aria-label={`Configurar aba ${tab.label}`} onClick={() => { setSelection({ tabId: tab.id }); window.requestAnimationFrame(() => nameRef.current?.focus()); }}><Settings2 size={16} /> Configurar aba</button>
-            <button type="button" className={button} aria-label={`Novo agrupamento em ${tab.label}`} onClick={() => setNewGroup(true)}><Plus size={16} /> Novo agrupamento</button>
-          </div>
+          {drag?.kind === 'group' && <div data-group-drop-end onDragOver={e => { e.preventDefault(); setDropTarget('group-end'); }} onDrop={e => dropGroup(e)}
+            className={`rounded-md border border-dashed p-4 text-center text-sm ${dropTarget === 'group-end' ? 'border-blue-700 bg-blue-50 text-blue-900' : 'border-slate-300 text-slate-600'}`}>Solte aqui para mover o agrupamento ao final.</div>}
         </div>
       </div>
       <aside aria-label="Propriedades da seleção" data-native-properties className="w-full shrink-0 border-t border-slate-200 bg-white lg:w-80 lg:overflow-y-auto lg:border-l lg:border-t-0">
@@ -257,7 +271,7 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
           <button type="button" className={`${button} text-red-700`} disabled={!canRemove || checkingRemoval} onClick={() => void remove()}><Trash2 size={15} /> {checkingRemoval ? 'Verificando respostas…' : `Excluir ${kindLabel}`}</button>
           {!canRemove && <p className="text-xs text-slate-600">{group ? 'Cada aba precisa de pelo menos um agrupamento.' : 'O formulário precisa de pelo menos uma aba.'}</p>}
         </div>}
-        {field && panel && <>
+        {group && field && panel && <>
           {hasOptions(field.type) && <div className="space-y-2 border-b border-slate-200 p-4">
             <h3 className="text-sm font-semibold">Opções da lista</h3>
             {Array.isArray(options) && options.map((option, index) => {
@@ -272,6 +286,7 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
             <button type="button" className={button} onClick={() => editField(field.id, f => editNativeElement(f, ['values'], [...(Array.isArray(options) ? options : []), { label: 'Nova opção', value: novoId() }]))}>Adicionar opção</button>
           </div>}
           <FieldConfigPanel key={`${field.id}:${field.type}`} native field={panel} masks={masks}
+            nativeKeyForLabel={label => generateNativeFieldKey({ definition, groupId: group.id, fieldId: field.id, label })}
             nativeTypeOptions={NATIVE_CATALOG.filter(item => (item.category === 'Apresentação') === (field.kind === 'presentation')).map(item => ({ value: item.type, label: item.label }))}
             onNativeTypeChange={type => editField(field.id, f => changeNativeElementType(f, type as NativeElementType))}
             availableFields={nativeFields(definition).filter(f => !!f.field.key).map(f => ({ id: f.path, label: f.field.label }))}
@@ -283,6 +298,11 @@ export function NativeFormEditor({ definition, update, masks, modeler, processKe
           {field.kind === 'field' && field.config?.archived === true && <p className="text-sm text-slate-600">Campo arquivado. Após a publicação, não será exibido nas tarefas nem nos relatórios; as respostas serão preservadas.</p>}
         </div>}
       </aside>
+      </div>
+      <div role="group" aria-label="Ações da aba" data-native-actions className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white p-3">
+        <button type="button" className={button} onClick={() => { setSelection({ tabId: tab.id }); window.requestAnimationFrame(() => nameRef.current?.focus()); }}><Settings2 size={16} /> Configurar aba</button>
+        <button type="button" className={button} onClick={() => setNewGroup(true)}><Plus size={16} /> Novo agrupamento</button>
+      </div>
       {blockedRemoval && <Dialog open title="Não é possível excluir" onClose={() => setBlockedRemoval(null)} width="sm">
         <p className="text-sm text-slate-700">Estes campos já possuem execuções e não podem ser excluídos. Foram arquivados no rascunho. Ao publicar, deixarão de aparecer nas tarefas e nos relatórios; as respostas serão preservadas.</p>
         <ul className="my-4 list-disc space-y-1 pl-5 text-sm">{blockedRemoval.usages.map(u => <li key={u.fieldId} className="break-words">{u.label} — {u.executionCount} {u.executionCount === 1 ? 'requisição' : 'requisições'}</li>)}</ul>
