@@ -14,6 +14,7 @@ import {
   type DataSourceScope,
   type DataSourceType,
   type TestResult,
+  type DataSourceTable,
 } from '@/lib/api/data-sources';
 import { openTab } from '@/lib/nav';
 import { Dialog } from '@/components/ui/Dialog';
@@ -22,6 +23,7 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/stores/toast';
 import { ApiError } from '@/lib/api';
 import { normalizeSqlQuery } from '@/lib/sql-query';
+import { formatFormFieldMapping, parseFormFieldMapping, type ApiMapping } from '@/lib/data-source-mapping';
 import { routes } from '@/lib/routes';
 import { ContextHelp } from '@/components/guide/ContextHelp';
 
@@ -119,6 +121,7 @@ export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string
   const [headers, setHeaders] = useState<ApiHeader[]>([]);
   const [body, setBody] = useState('');
   const [mapping, setMapping] = useState({ repeat: '', value: '', text: '' });
+  const [fieldMapping, setFieldMapping] = useState('');
   const [result, setResult] = useState<TestResult | null>(null);
   const [hydrated, setHydrated] = useState(!id);
 
@@ -127,7 +130,11 @@ export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string
     setName(d.name); setDescription(d.description ?? ''); setType(d.type);
     if (d.type === 'fixed') setItems(cfg.items?.length ? cfg.items : [{ value: '', label: '' }]);
     if (d.type === 'sql') setQuery(cfg.query ?? '');
-    if (d.type === 'api') { setUrl(cfg.url ?? ''); setMethod(cfg.method ?? 'GET'); setHeaders(cfg.headers ?? []); setBody(cfg.body ?? ''); setMapping(cfg.mapping ?? { repeat: '', value: '', text: '' }); }
+    if (d.type === 'api') {
+      setUrl(cfg.url ?? ''); setMethod(cfg.method ?? 'GET'); setHeaders(cfg.headers ?? []); setBody(cfg.body ?? '');
+      setMapping({ repeat: cfg.mapping?.repeat ?? '', value: cfg.mapping?.value ?? '', text: cfg.mapping?.text ?? '' });
+      setFieldMapping(formatFormFieldMapping(cfg.mapping?.fields));
+    }
     setHydrated(true);
   }
 
@@ -138,23 +145,23 @@ export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string
       setQuery(normalized);
       return { query: normalized };
     }
-    return { url, method, headers: headers.filter((h) => h.k), body, mapping };
+    return { url, method, headers: headers.filter((h) => h.k), body, mapping: { ...mapping, fields: parseFormFieldMapping(fieldMapping) } satisfies ApiMapping };
   }
 
   async function runTest() {
     setResult(null);
     try { setResult(await test.mutateAsync({ type, config: buildConfig() })); }
-    catch (err) { toast.error(err instanceof ApiError ? (err.detail ?? 'Falha no teste.') : 'Falha no teste.'); }
+    catch (err) { toast.error(err instanceof ApiError ? (err.detail ?? 'Falha no teste.') : err instanceof Error ? err.message : 'Falha no teste.'); }
   }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    const body = { name, description: description || undefined, scope, type, config: buildConfig() };
     try {
+      const body = { name, description: description || undefined, scope, type, config: buildConfig() };
       if (id) await update.mutateAsync({ id, body }); else await create.mutateAsync(body);
       toast.success(id ? 'Fonte atualizada.' : `Fonte "${name}" criada.`);
       onClose();
-    } catch (err) { toast.error(err instanceof ApiError ? (err.detail ?? err.message) : 'Não foi possível salvar a fonte.'); }
+    } catch (err) { toast.error(err instanceof ApiError ? (err.detail ?? err.message) : err instanceof Error ? err.message : 'Não foi possível salvar a fonte.'); }
   }
 
   const title = id ? 'Editar fonte de dados' : 'Nova fonte de dados';
@@ -212,12 +219,12 @@ export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string
         )}
         {type === 'api' && (
           <>
-            <ApiEditor url={url} setUrl={setUrl} method={method} setMethod={setMethod} headers={headers} setHeaders={setHeaders} body={body} setBody={setBody} mapping={mapping} setMapping={setMapping} />
+            <ApiEditor url={url} setUrl={setUrl} method={method} setMethod={setMethod} headers={headers} setHeaders={setHeaders} body={body} setBody={setBody} mapping={mapping} setMapping={setMapping} fieldMapping={fieldMapping} setFieldMapping={setFieldMapping} />
             <PlaceholderHelp />
           </>
         )}
 
-        {result && <ResultTable result={result} />}
+        {result && (type === 'api' ? <ApiTestResult result={result} /> : <ResultTable result={result} />)}
       </form>
     );
   }
@@ -300,6 +307,7 @@ function ApiEditor(p: {
   url: string; setUrl: (v: string) => void; method: string; setMethod: (v: string) => void;
   headers: ApiHeader[]; setHeaders: (v: ApiHeader[]) => void; body: string; setBody: (v: string) => void;
   mapping: { repeat: string; value: string; text: string }; setMapping: (v: { repeat: string; value: string; text: string }) => void;
+  fieldMapping: string; setFieldMapping: (v: string) => void;
 }) {
   return (
     <>
@@ -320,27 +328,50 @@ function ApiEditor(p: {
         </div>
       </Field>
       {p.method !== 'GET' && <Field label="Body (JSON)"><TextArea rows={3} value={p.body} onChange={(e) => p.setBody(e.target.value)} className="font-mono text-xs" /></Field>}
-      <Field label="Mapeamento (JSON path pontilhado)">
-        <div className="grid grid-cols-3 gap-2">
-          <TextInput value={p.mapping.repeat} placeholder="nó de repetição (ex: data)" onChange={(e) => p.setMapping({ ...p.mapping, repeat: e.target.value })} />
-          <TextInput value={p.mapping.value} placeholder="nó de valor (ex: id)" onChange={(e) => p.setMapping({ ...p.mapping, value: e.target.value })} />
-          <TextInput value={p.mapping.text} placeholder="nó de texto (ex: nome)" onChange={(e) => p.setMapping({ ...p.mapping, text: e.target.value })} />
+      <fieldset className="space-y-2">
+        <legend className="text-xs font-medium uppercase tracking-wide text-slate-500">Mapeamento das opções</legend>
+        <p className="text-xs text-slate-600">Use caminhos JSON pontilhados. Valor e texto são usados em campos de seleção. Para uma resposta com um único objeto, deixe o nó de repetição vazio.</p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <Field label="Nó de repetição"><TextInput value={p.mapping.repeat} placeholder="data.itens" onChange={(e) => p.setMapping({ ...p.mapping, repeat: e.target.value })} /></Field>
+          <Field label="Nó de valor"><TextInput value={p.mapping.value} placeholder="id" onChange={(e) => p.setMapping({ ...p.mapping, value: e.target.value })} /></Field>
+          <Field label="Nó de texto"><TextInput value={p.mapping.text} placeholder="nome" onChange={(e) => p.setMapping({ ...p.mapping, text: e.target.value })} /></Field>
         </div>
+      </fieldset>
+      <Field label="Mapeamento dos campos do formulário">
+        <p className="text-xs text-slate-600">Informe <code>identificador =&gt; caminho JSON</code>, um por linha. O caminho parte de cada item do nó de repetição ou da resposta inteira, se esse nó estiver vazio.</p>
+        <TextArea rows={4} value={p.fieldMapping} onChange={(e) => p.setFieldMapping(e.target.value)} className="font-mono text-xs" placeholder={'status_pagamento => Situacao\ncomprovante_pagamento_boleto => ImagemUrl\nvalor_pago => ValorPago'} />
+        <p className="text-xs text-slate-600">No modelador, abra <strong>Formulário</strong>, selecione o campo e copie a opção <strong>Chave (identificador)</strong> no painel de propriedades.</p>
+        <p className="mt-1 text-xs text-slate-600">Ao executar a fonte, os valores retornados preenchem os campos indicados. Em uma lista de opções, o preenchimento acompanha a opção selecionada.</p>
       </Field>
     </>
   );
 }
 
-function ResultTable({ result }: { result: TestResult }) {
+function ApiTestResult({ result }: { result: TestResult }) {
+  const original = result.originalResponse ?? '';
+  const mapped = result.mappedResult;
+  return (
+    <div className="space-y-3" aria-live="polite">
+      <section className="overflow-hidden rounded-md border border-slate-200" aria-label="Resultado original">
+        <h2 className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">Resultado original</h2>
+        <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-xs text-slate-700">{original || 'Resposta sem conteúdo.'}</pre>
+      </section>
+      {result.mappingError && <p role="alert" className="text-sm text-rose-700">{result.mappingError}</p>}
+      {mapped && mapped.columns.length > 0 && mapped.rows.length > 0 && <ResultTable result={mapped} title="Resultado mapeado" />}
+    </div>
+  );
+}
+
+function ResultTable({ result, title = 'Resultado' }: { result: DataSourceTable; title?: string }) {
   return (
     <div className="rounded-md border border-slate-200">
-      <p className="border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500">Resultado ({result.rows.length} linha{result.rows.length === 1 ? '' : 's'})</p>
-      <div className="max-h-48 overflow-auto">
+      <p className="border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600">{title} ({result.rows.length} linha{result.rows.length === 1 ? '' : 's'})</p>
+      <div className="max-h-48 overflow-auto" tabIndex={0} role="region" aria-label={title}>
         <table className="w-full text-xs">
           <thead className="bg-white text-slate-500"><tr>{result.columns.map((c) => <th key={c} className="px-3 py-1.5 text-left font-medium">{c}</th>)}</tr></thead>
           <tbody>
             {result.rows.map((row, i) => (
-              <tr key={i} className="border-t border-slate-100">{row.map((cell, j) => <td key={j} className="px-3 py-1.5 text-slate-700">{cell ?? <span className="text-slate-300">null</span>}</td>)}</tr>
+              <tr key={i} className="border-t border-slate-100">{row.map((cell, j) => <td key={j} className="px-3 py-1.5 text-slate-700">{cell == null ? <span className="text-slate-500">null</span> : typeof cell === 'object' ? JSON.stringify(cell) : String(cell)}</td>)}</tr>
             ))}
           </tbody>
         </table>
@@ -355,24 +386,32 @@ function PlaceholderHelp() {
   const ph = usePlaceholders();
   return (
     <div className="rounded-md border border-slate-200 bg-slate-50 p-2">
-      <button type="button" onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900">
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900">
         <Braces size={12} /> {open ? 'Ocultar' : 'Ver'} placeholders
       </button>
       {open && (
         <div className="mt-2 space-y-2">
-          <p className="text-[11px] text-slate-400">Use {`{{escopo.campo}}`} na consulta/URL/corpo — resolvido na execução. Clique para copiar.</p>
+          <p className="text-xs text-slate-600">Placeholders são marcadores substituídos por dados do requisitante, do executor, do processo ou do formulário ao executar a fonte. Use-os na consulta SQL, na URL, nos headers ou no corpo da API. Clique em um marcador para copiar.</p>
+          {ph.isPending && <p role="status" className="text-xs text-slate-600">Carregando placeholders…</p>}
+          {ph.isError && <p role="alert" className="text-xs text-rose-700">Não foi possível carregar os placeholders. <button type="button" onClick={() => void ph.refetch()} className="underline">Tentar novamente</button></p>}
           {(ph.data?.groups ?? []).map((g) => (
             <div key={g.group}>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{g.group}</p>
+              <p className="text-xs font-semibold text-slate-600">{g.group}</p>
               <div className="mt-1 flex flex-wrap gap-1">
                 {g.items.map((it) => (
                   <button key={it.token} type="button" title={`${it.label} — clique para copiar`}
-                    onClick={() => { navigator.clipboard?.writeText(it.token); toast.success('Placeholder copiado.'); }}
+                    onClick={async () => { try { await navigator.clipboard.writeText(it.token); toast.success('Placeholder copiado.'); } catch { toast.error('Não foi possível copiar o placeholder. Selecione o texto e copie manualmente.'); } }}
                     className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[11px] text-slate-700 hover:bg-slate-100">{it.token}</button>
                 ))}
               </div>
             </div>
           ))}
+          <div className="space-y-1 border-t border-slate-200 pt-2 text-xs text-slate-600">
+            <p className="font-semibold">Placeholders de formulários</p>
+            <p>Para um campo simples, use <code className="select-all break-all">{'{{formulario.identificador}}'}</code>. Exemplo: <code className="select-all break-all">{'{{formulario.cpf}}'}</code>. Substitua o identificador pela Chave (identificador) do campo, disponível ao selecioná-lo no editor de Formulário do modelador.</p>
+            <p>Para campos de uma tabela, use <code className="select-all break-all">{'{{formulario.chave_da_tabela.identificador}}'}</code>. Exemplo: <code className="select-all break-all">{'{{formulario.itens.valor}}'}</code>. Os valores das linhas são unidos por vírgula e espaço.</p>
+            <p>No teste do editor, requisitante e executor correspondem ao usuário conectado, e os dados do processo são exemplos. Os valores do formulário ficam disponíveis durante o preenchimento ou a execução do processo.</p>
+          </div>
         </div>
       )}
     </div>

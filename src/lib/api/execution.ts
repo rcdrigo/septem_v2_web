@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AutomationSource } from '@/lib/form-automation/runtime';
+import type { DataSourceOption } from '@/lib/api/data-sources';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { fetchDocumentCodes, fetchTaskSignatures } from '@/lib/upload';
@@ -36,7 +37,7 @@ export type TaskFilters = {
 };
 export type TaskSummary = { pendingCount: number };
 export type TaskButton = { id: string; label: string; validateForm: boolean; requireJustification?: boolean; primaryColor?: string | null; textColor?: string | null; icon?: string | null; hint?: string | null };
-export type FieldOptions = Record<string, { value: string; label: string }[]>;
+export type FieldOptions = Record<string, DataSourceOption[]>;
 export type TaskDetail = {
   id: string; name: string | null; status: string; executionId: string;
   process?: string | null; processNumber?: number | null; isTest?: boolean;

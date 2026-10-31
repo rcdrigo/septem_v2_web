@@ -13,6 +13,8 @@ import { routes } from '@/lib/routes';
 import { useQueryClient } from '@tanstack/react-query';
 import { signatureKeys, useDocumentCodes, useTaskSignatures } from '@/lib/api/execution';
 import { api, ApiError } from '@/lib/api';
+import type { DataSourceOption, FieldOptionsResponse } from '@/lib/api/data-sources';
+import { applyDataSourceFields } from '@/lib/form-data-source';
 import { regexToTemplate, applyMask, isAllDigits } from '@/lib/mask';
 import { maskDocumento, type DocKind } from '@/lib/documento';
 import { dateModeOfComponent, dateFieldLabel, type DateMode, type DateLimit } from '@/lib/datafield';
@@ -47,7 +49,7 @@ function dateModeOf(component: Component): DateMode {
   return dateModeOfComponent(component);
 }
 
-type OptionsMap = Record<string, { value: string; label: string }[]>;
+type OptionsMap = Record<string, DataSourceOption[]>;
 function collectInputs(components: Component[] | undefined, acc: Component[]) {
   for (const c of components ?? []) {
     if (c.key && INPUT_TYPES.has(c.type ?? '')) acc.push(c);
@@ -70,6 +72,7 @@ type Runtime = {
   removeRow: (key: string, index: number, scope?: string) => void;
   errors: Record<string, string>;
   set: (k: string, v: unknown) => void;
+  applyFieldValues: (fields: Record<string, unknown> | null | undefined, scope?: string) => void;
   dsOptions: OptionsMap;
   readOnly?: boolean;
   fieldState: FieldState;
@@ -140,10 +143,10 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
       (async () => {
         for (const c of dsFields) {
           try {
-            const res = await api.post<{ options: { value: string | null; label: string | null }[] }>(
-              '/api/v1/workflow/field-options', { dataSourceId: c.properties!.septemDataSourceId, taskId: uploadContext?.taskId });
+            const res = await api.post<FieldOptionsResponse>(
+              '/api/v1/workflow/field-options', { dataSourceId: c.properties!.septemDataSourceId, taskId: uploadContext?.taskId, formData: valuesRef.current });
             if (cancelled) return;
-            const opts = res.options.map((o) => ({ value: String(o.value ?? ''), label: String(o.label ?? o.value ?? '') }));
+            const opts = res.options.map((o) => ({ ...o, value: String(o.value ?? ''), label: String(o.label ?? o.value ?? '') }));
             setDsOptions((prev) => ({ ...prev, [c.key!]: opts }));
           } catch { /* sem permissão/erro: degrada para as opções estáticas */ }
         }
@@ -186,6 +189,9 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
       };
       valuesRef.current = update(valuesRef.current, 0);
       setValues(valuesRef.current);
+    }
+    function applyFieldValues(fields: Record<string, unknown> | null | undefined, scope = '') {
+      applyDataSourceFields({ components: schemaRef.current.components ?? [], fields, scope, set, setScoped });
     }
     function removeRow(key: string, index: number, scope = '') {
       const rows = scopeData(scope)[key];
@@ -239,7 +245,12 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
         setFieldState: (path, patch) => setFieldState(previous => ({ ...previous, [path]: { ...previous[path], ...patch } })),
         setSchema: (next) => { schemaRef.current = next; setRuntimeSchema(next); },
         setOptions: (key, options) => setDsOptions(prev => ({ ...prev, [key]: options })),
-        dataSource: (id, parameters) => api.post('/api/v1/workflow/field-options', { dataSourceId: id, parameters, taskId: uploadContext?.taskId }),
+        dataSource: async (id, parameters) => {
+          const response = await api.post<FieldOptionsResponse>('/api/v1/workflow/field-options', { dataSourceId: id, parameters, taskId: uploadContext?.taskId, formData: valuesRef.current });
+          if (automation.current !== runtime) return response;
+          applyFieldValues(response.fieldValues);
+          return response;
+        },
         onError: (message) => { automationError.current = message; setAutomationMessage(message); },
       }, readOnly ? [] : automationScripts ?? []);
       automation.current = runtime;
@@ -314,7 +325,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
 
     const pendingErrors = native && !readOnly ? validateForm(root.components ?? [], values, fieldState, dateErrors) : {};
     const runtime: Runtime = {
-      values, readValues: () => valuesRef.current, prefix: '', removeRow, errors: native && submitted ? { ...errors, ...pendingErrors } : errors, set, dsOptions, readOnly, fieldState, dateErrors, setDateError, runEvent, uploadContext,
+      values, readValues: () => valuesRef.current, prefix: '', removeRow, errors: native && submitted ? { ...errors, ...pendingErrors } : errors, set, applyFieldValues, dsOptions, readOnly, fieldState, dateErrors, setDateError, runEvent, uploadContext,
       assinaturas: { dados: queryAssinaturas.data ?? null, recarregar: recarregarAssinaturas },
       codigosDeDocumento,
     };
@@ -354,7 +365,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
 ReactForm.displayName = 'ReactForm';
 
 function Node({ comp }: { comp: Component }) {
-  const { values, errors, set, dsOptions, readOnly, fieldState, runEvent, setDateError, prefix } = useRuntime();
+  const { values, errors, set, applyFieldValues, dsOptions, readOnly, fieldState, runEvent, setDateError, prefix } = useRuntime();
   const controlId = useId();
 
   if (comp.key ? (fieldState[comp.key]?.hidden ?? comp.automationHidden) : comp.automationHidden) return null;
@@ -383,7 +394,7 @@ function Node({ comp }: { comp: Component }) {
 
   const v = values[key];
   const err = errors[key];
-  const options = dsOptions[key] ?? comp.values ?? [];
+  const options: DataSourceOption[] = dsOptions[key] ?? comp.values ?? [];
   const helpType = comp.properties?.septemHelpType ?? 'inline';
   const helpText = comp.properties?.septemHelpText;
   const popoverHelp = helpType === 'popover' ? helpText : null;
@@ -412,7 +423,11 @@ function Node({ comp }: { comp: Component }) {
     onBlur: (e: unknown) => runEvent(comp, 'blur', e),
     onFocus: (e: unknown) => runEvent(comp, 'focus', e),
   };
-  const setAndEmit = (val: unknown, e: unknown) => { set(key, val); runEvent(comp, 'change', e); };
+  const setAndEmit = (val: unknown, e: unknown) => {
+    set(key, val);
+    if (comp.type === 'select' || comp.type === 'radio') applyFieldValues(options.find(option => option.value === val)?.fieldValues);
+    runEvent(comp, 'change', e);
+  };
 
   const reqMark = (fieldState[key]?.required ?? comp.validate?.required)
     ? <span className="text-rose-500"> *</span>
@@ -754,6 +769,7 @@ function DynamicList({ comp }: { comp: Component }) {
               dateErrors: scopeMap(rt.dateErrors, `${key}.${i}`),
               setDateError: (k, message) => rt.setDateError(`${key}.${i}.${k}`, message),
               runEvent: (c, type, event, scope) => rt.runEvent(c, type, event, scope ?? fieldPath(rt.prefix, `${key}.${i}`)),
+              applyFieldValues: (fields) => rt.applyFieldValues(fields, fieldPath(rt.prefix, `${key}.${i}`)),
               set: (k, v) => {
                 const latest = rt.readValues()[key] as Record<string, unknown>[];
                 setRows(latest.map((r, j) => j === i ? { ...r, [k]: v } : r));
@@ -1149,6 +1165,7 @@ function NativeTable({ comp }: { comp: Component }) {
             setDateError: (field, message) => rt.setDateError(`${key}.${index}.${field}`, message),
             runEvent: (field, type, event) => rt.runEvent(field, type, event, `${key}.${index}`),
             set: (field, value) => rt.set(key, latestRows().map((item, i) => i === index ? { ...item, [field]: value } : item)),
+            applyFieldValues: (fields) => rt.applyFieldValues(fields, `${key}.${index}`),
           }}>
             {columns.map(field => <td key={field.id} className="px-2 py-3 align-top" data-form-id={field.id} data-form-key={`${key}.${index}.${field.key}`}><Node comp={field} /></td>)}
           </RuntimeCtx.Provider>

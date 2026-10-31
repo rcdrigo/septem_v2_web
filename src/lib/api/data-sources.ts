@@ -8,7 +8,10 @@ export type DataSourceListItem = { id: string; name: string; type: DataSourceTyp
 export type DataSourceDetail = { id: string; name: string; description: string | null; scope: DataSourceScope; type: DataSourceType; config: unknown };
 export type DataSourceWrite = { name: string; description?: string; scope: DataSourceScope; type: DataSourceType; config: unknown };
 
-export type TestResult = { columns: string[]; rows: (string | null)[][] };
+export type DataSourceTable = { columns: string[]; rows: unknown[][] };
+export type TestResult = DataSourceTable & { originalResponse?: string | null; mappedResult?: DataSourceTable | null; mappingError?: string | null };
+export type DataSourceOption = { value: string; label: string; fieldValues?: Record<string, unknown> | null };
+export type FieldOptionsResponse = { options: (Omit<DataSourceOption, 'value' | 'label'> & { value: string | null; label: string | null })[]; fieldValues?: Record<string, unknown> | null };
 export type DataSourceLog = { id: number; occurredAt: string; origin: string | null; status: string; durationMs: number; error: string | null };
 export type LogsPage = { items: DataSourceLog[]; total: number; page: number; pageSize: number };
 
