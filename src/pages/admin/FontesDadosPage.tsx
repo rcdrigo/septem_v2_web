@@ -26,8 +26,10 @@ import { normalizeSqlQuery } from '@/lib/sql-query';
 import { formatFormFieldMapping, parseFormFieldMapping, type ApiMapping } from '@/lib/data-source-mapping';
 import { routes } from '@/lib/routes';
 import { ContextHelp } from '@/components/guide/ContextHelp';
+import { EditableTableEditor, TableQueryEditor } from './TableDataSourceEditors';
+import { readEditableTable, readTableQuery, validateEditableTable, comparisons, type EditableTable, type TableQuery } from '@/lib/table-data-source';
 
-const TYPE_LABEL: Record<DataSourceType, string> = { fixed: 'Fixa', sql: 'SQL', api: 'API (JSON)' };
+const TYPE_LABEL: Record<DataSourceType, string> = { fixed: 'Fixa (Simples)', 'fixed-table': 'Fixa (Tabela)', table: 'Customizado (Tabela)', sql: 'Customizado (SQL)', api: 'API (JSON)' };
 
 /**
  * Fontes de dados (T1). Lista + editor por tipo (Fixa / SQL / API) com "Testar".
@@ -70,7 +72,7 @@ export function FontesDadosPage() {
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400"><Database size={26} /></div>
             <p className="text-sm font-medium text-slate-700">Nenhuma fonte de dados</p>
-            <p className="mt-1 text-sm text-slate-500">Crie uma fonte Fixa, SQL ou API para popular selects do formulário e outros pontos.</p>
+            <p className="mt-1 text-sm text-slate-500">Crie uma fonte simples, uma tabela ou uma integração para preencher os campos do formulário.</p>
           </div>
         ) : (
           <table className="w-full overflow-hidden rounded-md border border-slate-200 bg-white text-sm">
@@ -116,6 +118,9 @@ export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string
   const [type, setType] = useState<DataSourceType>('fixed');
   const [items, setItems] = useState<FixedItem[]>([{ value: '', label: '' }]);
   const [query, setQuery] = useState('');
+  const [table, setTable] = useState<EditableTable>({ columns: ['Código', 'Descrição'], rows: [['', '']] });
+  const [tableQuery, setTableQuery] = useState<TableQuery>({ sourceId: '', valueColumn: '', textColumn: '', filters: [] });
+  const [samples, setSamples] = useState<Record<string, string>>({});
   const [url, setUrl] = useState('');
   const [method, setMethod] = useState('GET');
   const [headers, setHeaders] = useState<ApiHeader[]>([]);
@@ -130,6 +135,8 @@ export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string
     setName(d.name); setDescription(d.description ?? ''); setType(d.type);
     if (d.type === 'fixed') setItems(cfg.items?.length ? cfg.items : [{ value: '', label: '' }]);
     if (d.type === 'sql') setQuery(cfg.query ?? '');
+    if (d.type === 'fixed-table') setTable(readEditableTable(d.config));
+    if (d.type === 'table') { setTableQuery(readTableQuery(d.config)); setFieldMapping(formatFormFieldMapping(cfg.mapping?.fields)); }
     if (d.type === 'api') {
       setUrl(cfg.url ?? ''); setMethod(cfg.method ?? 'GET'); setHeaders(cfg.headers ?? []); setBody(cfg.body ?? '');
       setMapping({ repeat: cfg.mapping?.repeat ?? '', value: cfg.mapping?.value ?? '', text: cfg.mapping?.text ?? '' });
@@ -138,8 +145,16 @@ export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string
     setHydrated(true);
   }
 
+  if (id && !hydrated) return <p role={detail.error ? 'alert' : 'status'} className="p-4 text-sm text-slate-700">{detail.error ? 'Não foi possível carregar a fonte. Reabra esta página para tentar novamente.' : 'Carregando fonte de dados…'}</p>;
+
   function buildConfig(): unknown {
     if (type === 'fixed') return { items: items.filter((i) => i.value || i.label) };
+    if (type === 'fixed-table') return validateEditableTable(table);
+    if (type === 'table') {
+      if (!tableQuery.sourceId || !tableQuery.valueColumn || !tableQuery.textColumn) throw new Error('Selecione a fonte de origem e as colunas de valor e texto.');
+      if (tableQuery.filters.some(f => !f.column || !f.field.trim() || !comparisons.some(c => c.value === f.operator))) throw new Error('Preencha coluna, comparação e identificador em todos os filtros.');
+      return { ...tableQuery, filters: tableQuery.filters.map(f => ({ ...f, field: f.field.trim() })), mapping: { fields: parseFormFieldMapping(fieldMapping) } };
+    }
     if (type === 'sql') {
       const normalized = normalizeSqlQuery(query);
       setQuery(normalized);
@@ -150,7 +165,7 @@ export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string
 
   async function runTest() {
     setResult(null);
-    try { setResult(await test.mutateAsync({ type, config: buildConfig() })); }
+    try { setResult(await test.mutateAsync({ type, config: buildConfig(), params: type === 'table' ? samples : undefined })); }
     catch (err) { toast.error(err instanceof ApiError ? (err.detail ?? 'Falha no teste.') : err instanceof Error ? err.message : 'Falha no teste.'); }
   }
 
@@ -200,15 +215,20 @@ export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string
   function renderForm() {
     return (
       <form id="ds-form" className="flex flex-col gap-3" onSubmit={save}>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid gap-2 sm:grid-cols-2">
           <Field label="Nome"><TextInput required autoFocus value={name} onChange={(e) => setName(e.target.value)} /></Field>
           <Field label="Tipo">
-            <Select value={type} options={[{ value: 'fixed', label: 'Fixa' }, { value: 'sql', label: 'Customizado (SQL)' }, { value: 'api', label: 'API (JSON)' }]} onChange={(e) => { setType(e.target.value as DataSourceType); setResult(null); }} />
+            <Select value={type} options={Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))} onChange={(e) => { setType(e.target.value as DataSourceType); setResult(null); }} />
           </Field>
         </div>
         <Field label="Descrição"><TextArea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
 
         {type === 'fixed' && <FixedEditor items={items} setItems={setItems} />}
+        {type === 'fixed-table' && <EditableTableEditor value={table} onChange={setTable} />}
+        {type === 'table' && <>
+          <TableQueryEditor value={tableQuery} onChange={setTableQuery} scope={scope} samples={samples} onSamples={setSamples} />
+          <FormFieldMappingEditor value={fieldMapping} onChange={setFieldMapping} table />
+        </>}
         {type === 'sql' && (
           <>
             <Field label="Consulta (SELECT ou procedure — somente leitura)" hint="Roda no banco do tenant. 1 coluna → valor=texto; 2 → valor,texto. Use @parametros. Suporta {{placeholders}} (resolvidos como parâmetro na execução).">
@@ -224,7 +244,10 @@ export function DataSourceDialog({ id, scope, onClose, fullPage }: { id?: string
           </>
         )}
 
-        {result && (type === 'api' ? <ApiTestResult result={result} /> : <ResultTable result={result} />)}
+        {result && (type === 'api' ? <ApiTestResult result={result} /> : <>
+          <ResultTable result={result} />
+          {type === 'table' && result.mappedResult && result.mappedResult.rows.length > 0 && <ResultTable result={result.mappedResult} title="Resultado mapeado" />}
+        </>)}
       </form>
     );
   }
@@ -337,14 +360,18 @@ function ApiEditor(p: {
           <Field label="Nó de texto"><TextInput value={p.mapping.text} placeholder="nome" onChange={(e) => p.setMapping({ ...p.mapping, text: e.target.value })} /></Field>
         </div>
       </fieldset>
-      <Field label="Mapeamento dos campos do formulário">
-        <p className="text-xs text-slate-600">Informe <code>identificador =&gt; caminho JSON</code>, um por linha. O caminho parte de cada item do nó de repetição ou da resposta inteira, se esse nó estiver vazio.</p>
-        <TextArea rows={4} value={p.fieldMapping} onChange={(e) => p.setFieldMapping(e.target.value)} className="font-mono text-xs" placeholder={'status_pagamento => Situacao\ncomprovante_pagamento_boleto => ImagemUrl\nvalor_pago => ValorPago'} />
-        <p className="text-xs text-slate-600">No modelador, abra <strong>Formulário</strong>, selecione o campo e copie a opção <strong>Chave (identificador)</strong> no painel de propriedades.</p>
-        <p className="mt-1 text-xs text-slate-600">Ao executar a fonte, os valores retornados preenchem os campos indicados. Em uma lista de opções, o preenchimento acompanha a opção selecionada.</p>
-      </Field>
+      <FormFieldMappingEditor value={p.fieldMapping} onChange={p.setFieldMapping} />
     </>
   );
+}
+
+function FormFieldMappingEditor({ value, onChange, table = false }: { value: string; onChange: (value: string) => void; table?: boolean }) {
+  return <Field label="Mapeamento dos campos do formulário">
+    <p className="text-xs text-slate-600">Informe <code>{table ? 'identificador => coluna' : 'identificador => caminho JSON'}</code>, um por linha. {table ? 'Use o nome exato da coluna da tabela de origem.' : 'O caminho parte de cada item do nó de repetição ou da resposta inteira, se esse nó estiver vazio.'}</p>
+    <TextArea rows={4} value={value} onChange={e => onChange(e.target.value)} className="font-mono text-xs" placeholder={table ? 'codigo_atividade => Código da atividade' : 'status_pagamento => Situacao\nvalor_pago => ValorPago'} />
+    <p className="text-xs text-slate-600">No modelador, abra <strong>Formulário</strong>, selecione o campo e copie a opção <strong>Chave (identificador)</strong> no painel de propriedades.</p>
+    <p className="text-xs text-slate-600">Ao executar a fonte, os valores retornados preenchem os campos indicados. Em uma lista de opções, o preenchimento acompanha a opção selecionada.</p>
+  </Field>;
 }
 
 function ApiTestResult({ result }: { result: TestResult }) {

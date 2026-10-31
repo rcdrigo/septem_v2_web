@@ -43,7 +43,7 @@ const VALIDATABLE = new Set(['textfield', 'textarea', 'number', 'datetime']);
 /** Tipos sem "rótulo" (conteúdo vem de outras propriedades, ou nenhum). */
 const NO_LABEL = new Set(['text', 'html', 'image', 'spacer', 'separator']);
 /** Tipos que exibem o seletor de Fonte de dados na aba Geral. */
-const FONTE_DADOS_TYPES = new Set(['textfield', 'number', 'datetime', 'select', 'radio', 'checklist', 'taglist', 'text', 'image']);
+const FONTE_DADOS_TYPES = new Set(['textfield', 'textarea', 'number', 'datetime', 'select', 'radio', 'checklist', 'taglist', 'text', 'image']);
 
 /** Divide as abas em linhas que sempre preenchem 100% (no máx. 3 por linha). */
 function chunkTabs<T>(arr: T[]): T[][] {

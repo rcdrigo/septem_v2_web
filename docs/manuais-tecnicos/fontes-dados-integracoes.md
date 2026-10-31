@@ -2,7 +2,7 @@
 
 ## Objetivo deste manual
 
-Este manual explica como criar, testar, manter e utilizar fontes de dados em processos e relatórios. Fontes de dados fornecem listas e valores dinâmicos para campos de formulário e outros pontos da automação. O cadastro é técnico e deve ser feito por administradores ou usuários autorizados.
+Este manual explica como criar, testar, manter e utilizar fontes de dados em processos e relatórios. Fontes de dados fornecem listas e valores dinâmicos para campos de formulário e outros pontos da automação. Administradores e usuários autorizados podem cadastrar listas e tabelas visualmente. Fontes SQL e API exigem configuração técnica.
 
 Use uma fonte quando uma informação precisa ser reutilizada, mantida fora do formulário ou consultada em outro sistema. Exemplos: relação de secretarias, tipos de licença, contratos vigentes, fornecedores cadastrados e empreendimentos vinculados a um CPF ou CNPJ.
 
@@ -18,14 +18,14 @@ Também identifique a origem e o responsável pelos dados. Uma lista curta e est
 2. Clique em **Nova fonte**. O editor abre em outra aba.
 3. Informe um **Nome** que descreva o dado, como `Tipos de licença ambiental`.
 4. Preencha a **Descrição** com a origem, a finalidade e o responsável pela manutenção.
-5. Escolha o **Tipo**: Fixa, Customizado (SQL) ou API (JSON).
+5. Escolha o **Tipo**: Fixa (Simples), Fixa (Tabela), Customizado (Tabela), Customizado (SQL) ou API (JSON).
 6. Configure o tipo escolhido e clique em **Testar**.
 7. Confira as colunas e linhas retornadas.
 8. Clique em **Salvar** somente depois de validar o resultado.
 
 O teste usa a configuração exibida, mesmo antes de salvar. Sempre teste novamente depois de alterar consulta, URL, cabeçalhos, corpo ou mapeamento.
 
-## Fonte fixa
+## Fixa (Simples)
 
 A fonte fixa mantém uma lista de pares **valor** e **texto**. O valor é gravado pelo sistema; o texto é apresentado ao usuário.
 
@@ -38,6 +38,41 @@ Exemplo:
 | `LO` | Licença de Operação |
 
 Use **+ adicionar item** para incluir opções e o botão de remoção para excluí-las. Ordene alfabeticamente por valor ou texto, ou use as setas para definir uma ordem manual. Evite alterar o valor de uma opção já utilizada: registros antigos podem continuar contendo o código anterior.
+
+## Fixa (Tabela)
+
+Use a **Tabela editável** para cadastrar linhas e colunas. Clique em **Adicionar coluna** para nomear uma informação e em **Adicionar linha** para incluir um registro. Use os botões de remoção para excluir linhas ou colunas.
+
+Para importar dados:
+
+1. Escolha um arquivo `.xlsx`, `.xls` ou `.csv` em **Importar planilha**.
+2. Confira os cabeçalhos e as primeiras linhas da prévia.
+3. Clique em **Usar dados importados** para substituir a tabela atual.
+4. Clique em **Salvar** para persistir os dados.
+
+A importação lê a primeira aba e usa a primeira linha como cabeçalho. Os nomes das colunas devem ser únicos e preenchidos. A tabela aceita até 100 colunas e 10.000 linhas. O arquivo deve ter até 10 MB. A importação mantém a representação de texto dos códigos, incluindo zeros definidos na formatação da planilha.
+
+## Customizado (Tabela)
+
+Use este tipo para consultar uma fonte **Fixa (Tabela)** sem escrever SQL.
+
+1. Selecione a **Fonte Fixa (Tabela)**.
+2. Selecione a **Coluna de valor**, cujo conteúdo identifica a opção.
+3. Selecione a **Coluna de texto**, cujo conteúdo é apresentado no formulário.
+4. Para restringir os resultados, clique em **Adicionar filtro**.
+5. Em cada filtro, selecione a coluna e a comparação. Digite o identificador do campo do formulário.
+6. Informe os **Valores para testar** e clique em **Testar**.
+7. Confira o resultado e clique em **Salvar**.
+
+Todos os filtros devem ser atendidos. As comparações disponíveis são igualdade, diferença, contém, começa com, maior, maior ou igual, menor e menor ou igual. As comparações de ordem usam números. Os valores de teste não são salvos.
+
+Para localizar o identificador, abra o formulário no modelador, selecione o campo e copie **Chave (identificador)**. Por exemplo, filtre a coluna `Código do grupo` usando **Igual a** e o identificador `grupo`.
+
+O resultado contém somente as duas colunas selecionadas como valor e texto. Pares repetidos de valor e texto aparecem uma vez. Em um combobox, os resultados são as opções disponíveis. Em um campo de texto, os textos são concatenados com vírgula.
+
+Enquanto um campo usado como filtro estiver vazio, o campo dependente aguarda seu preenchimento. Ao trocar a seleção anterior, as opções são atualizadas e seleções inválidas são limpas. Quando não há correspondência, o formulário informa que nenhum resultado foi encontrado.
+
+Para preencher outros campos após selecionar uma opção, use **Mapeamento dos campos do formulário**. Informe um mapeamento por linha no formato `identificador => coluna`, usando o nome exato da coluna de origem. O preenchimento utiliza a linha da opção selecionada, como nas fontes API.
 
 ## Fonte SQL
 

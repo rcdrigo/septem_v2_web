@@ -22,7 +22,7 @@
     "test:tags": "npm run build && node tools/uitest/tags.mjs && node tools/uitest/task-tags-session.mjs",
     "test:forms": "npm run build && npm run test:native-forms && node tools/uitest/native-form-runtime.mjs && node tools/uitest/native-form-task-fields.mjs && node tools/uitest/form-regressions.mjs && node tools/uitest/native-form-editor.mjs && node tools/uitest/native-field-lifecycle.mjs && node tools/uitest/native-form-structure.mjs && node tools/uitest/modelador-startup.mjs && npm run test:native-loading && node tools/uitest/form-publication.mjs && node tools/uitest/data-source-sql.mjs",
     "test:automation": "node tools/uitest/form-automation.mjs",
-    "test:data-sources": "npm run build && node tools/uitest/data-source-sql.mjs && node tools/uitest/data-source-api.mjs",
+    "test:data-sources": "npm run build && node tools/uitest/data-source-sql.mjs && node tools/uitest/data-source-api.mjs && node tools/uitest/data-source-table.mjs",
     "test:native-forms": "node tools/uitest/native-form-contracts.mjs && node tools/uitest/native-form-editor-contracts.mjs && node tools/uitest/native-form-references.mjs && node tools/uitest/native-task-field-identity.mjs",
     "test:native-editor": "npm run build && node tools/uitest/native-form-editor.mjs && node tools/uitest/native-field-lifecycle.mjs && node tools/uitest/native-form-structure.mjs",
     "test:native-task-fields": "node tools/uitest/native-form-task-fields.mjs",
@@ -34,7 +34,8 @@
     "test:client-onboarding": "npm run build && node tools/uitest/client-onboarding.mjs && node tools/uitest/client-access-policy.mjs",
     "test:client-onboarding-integration": "node tools/uitest/client-onboarding-integration.mjs",
     "test:platform-no-catalog": "npm run build && node tools/uitest/platform-no-process-catalog.mjs",
-    "test:business-rules": "npm run build && node tools/uitest/business-rule-field-references.mjs && node tools/uitest/business-rule-modeler.mjs && node tools/uitest/business-rule-execution.mjs"
+    "test:business-rules": "npm run build && node tools/uitest/business-rule-field-references.mjs && node tools/uitest/business-rule-modeler.mjs && node tools/uitest/business-rule-execution.mjs",
+    "test:data-source-table": "npm run build && node tools/uitest/data-source-table.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -56,6 +57,7 @@
     "react-day-picker": "^9.14.0",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.18.4",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zustand": "^5.0.13"
   },
   "devDependencies": {

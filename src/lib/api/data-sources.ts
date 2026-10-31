@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
-export type DataSourceType = 'fixed' | 'sql' | 'api';
+export type DataSourceType = 'fixed' | 'fixed-table' | 'table' | 'sql' | 'api';
 export type DataSourceScope = 'process' | 'report';
 
 export type DataSourceListItem = { id: string; name: string; type: DataSourceType; scope: DataSourceScope; description: string | null };
@@ -11,7 +11,7 @@ export type DataSourceWrite = { name: string; description?: string; scope: DataS
 export type DataSourceTable = { columns: string[]; rows: unknown[][] };
 export type TestResult = DataSourceTable & { originalResponse?: string | null; mappedResult?: DataSourceTable | null; mappingError?: string | null };
 export type DataSourceOption = { value: string; label: string; fieldValues?: Record<string, unknown> | null };
-export type FieldOptionsResponse = { options: (Omit<DataSourceOption, 'value' | 'label'> & { value: string | null; label: string | null })[]; fieldValues?: Record<string, unknown> | null };
+export type FieldOptionsResponse = { options: (Omit<DataSourceOption, 'value' | 'label'> & { value: string | null; label: string | null })[]; fieldValues?: Record<string, unknown> | null; sourceType?: DataSourceType; dependencies?: string[]; waitingForFields?: string[] };
 export type DataSourceLog = { id: number; occurredAt: string; origin: string | null; status: string; durationMs: number; error: string | null };
 export type LogsPage = { items: DataSourceLog[]; total: number; page: number; pageSize: number };
 

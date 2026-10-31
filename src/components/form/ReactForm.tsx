@@ -15,6 +15,7 @@ import { signatureKeys, useDocumentCodes, useTaskSignatures } from '@/lib/api/ex
 import { api, ApiError } from '@/lib/api';
 import type { DataSourceOption, FieldOptionsResponse } from '@/lib/api/data-sources';
 import { applyDataSourceFields } from '@/lib/form-data-source';
+import { useFormDataSources, type SourceStatus } from './useFormDataSources';
 import { regexToTemplate, applyMask, isAllDigits } from '@/lib/mask';
 import { maskDocumento, type DocKind } from '@/lib/documento';
 import { dateModeOfComponent, dateFieldLabel, type DateMode, type DateLimit } from '@/lib/datafield';
@@ -74,6 +75,7 @@ type Runtime = {
   set: (k: string, v: unknown) => void;
   applyFieldValues: (fields: Record<string, unknown> | null | undefined, scope?: string) => void;
   dsOptions: OptionsMap;
+  sourceStatuses: Record<string, SourceStatus>;
   readOnly?: boolean;
   fieldState: FieldState;
   dateErrors: Record<string, string>;
@@ -125,35 +127,14 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
       fieldStateRef.current = typeof update === 'function' ? update(fieldStateRef.current) : update;
       storeFieldState(fieldStateRef.current);
     }
-    // #28: só exibe o form depois que as fontes pendentes (não embutidas) carregarem.
-    const needsFetch = (c: Component) =>
-      !!c.properties?.septemDataSourceId && (['select', 'radio', 'checklist', 'taglist'].includes(c.type ?? '')) && !optionsByField?.[c.key!];
-    const [dsLoading, setDsLoading] = useState(() => inputs.some(needsFetch));
-
-    // Ref pro valor mais recente — o runtime de eventos lê de forma síncrona.
     const valuesRef = useRef(values);
     valuesRef.current = values;
-
-    // Carrega as opções dos selects/radios alimentados por fonte de dados.
-    useEffect(() => {
-      const dsFields = suspended ? [] : inputs.filter(needsFetch);
-      if (dsFields.length === 0) { setDsLoading(false); return; }
-      let cancelled = false;
-      setDsLoading(true);
-      (async () => {
-        for (const c of dsFields) {
-          try {
-            const res = await api.post<FieldOptionsResponse>(
-              '/api/v1/workflow/field-options', { dataSourceId: c.properties!.septemDataSourceId, taskId: uploadContext?.taskId, formData: valuesRef.current });
-            if (cancelled) return;
-            const opts = res.options.map((o) => ({ ...o, value: String(o.value ?? ''), label: String(o.label ?? o.value ?? '') }));
-            setDsOptions((prev) => ({ ...prev, [c.key!]: opts }));
-          } catch { /* sem permissão/erro: degrada para as opções estáticas */ }
-        }
-        if (!cancelled) setDsLoading(false);
-      })();
-      return () => { cancelled = true; };
-    }, [inputs, suspended, uploadContext?.taskId]);
+    const sourceStatuses = useFormDataSources({
+      components: root.components ?? [], values, suspended, readOnly, taskId: uploadContext?.taskId,
+      set: setScoped, applyFields: applyFieldValues,
+      setOptions: (path, options) => setDsOptions(prev => ({ ...prev, [path]: options })),
+    });
+    const dsLoading = Object.values(sourceStatuses).some(status => status.pending);
 
     function set(key: string, value: unknown) {
       valuesRef.current = { ...valuesRef.current, [key]: value };
@@ -325,7 +306,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
 
     const pendingErrors = native && !readOnly ? validateForm(root.components ?? [], values, fieldState, dateErrors) : {};
     const runtime: Runtime = {
-      values, readValues: () => valuesRef.current, prefix: '', removeRow, errors: native && submitted ? { ...errors, ...pendingErrors } : errors, set, applyFieldValues, dsOptions, readOnly, fieldState, dateErrors, setDateError, runEvent, uploadContext,
+      values, readValues: () => valuesRef.current, prefix: '', removeRow, errors: native && submitted ? { ...errors, ...pendingErrors } : errors, set, applyFieldValues, dsOptions, sourceStatuses, readOnly, fieldState, dateErrors, setDateError, runEvent, uploadContext,
       assinaturas: { dados: queryAssinaturas.data ?? null, recarregar: recarregarAssinaturas },
       codigosDeDocumento,
     };
@@ -365,7 +346,7 @@ export const ReactForm = forwardRef<ReactFormHandle, { schema: unknown; data?: R
 ReactForm.displayName = 'ReactForm';
 
 function Node({ comp }: { comp: Component }) {
-  const { values, errors, set, applyFieldValues, dsOptions, readOnly, fieldState, runEvent, setDateError, prefix } = useRuntime();
+  const { values, errors, set, applyFieldValues, dsOptions, sourceStatuses, readOnly, fieldState, runEvent, setDateError, prefix } = useRuntime();
   const controlId = useId();
 
   if (comp.key ? (fieldState[comp.key]?.hidden ?? comp.automationHidden) : comp.automationHidden) return null;
@@ -394,7 +375,8 @@ function Node({ comp }: { comp: Component }) {
 
   const v = values[key];
   const err = errors[key];
-  const options: DataSourceOption[] = dsOptions[key] ?? comp.values ?? [];
+  const sourceStatus = sourceStatuses[fieldPath(prefix, key)];
+  const options: DataSourceOption[] = dsOptions[fieldPath(prefix, key)] ?? dsOptions[key] ?? comp.values ?? [];
   const helpType = comp.properties?.septemHelpType ?? 'inline';
   const helpText = comp.properties?.septemHelpText;
   const popoverHelp = helpType === 'popover' ? helpText : null;
@@ -425,7 +407,11 @@ function Node({ comp }: { comp: Component }) {
   };
   const setAndEmit = (val: unknown, e: unknown) => {
     set(key, val);
-    if (comp.type === 'select' || comp.type === 'radio') applyFieldValues(options.find(option => option.value === val)?.fieldValues);
+    if (comp.type === 'select' || comp.type === 'radio') {
+      const selected = options.find(option => option.value === val);
+      const previous = options.find(option => option.value === v);
+      applyFieldValues(selected?.fieldValues ?? (previous?.fieldValues ? Object.fromEntries(Object.keys(previous.fieldValues).map(key => [key, null])) : undefined));
+    }
     runEvent(comp, 'change', e);
   };
 
@@ -453,7 +439,7 @@ function Node({ comp }: { comp: Component }) {
     control = <textarea rows={3} disabled={disabled} className={base} value={String(v ?? '')} {...evt} onChange={(e) => setAndEmit(e.target.value, e)} />;
   } else if (comp.type === 'select') {
     control = (
-      <select disabled={disabled} className={base} value={String(v ?? '')} {...evt} onChange={(e) => setAndEmit(e.target.value, e)}>
+      <select disabled={disabled || sourceStatus?.pending || !!sourceStatus?.waiting?.length} className={base} value={String(v ?? '')} {...evt} onChange={(e) => setAndEmit(e.target.value, e)}>
         <option value="">Selecione…</option>
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
@@ -538,6 +524,9 @@ function Node({ comp }: { comp: Component }) {
     <div className="flex min-w-0 flex-col gap-1" style={effectiveWidth ? { maxWidth: effectiveWidth } : undefined}>
       {(comp.type !== 'checkbox' || disabled) && labelEl}
       {control}
+      {sourceStatus?.waiting?.length ? <p role="status" className="mt-1 text-xs text-slate-600">Preencha primeiro: {sourceStatus.waiting.join(', ')}.</p>
+        : sourceStatus?.error ? <p role="alert" className="mt-1 text-xs text-rose-700">{sourceStatus.error}</p>
+        : sourceStatus?.empty ? <p role="status" className="mt-1 text-xs text-slate-600">Nenhum resultado encontrado para os filtros informados.</p> : null}
       {(err || inlineHelp || comp.description || showCounter) && <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           {err && <span id={`${controlId}-error`} role="alert" className="text-xs text-rose-600">{err}</span>}
